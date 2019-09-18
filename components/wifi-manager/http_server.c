@@ -37,7 +37,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
-static const char json_start[] = "{ \"autoexec\": %u, \"list\": [";
+static const char json_start[] = "{ \"recovery\": %u, \"autoexec\": %u, \"list\": [";
 static const char json_end[] = "]}";
 static const char template[] = "{ \"%s\": \"%s\" }";
 static const char array_separator[]=",";
@@ -45,6 +45,9 @@ static const char array_separator[]=",";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 
+#ifndef CONFIG_IS_RECOVERY_MODE
+#define CONFIG_IS_RECOVERY_MODE 0
+#endif
 
 /**
  * @brief embedded binary data.
@@ -222,7 +225,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 
 						autoexec_flag = wifi_manager_get_flag();
-						snprintf(buff,buflen-1, json_start, autoexec_flag);
+						snprintf(buff,buflen-1, json_start, CONFIG_IS_RECOVERY_MODE, autoexec_flag);
 						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 						do {
 							snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i);

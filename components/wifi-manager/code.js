@@ -11,7 +11,7 @@ if (!String.prototype.format) {
   };
 }
 
-var recovery = 0;
+var recovery = false;
 var enableTimers = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 
@@ -186,16 +186,6 @@ $(document).ready(function(){
     $('[name=audio]').click(function(){
         selectOutput(this);
    	});
-
-    if (recovery) {
-		$("#recoverydiv").hide();
-		$("#otadiv").show();
-		$("#command_line").hide();
-		$("#wifi").hide();
-    } else {
-		$("#recoverydiv").show();
-		$("#otadiv").hide();
-    }
 
 	//first time the page loads: attempt to get the connection status and start the wifi scan
 	refreshAP();
@@ -378,6 +368,19 @@ function getConfig() {
                 console.log('turn off autoexec');
                 $("#autoexec-cb")[0].checked=false;
                 $("#autoexec-command").hide(200);
+            }
+        }
+		if (data.hasOwnProperty('recovery')) {
+            if (data["recovery"] === 1) {
+                recovery = true;
+                $("#recoverydiv").hide();
+                $("#otadiv").show();
+                $("#command_line").hide();
+                $("#wifi").hide();
+            } else {
+                recovery = false;
+                $("#recoverydiv").show();
+                $("#otadiv").hide();
             }
         }
 		if (data.hasOwnProperty('list')) {
