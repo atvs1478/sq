@@ -28,3 +28,10 @@ extern bool wait_for_wifi();
 extern void console_start();
 extern pthread_cond_t wifi_connect_suspend_cond;
 extern pthread_t wifi_connect_suspend_mutex;
+
+#ifndef RECOVERY_APPLICATION
+#define RECOVERY_APPLICATION 0
+#else
+#undef RECOVERY_APPLICATION
+#define RECOVERY_APPLICATION 1
+#endif

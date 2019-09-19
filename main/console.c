@@ -33,6 +33,11 @@ static void * console_thread();
 void console_start();
 static const char * TAG = "console";
 
+#if (RECOVERY_APPLICATION )
+extern void start_ota(const char * bin_url);
+#endif
+
+
 /* Prompt to be printed before each line.
  * This can be customized, made dynamic, etc.
  */
@@ -235,7 +240,13 @@ void console_start() {
 	esp_console_register_help_command();
 	register_system();
 	register_nvs();
+#if !RECOVERY_APPLICATION
+#pragma message "compiling for squeezelite""
 	register_squeezelite();
+#else
+#pragma message "compiling for recovery"
+	register_ota_cmd();
+#endif
 	register_i2ctools();
 	printf("\n"
 			"Type 'help' to get the list of commands.\n"

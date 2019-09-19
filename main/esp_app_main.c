@@ -80,10 +80,7 @@ bool wait_for_wifi(){
 	    	ESP_LOGI(TAG,"WiFi Connected!");
 	    }
 	}
-
-
     return connected;
-
 }
 
 void app_main()

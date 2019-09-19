@@ -40,6 +40,13 @@ extern "C" {
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
 
+#ifndef RECOVERY_APPLICATION
+#define RECOVERY_APPLICATION 0
+#else
+#undef RECOVERY_APPLICATION
+#define RECOVERY_APPLICATION 1
+#endif
+
 
 #define DEFAULT_COMMAND_LINE  CONFIG_DEFAULT_COMMAND_LINE
 
@@ -163,10 +170,14 @@ extern "C" {
 /**
  * @brief Defines the maximum length in bytes of a JSON representation of the IP information
  * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
- * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0}
+ * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0, "ota_dsc":"Installing...", "ota_pct":100}
  */
+#if RECOVERY_APPLICATION
+// recovery has more resources available. Let's use them to include more details about the OTA process
+#define JSON_IP_INFO_SIZE 					150+255
+#else
 #define JSON_IP_INFO_SIZE 					150
-
+#endif
 
 
 /**
