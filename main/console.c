@@ -240,11 +240,11 @@ void console_start() {
 	esp_console_register_help_command();
 	register_system();
 	register_nvs();
-#if !RECOVERY_APPLICATION
-#pragma message "compiling for squeezelite""
+#if ! RECOVERY_APPLICATION
+#warning  "compiling for squeezelite"
 	register_squeezelite();
 #else
-#pragma message "compiling for recovery"
+#warning "compiling for recovery"
 	register_ota_cmd();
 #endif
 	register_i2ctools();
