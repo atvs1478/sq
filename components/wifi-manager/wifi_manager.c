@@ -407,7 +407,7 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
 #if !RECOVERY_APPLICATION
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
+		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"appname\":\"%s\",\"vers\":\"%s\"}\n";
 #else
 		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d, \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
 #endif

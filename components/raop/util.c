@@ -576,7 +576,7 @@ void free_metadata(struct metadata_s *metadata)
 }
 
 /*----------------------------------------------------------------------------*/
-
+
 int _fprintf(FILE *file, ...)
 {
 	va_list args;

@@ -27,21 +27,46 @@
 #include "sdkconfig.h"
 
 static const char * TAG = "platform_esp32";
-
+extern void start_ota(const char * bin_url);
+static struct {
+    struct arg_str *url;
+    struct arg_end *end;
+} ota_args;
 /* 'heap' command prints minumum heap size */
 static int perform_ota_update(int argc, char **argv)
 {
+    int nerrors = arg_parse(argc, argv, (void **) &ota_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, ota_args.end, argv[0]);
+        return 1;
+    }
+
+    const char *url = ota_args.url->sval[0];
+
+    esp_err_t err=ESP_OK;
+    start_ota(url);
+
+
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "%s", esp_err_to_name(err));
+        return 1;
+    }
 
     return 0;
 }
 
-static void register_ota_cmd()
+ void register_ota_cmd()
 {
+	 ota_args.url= arg_str1(NULL, NULL, "<url>", "url of the binary app file");
+	 ota_args.end = arg_end(2);
+
     const esp_console_cmd_t cmd = {
         .command = "ota_update",
         .help = "Updates the application binary from the provided URL",
         .hint = NULL,
         .func = &perform_ota_update,
+        .argtable = &ota_args
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
