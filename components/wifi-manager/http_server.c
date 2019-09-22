@@ -52,8 +52,14 @@ static TaskHandle_t task_http_server = NULL;
  */
 extern const uint8_t style_css_start[] asm("_binary_style_css_start");
 extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-extern const uint8_t jquery_gz_start[] asm("_binary_jquery_gz_start");
-extern const uint8_t jquery_gz_end[] asm("_binary_jquery_gz_end");
+extern const uint8_t jquery_gz_start[] asm("_binary_jquery_min_js_gz_start");
+extern const uint8_t jquery_gz_end[] asm("_binary_jquery_min_js_gz_end");
+extern const uint8_t popper_gz_start[] asm("_binary_popper_min_js_gz_start");
+extern const uint8_t popper_gz_end[] asm("_binary_popper_min_js_gz_end");
+extern const uint8_t bootstrap_js_gz_start[] asm("_binary_bootstrap_min_js_gz_start");
+extern const uint8_t bootstrap_js_gz_end[] asm("_binary_bootstrap_min_js_gz_end");
+extern const uint8_t bootstrap_css_gz_start[] asm("_binary_bootstrap_min_css_gz_start");
+extern const uint8_t bootstrap_css_gz_end[] asm("_binary_bootstrap_min_css_gz_end");
 extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
@@ -64,7 +70,10 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
-const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 29995\nContent-Encoding: gzip\n\n";
+const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 30604\nContent-Encoding: gzip\n\n";
+const static char http_popper_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 7487\nContent-Encoding: gzip\n\n";
+const static char http_bootstrap_js_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 15412\nContent-Encoding: gzip\n\n";
+const static char http_bootstrap_css_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nAccept-Ranges: bytes\nContent-Length: 25925\nContent-Encoding: gzip\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
@@ -173,13 +182,25 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, code_js_start, code_js_end - code_js_start, NETCONN_NOCOPY);
 				}
+				else if(strstr(line, "GET /style.css ")) {
+					netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
+				}
 				else if(strstr(line, "GET /jquery.js ")) {
 					netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
 					netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /style.css ")) {
-					netconn_write(conn, http_css_hdr, sizeof(http_css_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
+				else if(strstr(line, "GET /popper.js ")) {
+					netconn_write(conn, http_popper_gz_hdr, sizeof(http_popper_gz_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, popper_gz_start, popper_gz_end - popper_gz_start, NETCONN_NOCOPY);
+				}
+				else if(strstr(line, "GET /bootstrap.js ")) {
+					netconn_write(conn, http_bootstrap_js_gz_hdr, sizeof(http_bootstrap_js_gz_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, bootstrap_js_gz_start, bootstrap_js_gz_end - bootstrap_js_gz_start, NETCONN_NOCOPY);
+				}
+				else if(strstr(line, "GET /bootstrap.css ")) {
+					netconn_write(conn, http_bootstrap_css_gz_hdr, sizeof(http_bootstrap_css_gz_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, bootstrap_css_gz_start, bootstrap_css_gz_end - bootstrap_css_gz_start, NETCONN_NOCOPY);
 				}
 
                 //dynamic stuff
