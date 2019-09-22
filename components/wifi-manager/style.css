@@ -1,8 +1,6 @@
 body {
-    background-color: #eee;
     border: 0;
     margin: 0;
-    font: 1.1em tahoma, arial, sans-serif;
 }
 a {
     color: darkblue;
@@ -12,48 +10,11 @@ a {
 a:hover {
     color: red;
 }
-input {
-    font: 1.1em tahoma, arial, sans-serif;
-}
 input:focus,
 select:focus,
 textarea:focus,
 button:focus {
     outline: none;
-}
-input[type="button"] {
-    padding: 5px;
-    text-align: center;
-    display: block;
-}
-p {
-    padding: 10px;
-}
-#credits {
-    display: none;
-}
-#app {} #app-wrap {} #disconnect {
-    width: 150px;
-}
-.diag-box {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    height: 100%;
-    width: 100%;
-    display: none;
-}
-.diag-box-win {
-    position: absolute;
-    left: 10%;
-    width: 80%;
-    text-align: center;
-    border: 2px outset #888;
-    background-color: #fff;
-    border-radius: 10px;
-    top: 20%;
 }
 .blur {
     -webkit-filter: blur(2px);
@@ -65,29 +26,26 @@ p {
 .ape {
     margin-left: 20px;
     padding: 10px 0px 10px 10px;
+    background-color: #444;
 }
 .ape:hover {
     cursor: pointer;
 }
-.brdb {
-    border-bottom: 1px solid #888;
-}
 header {
-    background-color: #fff;
-    border-bottom: 1px solid #888;
-    border-top: 1px solid #888;
+    border-bottom: 1px solid #000;
+    border-top: 1px solid #000;
 }
 section {
-    background-color: #fff;
-    border-bottom: 1px solid #888;
-    border-top: 1px solid #888;
+    border-bottom: 1px solid #000;
+    border-top: 1px solid #000;
 }
 h1 {
-    display: block;
-    text-align: center;
     margin: 0;
-    padding: 15px;
-    font-size: 1.4em
+    margin-top: 20px;
+    padding: 10px;
+    text-transform: uppercase;
+    color: #888;
+    font-size: 1.6em
 }
 h2 {
     margin: 0;
@@ -153,9 +111,6 @@ h3 {
 }
 #no-disconnect {
     display: inline-block;
-}
-.ctr {
-    margin: 0 auto;
 }
 .tctr {
     text-align: center;
@@ -248,117 +203,91 @@ h3 {
 }
 /* end of SpinKit */
 
-.toggle label {
-	position: relative;
-	display: inline-block;
-	height: 3.5em;
+/* daduke stuff */
+input[type='text'], input[type='password'], textarea {
+  background: #999;
+  border: 0;
+  padding: 4px;
 }
 
-.toggle input {
-	display: none;
+
+
+.custom-switch, .custom-radio {
+  padding-left: 2.25rem;
+  margin-left: 12px;
+  padding-bottom: 1rem;
 }
 
-.toggle .slider {
-	/* Grundfläche */
-	
-	position: absolute;
-	cursor: pointer;
-	top: 1.5em;
-
-    left: 8px;
-
-	width: 4em;
-	height: 2em;
-	background-color: #c32e04;
-	/* red */
-	
-	transition: all .3s ease-in-out;
-	border-radius: 1em;
+.custom-checkbox > .custom-control-label {
+  padding-top: 0.5rem;
+  padding-left: 2rem;
+  padding-bottom: 0.1rem;
 }
 
-.toggle .slider:before {
-	/* verschiebbarer Button */
-	
-	position: absolute;
-	content: "";
-	height: 1.6em;
-	width: 1.6em;
-	left: 0.2em;
-	bottom: 0.2em;
-	background-color: white;
-	border-radius: 50%;
-	transition: all .3s ease-in-out;
+.custom-switch .custom-control-label::before {
+  left: -2.25rem;
+  height: 2rem;
+  width: 3.5rem;
+  pointer-events: all;
+  border-radius: 1rem;
 }
 
-.toggle input:checked + .slider {
-	background-color: #5a9900;
-	/* green */
+.custom-switch .custom-control-label::after {
+  top: calc(0.25rem + 2px);
+  left: calc(-2.25rem + 2px);
+  width: calc(2rem - 4px);
+  height: calc(2rem - 4px);
+  background-color: #adb5bd;
+  border-radius: 2rem;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, -webkit-transform 0.15s ease-in-out;
+  transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, -webkit-transform 0.15s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .custom-switch .custom-control-label::after {
+    transition: none;
+  }
 }
 
-.toggle input:focus + .slider {
-	background-color: pink;
-	box-shadow: 0 0 1px #5a9900;
+.custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+  background-color: #fff;
+  -webkit-transform: translateX(1.5rem); //translateX(0.75rem);
+  transform: translateX(1.5rem); //translateX(0.75rem);
 }
 
-.toggle input:checked + .slider:before {
-	-webkit-transform: translateX(1.9em);
-	/* Android 4 */
-	
-	-ms-transform: translateX(1.9em);
-	/* IE9 */
-	
-	transform: translateX(1.9em);
+
+
+
+
+
+
+
+textarea#autoexec1 {
+    width: 80%;
 }
 
-.text .slider:after {
-	/* Text vor dem FlipFlop-Schalter */
-	
-	position: absolute;
-	content: "AUS";
-	color: #c32e04;
-	font-weight: bold;
-	height: 1.6em;
-	left: -2.5em;
-	bottom: 0.2em;
+input, textarea {
+    margin-left: 10px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    border-top: none;
+    border-bottom: 1px solid #DDD;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.39), 0 -1px 1px #FFF, 0 1px 0 #FFF;
 }
 
-.text input:checked + .slider:after {
-	/* Text hinter dem FlipFlop-Schalter */
-	
-	position: absolute;
-	content: "AN";
-	color: #5a9900;
-	left: 4.5em;
-}
-
-input#autoexec1 {
-    border: none;
-    margin-left: 35px;
-    padding: 10px 0px 10px 10px;
-}
-
-input#ota {
-    margin-top: 5px;
-    margin-bottom: 5px;
+.form-group {
+    margin-left: 10px;
 }
 
 #otadiv {
-    margin-bottom: 15px;
-}
-
-#btsink, #player, #optional {
-    margin-left: 13px;
+	display: none;
 }
 
 #btsinkdiv {
-    display: none;
-    margin-top: 20px;
+	display: none;
 }
 
-textarea#autoexec1 {
-    width: 100%;
-}
-
+/* 
 .toggle-buttons input[type="radio"] {
 	visibility: hidden;
     width: 3px;
@@ -376,6 +305,4 @@ textarea#autoexec1 {
 	box-shadow: none;
 }
 
-#otadiv {
-	display: none;
-}
+*/
