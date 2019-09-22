@@ -12,7 +12,7 @@ if (!String.prototype.format) {
 }
 
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
-var recovery = false;
+var recovery = true;
 var enableTimers = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 
@@ -241,7 +241,6 @@ $(document).ready(function(){
 	});	
 
     $('[name=audio]').on("click", function(){
-        console.log(this);
         if (this.id == 'bt') {
             $("#btsinkdiv").show(200);
             output = 'bt';
@@ -257,7 +256,6 @@ $(document).ready(function(){
     $('#fwcheck').on("click", function(){
         $("#releaseTable").html("");
         $.getJSON(releaseURL, function(data) {
-            console.log(data);
             data.forEach(function(release) {
                 var url = '';
                 release.assets.forEach(function(asset) {
@@ -275,7 +273,6 @@ $(document).ready(function(){
                       "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
                     "</tr>"
                 );
-                console.log(release.assets);
             });
         })
         .fail(function() {
@@ -303,6 +300,8 @@ function setURL(button) {
         headers: { "X-Custom-fwurl": url },
         data: { 'timestamp': Date.now() }
     });
+    $('[data-url^="http"]').addClass("btn-success").removeClass("btn-danger");
+    $('[data-url="'+url+'"]').addClass("btn-danger").removeClass("btn-success");
 }
 
 function performConnect(conntype){
@@ -479,10 +478,11 @@ function getConfig() {
 		if (data.hasOwnProperty('recovery')) {
             if (data["recovery"] === 1) {
                 recovery = true;
+                $("#tab-wifi").removeClass("active show");
+                $("#tab-system").addClass("active show");
+                $("#navbar").hide();
                 $("#recoverydiv").hide();
                 $("#otadiv").show();
-                $("#command_line").hide();
-                $("#wifi").hide();
             } else {
                 recovery = false;
                 $("#recoverydiv").show();

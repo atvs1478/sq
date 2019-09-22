@@ -303,7 +303,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 								ESP_LOGE(TAG,"Unable to process autoexec%u. Name length overflow.",i);
 								break;
 							}
-							if(snprintf(autoexec_key,sizeof(autoexec_key)-1,"autoexec%u",i++)<0)
+							if(snprintf(autoexec_key,sizeof(autoexec_key)-1,"autoexec%u",i)<0)
 							{
 								ESP_LOGE(TAG,"Unable to process autoexec%u. Name length overflow.",i);
 								break;
@@ -320,6 +320,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 								{
 									ESP_LOGE(TAG,"command line length is too long : %s = %s", autoexec_name, autoexec_value);
 								}
+                                i++;
 							}
 							else {
 								ESP_LOGD(TAG,"No matching command found for name %s", autoexec_name);
