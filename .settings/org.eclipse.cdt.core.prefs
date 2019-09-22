@@ -1,0 +1,12 @@
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/value=d\:/msys2/opt/esp-idf
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/value=C\:/msys2/opt/xtensa-esp32-elf/bin;C\:/jdk-12.0.2/bin/server;C\:/jdk-12.0.2/bin;C\:\\Windows\\system32;C\:\\Windows;C\:\\Windows\\System32\\Wbem;C\:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C\:\\Program Files\\NVIDIA Corporation\\NVIDIA NvDLISR;C\:\\jdk-12.0.2\\bin;C\:\\Program Files\\PuTTY\\;C\:\\Program Files (x86)\\HP\\IdrsOCR_15.2.10.1114\\;C\:\\eclipse
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/appendContributed=true

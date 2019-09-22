@@ -47,7 +47,7 @@ static const type_str_pair_t type_str_pair[] = {
 
 static const size_t TYPE_STR_PAIR_SIZE = sizeof(type_str_pair) / sizeof(type_str_pair[0]);
 static const char *ARG_TYPE_STR = "type can be: i8, u8, i16, u16 i32, u32 i64, u64, str, blob";
-char current_namespace[16] = "espwifimgr";
+char current_namespace[16] = "squeezelite-esp32";
 static const char * TAG = "platform_esp32";
 
 static struct {
@@ -461,8 +461,6 @@ static int set_namespace(int argc, char **argv)
     return 0;
 }
 
-#ifdef ESP_IDF_COMMIT_bde1c30 // this commit added support for listing nvs entries
-
 static int list(const char *part, const char *name, const char *str_type)
 {
     nvs_type_t type = str_to_type(str_type);
@@ -502,7 +500,6 @@ static int list_entries(int argc, char **argv)
 
     return list(part, name, type);
 }
-#endif
 void register_nvs()
 {
 	esp_log_level_set(TAG, ESP_LOG_VERBOSE);
@@ -569,7 +566,6 @@ void register_nvs()
         .argtable = &namespace_args
     };
 
-#ifdef ESP_IDF_COMMIT_bde1c30 // this commit added support for listing nvs entries
     const esp_console_cmd_t list_entries_cmd = {
            .command = "nvs_list",
            .help = "List stored key-value pairs stored in NVS."
@@ -581,7 +577,6 @@ void register_nvs()
            .argtable = &list_args
        };
     ESP_ERROR_CHECK(esp_console_cmd_register(&list_entries_cmd));
-#endif
     ESP_ERROR_CHECK(esp_console_cmd_register(&set_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&get_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_cmd));

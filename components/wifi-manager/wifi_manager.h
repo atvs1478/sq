@@ -176,7 +176,8 @@ extern "C" {
 // recovery has more resources available. Let's use them to include more details about the OTA process
 #define JSON_IP_INFO_SIZE 					150+255
 #else
-#define JSON_IP_INFO_SIZE 					150
+// 40 chars for appname and version
+#define JSON_IP_INFO_SIZE 					150+40
 #endif
 
 

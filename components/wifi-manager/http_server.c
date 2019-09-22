@@ -33,7 +33,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "http_server.h"
 #include "cmd_system.h"
-
+#define NVS_PARTITION_NAME "nvs"
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
@@ -130,6 +130,38 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 			(*len)++;
 			ptr++;
 		}
+		return ret;
+	}
+	return NULL;
+}
+char* http_server_search_header(char *request, char *header_name, int *len, char * parm_name, int parm_name_max_len, char ** next_position ) {
+	*len = 0;
+	char *ret = NULL;
+	char *ptr = NULL;
+
+	ptr = strstr(request, header_name);
+	if (ptr) {
+		ret = ptr + strlen(header_name);
+		ptr = ret;
+		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r' && *ptr != ':' ) {
+			ptr++;
+		}
+		if(*ptr==':'){
+			// save the parameter name: the string between header name and ":"
+			strncpy(parm_name,ret,(ptr-ret-1>parm_name_max_len?parm_name_max_len:ptr-ret-1));
+			ptr++;
+			while (*ptr == ' ' ) {
+				ptr++;
+			}
+		}
+
+		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
+			(*len)++;
+			ptr++;
+		}
+		// Terminate value inside its actual buffer so we can treat it as individual string
+		*ptr='\0';
+		*next_position=ptr;
 		return ret;
 	}
 	return NULL;
@@ -239,40 +271,43 @@ void http_server_netconn_serve(struct netconn *conn) {
 					{
 						int i=1;
 						size_t l = 0;
+						esp_err_t esp_err;
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-
 						autoexec_flag = wifi_manager_get_flag();
 						snprintf(buff,buflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
 						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-						do {
-							snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i);
-							ESP_LOGD(TAG,"Getting command name %s", autoexec_name);
-							autoexec_value = wifi_manager_alloc_get_config(autoexec_name, &l);
-							if(autoexec_value!=NULL ){
+
+						ESP_LOGI(TAG, "About to get config from flash");
+
+						nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, NVS_TYPE_STR);
+						if (it == NULL) {
+							ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
+						}
+						while (it != NULL){
+							nvs_entry_info_t info;
+							nvs_entry_info(it, &info);
+							it = nvs_entry_next(it);
+							if(strstr(info.namespace_name, current_namespace)){
 								if(i>1)
 								{
 									netconn_write(conn, array_separator, strlen(array_separator), NETCONN_NOCOPY);
 									ESP_LOGD(TAG,"%s", array_separator);
 								}
-								ESP_LOGI(TAG,"found command %s = %s", autoexec_name, autoexec_value);
-                				strreplace(autoexec_value, s, r);
-								snprintf(buff, buflen-1, template, autoexec_name, autoexec_value);
+
+								autoexec_value = wifi_manager_alloc_get_config(info.key, &l);
+								strreplace(autoexec_value, s, r);
+								ESP_LOGI(TAG,"Namespace %s, key=%s, value=%s", info.namespace_name, info.key,autoexec_value );
+								snprintf(buff, buflen-1, template, info.key, autoexec_value);
 								netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-								ESP_LOGD(TAG,"%s", buff);
 								ESP_LOGD(TAG,"Freeing memory for command %s name", autoexec_name);
-								free(autoexec_value);
+								free(autoexec_value );
+								i++;
 							}
-							else {
-								ESP_LOGD(TAG,"No matching command found for name %s", autoexec_name);
-								break;
-							}
-                            i++;
-						} while(1);
+						}
 						free(buff);
 
 						netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
 						ESP_LOGD(TAG,"%s", json_end);
-
 					}
 				}
 				else if(strstr(line, "POST /config.json ")){
@@ -280,56 +315,47 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						int i=1;
-						int lenS = 0, lenA=0;
-						char autoexec_name[22]={0};
-						char autoexec_key[12]={0};
-						char * autoexec_value=NULL;
-						char * autoexec_flag_s=NULL;
+						int lenA=0;
+						char * last_parm=save_ptr;
+						char * next_parm=save_ptr;
+						char * last_parm_name[41]={0};
 						uint8_t autoexec_flag=0;
-						autoexec_flag_s = http_server_get_header(save_ptr, "X-Custom-autoexec: ", &lenA);
-						if(autoexec_flag_s!=NULL && lenA > 0)
-						{
-							autoexec_flag = atoi(autoexec_flag_s);
-							wifi_manager_save_autoexec_flag(autoexec_flag);
+						bool bErrorFound=false;
+
+						while(last_parm!=NULL){
+							// Search will return
+							memset(last_parm_name,0x00,sizeof(last_parm_name));
+							last_parm = http_server_search_header(next_parm, "X-Custom- ", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm);
+							ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
+							if(last_parm!=NULL){
+								if(strstr(last_parm_name, "autoexec")){
+									autoexec_flag = atoi(last_parm);
+									wifi_manager_save_autoexec_flag(autoexec_flag);
+								}
+								else {
+									if(lenA < MAX_COMMAND_LINE_SIZE ){
+										ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ Storing parameter");
+										wifi_manager_save_autoexec_config(last_parm,last_parm_name,lenA);
+									}
+									else
+									{
+										char szErrorPrefix[]="{ status: \"value length is too long for  ";
+										char szErrorSuffix[]="{ status: \"value length is too long for  ";
+										netconn_write(conn, szErrorPrefix, strlen(szErrorPrefix), NETCONN_NOCOPY);
+										ESP_LOGE(TAG,"length is too long : %s = %s", last_parm_name, last_parm);
+										last_parm=NULL;
+									}
+								}
+							}
+						}
+						if(bErrorFound){
+							netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY); //400 invalid request
+						}
+						else{
+							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 						}
 
-						do {
-							if(snprintf(autoexec_name,sizeof(autoexec_name)-1,"X-Custom-autoexec%u: ",i)<0)
-							{
-								ESP_LOGE(TAG,"Unable to process autoexec%u. Name length overflow.",i);
-								break;
-							}
-							if(snprintf(autoexec_key,sizeof(autoexec_key)-1,"autoexec%u",i++)<0)
-							{
-								ESP_LOGE(TAG,"Unable to process autoexec%u. Name length overflow.",i);
-								break;
-							}
-							ESP_LOGD(TAG,"Looking for command name %s.", autoexec_name);
-							autoexec_value = http_server_get_header(save_ptr, autoexec_name, &lenS);
 
-							if(autoexec_value ){
-								if(lenS < MAX_COMMAND_LINE_SIZE ){
-									ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ call, with %s: %s, length %i", autoexec_key, autoexec_value, lenS);
-									wifi_manager_save_autoexec_config(autoexec_value,autoexec_key,lenS);
-								}
-								else
-								{
-									ESP_LOGE(TAG,"command line length is too long : %s = %s", autoexec_name, autoexec_value);
-								}
-							}
-							else {
-								ESP_LOGD(TAG,"No matching command found for name %s", autoexec_name);
-								break;
-							}
-						} while(1);
-
-						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
-
-                        //reboot esp if autoexec1 was modified
-                            if (i > 1) { 
-							ESP_LOGD(TAG,"autoexec1 changed, triggering reboot");
-                            esp_restart();
-                        }
 					}
 					else{
 						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);

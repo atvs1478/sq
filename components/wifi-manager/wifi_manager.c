@@ -54,7 +54,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
-
+#include "app_update/include/esp_ota_ops.h"
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
@@ -98,6 +98,7 @@ struct wifi_settings_t wifi_settings = {
 };
 
 const char wifi_manager_nvs_namespace[] = "espwifimgr";
+char current_namespace[16] = "squeezelite-esp32";
 
 EventGroupHandle_t wifi_manager_event_group;
 
@@ -177,7 +178,7 @@ uint8_t wifi_manager_get_flag(){
 	esp_err_t esp_err;
 	ESP_LOGI(TAG, "About to get config from flash");
 
-	esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+	esp_err = nvs_open(current_namespace, NVS_READWRITE, &handle);
 	if (esp_err != ESP_OK) return 0;
 
 	esp_err= nvs_get_u8(handle, "autoexec", &value);
@@ -194,7 +195,7 @@ char * wifi_manager_alloc_get_config(char * name, size_t * l){
 	nvs_handle handle;
 	ESP_LOGD(TAG, "About to get config value %s from flash",name);
 
-	if (nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle) == ESP_OK) {
+	if (nvs_open(current_namespace, NVS_READWRITE, &handle) == ESP_OK) {
 		if (nvs_get_str(handle, name, NULL, &len)==ESP_OK) {
 			value=(char *)malloc(len);
 			memset(value,0x0, len);
@@ -220,7 +221,7 @@ esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag){
 	nvs_handle handle;
 	esp_err_t esp_err;
 	ESP_LOGI(TAG, "About to save config to flash");
-	esp_err=nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+	esp_err=nvs_open(current_namespace, NVS_READWRITE, &handle);
 	if (esp_err != ESP_OK) {
 		ESP_LOGE(TAG,"Unable to open nvs namespace %s",wifi_manager_nvs_namespace);
 		return esp_err;
@@ -248,17 +249,15 @@ esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag){
 
 esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
 	nvs_handle handle;
-    char val[len+1];
-	esp_err_t esp_err;
-    if (len) { *val = '\0'; strncat(val, value, len); }
-	ESP_LOGI(TAG, "About to save config to flash");
-	esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
+    esp_err_t esp_err;
+    ESP_LOGI(TAG, "About to save config to flash");
+	esp_err = nvs_open(current_namespace, NVS_READWRITE, &handle);
 	if (esp_err != ESP_OK) {
-		ESP_LOGE(TAG,"Unable to open nvs namespace %s",wifi_manager_nvs_namespace);
+		ESP_LOGE(TAG,"Unable to open nvs namespace %s",current_namespace);
 		return esp_err;
 	}
 
-    esp_err = nvs_set_str(handle, name, val);
+    esp_err = nvs_set_str(handle, name, value);
 	if (esp_err != ESP_OK){
 		ESP_LOGE(TAG,"Unable to save value %s=%s",name,val);
 		nvs_close(handle);
@@ -406,13 +405,14 @@ void wifi_manager_clear_ip_info_json(){
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
-#if !RECOVERY_APPLICATION
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d}\n";
-#else
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d, \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
+		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"";
+#if RECOVERY_APPLICATION
+		"\"ota_dsc\":\"%s\", \"ota_pct\":%d";
 #endif
+	"}\n";
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 
+		app_desc_t* app_desc=esp_ota_get_app_description(void);
 
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		strcpy(ip_info_json, "{\"ssid\":");
@@ -433,7 +433,11 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 					ip,
 					netmask,
 					gw,
-					(int)update_reason_code
+					(int)update_reason_code,
+					app_desc->project_name,
+					app_desc->version
+
+
 #if RECOVERY_APPLICATION
 					,ota_get_status(),
 					 ota_get_pct_complete()
