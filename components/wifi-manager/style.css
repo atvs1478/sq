@@ -127,6 +127,9 @@ h3 {
 #connect-details {
     display: none;
 }
+#diag-disconnect {
+    display: none;
+}
 .fr {
     float: right;
     margin-right: 20px;
