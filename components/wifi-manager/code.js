@@ -11,6 +11,7 @@ if (!String.prototype.format) {
   };
 }
 
+var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
 var enableTimers = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
@@ -253,6 +254,36 @@ $(document).ready(function(){
         }
    	});
 
+    $('#fwcheck').on("click", function(){
+        $("#releaseTable").html("");
+        $.getJSON(releaseURL, function(data) {
+            console.log(data);
+            data.forEach(function(release) {
+                var url = '';
+                release.assets.forEach(function(asset) {
+                    if (asset.name.match(/\.bin$/)) {
+                        url = asset.browser_download_url;
+                    }
+                });
+                var [ver, idf, cfg, branch] = release.name.split('-');
+                $("#releaseTable").append(
+                    "<tr>"+
+                      "<td>"+ver+"</td>"+
+                      "<td>"+idf+"</td>"+
+                      "<td>"+cfg+"</td>"+
+                      "<td>"+branch+"</td>"+
+                      "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
+                    "</tr>"
+                );
+                console.log(release.assets);
+            });
+        })
+        .fail(function() {
+            alert("failed to fetch release history!");
+        });
+    });
+
+
 	//first time the page loads: attempt to get the connection status and start the wifi scan
 	refreshAP();
     getConfig();
@@ -261,6 +292,18 @@ $(document).ready(function(){
 	startCheckStatusInterval();
 	startRefreshAPInterval();
 });
+
+function setURL(button) {
+    var url = button.dataset.url;
+    $.ajax({
+        url: '/config.json',
+        dataType: 'json',
+        method: 'POST',
+        cache: false,
+        headers: { "X-Custom-fwurl": url },
+        data: { 'timestamp': Date.now() }
+    });
+}
 
 function performConnect(conntype){
 	//stop the status refresh. This prevents a race condition where a status 

@@ -206,9 +206,21 @@
                 <div id="recoverydiv">
                     <h1>Check for firmware upgrade</h1>
                     <div class="buttons">
-                        <input type="button" id="fwcheck" class="btn btn-primary" value="Check" />
-                        <p><span id="currentfw">Currently running: 0.1</span> - <span id="latestfw">latest available version: 0.2</span></p>
+                        <input type="button" id="fwcheck" class="btn btn-info" value="Update" />
                     </div>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Firmware version</th>
+                                <th scope="col">IDF version</th>
+                                <th scope="col">HW platform</th>
+                                <th scope="col">Branch</th>
+                                <th scope="col">Flash this FW</th>
+                            </tr>
+                        </thead>
+                        <tbody id="releaseTable">
+                        </tbody>
+                    </table>
                     <h1>Reboot to recovery system to perform firmware upgrade</h1>
                     <div class="buttons">
                         <input type="button" id="recovery" class="btn btn-primary" value="Recovery" />
