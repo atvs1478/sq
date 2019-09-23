@@ -41,10 +41,15 @@ extern "C" {
 #include "esp_wifi_types.h"
 
 #ifndef RECOVERY_APPLICATION
-#define RECOVERY_APPLICATION 0
+#error "RECOVERY_APPLICATION not defined. Defaulting to squeezelite"
+#endif
+
+#if RECOVERY_APPLICATION==1
+#warning "compiling for recovery."
+#elif RECOVERY_APPLICATION==0
+#warning "compiling for squeezelite."
 #else
-#undef RECOVERY_APPLICATION
-#define RECOVERY_APPLICATION 1
+#error "unknown configuration"
 #endif
 
 

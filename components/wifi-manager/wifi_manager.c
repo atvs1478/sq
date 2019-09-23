@@ -58,7 +58,6 @@ Contains the freeRTOS task and all necessary support
 #include "esp_app_format.h"
 
 
-
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
@@ -410,18 +409,23 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	if(config){
 <<<<<<< HEAD
 =======
+<<<<<<< HEAD
+=======
 		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"";
 >>>>>>> branch 'Over_The_Air_Update' of https://github.com/sle118/squeezelite-esp32.git
+>>>>>>> refs/remotes/origin/Over_The_Air_Update
 #if RECOVERY_APPLICATION
-<<<<<<< HEAD
 				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
 #else
 				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"}\n";
 #endif
+<<<<<<< HEAD
+=======
 =======
 		"\"ota_dsc\":\"%s\", \"ota_pct\":%d";
 	"}\n";
 >>>>>>> branch 'Over_The_Air_Update' of https://github.com/sle118/squeezelite-esp32.git
+>>>>>>> refs/remotes/origin/Over_The_Air_Update
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 		const esp_app_desc_t* desc = esp_ota_get_app_description();
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
