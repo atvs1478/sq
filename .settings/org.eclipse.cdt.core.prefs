@@ -1,21 +1,7 @@
 eclipse.preferences.version=1
-<<<<<<< HEAD
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/delimiter=;
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/operation=append
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/BATCH_BUILD/value=1
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/delimiter=;
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/operation=append
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/value=d\:/msys2/opt/esp-idf
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/delimiter=;
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/operation=replace
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/value=C\:/msys2/opt/xtensa-esp32-elf/bin;C\:/jdk-12.0.2/bin/server;C\:/jdk-12.0.2/bin;C\:\\Windows\\system32;C\:\\Windows;C\:\\Windows\\System32\\Wbem;C\:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C\:\\Program Files\\NVIDIA Corporation\\NVIDIA NvDLISR;C\:\\jdk-12.0.2\\bin;C\:\\Program Files\\PuTTY\\;C\:\\Program Files (x86)\\HP\\IdrsOCR_15.2.10.1114\\;C\:\\eclipse
-=======
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/BATCH_BUILD/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/BATCH_BUILD/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/BATCH_BUILD/value=1
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/EXTRA_CFLAGS/delimiter=\:
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/EXTRA_CFLAGS/operation=replace
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/EXTRA_CFLAGS/value=-DRECOVERY_APPLICATION\=1
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/IDF_PATH/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786.212420495/IDF_PATH/value=/var/opt/esp-idf
@@ -30,6 +16,42 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/EXTRA_C
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/IDF_PATH/value=/var/opt/esp-idf
->>>>>>> refs/remotes/origin/Over_The_Air_Update
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/PATH/value=C\:/msys2/opt/xtensa-esp32-elf/bin;C\:/jdk-12.0.2/bin/server;C\:/jdk-12.0.2/bin;C\:\\Windows\\system32;C\:\\Windows;C\:\\Windows\\System32\\Wbem;C\:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C\:\\Program Files\\NVIDIA Corporation\\NVIDIA NvDLISR;C\:\\jdk-12.0.2\\bin;C\:\\Program Files\\PuTTY\\;C\:\\Program Files (x86)\\HP\\IdrsOCR_15.2.10.1114\\;C\:\\eclipse
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/append=true
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/appendContributed=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/value=/var/opt/esp-idf/
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PATH/value=/var/opt/xtensa-esp32-elf/bin/\:/sbin\:/bin\:/usr/bin\:/usr/local/bin\:/snap/bin\:/bin\:/sbin\:/usr/bin\:/usr/local/bin\:/snap/bin
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_NAME/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_NAME/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_NAME/value=recovery.custom
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_VER/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_VER/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/PROJECT_VER/value=custom
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/appendContributed=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/value=/var/opt/esp-idf/
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PATH/value=/var/opt/xtensa-esp32-elf/bin/\:/sbin\:/bin\:/usr/bin\:/usr/local/bin\:/snap/bin\:/bin\:/sbin\:/usr/bin\:/usr/local/bin\:/snap/bin
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_NAME/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_NAME/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_NAME/value=squeezelite.custom
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/value=custom
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/appendContributed=true

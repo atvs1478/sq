@@ -25,6 +25,7 @@
 #include "esp_pthread.h"
 #include "cmd_decl.h"
 #include "console.h"
+#include "wifi_manager.h"
 
 #include "cmd_squeezelite.h"
 #include "nvs_utilities.h"
@@ -33,7 +34,7 @@ static void * console_thread();
 void console_start();
 static const char * TAG = "console";
 
-#if (RECOVERY_APPLICATION )
+#if RECOVERY_APPLICATION ==1
 extern void start_ota(const char * bin_url);
 #endif
 
@@ -240,12 +241,14 @@ void console_start() {
 	esp_console_register_help_command();
 	register_system();
 	register_nvs();
-#if ! RECOVERY_APPLICATION
-#warning  "compiling for squeezelite"
+#if RECOVERY_APPLICATION!=1
+#warning "compiling for squeezelite"
 	register_squeezelite();
-#else
+#elif RECOVERY_APPLICATION==1
 #warning "compiling for recovery"
 	register_ota_cmd();
+#else
+#error "Unknown build configuration"
 #endif
 	register_i2ctools();
 	printf("\n"

@@ -23,9 +23,9 @@
 #include "tcpip_adapter.h"
 
 
-static const char *TAG = "simple_ota_example";
-extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+static const char *TAG = "squeezelite-ota";
+//extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+//extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
 #define OTA_URL_SIZE 256
 static char ota_status[31]={0};
@@ -74,7 +74,7 @@ void ota_task(void *pvParameter, const char * bin_url)
 
     esp_http_client_config_t config = {
         .url = bin_url,
-        .cert_pem = (char *)server_cert_pem_start,
+        //.cert_pem = (char *)server_cert_pem_start,
         .event_handler = _http_event_handler,
     };
 
