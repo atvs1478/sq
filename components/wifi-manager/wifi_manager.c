@@ -56,6 +56,7 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/ip4_addr.h"
 #include "app_update/include/esp_ota_ops.h"
 
+
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
@@ -408,7 +409,6 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"";
 #if RECOVERY_APPLICATION
 		"\"ota_dsc\":\"%s\", \"ota_pct\":%d";
-#endif
 	"}\n";
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 
