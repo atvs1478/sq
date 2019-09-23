@@ -68,7 +68,7 @@ in_addr_t 	get_localhost(char **name);
 void 		get_mac(u8_t mac[]);
 int 		shutdown_socket(int sd);
 int 		bind_socket(short unsigned *port, int mode);
-int 		conn_socket(unsigned short port);typedef struct {
+int 		conn_socket(unsigned short port);typedef struct {
 	char *key;
 	char *data;
 } key_data_t;
