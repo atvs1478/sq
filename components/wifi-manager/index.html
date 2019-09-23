@@ -1,212 +1,257 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<link rel="stylesheet" href="/style.css">
-		<script src="/jquery.js"></script>
-		<script src="/code.js"></script>
-		<title>esp32-wifi-manager</title>
-	</head>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <link rel="stylesheet" href="/test/bootstrap.min.css"> <!-- TODO delete -->
+        <link rel="stylesheet" href="/bootstrap.css">
+        <link rel="stylesheet" href="/style.css">
+        <script src="/jquery.js"></script>
+        <script src="/bootstrap.js"></script>
+        <script src="/popper.js"></script>
 
-	<body>
-		<div id="app">
-			<div id="app-wrap">
-                <div id="command_line">
-                    <header>
-                        <h1>Startup command</h1>
-                    </header>
-                    <h2>
-                        <div id="autoexec" class="toggle">
-                            <label>Run squeezelite automatically at boot
-                                <input id="autoexec-cb" type="checkbox" checked="checked" onclick='handleClick(this);'/><span class="slider"></span>
-                            </label>
-                        </div>
-                    </h2>
+        <!-- TODO delete -->
+        <script src="/test/jquery.min.js"></script>
+        <script src="/test/bootstrap.min.js"></script>
+        <script src="/test/popper.min.js"></script>
 
-                    <div id="autoexec-command">
-                        <div id="audioout" class="toggle-buttons">
-                            <h2>Audio output</h2>
-                            <input type="radio" id="i2s" name="audio" checked='checked' />
-                            <label for="i2s">I2S</label>
-                            <input type="radio" id="spdif" name="audio" />
-                            <label for="spdif">SPDIF</label>
-                            <input type="radio" id="bt" name="audio" />
-                            <label for="bt">Bluetooth</label>
-                        </div>
-                        <div id="btsinkdiv">
-                            <input id="btsink" type="text" value="BT sink name" />
-                        </div>
-                        <div>
-                            <h2>Player name</h2>
-                            <input id="player" type="text" value="squeezelite" />
-                        </div>
-                        <div>
-                            <h2>Optional setting (e.g. for LMS IP address)</h2>
-                            <input id="optional" type="text" value="" placeholder="-s 192.168.0.1" />
-                        </div>
+        <script src="/code.js"></script>
 
-                        <div class="buttons">
-                            <input id="generate-command" type="button" value="Generate" />
-                        </div>
 
-                        <h2>Squeezelite command to run</h2>
-                        <section id="command-list">
-                            <textarea id="autoexec1" maxlength="120">squeezelite -o I2S -b 500:2000 -d all=info -M esp32</textarea>
+        <title>esp32-wifi-manager</title>
+    </head>
+
+    <body>
+        <ul id="navbar" class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link active" data-toggle="tab" href="#tab-wifi">WiFi</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-startup">Startup</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-audio">Audio + LMS</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-gpio">GPIO</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-system">System</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-credits">Credits</a>
+            </li>
+        </ul>
+
+        <div id="myTabContent" class="tab-content">
+            <div class="tab-pane fade active show" id="tab-wifi">
+                <div id="wifi">
+                    <div id="wifi-status">
+                        <h2>Connected to:</h2>
+                        <section id="connected-to">
+                            <div class="ape"><div class="w0"><div class="pw"><span></span></div></div></div>
                         </section>
                     </div>
+                    <h2>Manual connect</h2>
+                    <section id="manual_add">
+                        <div class="ape">ADD (HIDDEN) SSID</div>
+                    </section>
+                    <h2>or choose a network...</h2>
+                    <section id="wifi-list">
+                    </section>
+                </div>
 
+                <div id="connect_manual">
+                    <header>
+                        <h1>Enter Details</h1>
+                    </header>
+                    <h2>Manual Connection</h2>
+                    <section>
+                        <input id="manual_ssid" type="text" placeholder="SSID" value="">
+                        <input id="manual_pwd" type="password" placeholder="Password" value="">
+                    </section>
                     <div class="buttons">
-                        <input id="update-command" type="button" value="Save" />
+                        <input id="manual_join" type="button" class="btn btn-success" value="Join" data-connect="manual" />
+                        <input id="manual_cancel" type="button" class="btn btn-danger" value="Cancel"/>
                     </div>
                 </div>
-                <div id="recoverydiv">
-                    <header><h1>System management</h1></header>
-                    <h2>Check for firmware upgrade</h2>
+
+                <div id="connect">
+                    <header>
+                        <h1>Enter Password</h1>
+                    </header>
+                    <h2>Password for <span id="ssid-pwd"></span></h2>
+                    <section>
+                        <input id="pwd" type="password" placeholder="Password" value="">
+                    </section>
                     <div class="buttons">
-                        <input type="button" id="fwcheck" value="Check" onclick='handleClick(this);' />
-                        <p><span id="currentfw">Currently running: 0.1</span> - <span id="latestfw">latest available version: 0.2</span></p>
+                        <input id="join" type="button" class="btn btn-success" value="Join" />
+                        <input id="cancel" type="button" class="btn btn-danger" value="Cancel"/>
                     </div>
-                    <h2>Reboot to recovery system to perform firmware upgrade</h2>
+                </div>
+
+                <div id="connect-wait">
+                    <header>
+                        <h1>Please wait...</h1>
+                    </header>
+                    <h2>Connecting to <span id="ssid-wait"></span></h2>
+                    <section>
+                        <div id="loading">
+                            <div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+                            <p class="tctr">You may lose wifi access while the esp32 recalibrates its radio. Please wait until your device automatically reconnects. This can take up to 30s.</p>
+                        </div>
+                        <div id="connect-success">
+                            <h3 class="gr">Success!</h3>
+                        </div>
+                        <div id="connect-fail">
+                            <h3 class="rd">Connection failed</h3>
+                            <p class="tctr">Please double-check wifi password if any and make sure the access point has good signal.</p>
+                        </div>
+                    </section>
                     <div class="buttons">
-                        <input type="button" id="recovery" value="Recovery" onclick='handleClick(this);' />
+                        <input id="ok-connect" type="button" value="OK" class="btn btn-success" />
+                    </div>
+                </div>
+
+                <div id="connect-details">
+                    <div id="connect-details-wrap">
+                        <header>
+                            <h1></h1>
+                        </header>
+                        <h2></h2>
+                        <section>
+                            <div class="buttons">
+                                <input id="disconnect" type="button" value="Disconnect" class="btn btn-danger"/>
+                            </div>
+                        </section>
+                        <h2>IP Address</h2>
+                        <section>
+                            <div class="ape brdb">IP Address:<div id="ip" class="fr"></div></div>
+                            <div class="ape brdb">Subnet Mask:<div id="netmask" class="fr"></div></div>
+                            <div class="ape">Default Gateway:<div id="gw" class="fr"></div></div>
+                        </section>
+                        <div class="buttons">
+                            <input id="ok-details" type="button" value="Back" class="btn btn-success" />
+                        </div>
+                    </div>					
+                    <div id="diag-disconnect" class="diag-box">
+                        <div class="diag-box-win">
+                            <p>Are you sure you would like to disconnect from this wifi?</p>
+                            <div class="buttons">
+                                <input id="no-disconnect" type="button" value="No" class="btn btn-success" />
+                                <input id="yes-disconnect" type="button" value="Yes" class="btn btn-danger" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-startup">
+                <h1>Run squeezelite automatically at boot</h1>
+
+                <div class="custom-control custom-switch">
+                      <input type="checkbox" class="custom-control-input" id="autoexec-cb" checked="checked">
+                      <label class="custom-control-label" for="autoexec-cb"></label>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-audio">
+                <div id="audioout">
+                    <h1>Audio output</h1>
+                    <div class="form-group">
+                        <div class="custom-control custom-radio">
+                            <input type="radio" id="i2s" name="audio" class="custom-control-input" checked='checked' />
+                            <label for="i2s" class="custom-control-label">I2S</label>
+                        </div>
+                        <div class="custom-control custom-radio">
+                            <input type="radio" id="spdif" name="audio" class="custom-control-input" />
+                            <label for="spdif" class="custom-control-label">SPDIF</label>
+                        </div>
+                        <div class="custom-control custom-radio">
+                            <input type="radio" id="bt" name="audio" class="custom-control-input" />
+                            <label for="bt" class="custom-control-label">Bluetooth</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="btsinkdiv">
+                    <input id="btsink" type="text" value="BT sink name" />
+                </div>
+                <div>
+                    <h1>Player name</h1>
+                    <input id="player" type="text" value="squeezelite" />
+                </div>
+                <div>
+                    <h1>Optional setting (e.g. for LMS IP address)</h1>
+                    <input id="optional" type="text" value="" placeholder="-s 192.168.0.1" />
+                </div>
+
+                <div class="buttons">
+                    <input id="generate-command" type="button" class="btn btn-success" value="Generate" />
+                </div>
+
+                <h1>Squeezelite command to run</h1>
+                <section id="command-list">
+                    <textarea id="autoexec1" maxlength="120">squeezelite -o I2S -b 500:2000 -d all=info -M esp32</textarea>
+                </section>
+                <div class="buttons">
+                    <input id="save-autoexec1" type="button" class="btn btn-success" value="Save" />
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-gpio">
+            </div>
+
+            <div class="tab-pane fade" id="tab-system">
+                <div id="recoverydiv">
+                    <h1>Check for firmware upgrade</h1>
+                    <div class="buttons">
+                        <input type="button" id="fwcheck" class="btn btn-info" value="Update" />
+                    </div>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Firmware version</th>
+                                <th scope="col">IDF version</th>
+                                <th scope="col">HW platform</th>
+                                <th scope="col">Branch</th>
+                                <th scope="col">Flash this FW</th>
+                            </tr>
+                        </thead>
+                        <tbody id="releaseTable">
+                        </tbody>
+                    </table>
+                    <h1>Reboot to recovery system to perform firmware upgrade</h1>
+                    <div class="buttons">
+                        <input type="button" id="recovery" class="btn btn-warning" value="Recovery" />
                     </div>
                 </div>
                 <div id="otadiv">
                     <header><h1>Firmware upgrade</h1></header>
                     <form name="multipart" action="otaform" method="post" enctype="multipart/form-data" onsubmit="do_upload(this); return false;">
                         <progress id="progr" value="0" max="100" >Upload Progress</progress>
-                        <input type="file" name="ota" id="ota" size="20" accept=".bin" onchange="file_change();">
-                        <span id="file_info"></span>
-                        <input type="submit" id="update" disabled="" value="Upload">
                     </form>
-                    <h2>Reboot system with new firmware</h2>
+                    <h1>Reboot system with new firmware</h1>
                     <div class="buttons">
-                        <input type="button" id="reboot" value="Reboot" onclick='handleClick(this);' />
+                        <input type="button" id="reboot" class="btn btn-warning" value="Reboot" />
                     </div>
                 </div>
+            </div>
 
-				<div id="wifi">
-					<header>
-						<h1>Wi-Fi</h1>
-					</header>
-					<div id="wifi-status">
-						<h2>Connected to:</h2>
-						<section id="connected-to">
-							<div class="ape"><div class="w0"><div class="pw"><span></span></div></div></div>
-						</section>
-					</div>
-					<h2>Manual connect</h2>
-					<section id="manual_add">
-					<div class="ape">ADD (HIDDEN) SSID<div>
-					</section>
-					<h2>or choose a network...</h2>
-					<section id="wifi-list">
-					</section>
-					<div id="pwrdby"><em>Powered by </em><a id="acredits" href="#"><strong>esp32-wifi-manager</strong></a>.</div>
-				</div>
-				<div id="connect_manual">
-					<header>
-						<h1>Enter Details</h1>
-					</header>
-					<h2>Manual Connection</h2>
-					<section>
-						<input id="manual_ssid" type="text" placeholder="SSID" value="">
-						<input id="manual_pwd" type="password" placeholder="Password" value="">
-					</section>
-					<div class="buttons">
-							<input id="manual_join" type="button" value="Join" data-connect="manual" />
-							<input id="manual_cancel" type="button" value="Cancel"/>
-					</div>
-				</div>
-				<div id="connect">
-					<header>
-						<h1>Enter Password</h1>
-					</header>
-					<h2>Password for <span id="ssid-pwd"></span></h2>
-					<section>
-						<input id="pwd" type="password" placeholder="Password" value="">
-					</section>
-					<div class="buttons">
-							<input id="join" type="button" value="Join" />
-							<input id="cancel" type="button" value="Cancel"/>
-					</div>
-				</div>
-				<div id="connect-wait">
-					<header>
-						<h1>Please wait...</h1>
-					</header>
-					<h2>Connecting to <span id="ssid-wait"></span></h2>
-					<section>
-						<div id="loading">
-							<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
-							<p class="tctr">You may lose wifi access while the esp32 recalibrates its radio. Please wait until your device automatically reconnects. This can take up to 30s.</p>
-						</div>
-						<div id="connect-success">
-							<h3 class="gr">Success!</h3>
-						</div>
-						<div id="connect-fail">
-							<h3 class="rd">Connection failed</h3>
-							<p class="tctr">Please double-check wifi password if any and make sure the access point has good signal.</p>
-						</div>
-					</section>
-					<div class="buttons">
-						<input id="ok-connect" type="button" value="OK" class="ctr" />
-					</div>
-				</div>
-				<div id="connect-details">
-					<div id="connect-details-wrap">
-						<header>
-							<h1></h1>
-						</header>
-						<h2></h2>
-						<section>
-							<div class="buttons">
-								<input id="disconnect" type="button" value="Disconnect" class="ctr"/>
-							</div>
-						</section>
-						<h2>IP Address</h2>
-						<section>
-							<div class="ape brdb">IP Address:<div id="ip" class="fr"></div></div>
-							<div class="ape brdb">Subnet Mask:<div id="netmask" class="fr"></div></div>
-							<div class="ape">Default Gateway:<div id="gw" class="fr"></div></div>
-						</section>
-						<div class="buttons">
-							<input id="ok-details" type="button" value="OK" class="ctr" />
-						</div>
-					</div>					
-					<div id="diag-disconnect" class="diag-box">
-						<div class="diag-box-win">
-							<p>Are you sure you would like to disconnect from this wifi?</p>
-							<div class="buttons">
-								<input id="no-disconnect" type="button" value="No" />
-								<input id="yes-disconnect" type="button" value="Yes" />
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<div id="credits">
-			<header>
-				<h1>About this app...</h1>
-			</header>
-			<h2></h2>
-			<section>
-				<p><strong>esp32-wifi-manager</strong>, &copy; 2017-2019, Tony Pottier<br />Licender under the MIT License.</p>
-				<p>
-					This app would not be possible without the following libraries:
-				</p>
-				<ul>
-					<li>SpinKit, &copy;  2015, Tobias Ahlin. Licensed under the MIT License.</li>
-					<li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
-					<li>cJSON, &copy; 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
-				</ul>
-			</section>
-			<div class="buttons">
-				<input id="ok-credits" type="button" value="OK" class="ctr" />
-			</div>
-		</div>
-	</body>
-<html>
+            <div class="tab-pane fade" id="tab-credits">
+                <section>
+                    <p><strong>esp32-wifi-manager</strong>, &copy; 2017-2019, Tony Pottier<br />Licender under the MIT License.</p>
+                    <p>
+                    This app would not be possible without the following libraries:
+                    </p>
+                    <ul>
+                        <li>SpinKit, &copy;  2015, Tobias Ahlin. Licensed under the MIT License.</li>
+                        <li>jQuery, The jQuery Foundation. Licensed under the MIT License.</li>
+                        <li>cJSON, &copy; 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
+                    </ul>
+                </section>
+            </div>
+
+        </div>
+    </body>
+</html>

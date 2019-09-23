@@ -11,7 +11,8 @@ if (!String.prototype.format) {
   };
 }
 
-var recovery = false;
+var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
+var recovery = true;
 var enableTimers = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 
@@ -24,6 +25,7 @@ var StatusIntervalActive = false;
 var ConfigIntervalActive = false;
 var RefreshAPIIntervalActive = false;
 
+var output = '';
 //TODO check
 var to = 0, set_int = 0;
 
@@ -65,7 +67,7 @@ function RepeatCheckConfigInterval(){
 
 function RepeatRefreshAPInterval(){
 	if(RefreshAPIIntervalActive)
-		startRefreshAPInterval()
+		startRefreshAPInterval();
 }
 
 $(document).ready(function(){
@@ -175,17 +177,109 @@ $(document).ready(function(){
 		$( "#wifi" ).slideDown( "fast", function() {})
 	});
 	
-	$("#update-command").click(function() {
-		updateAutoexec();
+	$("#autoexec-cb").on("click", function() {
+        autoexec = (this.checked)?1:0;
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: { "X-Custom-autoexec": autoexec },
+            data: { 'timestamp': Date.now() }
+        });
+        console.log('sent config JSON with headers:', autoexec);
+    });
+
+	$("#save-autoexec1").on("click", function() {
+        autoexec1 = $("#autoexec1").val();
+        
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: { "X-Custom-autoexec1": autoexec1 },
+            data: { 'timestamp': Date.now() }
+        });
+        console.log('sent config JSON with headers:', autoexec1);
+    });
+
+	$("#recovery").on("click", function() {
+        $.ajax({
+            url: '/recovery.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            data: { 'timestamp': Date.now()}
+        });
+    });
+
+	$("#reboot").on("click", function() {
+        $.ajax({
+            url: '/reboot.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            data: { 'timestamp': Date.now()}
+        });
+    });
+
+	$("#generate-command").on("click", function() {
+        var commandLine = commandHeader + '-n ' + $("#player").val();
+
+        if (output == 'bt') {
+            commandLine += ' -o "BT -n \'' + $("#btsink").val() + '\'" -R -Z 192000';
+        } else if (output == 'spdif') {
+            commandLine += ' -o SPDIF -R -Z 192000';
+        } else {
+            commandLine += ' -o I2S';
+        }
+        if ($("#optional").val() != '') {
+            commandLine += ' ' + $("#optional").val();
+        }
+        $("#autoexec1").val(commandLine);
 	});	
 
-	$("#generate-command").click(function() {
-		generateCommand();
-	});	
-
-    $('[name=audio]').click(function(){
-        selectOutput(this);
+    $('[name=audio]').on("click", function(){
+        if (this.id == 'bt') {
+            $("#btsinkdiv").show(200);
+            output = 'bt';
+        } else if (this.id == 'spdif') {
+            $("#btsinkdiv").hide(200);
+            output = 'spdif';
+        } else {
+            $("#btsinkdiv").hide(200);
+            output = 'i2s';
+        }
    	});
+
+    $('#fwcheck').on("click", function(){
+        $("#releaseTable").html("");
+        $.getJSON(releaseURL, function(data) {
+            data.forEach(function(release) {
+                var url = '';
+                release.assets.forEach(function(asset) {
+                    if (asset.name.match(/\.bin$/)) {
+                        url = asset.browser_download_url;
+                    }
+                });
+                var [ver, idf, cfg, branch] = release.name.split('-');
+                $("#releaseTable").append(
+                    "<tr>"+
+                      "<td>"+ver+"</td>"+
+                      "<td>"+idf+"</td>"+
+                      "<td>"+cfg+"</td>"+
+                      "<td>"+branch+"</td>"+
+                      "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
+                    "</tr>"
+                );
+            });
+        })
+        .fail(function() {
+            alert("failed to fetch release history!");
+        });
+    });
+
 
 	//first time the page loads: attempt to get the connection status and start the wifi scan
 	refreshAP();
@@ -195,6 +289,20 @@ $(document).ready(function(){
 	startCheckStatusInterval();
 	startRefreshAPInterval();
 });
+
+function setURL(button) {
+    var url = button.dataset.url;
+    $.ajax({
+        url: '/config.json',
+        dataType: 'json',
+        method: 'POST',
+        cache: false,
+        headers: { "X-Custom-fwurl": url },
+        data: { 'timestamp': Date.now() }
+    });
+    $('[data-url^="http"]').addClass("btn-success").removeClass("btn-danger");
+    $('[data-url="'+url+'"]').addClass("btn-danger").removeClass("btn-success");
+}
 
 function performConnect(conntype){
 	//stop the status refresh. This prevents a race condition where a status 
@@ -239,8 +347,6 @@ function performConnect(conntype){
 	startCheckStatusInterval();
 	startRefreshAPInterval();
 }
-
-
 
 function rssiToIcon(rssi){
 	if(rssi >= -60){
@@ -367,16 +473,16 @@ function getConfig() {
             } else {
                 console.log('turn off autoexec');
                 $("#autoexec-cb")[0].checked=false;
-                $("#autoexec-command").hide(200);
             }
         }
 		if (data.hasOwnProperty('recovery')) {
             if (data["recovery"] === 1) {
                 recovery = true;
+                $("#tab-wifi").removeClass("active show");
+                $("#tab-system").addClass("active show");
+                $("#navbar").hide();
                 $("#recoverydiv").hide();
                 $("#otadiv").show();
-                $("#command_line").hide();
-                $("#wifi").hide();
             } else {
                 recovery = false;
                 $("#recoverydiv").show();
@@ -399,77 +505,8 @@ function getConfig() {
 	});
 }
 
-function updateAutoexec(){
-	autoexec = ($("#autoexec-cb")[0].checked)?1:0;
-	autoexec1 = $("#autoexec1").val();
-	
-	$.ajax({
-		url: '/config.json',
-		dataType: 'json',
-		method: 'POST',
-		cache: false,
-		headers: { "X-Custom-autoexec": autoexec, "X-Custom-autoexec1": autoexec1 },
-		data: { 'timestamp': Date.now() }
-	});
-    console.log('sent config JSON with headers:', autoexec, autoexec1);
-}
 
-var output = '';
-function selectOutput(el) {
-    if ($(el).attr('id') == 'bt') {
-        $("#btsinkdiv").show(200);
-        output = 'bt';
-    } else if ($(el).attr('id') == 'spdif') {
-        $("#btsinkdiv").hide(200);
-        output = 'spdif';
-    } else {
-        $("#btsinkdiv").hide(200);
-        output = 'i2s';
-    }
-}
 
-function generateCommand() {
-    var commandLine = commandHeader + '-n ' + $("#player").val();
-
-    if (output == 'bt') {
-        commandLine += ' -o "BT -n \'' + $("#btsink").val() + '\'" -R -Z 192000';
-    } else if (output == 'spdif') {
-        commandLine += ' -o SPDIF -R -Z 192000';
-    } else {
-        commandLine += ' -o I2S';
-    }
-    if ($("#optional").val() != '') {
-        commandLine += ' ' + $("#optional").val();
-    }
-    $("#autoexec1").val(commandLine);
-}
-
-function handleClick(item) {
-    console.log(item);
-    if (item.id == 'autoexec-cb') {
-        if (item.checked) {
-            $("#autoexec-command").show(200);
-        } else {
-            $("#autoexec-command").hide(200);
-        }
-    } else if (item.id == 'recovery') {
-        $.ajax({
-            url: '/recovery.json',
-            dataType: 'json',
-            method: 'POST',
-            cache: false,
-            data: { 'timestamp': Date.now()}
-        });
-    } else if (item.id == 'reboot') {
-        $.ajax({
-            url: '/reboot.json',
-            dataType: 'json',
-            method: 'POST',
-            cache: false,
-            data: { 'timestamp': Date.now()}
-        });
-    }
-}
 
 //TODO daduke check
 function file_change() {
