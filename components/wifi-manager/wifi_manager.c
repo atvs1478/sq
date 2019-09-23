@@ -54,7 +54,9 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "lwip/ip4_addr.h"
-#include "app_update/include/esp_ota_ops.h"
+#include "esp_ota_ops.h"
+#include "esp_app_format.h"
+
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
@@ -98,7 +100,7 @@ struct wifi_settings_t wifi_settings = {
 };
 
 const char wifi_manager_nvs_namespace[] = "espwifimgr";
-char current_namespace[16] = "squeezelite-esp32";
+extern char current_namespace[];
 
 EventGroupHandle_t wifi_manager_event_group;
 
@@ -259,7 +261,7 @@ esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
 
     esp_err = nvs_set_str(handle, name, value);
 	if (esp_err != ESP_OK){
-		ESP_LOGE(TAG,"Unable to save value %s=%s",name,val);
+		ESP_LOGE(TAG,"Unable to save value %s=%s",name,value);
 		nvs_close(handle);
 		return esp_err;
 	}
@@ -272,7 +274,7 @@ esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
 
 	nvs_close(handle);
 
-	ESP_LOGD(TAG, "wifi_manager_wrote %s=%s with length %i", name, val, len);
+	ESP_LOGD(TAG, "wifi_manager_wrote %s=%s with length %i", name, value, len);
 
 	return ESP_OK;
 
@@ -405,15 +407,13 @@ void wifi_manager_clear_ip_info_json(){
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(config){
-		const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"";
 #if RECOVERY_APPLICATION
-		"\"ota_dsc\":\"%s\", \"ota_pct\":%d";
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
+#else
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"}\n";
 #endif
-	"}\n";
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-
-		app_desc_t* app_desc=esp_ota_get_app_description(void);
-
+		const esp_app_desc_t* desc = esp_ota_get_app_description();
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		strcpy(ip_info_json, "{\"ssid\":");
 		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
@@ -434,8 +434,8 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 					netmask,
 					gw,
 					(int)update_reason_code,
-					app_desc->project_name,
-					app_desc->version
+					desc->project_name,
+					desc->version
 
 
 #if RECOVERY_APPLICATION
@@ -450,7 +450,10 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 								"0",
 								"0",
 								"0",
-								(int)update_reason_code
+								(int)update_reason_code,
+								desc->project_name,
+								desc->version
+
 #if RECOVERY_APPLICATION
 					,"",
 					0

@@ -47,7 +47,7 @@ static const type_str_pair_t type_str_pair[] = {
 
 static const size_t TYPE_STR_PAIR_SIZE = sizeof(type_str_pair) / sizeof(type_str_pair[0]);
 static const char *ARG_TYPE_STR = "type can be: i8, u8, i16, u16 i32, u32 i64, u64, str, blob";
-char current_namespace[16] = "squeezelite-esp32";
+char current_namespace[] = "squeezelite-esp32";
 static const char * TAG = "platform_esp32";
 
 static struct {
@@ -97,7 +97,17 @@ static nvs_type_t str_to_type(const char *type)
 
     return NVS_TYPE_ANY;
 }
+static const char *type_to_str(nvs_type_t type)
+{
+    for (int i = 0; i < TYPE_STR_PAIR_SIZE; i++) {
+        const type_str_pair_t *p = &type_str_pair[i];
+        if (p->type == type) {
+            return  p->str;
+        }
+    }
 
+    return "Unknown";
+}
 static esp_err_t store_blob(nvs_handle nvs, const char *key, const char *str_values)
 {
     uint8_t value;

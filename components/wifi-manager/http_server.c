@@ -44,6 +44,7 @@ static const char array_separator[]=",";
 
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
+extern char current_namespace[];
 
 /**
  * @brief embedded binary data.
@@ -318,7 +319,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						int lenA=0;
 						char * last_parm=save_ptr;
 						char * next_parm=save_ptr;
-						char * last_parm_name[41]={0};
+						char  last_parm_name[41]={0};
 						uint8_t autoexec_flag=0;
 						bool bErrorFound=false;
 
@@ -354,7 +355,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 						else{
 							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 						}
-
 
 					}
 					else{
