@@ -68,8 +68,9 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-void ota_task(void *pvParameter, const char * bin_url)
+void ota_task(void *pvParameter)
 {
+	char * bin_url=(char *)pvParameter;
     ESP_LOGI(TAG, "Starting OTA example");
 
     esp_http_client_config_t config = {
@@ -106,6 +107,8 @@ void start_ota(const char * bin_url)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+    char * urlPtr=malloc((strlen(bin_url)+1)*sizeof(char));
+    strcpy(urlPtr,bin_url);
 
-    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, NULL);
+    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, urlPtr);
 }
