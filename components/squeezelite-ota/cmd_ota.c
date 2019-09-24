@@ -59,7 +59,7 @@ static int perform_ota_update(int argc, char **argv)
  void register_ota_cmd()
 {
 	 ota_args.url= arg_str1(NULL, NULL, "<url>", "url of the binary app file");
-	 ota_args.end = arg_end(2);
+	 ota_args.end = arg_end(1);
 
     const esp_console_cmd_t cmd = {
         .command = "ota_update",
