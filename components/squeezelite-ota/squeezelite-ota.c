@@ -41,28 +41,30 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
         ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
-        strncpy(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_ERROR");
+        strncpy(ota_status,"HTTP_EVENT_ERROR",sizeof(ota_status)-1);
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-        strncpy(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_ON_CONNECTED");
+        strncpy(ota_status,"HTTP_EVENT_ON_CONNECTED",sizeof(ota_status)-1);
                 break;
     case HTTP_EVENT_HEADER_SENT:
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
-        strncpy(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_HEADER_SENT");
+        strncpy(ota_status,"HTTP_EVENT_HEADER_SENT",sizeof(ota_status)-1);
         break;
     case HTTP_EVENT_ON_HEADER:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+        snprintf(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        snprintf(ota_status,sizeof(ota_status)-1, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
         break;
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_DISCONNECTED");
-        strncpy(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_DISCONNECTED");
+        strncpy(ota_status,"HTTP_EVENT_DISCONNECTED",sizeof(ota_status)-1);
         break;
     }
     return ESP_OK;
@@ -78,6 +80,7 @@ void ota_task(void *pvParameter)
         //.cert_pem = (char *)server_cert_pem_start,
         .event_handler = _http_event_handler,
     };
+    ESP_LOGI(TAG, "Starting ota: %s", bin_url);
 
     // todo: review how certificates work
     config.skip_cert_common_name_check = true;
@@ -88,9 +91,8 @@ void ota_task(void *pvParameter)
     } else {
         ESP_LOGE(TAG, "Firmware upgrade failed");
     }
-    while (1) {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
+    free(pvParameter);
+    return;
 }
 
 void start_ota(const char * bin_url)
@@ -110,5 +112,6 @@ void start_ota(const char * bin_url)
     char * urlPtr=malloc((strlen(bin_url)+1)*sizeof(char));
     strcpy(urlPtr,bin_url);
 
-    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, urlPtr);
+    ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
+    xTaskCreate(&ota_task, "ota_task", 8192,(void *) urlPtr, 5, NULL);
 }

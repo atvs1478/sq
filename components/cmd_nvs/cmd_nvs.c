@@ -530,7 +530,10 @@ void register_nvs()
 
     namespace_args.namespace = arg_str1(NULL, NULL, "<namespace>", "namespace of the partition to be selected");
     namespace_args.end = arg_end(2);
-
+    list_args.partition = arg_str1(NULL, NULL, "<partition>", "partition name");
+    list_args.namespace = arg_str0("n", "namespace", "<namespace>", "namespace name");
+    list_args.type = arg_str0("t", "type", "<type>", ARG_TYPE_STR);
+    list_args.end = arg_end(2);
     const esp_console_cmd_t set_cmd = {
         .command = "nvs_set",
         .help = "Set variable in selected namespace. Blob type must be comma separated list of hex values. \n"

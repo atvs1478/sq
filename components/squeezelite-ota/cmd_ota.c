@@ -44,6 +44,7 @@ static int perform_ota_update(int argc, char **argv)
     const char *url = ota_args.url->sval[0];
 
     esp_err_t err=ESP_OK;
+    ESP_LOGI(TAG, "Starting ota: %s", url);
     start_ota(url);
 
 
@@ -59,10 +60,10 @@ static int perform_ota_update(int argc, char **argv)
  void register_ota_cmd()
 {
 	 ota_args.url= arg_str1(NULL, NULL, "<url>", "url of the binary app file");
-	 ota_args.end = arg_end(1);
+	 ota_args.end = arg_end(2);
 
     const esp_console_cmd_t cmd = {
-        .command = "ota_update",
+        .command = "update",
         .help = "Updates the application binary from the provided URL",
         .hint = NULL,
         .func = &perform_ota_update,
