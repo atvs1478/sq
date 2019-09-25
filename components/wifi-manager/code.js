@@ -264,9 +264,11 @@ $(document).ready(function(){
                     }
                 });
                 var [ver, idf, cfg, branch] = release.name.split('#');
+                var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
+                console.log(body);
                 $("#releaseTable").append(
                     "<tr>"+
-                      "<td>"+ver+"</td>"+
+                      "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
                       "<td>"+idf+"</td>"+
                       "<td>"+cfg+"</td>"+
                       "<td>"+branch+"</td>"+
@@ -287,6 +289,10 @@ $(document).ready(function(){
     //start timers
 	startCheckStatusInterval();
 	startRefreshAPInterval();
+    $('[data-toggle="tooltip"]').tooltip({
+        html: true,
+        placement : 'right',
+    });
 });
 
 function setURL(button) {

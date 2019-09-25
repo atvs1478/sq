@@ -290,6 +290,11 @@ input, textarea {
 	display: none;
 }
 
+.tooltip-inner {
+    font-family: monospace, monospace;
+    font-size: 70%;
+}
+
 /* 
 .toggle-buttons input[type="radio"] {
 	visibility: hidden;
