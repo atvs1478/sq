@@ -280,7 +280,6 @@ $(document).ready(function(){
         });
     });
 
-
 	//first time the page loads: attempt to get the connection status and start the wifi scan
 	refreshAP();
     getConfig();
@@ -478,9 +477,6 @@ function getConfig() {
 		if (data.hasOwnProperty('recovery')) {
             if (data["recovery"] === 1) {
                 recovery = true;
-                $("#tab-wifi").removeClass("active show");
-                $("#tab-system").addClass("active show");
-                $("#navbar").hide();
                 $("#recoverydiv").hide();
                 $("#otadiv").show();
             } else {
