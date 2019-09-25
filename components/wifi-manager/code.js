@@ -12,7 +12,7 @@ if (!String.prototype.format) {
 }
 
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
-var recovery = true;
+var recovery = false;
 var enableTimers = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 
@@ -263,7 +263,7 @@ $(document).ready(function(){
                         url = asset.browser_download_url;
                     }
                 });
-                var [ver, idf, cfg, branch] = release.name.split('-');
+                var [ver, idf, cfg, branch] = release.name.split('#');
                 $("#releaseTable").append(
                     "<tr>"+
                       "<td>"+ver+"</td>"+
