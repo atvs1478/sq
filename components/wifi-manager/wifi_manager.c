@@ -57,7 +57,6 @@ Contains the freeRTOS task and all necessary support
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
 
-
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
@@ -417,7 +416,6 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		strcpy(ip_info_json, "{\"ssid\":");
 		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
-
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
@@ -462,7 +460,22 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 		}
 	}
 	else{
-		wifi_manager_clear_ip_info_json();
+#if RECOVERY_APPLICATION
+				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
+#else
+				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\"}\n";
+#endif
+		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
+		const esp_app_desc_t* desc = esp_ota_get_app_description();
+		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
+		snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
+		desc->project_name,
+		desc->version
+#if RECOVERY_APPLICATION
+					,ota_get_status(),
+					 ota_get_pct_complete()
+#endif
+			);
 	}
 }
 

@@ -24,8 +24,8 @@
 
 
 static const char *TAG = "squeezelite-ota";
-//extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-//extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
+extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
 #define OTA_URL_SIZE 256
 static char ota_status[31]={0};
@@ -41,30 +41,30 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
         ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
-        strncpy(ota_status,"HTTP_EVENT_ERROR",sizeof(ota_status)-1);
+        //strncpy(ota_status,"HTTP_EVENT_ERROR",sizeof(ota_status)-1);
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-        strncpy(ota_status,"HTTP_EVENT_ON_CONNECTED",sizeof(ota_status)-1);
+       // strncpy(ota_status,"HTTP_EVENT_ON_CONNECTED",sizeof(ota_status)-1);
                 break;
     case HTTP_EVENT_HEADER_SENT:
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
-        strncpy(ota_status,"HTTP_EVENT_HEADER_SENT",sizeof(ota_status)-1);
+       /// strncpy(ota_status,"HTTP_EVENT_HEADER_SENT",sizeof(ota_status)-1);
         break;
     case HTTP_EVENT_ON_HEADER:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-        snprintf(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, status_code=%d, key=%s, value=%s",esp_http_client_get_status_code(evt->client),evt->header_key, evt->header_value);
+        //snprintf(ota_status,sizeof(ota_status)-1,"HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        snprintf(ota_status,sizeof(ota_status)-1, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
+        //snprintf(ota_status,sizeof(ota_status)-1, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
         break;
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_DISCONNECTED");
-        strncpy(ota_status,"HTTP_EVENT_DISCONNECTED",sizeof(ota_status)-1);
+        //strncpy(ota_status,"HTTP_EVENT_DISCONNECTED",sizeof(ota_status)-1);
         break;
     }
     return ESP_OK;
@@ -77,13 +77,13 @@ void ota_task(void *pvParameter)
 
     esp_http_client_config_t config = {
         .url = bin_url,
-        //.cert_pem = (char *)server_cert_pem_start,
+        .cert_pem = (char *)server_cert_pem_start,
         .event_handler = _http_event_handler,
-    };
-    ESP_LOGI(TAG, "Starting ota: %s", bin_url);
+		.buffer_size = 1024*50,
 
-    // todo: review how certificates work
-    config.skip_cert_common_name_check = true;
+    };
+
+    config.skip_cert_common_name_check = false;
 
     esp_err_t ret = esp_https_ota(&config);
     if (ret == ESP_OK) {
@@ -113,5 +113,5 @@ void start_ota(const char * bin_url)
     strcpy(urlPtr,bin_url);
 
     ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
-    xTaskCreate(&ota_task, "ota_task", 8192,(void *) urlPtr, 5, NULL);
+    xTaskCreate(&ota_task, "ota_task", 8192*3,(void *) urlPtr, 5, NULL);
 }

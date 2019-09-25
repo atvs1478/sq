@@ -208,7 +208,7 @@ void initialize_console() {
 
 	/* Initialize the console */
 	esp_console_config_t console_config = { .max_cmdline_args = 22,
-			.max_cmdline_length = 256,
+			.max_cmdline_length = 600,
 #if CONFIG_LOG_COLORS
 			.hint_color = atoi(LOG_COLOR_CYAN)
 #endif
