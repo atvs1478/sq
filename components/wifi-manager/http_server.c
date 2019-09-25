@@ -46,6 +46,7 @@ static const char array_separator[]=",";
 static TaskHandle_t task_http_server = NULL;
 extern char current_namespace[];
 
+extern void start_ota(const char * bin_url);
 /**
  * @brief embedded binary data.
  * @see file "component.mk"
@@ -274,8 +275,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					char autoexec_name[21]={0};
 					char * autoexec_value=NULL;
 					uint8_t autoexec_flag=0;
-					int buflen=MAX_COMMAND_LINE_SIZE+strlen(template)+1;
-					char * buff = malloc(buflen);
+					int locbuflen=MAX_COMMAND_LINE_SIZE+strlen(template)+1;
+					char * buff = malloc(locbuflen);
           			char *s = "\"";
           			char *r = "\\\"";
 					if(!buff)
@@ -290,7 +291,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						esp_err_t esp_err;
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 						autoexec_flag = wifi_manager_get_flag();
-						snprintf(buff,buflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
+						snprintf(buff,locbuflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
 						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 
 						ESP_LOGI(TAG, "About to get config from flash");
@@ -313,7 +314,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 								autoexec_value = wifi_manager_alloc_get_config(info.key, &l);
 								strreplace(autoexec_value, s, r);
 								ESP_LOGI(TAG,"Namespace %s, key=%s, value=%s", info.namespace_name, info.key,autoexec_value );
-								snprintf(buff, buflen-1, template, info.key, autoexec_value);
+								snprintf(buff, locbuflen-1, template, info.key, autoexec_value);
 								netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
 								ESP_LOGD(TAG,"Freeing memory for command %s name", autoexec_name);
 								free(autoexec_value );
@@ -336,6 +337,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					char  last_parm_name[41]={0};
 					uint8_t autoexec_flag=0;
 					bool bErrorFound=false;
+					bool bOTA=false;
+					char * otaURL=NULL;
 
 					while(last_parm!=NULL){
 						// Search will return
@@ -344,6 +347,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm);
 						if(last_parm!=NULL){
 							ESP_LOGI(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
+							if(strcmp(last_parm_name, "fwurl")==0){
+								// we're getting a request to do an OTA from that URL
+								ESP_LOGI(TAG, "OTA parameter found!");
+								otaURL=strdup(last_parm);
+								bOTA=true;
+							}
 							if(strcmp(last_parm_name, "autoexec")==0){
 								autoexec_flag = atoi(last_parm);
 								wifi_manager_save_autoexec_flag(autoexec_flag);
@@ -369,6 +378,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 					}
 					else{
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
+						if(bOTA){
+							ESP_LOGI(TAG, "Initiating OTA for url %s",otaURL);
+							start_ota(otaURL);
+						}
 					}
 
 				} 
@@ -440,7 +453,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
 	}
-
+	// reset the buffer with nulls
+	memset(buf, 0x00,buflen);
 	/* free the buffer */
 	netbuf_delete(inbuf);
 }

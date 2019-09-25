@@ -24,7 +24,7 @@
 #include "esp_pthread.h"
 
 extern void run_command(char * line);
-extern bool wait_for_wifi();
+extern  bool wait_for_wifi();
 extern void console_start();
 extern pthread_cond_t wifi_connect_suspend_cond;
 extern pthread_t wifi_connect_suspend_mutex;

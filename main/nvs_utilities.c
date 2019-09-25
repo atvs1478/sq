@@ -210,4 +210,22 @@ esp_err_t get_nvs_value(nvs_type_t type, const char *key, void*value, const uint
 	nvs_close(nvs);
 	return err;
 }
+esp_err_t erase_nvs(const char *key)
+{
+    nvs_handle nvs;
+
+    esp_err_t err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) {
+        err = nvs_erase_key(nvs, key);
+        if (err == ESP_OK) {
+            err = nvs_commit(nvs);
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG, "Value with key '%s' erased", key);
+            }
+        }
+        nvs_close(nvs);
+    }
+
+    return err;
+}
 

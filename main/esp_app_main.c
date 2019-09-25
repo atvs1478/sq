@@ -38,15 +38,17 @@
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"
-
+#include "nvs_utilities.h"
 #include "http_server.h"
 #include "wifi_manager.h"
+#include "squeezelite-ota.h"
+
 static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)
 
 static const char TAG[] = "esp_app_main";
-
+char * fwurl = NULL;
 
 #ifdef CONFIG_SQUEEZEAMP
 #define LED_GREEN_GPIO 	12
@@ -55,15 +57,18 @@ static const char TAG[] = "esp_app_main";
 #define LED_GREEN_GPIO 	0
 #define LED_RED_GPIO	0
 #endif
+static bool bWifiConnected=false;
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
 	ESP_LOGI(TAG, "I have a connection!");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+	bWifiConnected=true;
 	led_unpush(LED_GREEN);
 }
 void cb_connection_sta_disconnected(void *pvParameter){
 	led_blink_pushed(LED_GREEN, 250, 250);
+	bWifiConnected=false;
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 }
 bool wait_for_wifi(){
@@ -88,6 +93,7 @@ void app_main()
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	led_config(LED_RED, LED_RED_GPIO, 0);
 	wifi_event_group = xEventGroupCreate();
+	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 	
 	/* start the wifi manager */
 	led_blink(LED_GREEN, 250, 250);
@@ -95,6 +101,17 @@ void app_main()
 	wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 	wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 
+	char * fwurl = get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
+	if(fwurl){
+		// the first thing we need to do here is to erase the firmware url
+		// to avoid a boot loop
+		erase_nvs("fwurl");
+		while(!bWifiConnected){
+			wait_for_wifi();
+		}
+		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
+		start_ota(fwurl);
+	}
 
 	console_start();
 }

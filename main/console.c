@@ -282,9 +282,14 @@ void console_start() {
     esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
     cfg.thread_name= "console";
     cfg.inherit_cfg = true;
+#if RECOVERY_APPLICATION
+    // make sure the stack is large enough for http processing with redirects.
+	cfg.stack_size = 1024*100 ;
+#endif
     esp_pthread_set_cfg(&cfg);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
+
 	pthread_create(&thread_console, &attr, console_thread, NULL);
 	pthread_attr_destroy(&attr);
 }

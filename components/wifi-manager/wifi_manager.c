@@ -56,14 +56,12 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/ip4_addr.h"
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
+#include "squeezelite-ota.h"
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
-#if RECOVERY_APPLICATION
-extern const char * ota_get_status();
-extern uint8_t ota_get_pct_complete();
-#endif
+
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 
