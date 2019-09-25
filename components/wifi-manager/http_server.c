@@ -139,32 +139,47 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
+	int currentLength=0;
 
+	ESP_LOGD(TAG, "header name: [%s]\nRequest: %s", header_name, request);
 	ptr = strstr(request, header_name);
-	if (ptr) {
+
+
+	if (ptr!=NULL) {
 		ret = ptr + strlen(header_name);
 		ptr = ret;
+		currentLength=(int)(ptr-request);
+		ESP_LOGD(TAG, "found string at %d", currentLength);
+
 		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r' && *ptr != ':' ) {
 			ptr++;
 		}
 		if(*ptr==':'){
+			currentLength=(int)(ptr-ret);
+			ESP_LOGD(TAG, "Found parameter name end, length : %d", currentLength);
 			// save the parameter name: the string between header name and ":"
-			strncpy(parm_name,ret,(ptr-ret-1>parm_name_max_len?parm_name_max_len:ptr-ret-1));
+			strncpy(parm_name,ret,(currentLength>parm_name_max_len?parm_name_max_len:currentLength));
+			ESP_LOGD(TAG, "Found parameter name : %s ", parm_name);
 			ptr++;
 			while (*ptr == ' ' ) {
 				ptr++;
 			}
-		}
 
+		}
+		ret=ptr;
 		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
 			(*len)++;
 			ptr++;
 		}
 		// Terminate value inside its actual buffer so we can treat it as individual string
 		*ptr='\0';
-		*next_position=ptr;
+		currentLength=(int)(ptr-ret);
+		ESP_LOGD(TAG, "Found parameter value end, length : %d, 	value: %s", currentLength,ret );
+
+		*next_position=++ptr;
 		return ret;
 	}
+	ESP_LOGD(TAG, "No more match for : %s", header_name);
 	return NULL;
 }
 
@@ -314,53 +329,48 @@ void http_server_netconn_serve(struct netconn *conn) {
 				else if(strstr(line, "POST /config.json ")){
 					ESP_LOGI(TAG,"Serving POST config.json");
 
-					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
-						int i=1;
-						int lenA=0;
-						char * last_parm=save_ptr;
-						char * next_parm=save_ptr;
-						char  last_parm_name[41]={0};
-						uint8_t autoexec_flag=0;
-						bool bErrorFound=false;
+					int i=1;
+					int lenA=0;
+					char * last_parm=save_ptr;
+					char * next_parm=save_ptr;
+					char  last_parm_name[41]={0};
+					uint8_t autoexec_flag=0;
+					bool bErrorFound=false;
 
-						while(last_parm!=NULL){
-							// Search will return
-							memset(last_parm_name,0x00,sizeof(last_parm_name));
-							last_parm = http_server_search_header(next_parm, "X-Custom- ", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm);
-							ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
-							if(last_parm!=NULL){
-								if(strstr(last_parm_name, "autoexec")){
-									autoexec_flag = atoi(last_parm);
-									wifi_manager_save_autoexec_flag(autoexec_flag);
+					while(last_parm!=NULL){
+						// Search will return
+						ESP_LOGI(TAG, "Getting parameters from X-Custom headers");
+						memset(last_parm_name,0x00,sizeof(last_parm_name));
+						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm);
+						if(last_parm!=NULL){
+							ESP_LOGI(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
+							if(strcmp(last_parm_name, "autoexec")==0){
+								autoexec_flag = atoi(last_parm);
+								wifi_manager_save_autoexec_flag(autoexec_flag);
+							}
+							else {
+								if(lenA < MAX_COMMAND_LINE_SIZE ){
+									ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ Storing parameter");
+									wifi_manager_save_autoexec_config(last_parm,last_parm_name,lenA);
 								}
-								else {
-									if(lenA < MAX_COMMAND_LINE_SIZE ){
-										ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ Storing parameter");
-										wifi_manager_save_autoexec_config(last_parm,last_parm_name,lenA);
-									}
-									else
-									{
-										char szErrorPrefix[]="{ status: \"value length is too long for  ";
-										char szErrorSuffix[]="{ status: \"value length is too long for  ";
-										netconn_write(conn, szErrorPrefix, strlen(szErrorPrefix), NETCONN_NOCOPY);
-										ESP_LOGE(TAG,"length is too long : %s = %s", last_parm_name, last_parm);
-										last_parm=NULL;
-									}
+								else
+								{
+									char szErrorPrefix[]="{ status: \"value length is too long for  ";
+									char szErrorSuffix[]="{ status: \"value length is too long for  ";
+									netconn_write(conn, szErrorPrefix, strlen(szErrorPrefix), NETCONN_NOCOPY);
+									ESP_LOGE(TAG,"length is too long : %s = %s", last_parm_name, last_parm);
+									last_parm=NULL;
 								}
 							}
 						}
-						if(bErrorFound){
-							netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY); //400 invalid request
-						}
-						else{
-							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
-						}
-
+					}
+					if(bErrorFound){
+						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY); //400 invalid request
 					}
 					else{
-						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-						ESP_LOGE(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
+						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 					}
+
 				} 
 				else if(strstr(line, "POST /connect.json ")) {
 					ESP_LOGI(TAG, "http_server_netconn_serve: POST /connect.json");
