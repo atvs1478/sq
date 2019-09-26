@@ -214,9 +214,7 @@ char * wifi_manager_alloc_get_config(char * name, size_t * l){
 	}
 	else
 	{
-		char szErrorDesc[101]={0};
-		esp_err_to_name_r(esp_err , szErrorDesc, sizeof(szErrorDesc)-1);
-		ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace,esp_err, szErrorDesc);
+		ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace,esp_err, esp_err_to_name(esp_err));
 	}
 	return value;
 
@@ -231,9 +229,7 @@ esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag){
 		ESP_LOGE(TAG,"Unable to open nvs namespace %s. nvs is not initialized.",wifi_manager_nvs_namespace);
 	}
 	else if (esp_err != ESP_OK) {
-		char szErrorDesc[101]={0};
-		esp_err_to_name_r(esp_err , szErrorDesc, sizeof(szErrorDesc)-1);
-		ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %s", wifi_manager_nvs_namespace, szErrorDesc);
+		ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %s", wifi_manager_nvs_namespace, esp_err_to_name(esp_err));
 		return esp_err;
 	}
 
@@ -266,9 +262,7 @@ esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
 			ESP_LOGE(TAG,"Unable to open nvs namespace %s. nvs is not initialized.",wifi_manager_nvs_namespace);
 	}
 	else if (esp_err != ESP_OK) {
-			char szErrorDesc[101]={0};
-			esp_err_to_name_r(esp_err , szErrorDesc, sizeof(szErrorDesc)-1);
-			ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace, esp_err, szErrorDesc);
+			ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace, esp_err, esp_err_to_name(esp_err));
 			return esp_err;
 		}
     esp_err = nvs_set_str(handle, name, value);

@@ -103,9 +103,6 @@ void app_main()
 
 	char * fwurl = get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
 	if(fwurl){
-		// the first thing we need to do here is to erase the firmware url
-		// to avoid a boot loop
-		erase_nvs("fwurl");
 		while(!bWifiConnected){
 			wait_for_wifi();
 		}
