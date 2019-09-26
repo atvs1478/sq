@@ -13,8 +13,10 @@ if (!String.prototype.format) {
 
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
-var enableTimers = true;
+var enableAPTimer = true;
+var enableStatusTimer = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
+var pname, ver, otapct;
 
 var apList = null;
 var selectedSSID = "";
@@ -22,12 +24,9 @@ var refreshAPInterval = null;
 var checkStatusInterval = null;
 
 var StatusIntervalActive = false;
-var ConfigIntervalActive = false;
 var RefreshAPIIntervalActive = false;
 
 var output = '';
-//TODO check
-var to = 0, set_int = 0;
 
 function stopCheckStatusInterval(){
 	if(checkStatusInterval != null){
@@ -58,11 +57,6 @@ function startRefreshAPInterval(){
 function RepeatCheckStatusInterval(){
 	if(StatusIntervalActive)
 		startCheckStatusInterval();
-}
-
-function RepeatCheckConfigInterval(){
-	if(ConfigIntervalActive)
-		startCheckConfigInterval();
 }
 
 function RepeatRefreshAPInterval(){
@@ -363,7 +357,7 @@ function rssiToIcon(rssi){
 }
 
 function refreshAP(){
-    if (!enableTimers) return;
+    if (!enableAPTimer) return;
 	$.getJSON( "/ap.json", function( data ) {
 		if(data.length > 0){
 			//sort by signal strength
@@ -388,7 +382,8 @@ function refreshAPHTML(data){
 }
 
 function checkStatus(){
-    if (!enableTimers) return;
+	RepeatCheckStatusInterval();
+    if (!enableStatusTimer) return;
 	$.getJSON( "/status.json", function( data ) {
 		if(data.hasOwnProperty('ssid') && data['ssid'] != ""){
 			if(data["ssid"] === selectedSSID){
@@ -411,7 +406,8 @@ function checkStatus(){
 					$( "#connect-success" ).show();
 					$( "#connect-fail" ).hide();
 
-                    enableTimers = false;
+                    enableAPTimer = false;
+                    if (!recovery) enableStatusTimer = false;
 				}
 				else if(data["urc"] === 1){
 					//failed attempt
@@ -432,7 +428,8 @@ function checkStatus(){
 					$( "#connect-fail" ).show();
 					$( "#connect-success" ).hide();
                     
-                    enableTimers = true;
+                    enableAPTimer = true;
+                    enableStatusTimer = true;
 				}
 			}
 			else if(data.hasOwnProperty('urc') && data['urc'] === 0){
@@ -445,7 +442,8 @@ function checkStatus(){
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
 				}
-                enableTimers = false;
+                enableAPTimer = false;
+                if (!recovery) enableStatusTimer = false;
 			}
 		}
 		else if(data.hasOwnProperty('urc') && data['urc'] === 2){
@@ -453,14 +451,25 @@ function checkStatus(){
 			if($("#wifi-status").is(":visible")){
 				$("#wifi-status").slideUp( "fast", function() {});
 			}
-            enableTimers = true;
-		}
+            enableAPTimer = true;
+            enableStatusTimer = true;
+        }
+		if(data.hasOwnProperty('project_name') && data['project_name'] != ''){
+            pname = data['project_name'];
+            $("#mode").html(pname+" mode running "+ver);
+        }
+		if(data.hasOwnProperty('version') && data['version'] != ''){
+            ver = data['version'];
+        }
+		if(data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
+            otapct = data['ota_pct'];
+            $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
+            $('.progress-bar').html(otapct+'%');
+        }
 	})
 	.fail(function() {
 		//don't do anything, the server might be down while esp32 recalibrates radio
 	});
-
-	RepeatCheckStatusInterval();
 }
 
 function getConfig() {
@@ -478,6 +487,7 @@ function getConfig() {
             if (data["recovery"] === 1) {
                 recovery = true;
                 $("#otadiv").show();
+                enableStatusTimer = true;
             } else {
                 recovery = false;
                 $("#otadiv").hide();
@@ -497,79 +507,4 @@ function getConfig() {
 	.fail(function() {
 		console.log("failed to fetch config!");
 	});
-}
-
-
-
-
-//TODO daduke check
-function file_change() {
-        document.getElementById('update').disabled = 0;
-}
-
-function do_upload(f) {
-	var xhr = new XMLHttpRequest();
-
-        document.getElementById('update').disabled = 1;
-	//ws.close();
-	document.getElementById("progr").class = "progr-ok";
-
-	xhr.upload.addEventListener("progress", function(e) {
-		document.getElementById("progr").value = parseInt(e.loaded / e.total * 100);
-
-		if (e.loaded == e.total) {
-		//	document.getElementById("realpage").style.display = "none";
-		//	document.getElementById("waiting").style.display = "block";
-		}
-	
-	}, false);
-
-	xhr.onreadystatechange = function(e) {
-		   console.log("rs" + xhr.readyState + " status " + xhr.status); 
-		if (xhr.readyState == 4) {
-			/* it completed, for good or for ill */
-		//	document.getElementById("realpage").style.display = "none";
-		//	document.getElementById("waiting").style.display = "block";
-			document.getElementById("progr").class = "progr-ok";
-			console.log("upload reached state 4: xhr status " + xhr.status);
-			setTimeout(function() { window.location.href = location.origin + "/"; }, 9000 );
-		}
-	};
-
-	/* kill the heart timer */
-	clearInterval(set_int);
-
-	xhr.open("POST", f.action, true);
-	xhr.send(new FormData(f));
-
-	return false;
-}
-
-function heart_timer() {
-	var s;
-	
-	s = Math.round((95 * to) / (40 * 10)) / 100;
-	
-	if (s < 0) {
-		clearInterval(set_int);
-		set_int = 0;
-		
-		ws.close();
-		
-		document.getElementById("realpage").style.opacity = "0.3";
-	}
-		
-	
-	to--;
-	document.getElementById("heart").style.opacity = s;
-}
-
-
-function heartbeat()
-{
-	to = 40 * 10;
-	if (!set_int) {
-		set_int = setInterval(heart_timer, 100);
-	}
-		
 }
