@@ -290,3 +290,7 @@ input, textarea {
     font-family: monospace, monospace;
     font-size: 70%;
 }
+
+#progress {
+    margin-left: 13px;
+}

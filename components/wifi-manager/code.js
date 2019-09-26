@@ -212,7 +212,7 @@ $(document).ready(function(){
         console.log('sent config JSON with headers:', autoexec1);
     });
 
-	$("#recovery").on("click", function() {
+	$("#flash").on("click", function() {
         var url = $("#fwurl").val();
         $.ajax({
             url: '/config.json',
@@ -221,23 +221,6 @@ $(document).ready(function(){
             cache: false,
             headers: { "X-Custom-fwurl": url },
             data: { 'timestamp': Date.now() }
-        });
-        $.ajax({
-            url: '/recovery.json',
-            dataType: 'json',
-            method: 'POST',
-            cache: false,
-            data: { 'timestamp': Date.now()}
-        });
-    });
-
-	$("#reboot").on("click", function() {
-        $.ajax({
-            url: '/reboot.json',
-            dataType: 'json',
-            method: 'POST',
-            cache: false,
-            data: { 'timestamp': Date.now()}
         });
     });
 
@@ -494,11 +477,9 @@ function getConfig() {
 		if (data.hasOwnProperty('recovery')) {
             if (data["recovery"] === 1) {
                 recovery = true;
-                //$("#recoverydiv").hide();
                 $("#otadiv").show();
             } else {
                 recovery = false;
-                $("#recoverydiv").show();
                 $("#otadiv").hide();
             }
         }

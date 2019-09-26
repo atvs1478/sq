@@ -199,40 +199,30 @@
             </div>
 
             <div class="tab-pane fade" id="tab-system">
-                <div id="recoverydiv">
-                    <h1>Check for firmware upgrade</h1>
-                    <div class="buttons">
-                        <input type="button" id="fwcheck" class="btn btn-info" value="Check for updates" />
-                    </div>
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Firmware version</th>
-                                <th scope="col">IDF version</th>
-                                <th scope="col">HW platform</th>
-                                <th scope="col">Branch</th>
-                                <th scope="col">Flash this FW</th>
-                            </tr>
-                        </thead>
-                        <tbody id="releaseTable">
-                        </tbody>
-                    </table>
-                    <h2>Firmware URL:</h2>
-                    <textarea id="fwurl" maxlength="120"></textarea>
-                    <h1>Reboot to recovery system to perform firmware upgrade</h1>
-                    <div class="buttons">
-                        <input type="button" id="recovery" class="btn btn-warning" value="Recovery" />
-                    </div>
+                <h1>Check for firmware upgrade</h1>
+                <div class="buttons">
+                    <input type="button" id="fwcheck" class="btn btn-info" value="Check for updates" />
+                </div>
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Firmware version</th>
+                            <th scope="col">IDF version</th>
+                            <th scope="col">HW platform</th>
+                            <th scope="col">Branch</th>
+                            <th scope="col">Flash this FW</th>
+                        </tr>
+                    </thead>
+                    <tbody id="releaseTable">
+                    </tbody>
+                </table>
+                <h2>Firmware URL:</h2>
+                <textarea id="fwurl" maxlength="120"></textarea>
+                <div class="buttons">
+                    <input type="button" id="flash" class="btn btn-danger" value="Flash!" />
                 </div>
                 <div id="otadiv">
-                    <header><h1>Firmware upgrade</h1></header>
-                    <form name="multipart" action="otaform" method="post" enctype="multipart/form-data" onsubmit="do_upload(this); return false;">
-                        <progress id="progr" value="0" max="100" >Upload Progress</progress>
-                    </form>
-                    <h1>Reboot system with new firmware</h1>
-                    <div class="buttons">
-                        <input type="button" id="reboot" class="btn btn-warning" value="Reboot" />
-                    </div>
+                    <div id="progress">Progress: <progress id="progr" value="0" max="100" ></progress></div>
                 </div>
             </div>
 
