@@ -29,9 +29,6 @@
                 <a class="nav-link active" data-toggle="tab" href="#tab-wifi">WiFi</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#tab-startup">Startup</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-audio">Audio + LMS</a>
             </li>
             <li class="nav-item">
@@ -148,15 +145,6 @@
                 </div>
             </div>
 
-            <div class="tab-pane fade" id="tab-startup">
-                <h1>Run squeezelite automatically at boot</h1>
-
-                <div class="custom-control custom-switch">
-                      <input type="checkbox" class="custom-control-input" id="autoexec-cb" checked="checked">
-                      <label class="custom-control-label" for="autoexec-cb"></label>
-                </div>
-            </div>
-
             <div class="tab-pane fade" id="tab-audio">
                 <div id="audioout">
                     <h1>Audio output</h1>
@@ -198,6 +186,13 @@
                 <div class="buttons">
                     <input id="save-autoexec1" type="button" class="btn btn-success" value="Save" />
                 </div>
+
+                <h1>Start Squeezelite</h1>
+                <div class="custom-control custom-switch">
+                      <input type="checkbox" class="custom-control-input" id="autoexec-cb" checked="checked">
+                      <label class="custom-control-label" for="autoexec-cb"></label>
+                </div>
+                <br />
             </div>
 
             <div class="tab-pane fade" id="tab-gpio">
@@ -207,7 +202,7 @@
                 <div id="recoverydiv">
                     <h1>Check for firmware upgrade</h1>
                     <div class="buttons">
-                        <input type="button" id="fwcheck" class="btn btn-info" value="Update" />
+                        <input type="button" id="fwcheck" class="btn btn-info" value="Check for updates" />
                     </div>
                     <table class="table table-hover">
                         <thead>

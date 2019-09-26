@@ -188,6 +188,14 @@ $(document).ready(function(){
             data: { 'timestamp': Date.now() }
         });
         console.log('sent config JSON with headers:', autoexec);
+        console.log('now triggering reboot');
+        $.ajax({
+            url: '/reboot.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            data: { 'timestamp': Date.now()}
+        });
     });
 
 	$("#save-autoexec1").on("click", function() {
@@ -265,7 +273,6 @@ $(document).ready(function(){
                 });
                 var [ver, idf, cfg, branch] = release.name.split('#');
                 var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
-                console.log(body);
                 $("#releaseTable").append(
                     "<tr>"+
                       "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
@@ -289,6 +296,7 @@ $(document).ready(function(){
     //start timers
 	startCheckStatusInterval();
 	startRefreshAPInterval();
+
     $('[data-toggle="tooltip"]').tooltip({
         html: true,
         placement : 'right',
