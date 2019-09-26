@@ -213,6 +213,15 @@ $(document).ready(function(){
     });
 
 	$("#recovery").on("click", function() {
+        var url = $("#fwurl").val();
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: { "X-Custom-fwurl": url },
+            data: { 'timestamp': Date.now() }
+        });
         $.ajax({
             url: '/recovery.json',
             dataType: 'json',
@@ -305,14 +314,8 @@ $(document).ready(function(){
 
 function setURL(button) {
     var url = button.dataset.url;
-    $.ajax({
-        url: '/config.json',
-        dataType: 'json',
-        method: 'POST',
-        cache: false,
-        headers: { "X-Custom-fwurl": url },
-        data: { 'timestamp': Date.now() }
-    });
+    $("#fwurl").val(url);
+
     $('[data-url^="http"]').addClass("btn-success").removeClass("btn-danger");
     $('[data-url="'+url+'"]').addClass("btn-danger").removeClass("btn-success");
 }
@@ -491,7 +494,7 @@ function getConfig() {
 		if (data.hasOwnProperty('recovery')) {
             if (data["recovery"] === 1) {
                 recovery = true;
-                $("#recoverydiv").hide();
+                //$("#recoverydiv").hide();
                 $("#otadiv").show();
             } else {
                 recovery = false;
