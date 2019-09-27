@@ -259,10 +259,13 @@ $(document).ready(function(){
                 });
                 var [ver, idf, cfg, branch] = release.name.split('#');
                 var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
+                var [date, time] = release.created_at.split('T');
+                if (ver.match(/esp-idf/)) next; //TODO delete
                 $("#releaseTable").append(
                     "<tr>"+
                       "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
                       "<td>"+idf+"</td>"+
+                      "<td>"+date+"</td>"+
                       "<td>"+cfg+"</td>"+
                       "<td>"+branch+"</td>"+
                       "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
