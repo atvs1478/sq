@@ -136,7 +136,7 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 	}
 	return NULL;
 }
-char* http_server_search_header(char *request, char *header_name, int *len, char * parm_name, int parm_name_max_len, char ** next_position ) {
+char* http_server_search_header(char *request, char *header_name, int *len, char * parm_name, int parm_name_max_len, char ** next_position, char * bufEnd) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -146,13 +146,13 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 	ptr = strstr(request, header_name);
 
 
-	if (ptr!=NULL) {
+	if (ptr!=NULL && ptr<bufEnd) {
 		ret = ptr + strlen(header_name);
 		ptr = ret;
 		currentLength=(int)(ptr-request);
 		ESP_LOGD(TAG, "found string at %d", currentLength);
 
-		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r' && *ptr != ':' ) {
+		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r' && *ptr != ':' && ptr<bufEnd) {
 			ptr++;
 		}
 		if(*ptr==':'){
@@ -162,13 +162,13 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 			strncpy(parm_name,ret,(currentLength>parm_name_max_len?parm_name_max_len:currentLength));
 			ESP_LOGD(TAG, "Found parameter name : %s ", parm_name);
 			ptr++;
-			while (*ptr == ' ' ) {
+			while (*ptr == ' ' && ptr<bufEnd) {
 				ptr++;
 			}
 
 		}
 		ret=ptr;
-		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
+		while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r'&& ptr<bufEnd) {
 			(*len)++;
 			ptr++;
 		}
@@ -344,7 +344,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						// Search will return
 						ESP_LOGI(TAG, "Getting parameters from X-Custom headers");
 						memset(last_parm_name,0x00,sizeof(last_parm_name));
-						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm);
+						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm,buf+buflen);
 						if(last_parm!=NULL){
 							ESP_LOGI(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
 							if(strcmp(last_parm_name, "fwurl")==0){
