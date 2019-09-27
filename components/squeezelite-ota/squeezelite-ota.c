@@ -98,7 +98,12 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_HEADER:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, status_code=%d, key=%s, value=%s",esp_http_client_get_status_code(evt->client),evt->header_key, evt->header_value);
-        if (strcasecmp(evt->header_key, "location") == 0) {
+		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+		if (strcasecmp(evt->header_key, "location") == 0) {
         	if(ota_status.actual_url!=NULL) {
         		free(ota_status.actual_url);
         		ota_status.actual_url = NULL;
@@ -114,7 +119,12 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_DATA:
     	if(!ota_status.bOTA_started) ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
-        if(esp_http_client_get_status_code(evt->client) == 302){
+		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+		if(esp_http_client_get_status_code(evt->client) == 302){
                 	// This is an indication of a redirect.  Let's follow it
                 	return ESP_OK;
         }
@@ -126,6 +136,11 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
+		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
         break;
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_DISCONNECTED");
