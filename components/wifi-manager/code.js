@@ -206,6 +206,26 @@ $(document).ready(function(){
         console.log('sent config JSON with headers:', autoexec1);
     });
 
+	$("#save-gpio").on("click", function() {
+        var headers = {};
+        $("input.gpio").each(function() {
+            var id = $(this)[0].id;
+            var pin = $(this).val();
+            if (pin != '') {
+                headers[id] = pin;
+            }
+        });
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: JSON.stringify(headers),
+            data: { 'timestamp': Date.now() }
+        });
+        console.log('sent config JSON with headers:', JSON.stringify(headers));
+    });
+
 	$("#flash").on("click", function() {
         var url = $("#fwurl").val();
         $.ajax({
@@ -259,10 +279,13 @@ $(document).ready(function(){
                 });
                 var [ver, idf, cfg, branch] = release.name.split('#');
                 var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
+                var [date, time] = release.created_at.split('T');
+                if (ver.match(/esp-idf/)) return; //TODO delete
                 $("#releaseTable").append(
                     "<tr>"+
                       "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
                       "<td>"+idf+"</td>"+
+                      "<td>"+date+"</td>"+
                       "<td>"+cfg+"</td>"+
                       "<td>"+branch+"</td>"+
                       "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
@@ -396,6 +419,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
+                    $(".footer").html("connected to SSID "+text(data["ssid"])+" with IP "+text(data["ip"]));
 					
 					//unlock the wait screen if needed
 					$( "#ok-connect" ).prop("disabled",false);
@@ -441,6 +465,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
+                    $(".footer").html("connected to SSID "+data["ssid"]+" with IP "+data["ip"]);
 				}
                 enableAPTimer = false;
                 if (!recovery) enableStatusTimer = false;

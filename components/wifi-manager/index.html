@@ -197,6 +197,61 @@
             </div>
 
             <div class="tab-pane fade" id="tab-gpio">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Signal</th>
+                            <th scope="col">GPIO pin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gpioTable">
+                        <tr>
+                            <td><strong>I2S</strong></td><td></td>
+                        </tr>
+                        <tr>
+                            <td>I2S Bit clock</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="gpio-i2s-bc" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>I2S Word select</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="gpio-i2s-ws" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>I2S Data</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="gpio-i2s-data" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>SPDIF</strong></td><td></td>
+                        </tr>
+                        <tr>
+                            <td>SPDIF Bit clock</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="spdif-i2s-bc" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SPDIF Word select</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="spdif-i2s-ws" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SPDIF Data</td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="spdif-i2s-data" maxlength="2" size="2">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="buttons">
+                    <input id="save-gpio" type="button" class="btn btn-success" value="Save" />
+                </div>
             </div>
 
             <div class="tab-pane fade" id="tab-system">
@@ -209,6 +264,7 @@
                         <tr>
                             <th scope="col">Firmware version</th>
                             <th scope="col">IDF version</th>
+                            <th scope="col">Release date</th>
                             <th scope="col">HW platform</th>
                             <th scope="col">Branch</th>
                             <th scope="col">Flash this FW</th>
@@ -247,5 +303,6 @@
             </div>
 
         </div>
+        <footer class="footer"></footer>
     </body>
 </html>
