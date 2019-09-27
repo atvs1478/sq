@@ -33,6 +33,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "http_server.h"
 #include "cmd_system.h"
+
 #define NVS_PARTITION_NAME "nvs"
 
 /* @brief tag used for ESP serial console messages */
@@ -41,7 +42,8 @@ static const char json_start[] = "{ \"recovery\": %u, \"autoexec\": %u, \"list\"
 static const char json_end[] = "]}";
 static const char template[] = "{ \"%s\": \"%s\" }";
 static const char array_separator[]=",";
-
+static char *s = "\"";
+static char *r = "\\\"";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 extern char current_namespace[];
@@ -69,13 +71,10 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 
 
 /* const http headers stored in ROM */
+const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAccept-Ranges: bytes\nContent-Length: %d\nContent-Encoding: %s\n\n";
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
-const static char http_jquery_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 30604\nContent-Encoding: gzip\n\n";
-const static char http_popper_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 7487\nContent-Encoding: gzip\n\n";
-const static char http_bootstrap_js_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccept-Ranges: bytes\nContent-Length: 15412\nContent-Encoding: gzip\n\n";
-const static char http_bootstrap_css_gz_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nAccept-Ranges: bytes\nContent-Length: 25925\nContent-Encoding: gzip\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
@@ -85,9 +84,12 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
+
+
 void http_server_start(){
+
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 1024*3, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
@@ -136,7 +138,7 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 	}
 	return NULL;
 }
-char* http_server_search_header(char *request, char *header_name, int *len, char * parm_name, int parm_name_max_len, char ** next_position, char * bufEnd) {
+char* http_server_search_header(char *request, char *header_name, int *len, char ** parm_name, char ** next_position, char * bufEnd) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -159,8 +161,14 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 			currentLength=(int)(ptr-ret);
 			ESP_LOGD(TAG, "Found parameter name end, length : %d", currentLength);
 			// save the parameter name: the string between header name and ":"
-			strncpy(parm_name,ret,(currentLength>parm_name_max_len?parm_name_max_len:currentLength));
-			ESP_LOGD(TAG, "Found parameter name : %s ", parm_name);
+			*parm_name=malloc(currentLength+1);
+			if(*parm_name==NULL){
+				ESP_LOGE(TAG, "Unable to allocate memory for new header name");
+				return NULL;
+			}
+			memset(*parm_name, 0x00,currentLength+1);
+			strncpy(*parm_name,ret,currentLength);
+			ESP_LOGD(TAG, "Found parameter name : %s ", *parm_name);
 			ptr++;
 			while (*ptr == ' ' && ptr<bufEnd) {
 				ptr++;
@@ -183,7 +191,24 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 	ESP_LOGD(TAG, "No more match for : %s", header_name);
 	return NULL;
 }
-
+void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, const uint8_t * end, char * content_type,char * encoding){
+	uint16_t len=end - start;
+	size_t  buff_length= sizeof(http_hdr_template)+strlen(content_type)+strlen(encoding);
+	char * http_hdr=malloc(buff_length);
+	if( http_hdr == NULL){
+		ESP_LOGE(TAG,"Cound not allocate %d bytes for headers.",buff_length);
+		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+	}
+	else
+	{
+		memset(http_hdr,0x00,buff_length);
+		snprintf(http_hdr, buff_length-1,http_hdr_template,content_type,len,encoding);
+		netconn_write(conn, http_hdr, strlen(http_hdr), NETCONN_NOCOPY);
+		ESP_LOGD(TAG,"sending response : %s",http_hdr);
+		netconn_write(conn, start, end - start, NETCONN_NOCOPY);
+		free(http_hdr);
+	}
+}
 
 void http_server_netconn_serve(struct netconn *conn) {
 
@@ -225,7 +250,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				/* default page */
 				if(strstr(line, "GET / ")) {
 					netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, index_html_start, index_html_end - index_html_start, NETCONN_NOCOPY);
+					netconn_write(conn, index_html_start, index_html_end- index_html_start, NETCONN_NOCOPY);
 				}
 				else if(strstr(line, "GET /code.js ")) {
 					netconn_write(conn, http_js_hdr, sizeof(http_js_hdr) - 1, NETCONN_NOCOPY);
@@ -236,20 +261,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, style_css_start, style_css_end - style_css_start, NETCONN_NOCOPY);
 				}
 				else if(strstr(line, "GET /jquery.js ")) {
-					netconn_write(conn, http_jquery_gz_hdr, sizeof(http_jquery_gz_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, jquery_gz_start, jquery_gz_end - jquery_gz_start, NETCONN_NOCOPY);
+					http_server_send_resource_file(conn,jquery_gz_start, jquery_gz_end, "text/javascript", "gzip" );
 				}
 				else if(strstr(line, "GET /popper.js ")) {
-					netconn_write(conn, http_popper_gz_hdr, sizeof(http_popper_gz_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, popper_gz_start, popper_gz_end - popper_gz_start, NETCONN_NOCOPY);
+					http_server_send_resource_file(conn,popper_gz_start, popper_gz_end, "text/javascript", "gzip" );
 				}
 				else if(strstr(line, "GET /bootstrap.js ")) {
-					netconn_write(conn, http_bootstrap_js_gz_hdr, sizeof(http_bootstrap_js_gz_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, bootstrap_js_gz_start, bootstrap_js_gz_end - bootstrap_js_gz_start, NETCONN_NOCOPY);
+					http_server_send_resource_file(conn,bootstrap_js_gz_start, bootstrap_js_gz_end, "text/javascript", "gzip" );
 				}
 				else if(strstr(line, "GET /bootstrap.css ")) {
-					netconn_write(conn, http_bootstrap_css_gz_hdr, sizeof(http_bootstrap_css_gz_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, bootstrap_css_gz_start, bootstrap_css_gz_end - bootstrap_css_gz_start, NETCONN_NOCOPY);
+					http_server_send_resource_file(conn,bootstrap_css_gz_start, bootstrap_css_gz_end, "text/css", "gzip" );
 				}
 
                 //dynamic stuff
@@ -272,14 +293,13 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else if(strstr(line, "GET /config.json ")){
 					ESP_LOGI(TAG,"Serving config.json");
-					char autoexec_name[21]={0};
+
 					char * autoexec_value=NULL;
 					uint8_t autoexec_flag=0;
-					int locbuflen=MAX_COMMAND_LINE_SIZE+strlen(template)+1;
-					char * buff = malloc(locbuflen);
-          			char *s = "\"";
-          			char *r = "\\\"";
-					if(!buff)
+					int locbuflen=MAX_COMMAND_LINE_SIZE*4+strlen(template)+1;
+					char * config_buffer = malloc(locbuflen);
+
+					if(!config_buffer)
 					{
 						ESP_LOGE(TAG,"Unable to allocate buffer for config.json!");
 						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
@@ -288,22 +308,20 @@ void http_server_netconn_serve(struct netconn *conn) {
 					{
 						int i=1;
 						size_t l = 0;
-						esp_err_t esp_err;
+						nvs_entry_info_t info;
+
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 						autoexec_flag = wifi_manager_get_flag();
-						snprintf(buff,locbuflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
-						netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
+						snprintf(config_buffer,locbuflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
+						netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
 
 						ESP_LOGI(TAG, "About to get config from flash");
-
 						nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, NVS_TYPE_STR);
 						if (it == NULL) {
 							ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
 						}
 						while (it != NULL){
-							nvs_entry_info_t info;
 							nvs_entry_info(it, &info);
-							it = nvs_entry_next(it);
 							if(strstr(info.namespace_name, current_namespace)){
 								if(i>1)
 								{
@@ -314,27 +332,25 @@ void http_server_netconn_serve(struct netconn *conn) {
 								autoexec_value = wifi_manager_alloc_get_config(info.key, &l);
 								strreplace(autoexec_value, s, r);
 								ESP_LOGI(TAG,"Namespace %s, key=%s, value=%s", info.namespace_name, info.key,autoexec_value );
-								snprintf(buff, locbuflen-1, template, info.key, autoexec_value);
-								netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-								ESP_LOGD(TAG,"Freeing memory for command %s name", autoexec_name);
+								snprintf(config_buffer, locbuflen-1, template, info.key, autoexec_value);
+								netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
+								ESP_LOGD(TAG,"Freeing memory for command [%s] value [%s]", info.key, autoexec_value);
 								free(autoexec_value );
 								i++;
 							}
+							it = nvs_entry_next(it);
 						}
-						free(buff);
-
+						free(config_buffer);
 						netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
-						ESP_LOGD(TAG,"%s", json_end);
 					}
 				}
 				else if(strstr(line, "POST /config.json ")){
 					ESP_LOGI(TAG,"Serving POST config.json");
 
-					int i=1;
 					int lenA=0;
 					char * last_parm=save_ptr;
 					char * next_parm=save_ptr;
-					char  last_parm_name[41]={0};
+					char  * last_parm_name=NULL;
 					uint8_t autoexec_flag=0;
 					bool bErrorFound=false;
 					bool bOTA=false;
@@ -343,9 +359,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					while(last_parm!=NULL){
 						// Search will return
 						ESP_LOGI(TAG, "Getting parameters from X-Custom headers");
-						memset(last_parm_name,0x00,sizeof(last_parm_name));
-						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, last_parm_name, sizeof(last_parm_name)-1,&next_parm,buf+buflen);
-						if(last_parm!=NULL){
+						last_parm = http_server_search_header(next_parm, "X-Custom-", &lenA, &last_parm_name,&next_parm,buf+buflen);
+						if(last_parm!=NULL && last_parm_name!=NULL){
 							ESP_LOGI(TAG, "http_server_netconn_serve: config.json/ call, found parameter %s=%s, length %i", last_parm_name, last_parm, lenA);
 							if(strcmp(last_parm_name, "fwurl")==0){
 								// we're getting a request to do an OTA from that URL
@@ -364,13 +379,15 @@ void http_server_netconn_serve(struct netconn *conn) {
 								}
 								else
 								{
-									char szErrorPrefix[]="{ status: \"value length is too long for  ";
-									char szErrorSuffix[]="{ status: \"value length is too long for  ";
-									netconn_write(conn, szErrorPrefix, strlen(szErrorPrefix), NETCONN_NOCOPY);
 									ESP_LOGE(TAG,"length is too long : %s = %s", last_parm_name, last_parm);
 									last_parm=NULL;
+									bErrorFound=true;
 								}
 							}
+						}
+						if(last_parm_name!=NULL) {
+							free(last_parm_name);
+							last_parm_name=NULL;
 						}
 					}
 					if(bErrorFound){

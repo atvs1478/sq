@@ -32,9 +32,13 @@ static struct {
 	char status_text[31];
 	uint32_t ota_actual_len;
 	uint32_t ota_total_len;
-	char * actual_url;
-	bool bOTA_started;
+	char * redirected_url;
+	char * current_url;
+	bool bRedirectFound;
+	bool bOTAStarted;
 } ota_status;
+uint8_t lastpct=0;
+uint8_t newpct=0;
 
 static esp_http_client_config_t config;
 static esp_http_client_config_t ota_config;
@@ -45,7 +49,7 @@ const char * ota_get_status(){
 }
 uint8_t ota_get_pct_complete(){
 	return ota_status.ota_total_len==0?0:
-			(uint8_t)((uint32_t)ota_status.ota_actual_len/(uint32_t)ota_status.ota_total_len*100);
+			(uint8_t)((float)ota_status.ota_actual_len/(float)ota_status.ota_total_len*100.0f);
 }
 
 static void __attribute__((noreturn)) task_fatal_error(void)
@@ -57,7 +61,7 @@ static void __attribute__((noreturn)) task_fatal_error(void)
         ;
     }
 }
-
+#define FREE_RESET(p) if(p!=NULL) { free(p); p=NULL; }
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
 // --------------
@@ -82,35 +86,27 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-        if(!ota_status.bOTA_started){
-        	ESP_LOGW(TAG, "Resetting the OTA stats");
-			ota_status.ota_total_len=0;
-			ota_status.ota_actual_len=0;
-			if(ota_status.actual_url!=NULL){
-				free(ota_status.actual_url);
-				ota_status.actual_url=NULL;
-			}
-        }
-       break;
-    case HTTP_EVENT_HEADER_SENT:
-        ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
-       /// strncpy(ota_status,"HTTP_EVENT_HEADER_SENT",sizeof(ota_status)-1);
-        break;
-    case HTTP_EVENT_ON_HEADER:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, status_code=%d, key=%s, value=%s",esp_http_client_get_status_code(evt->client),evt->header_key, evt->header_value);
-		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+        if(ota_status.bOTAStarted) snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Installing...");
+		ota_status.ota_total_len=0;
+		ota_status.ota_actual_len=0;
+		lastpct=0;
+		newpct=0;
+			ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
 					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
 					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+			break;
+    case HTTP_EVENT_HEADER_SENT:
+        ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
+        break;
+    case HTTP_EVENT_ON_HEADER:
+        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, status_code=%d, key=%s, value=%s",esp_http_client_get_status_code(evt->client),evt->header_key, evt->header_value);
 		if (strcasecmp(evt->header_key, "location") == 0) {
-        	if(ota_status.actual_url!=NULL) {
-        		free(ota_status.actual_url);
-        		ota_status.actual_url = NULL;
-        	}
-        	ota_status.actual_url=strdup(evt->header_value);
-        	ESP_LOGW(TAG,"OTA will redirect to url: %s",ota_status.actual_url);
-        	ota_status.bOTA_started = true;
+			FREE_RESET(ota_status.redirected_url);
+        	ota_status.redirected_url=strdup(evt->header_value);
+        	ESP_LOGW(TAG,"OTA will redirect to url: %s",ota_status.redirected_url);
+        	ota_status.bRedirectFound= true;
         }
         if (strcasecmp(evt->header_key, "content-length") == 0) {
         	ota_status.ota_total_len = atol(evt->header_value);
@@ -118,20 +114,17 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         }
         break;
     case HTTP_EVENT_ON_DATA:
-    	if(!ota_status.bOTA_started) ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
-		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
-					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
-		if(esp_http_client_get_status_code(evt->client) == 302){
-                	// This is an indication of a redirect.  Let's follow it
-                	return ESP_OK;
-        }
-        if(esp_http_client_get_status_code(evt->client) == 200 ){
-        	if(!ota_status.bOTA_started) return ESP_OK;
+    	if(!ota_status.bOTAStarted)  {
+    		ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
+    	}
+    	else if(ota_status.bOTAStarted && esp_http_client_get_status_code(evt->client) == 200 ){
 			ota_status.ota_actual_len+=evt->data_len;
-			ESP_LOGD(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, ota_get_pct_complete());
+			if(ota_get_pct_complete()%5 == 0) newpct = ota_get_pct_complete();
+			if(lastpct!=newpct )
+			{
+				lastpct=newpct;
+				ESP_LOGD(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, newpct);
+			}
         }
         break;
     case HTTP_EVENT_ON_FINISH:
@@ -168,62 +161,60 @@ static void check_http_redirect(void)
 	ESP_LOGD(TAG, "fetching headers");
 	esp_http_client_fetch_headers(client);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "redirect check returned success");
+        ESP_LOGI(TAG, "redirect check retrieved headers");
     } else {
         ESP_LOGE(TAG, "redirect check returned %s", esp_err_to_name(err));
     }
 }
 esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
-	memset(&ota_status, 0x00, sizeof(ota_status));
-	if(url==NULL || strlen(url)==0){
-		ESP_LOGE(TAG,"HTTP OTA called without a url");
-		return ESP_ERR_INVALID_ARG;
-	}
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
-	ota_status.actual_url= strdup(url);
-	ota_status.bOTA_started=false;
 	conf->cert_pem = (char *)server_cert_pem_start;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 1024*4;
+	conf->buffer_size = 1024*2;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
-	conf->url = strdup(ota_status.actual_url);
+	conf->url = strdup(url);
 	conf->max_redirection_count = 0;
 
 	return ESP_OK;
 }
 void ota_task(void *pvParameter)
 {
+	char * passedURL=(char *)pvParameter;
+	memset(&ota_status, 0x00, sizeof(ota_status));
+
 	ESP_LOGD(TAG, "HTTP ota Thread started");
-
-	if(init_config(&config,(char *)pvParameter)!=ESP_OK){
-		if(pvParameter!=NULL) free(pvParameter);
+	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Initializing...");
+	ota_status.bRedirectFound=false;
+	if(passedURL==NULL || strlen(passedURL)==0){
+		ESP_LOGE(TAG,"HTTP OTA called without a url");
 		vTaskDelete(NULL);
-		return;
+		return ;
 	}
-	free(pvParameter);
+	ota_status.current_url= strdup(passedURL);
+	init_config(&config,ota_status.current_url);
 
+	FREE_RESET(pvParameter);
+	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Checking for redirect...");
 	check_http_redirect();
-	if(!ota_status.bOTA_started || ota_status.actual_url == NULL){
+	if(ota_status.bRedirectFound && ota_status.redirected_url== NULL){
 		// OTA Failed miserably.  Errors would have been logged somewhere
-		ESP_LOGE(TAG,"Redirect check failed. Bailing out");
+		ESP_LOGE(TAG,"Redirect check failed to identify target URL. Bailing out");
 		vTaskDelete(NULL);
 	}
 	ESP_LOGD(TAG,"Calling esp_https_ota");
-	if(init_config(&ota_config,ota_status.actual_url)!=ESP_OK){
-		if(pvParameter!=NULL) free(pvParameter);
-		vTaskDelete(NULL);
-		return;
-	}
-	free(ota_status.actual_url);
-	ota_status.actual_url=NULL;
-
+	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
+	ota_status.bOTAStarted = true;
+	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Starting OTA...");
 	esp_err_t err = esp_https_ota(&config);
     if (err == ESP_OK) {
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Firmware upgrade failed with error : %s", esp_err_to_name(err));
     }
+	FREE_RESET(ota_status.current_url);
+	FREE_RESET(ota_status.redirected_url);
+
     vTaskDelete(NULL);
 }
 
@@ -264,7 +255,7 @@ void start_ota(const char * bin_url)
 
 
     ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
-    ret=xTaskCreate(&ota_task, "ota_task", 1024*8,(void *) urlPtr, 3, NULL);
+    ret=xTaskCreate(&ota_task, "ota_task", 1024*10,(void *) urlPtr, 3, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
         }
