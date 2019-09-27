@@ -206,6 +206,26 @@ $(document).ready(function(){
         console.log('sent config JSON with headers:', autoexec1);
     });
 
+	$("#save-gpio").on("click", function() {
+        var headers = {};
+        $("input.gpio").each(function() {
+            var id = $(this)[0].id;
+            var pin = $(this).val();
+            if (pin != '') {
+                headers[id] = pin;
+            }
+        });
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: JSON.stringify(headers),
+            data: { 'timestamp': Date.now() }
+        });
+        console.log('sent config JSON with headers:', JSON.stringify(headers));
+    });
+
 	$("#flash").on("click", function() {
         var url = $("#fwurl").val();
         $.ajax({
@@ -260,7 +280,7 @@ $(document).ready(function(){
                 var [ver, idf, cfg, branch] = release.name.split('#');
                 var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
                 var [date, time] = release.created_at.split('T');
-                if (ver.match(/esp-idf/)) next; //TODO delete
+                if (ver.match(/esp-idf/)) return; //TODO delete
                 $("#releaseTable").append(
                     "<tr>"+
                       "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+

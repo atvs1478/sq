@@ -213,6 +213,12 @@ input[type='text'], input[type='password'], textarea {
   padding: 4px;
 }
 
+input.gpio {
+    width: 2em;
+    color: #000;
+    height: 1.8em;
+}
+
 .custom-switch, .custom-radio {
   padding-left: 2.25rem;
   margin-left: 12px;
