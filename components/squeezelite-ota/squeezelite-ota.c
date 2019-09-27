@@ -36,6 +36,7 @@ static struct {
 	char * current_url;
 	bool bRedirectFound;
 	bool bOTAStarted;
+	bool bInitialized;
 } ota_status;
 uint8_t lastpct=0;
 uint8_t newpct=0;
@@ -45,6 +46,11 @@ static esp_http_client_config_t ota_config;
 static esp_http_client_handle_t client;
 
 const char * ota_get_status(){
+	if(!ota_status.bInitialized)
+		{
+			memset(ota_status.status_text, 0x00,sizeof(ota_status.status_text));
+			ota_status.bInitialized = true;
+		}
 	return ota_status.status_text;
 }
 uint8_t ota_get_pct_complete(){
@@ -187,7 +193,7 @@ void ota_task(void *pvParameter)
 {
 	char * passedURL=(char *)pvParameter;
 	memset(&ota_status, 0x00, sizeof(ota_status));
-
+	ota_status.bInitialized = true;
 	ESP_LOGD(TAG, "HTTP ota Thread started");
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Initializing...");
 	ota_status.bRedirectFound=false;

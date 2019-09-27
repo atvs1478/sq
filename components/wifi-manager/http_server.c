@@ -343,6 +343,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 						free(config_buffer);
 						netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
 					}
+					ESP_LOGD(TAG,"Done serving config.json");
 				}
 				else if(strstr(line, "POST /config.json ")){
 					ESP_LOGI(TAG,"Serving POST config.json");
@@ -470,8 +471,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
 	}
-	// reset the buffer with nulls
-	memset(buf, 0x00,buflen);
 	/* free the buffer */
 	netbuf_delete(inbuf);
 }
