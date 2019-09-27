@@ -419,6 +419,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
+                    $(".footer").html("connected to SSID "+text(data["ssid"])+" with IP "+text(data["ip"]));
 					
 					//unlock the wait screen if needed
 					$( "#ok-connect" ).prop("disabled",false);
@@ -464,6 +465,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
+                    $(".footer").html("connected to SSID "+data["ssid"]+" with IP "+data["ip"]);
 				}
                 enableAPTimer = false;
                 if (!recovery) enableStatusTimer = false;
