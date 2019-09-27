@@ -124,6 +124,11 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 			{
 				lastpct=newpct;
 				ESP_LOGD(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, newpct);
+				ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+						heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 			}
         }
         break;
@@ -208,8 +213,10 @@ void ota_task(void *pvParameter)
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Starting OTA...");
 	esp_err_t err = esp_https_ota(&config);
     if (err == ESP_OK) {
+    	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Success!");
         esp_restart();
     } else {
+    	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Error: %s",esp_err_to_name(err));
         ESP_LOGE(TAG, "Firmware upgrade failed with error : %s", esp_err_to_name(err));
     }
 	FREE_RESET(ota_status.current_url);
