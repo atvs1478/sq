@@ -17,6 +17,7 @@ var enableAPTimer = true;
 var enableStatusTimer = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct;
+var blockAjax = false;
 
 var apList = null;
 var selectedSSID = "";
@@ -46,7 +47,7 @@ function stopRefreshAPInterval(){
 
 function startCheckStatusInterval(){
 	StatusIntervalActive = true;
-	checkStatusInterval = setTimeout(checkStatus, 950);
+	checkStatusInterval = setTimeout(checkStatus, 3000);
 }
 
 function startRefreshAPInterval(){
@@ -407,6 +408,8 @@ function refreshAPHTML(data){
 function checkStatus(){
 	RepeatCheckStatusInterval();
     if (!enableStatusTimer) return;
+    if (blockAjax) return;
+    blockAjax = true;
 	$.getJSON( "/status.json", function( data ) {
 		if(data.hasOwnProperty('ssid') && data['ssid'] != ""){
 			if(data["ssid"] === selectedSSID){
@@ -419,7 +422,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
-                    $(".footer").html("connected to SSID "+text(data["ssid"])+" with IP "+text(data["ip"]));
+                    $("span#foot-wifi").html(", SSID: "+data["ssid"]+", IP: "+data["ip"]);
 					
 					//unlock the wait screen if needed
 					$( "#ok-connect" ).prop("disabled",false);
@@ -440,6 +443,7 @@ function checkStatus(){
 					$("#ip").text('0.0.0.0');
 					$("#netmask").text('0.0.0.0');
 					$("#gw").text('0.0.0.0');
+                    $("span#foot-wifi").html("");
 					
 					//don't show any connection
 					$("#wifi-status").slideUp( "fast", function() {});
@@ -465,7 +469,7 @@ function checkStatus(){
 					$("#netmask").text(data["netmask"]);
 					$("#gw").text(data["gw"]);
 					$("#wifi-status").slideDown( "fast", function() {});
-                    $(".footer").html("connected to SSID "+data["ssid"]+" with IP "+data["ip"]);
+                    $("span#foot-wifi").html(", SSID: "+data["ssid"]+", IP: "+data["ip"]);
 				}
                 enableAPTimer = false;
                 if (!recovery) enableStatusTimer = false;
@@ -475,22 +479,24 @@ function checkStatus(){
 			//that's a manual disconnect
 			if($("#wifi-status").is(":visible")){
 				$("#wifi-status").slideUp( "fast", function() {});
+                $("span#foot-wifi").html("");
 			}
             enableAPTimer = true;
             enableStatusTimer = true;
         }
 		if(data.hasOwnProperty('project_name') && data['project_name'] != ''){
             pname = data['project_name'];
-            $("#mode").html(pname+" mode running "+ver);
         }
 		if(data.hasOwnProperty('version') && data['version'] != ''){
             ver = data['version'];
+            $("span#foot-fw").html("fw: "+ver+", mode: "+pname);
         }
 		if(data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
             otapct = data['ota_pct'];
             $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
             $('.progress-bar').html(otapct+'%');
         }
+        blockAjax = false;
 	})
 	.fail(function() {
 		//don't do anything, the server might be down while esp32 recalibrates radio

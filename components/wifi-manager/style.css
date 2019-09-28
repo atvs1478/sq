@@ -303,10 +303,6 @@ input, textarea {
     width: 60%;
 }
 
-#mode {
-    float: right;
-}
-
 .footer {
   position: fixed;
   left: 0;
