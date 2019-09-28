@@ -206,6 +206,7 @@ void ota_task(void *pvParameter)
 	init_config(&config,ota_status.current_url);
 
 	FREE_RESET(pvParameter);
+
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Checking for redirect...");
 	check_http_redirect();
 	if(ota_status.bRedirectFound && ota_status.redirected_url== NULL){
@@ -217,6 +218,8 @@ void ota_task(void *pvParameter)
 	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
 	ota_status.bOTAStarted = true;
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Starting OTA...");
+	// pause to let the system catch up
+	vTaskDelay(1500/ portTICK_RATE_MS);
 	esp_err_t err = esp_https_ota(&config);
     if (err == ESP_OK) {
     	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Success!");
@@ -265,10 +268,10 @@ void start_ota(const char * bin_url)
         }
         nvs_close(nvs);
     }
-
-
+    ESP_LOGI(TAG, "Waiting for other processes to start");
+    vTaskDelay(2500/ portTICK_RATE_MS);
     ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
-    ret=xTaskCreate(&ota_task, "ota_task", 1024*10,(void *) urlPtr, 3, NULL);
+    ret=xTaskCreate(&ota_task, "ota_task", 1024*10,(void *) urlPtr, 4, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
         }
