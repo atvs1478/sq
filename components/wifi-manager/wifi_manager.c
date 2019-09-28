@@ -129,7 +129,9 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
 
-
+void wifi_manager_refresh_ota_json(){
+	wifi_manager_send_message(EVENT_REFRESH_OTA, NULL);
+}
 
 void wifi_manager_scan_async(){
 	wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
@@ -1131,9 +1133,15 @@ void wifi_manager( void * pvParameters ){
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
-
 				break;
-
+			case UPDATE_CONNECTION_OK:
+				/* refresh JSON with the new ota data */
+				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+					/* generate the connection info with success */
+					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );
+					wifi_manager_unlock_json_buffer();
+				}
+				break;
 			case ORDER_DISCONNECT_STA:
 				ESP_LOGI(TAG, "MESSAGE: ORDER_DISCONNECT_STA");
 

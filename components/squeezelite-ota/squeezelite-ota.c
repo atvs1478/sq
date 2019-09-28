@@ -44,7 +44,7 @@ uint8_t newpct=0;
 static esp_http_client_config_t config;
 static esp_http_client_config_t ota_config;
 static esp_http_client_handle_t client;
-
+extern void wifi_manager_refresh_ota_json();
 const char * ota_get_status(){
 	if(!ota_status.bInitialized)
 		{
@@ -93,10 +93,12 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
         if(ota_status.bOTAStarted) snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Installing...");
+        wifi_manager_refresh_ota_json();
 		ota_status.ota_total_len=0;
 		ota_status.ota_actual_len=0;
 		lastpct=0;
 		newpct=0;
+		wifi_manager_refresh_ota_json();
 			ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
 					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
@@ -128,6 +130,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 			if(ota_get_pct_complete()%5 == 0) newpct = ota_get_pct_complete();
 			if(lastpct!=newpct )
 			{
+				wifi_manager_refresh_ota_json();
 				lastpct=newpct;
 				ESP_LOGD(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, newpct);
 				ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
@@ -196,6 +199,7 @@ void ota_task(void *pvParameter)
 	ota_status.bInitialized = true;
 	ESP_LOGD(TAG, "HTTP ota Thread started");
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Initializing...");
+	wifi_manager_refresh_ota_json();
 	ota_status.bRedirectFound=false;
 	if(passedURL==NULL || strlen(passedURL)==0){
 		ESP_LOGE(TAG,"HTTP OTA called without a url");
@@ -208,6 +212,7 @@ void ota_task(void *pvParameter)
 	FREE_RESET(pvParameter);
 
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Checking for redirect...");
+	wifi_manager_refresh_ota_json();
 	check_http_redirect();
 	if(ota_status.bRedirectFound && ota_status.redirected_url== NULL){
 		// OTA Failed miserably.  Errors would have been logged somewhere
@@ -218,14 +223,17 @@ void ota_task(void *pvParameter)
 	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
 	ota_status.bOTAStarted = true;
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Starting OTA...");
+	wifi_manager_refresh_ota_json();
 	// pause to let the system catch up
 	vTaskDelay(1500/ portTICK_RATE_MS);
 	esp_err_t err = esp_https_ota(&config);
     if (err == ESP_OK) {
     	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Success!");
+    	wifi_manager_refresh_ota_json();
         esp_restart();
     } else {
     	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Error: %s",esp_err_to_name(err));
+    	wifi_manager_refresh_ota_json();
         ESP_LOGE(TAG, "Firmware upgrade failed with error : %s", esp_err_to_name(err));
     }
 	FREE_RESET(ota_status.current_url);

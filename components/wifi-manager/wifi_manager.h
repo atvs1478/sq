@@ -212,7 +212,8 @@ typedef enum message_code_t {
 	EVENT_STA_DISCONNECTED = 12,
 	EVENT_SCAN_DONE = 13,
 	EVENT_STA_GOT_IP = 14,
-	MESSAGE_CODE_COUNT = 15 /* important for the callback array */
+	EVENT_REFRESH_OTA = 15,
+	MESSAGE_CODE_COUNT = 16 /* important for the callback array */
 
 }message_code_t;
 
