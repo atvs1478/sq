@@ -2,6 +2,8 @@ body {
     border: 0;
     margin: 0;
     margin-bottom:50px;
+    padding-left: 12px;
+    padding-right: 12px;
 }
 a {
     color: darkblue;
@@ -25,7 +27,6 @@ button:focus {
     filter: blur(2px);
 }
 .ape {
-    margin-left: 20px;
     padding: 10px 0px 10px 10px;
     background-color: #444;
 }
@@ -79,21 +80,18 @@ h3 {
 #manual_ssid {
     border: none;
     width: 80%;
-    margin-left: 35px;
     padding: 10px 0px 10px 10px;
     display: block
 }
 #manual_pwd {
     border: none;
     width: 80%;
-    margin-left: 35px;
     padding: 10px 0px 10px 10px;
     display: block
 }
 #pwd {
     border: none;
     width: 80%;
-    margin-left: 35px;
     padding: 10px 0px 10px 10px;
     display: block
 }
@@ -108,7 +106,6 @@ h3 {
 }
 #yes-disconnect {
     display: inline-block;
-    margin-left: 20px;
 }
 #no-disconnect {
     display: inline-block;
@@ -220,9 +217,12 @@ input.gpio {
     height: 1.8em;
 }
 
+.custom-switch {
+    margin-left: 8px;
+}
+
 .custom-switch, .custom-radio {
   padding-left: 2.25rem;
-  margin-left: 12px;
   padding-bottom: 1rem;
 }
 
@@ -273,16 +273,11 @@ textarea#autoexec1, textarea#fwurl {
 }
 
 input, textarea {
-    margin-left: 10px;
     border-radius: 3px;
     border: 1px solid transparent;
     border-top: none;
     border-bottom: 1px solid #DDD;
     box-shadow: inset 0 1px 2px rgba(0,0,0,.39), 0 -1px 1px #FFF, 0 1px 0 #FFF;
-}
-
-.form-group {
-    margin-left: 10px;
 }
 
 #otadiv {
@@ -299,7 +294,6 @@ input, textarea {
 }
 
 #progress {
-    margin-left: 13px;
     width: 60%;
 }
 
