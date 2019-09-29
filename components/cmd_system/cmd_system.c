@@ -24,6 +24,8 @@
 #include "esp32/rom/uart.h"
 #include "cmd_system.h"
 #include "sdkconfig.h"
+#include "esp_partition.h"
+#include "esp_ota_ops.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -102,9 +104,14 @@ static int restart(int argc, char **argv)
 void guided_factory()
 {
     ESP_LOGI(TAG, "Rebooting to factory.");
-    uint32_t *p_force_factory_magic = (uint32_t *)LWS_MAGIC_REBOOT_TYPE_ADS;
-	*p_force_factory_magic = LWS_MAGIC_REBOOT_TYPE_REQ_FACTORY;
 
+    const esp_partition_t *partition;
+	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
+	partition = (esp_partition_t *) esp_partition_get(it);
+	if(partition != NULL){
+		esp_ota_set_boot_partition(partition);
+	}
+	esp_partition_iterator_release(it);
 	esp_restart();
 
 }
