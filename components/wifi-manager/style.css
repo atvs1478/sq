@@ -297,6 +297,10 @@ input, textarea {
     width: 60%;
 }
 
+.progress-bar {
+    background-color: #037AF0;
+}
+
 .footer {
   position: fixed;
   left: 0;
