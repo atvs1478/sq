@@ -281,7 +281,6 @@ $(document).ready(function(){
                 var [ver, idf, cfg, branch] = release.name.split('#');
                 var body = release.body.replace(/\\n/ig, "<br />").replace(/\'/ig, "\"");
                     var [date, time] = release.created_at.split('T');
-                    if (ver.match(/esp-idf/)) return; //TODO delete
                     $("#releaseTable").append(
                         "<tr>"+
                         "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
