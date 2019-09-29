@@ -277,9 +277,13 @@ void start_ota(const char * bin_url)
         nvs_close(nvs);
     }
     ESP_LOGI(TAG, "Waiting for other processes to start");
+<<<<<<< HEAD
     for(int i=0;i<10;i++){
     	vTaskDelay(1000/ portTICK_RATE_MS);
     }
+=======
+    vTaskDelay(5000/ portTICK_RATE_MS);
+>>>>>>> branch 'Over_The_Air_Update' of https://github.com/sle118/squeezelite-esp32.git
 #ifdef CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_1
 #define OTA_CORE 0
 #warning "Wifi running on core 1"
