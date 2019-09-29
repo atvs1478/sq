@@ -73,6 +73,8 @@ wifi_ap_record_t *accessp_records;
 char *accessp_json = NULL;
 char *ip_info_json = NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
+static update_reason_code_t last_update_reason_code=0;
+
 
 void (**cb_ptr_arr)(void*) = NULL;
 
@@ -414,11 +416,18 @@ void wifi_manager_clear_ip_info_json(){
 
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+	if(update_reason_code == UPDATE_OTA) {
+		update_reason_code = last_update_reason_code;
+	}
+	else
+	{
+		last_update_reason_code = update_reason_code;
+	}
 	if(config){
 #if RECOVERY_APPLICATION
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%u}\n";
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%u,\"recovery\": 1}\n";
 #else
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\"}\n";
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\",\"recovery\": 0}\n";
 #endif
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 		const esp_app_desc_t* desc = esp_ota_get_app_description();
@@ -900,6 +909,12 @@ void wifi_manager( void * pvParameters ){
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
+			case EVENT_REFRESH_OTA:
+				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+					wifi_manager_generate_ip_info_json( UPDATE_OTA );
+					wifi_manager_unlock_json_buffer();
+				}
+				break;
 
 			case ORDER_START_WIFI_SCAN:
 				ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
@@ -1155,7 +1170,6 @@ void wifi_manager( void * pvParameters ){
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
 				break;
-
 			default:
 				break;
 

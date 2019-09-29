@@ -98,12 +98,11 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 		ota_status.ota_actual_len=0;
 		lastpct=0;
 		newpct=0;
-		wifi_manager_refresh_ota_json();
-			ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
-					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+		ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
+				heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+				heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+				heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+				heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 			break;
     case HTTP_EVENT_HEADER_SENT:
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
@@ -184,7 +183,7 @@ esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
 	conf->cert_pem = (char *)server_cert_pem_start;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 1024*2;
+	conf->buffer_size = 1024*8;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
@@ -207,26 +206,26 @@ void ota_task(void *pvParameter)
 		return ;
 	}
 	ota_status.current_url= strdup(passedURL);
-	init_config(&config,ota_status.current_url);
+//	init_config(&config,ota_status.current_url);
 
 	FREE_RESET(pvParameter);
-
-	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Checking for redirect...");
-	wifi_manager_refresh_ota_json();
-	check_http_redirect();
-	if(ota_status.bRedirectFound && ota_status.redirected_url== NULL){
-		// OTA Failed miserably.  Errors would have been logged somewhere
-		ESP_LOGE(TAG,"Redirect check failed to identify target URL. Bailing out");
-		vTaskDelete(NULL);
-	}
+//
+//	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Checking for redirect...");
+//	wifi_manager_refresh_ota_json();
+//	check_http_redirect();
+//	if(ota_status.bRedirectFound && ota_status.redirected_url== NULL){
+//		// OTA Failed miserably.  Errors would have been logged somewhere
+//		ESP_LOGE(TAG,"Redirect check failed to identify target URL. Bailing out");
+//		vTaskDelete(NULL);
+//	}
 	ESP_LOGD(TAG,"Calling esp_https_ota");
 	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
 	ota_status.bOTAStarted = true;
 	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Starting OTA...");
 	wifi_manager_refresh_ota_json();
 	// pause to let the system catch up
-	vTaskDelay(1500/ portTICK_RATE_MS);
-	esp_err_t err = esp_https_ota(&config);
+	vTaskDelay(500/ portTICK_RATE_MS);
+	esp_err_t err = esp_https_ota(&ota_config);
     if (err == ESP_OK) {
     	snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,"Success!");
     	wifi_manager_refresh_ota_json();
@@ -279,7 +278,7 @@ void start_ota(const char * bin_url)
     ESP_LOGI(TAG, "Waiting for other processes to start");
     vTaskDelay(2500/ portTICK_RATE_MS);
     ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
-    ret=xTaskCreate(&ota_task, "ota_task", 1024*10,(void *) urlPtr, 4, NULL);
+    ret=xTaskCreate(&ota_task, "ota_task", 1024*20,(void *) urlPtr, 4, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
         }

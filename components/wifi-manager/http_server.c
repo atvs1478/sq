@@ -38,7 +38,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
-static const char json_start[] = "{ \"recovery\": %u, \"autoexec\": %u, \"list\": [";
+static const char json_start[] = "{ \"autoexec\": %u, \"list\": [";
 static const char json_end[] = "]}";
 static const char template[] = "{ \"%s\": \"%s\" }";
 static const char array_separator[]=",";
@@ -312,7 +312,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 						autoexec_flag = wifi_manager_get_flag();
-						snprintf(config_buffer,locbuflen-1, json_start, RECOVERY_APPLICATION, autoexec_flag);
+						snprintf(config_buffer,locbuflen-1, json_start, autoexec_flag);
 						netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
 
 						ESP_LOGI(TAG, "About to get config from flash");
