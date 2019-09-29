@@ -237,6 +237,7 @@ $(document).ready(function(){
             headers: { "X-Custom-fwurl": url },
             data: { 'timestamp': Date.now() }
         });
+        enableStatusTimer = true;
     });
 
     $("#generate-command").on("click", function() {
