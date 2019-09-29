@@ -484,6 +484,17 @@ $(document).ready(function(){
                 enableAPTimer = true;
                 enableStatusTimer = true;
             }
+            if (data.hasOwnProperty('recovery')) {
+                if (data["recovery"] === 1) {
+                    recovery = true;
+                    $("#otadiv").show();
+                    enableStatusTimer = true;
+                } else {
+                    recovery = false;
+                    $("#otadiv").hide();
+                    enableStatusTimer = false;
+                }
+            }
             if(data.hasOwnProperty('project_name') && data['project_name'] != ''){
                 pname = data['project_name'];
             }
@@ -512,17 +523,6 @@ $(document).ready(function(){
                 } else {
                     console.log('turn off autoexec');
                     $("#autoexec-cb")[0].checked=false;
-                }
-            }
-            if (data.hasOwnProperty('recovery')) {  //move to status!
-                if (data["recovery"] === 1) {
-                    recovery = true;
-                    $("#otadiv").show();
-                    enableStatusTimer = true;
-                } else {
-                    recovery = false;
-                    $("#otadiv").hide();
-                    enableStatusTimer = false;
                 }
             }
             if (data.hasOwnProperty('list')) {
