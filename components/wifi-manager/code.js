@@ -498,9 +498,9 @@ $(document).ready(function(){
             }
             blockAjax = false;
         })
-            .fail(function() {
-                //don't do anything, the server might be down while esp32 recalibrates radio
-            });
+        .fail(function() {
+            //don't do anything, the server might be down while esp32 recalibrates radio
+        });
     }
 
     function getConfig() {
@@ -514,7 +514,7 @@ $(document).ready(function(){
                     $("#autoexec-cb")[0].checked=false;
                 }
             }
-            if (data.hasOwnProperty('recovery')) {
+            if (data.hasOwnProperty('recovery')) {  //move to status!
                 if (data["recovery"] === 1) {
                     recovery = true;
                     $("#otadiv").show();
@@ -522,6 +522,7 @@ $(document).ready(function(){
                 } else {
                     recovery = false;
                     $("#otadiv").hide();
+                    enableStatusTimer = false;
                 }
             }
             if (data.hasOwnProperty('list')) {
@@ -535,7 +536,7 @@ $(document).ready(function(){
                 });
             }
         })
-            .fail(function() {
-                console.log("failed to fetch config!");
-            });
+        .fail(function() {
+            console.log("failed to fetch config!");
+        });
     }
