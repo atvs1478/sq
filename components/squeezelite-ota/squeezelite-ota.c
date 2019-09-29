@@ -121,17 +121,18 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         }
         break;
     case HTTP_EVENT_ON_DATA:
+    	vTaskDelay(5/ portTICK_RATE_MS);
     	if(!ota_status.bOTAStarted)  {
     		ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
     	}
     	else if(ota_status.bOTAStarted && esp_http_client_get_status_code(evt->client) == 200 ){
 			ota_status.ota_actual_len+=evt->data_len;
-			if(ota_get_pct_complete()%5 == 0) newpct = ota_get_pct_complete();
+			if(ota_get_pct_complete()%2 == 0) newpct = ota_get_pct_complete();
 			if(lastpct!=newpct )
 			{
 				wifi_manager_refresh_ota_json();
 				lastpct=newpct;
-				ESP_LOGD(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, newpct);
+				ESP_LOGI(TAG,"Receiving OTA data chunk len: %d, %d of %d (%d pct)", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, newpct);
 				ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)\n",
 						heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 						heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
@@ -183,7 +184,7 @@ esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
 	conf->cert_pem = (char *)server_cert_pem_start;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 1024*8;
+	conf->buffer_size = 2048;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
@@ -276,9 +277,16 @@ void start_ota(const char * bin_url)
         nvs_close(nvs);
     }
     ESP_LOGI(TAG, "Waiting for other processes to start");
-    vTaskDelay(2500/ portTICK_RATE_MS);
+    vTaskDelay(5000/ portTICK_RATE_MS);
+#ifdef CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_1
+#define OTA_CORE 0
+#warning "Wifi running on core 1"
+#else
+#define OTA_CORE 1
+    #endif
     ESP_LOGI(TAG, "Starting ota: %s", urlPtr);
-    ret=xTaskCreate(&ota_task, "ota_task", 1024*20,(void *) urlPtr, 4, NULL);
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*40, (void *)urlPtr, tskIDLE_PRIORITY+3, NULL, OTA_CORE);
+
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
         }
