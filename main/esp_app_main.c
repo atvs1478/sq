@@ -102,13 +102,15 @@ void app_main()
 	wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 
 	char * fwurl = get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
-	if(fwurl){
+	if(fwurl && strlen(fwurl)>0){
 		while(!bWifiConnected){
 			wait_for_wifi();
 		}
 		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
 		start_ota(fwurl);
 	}
-
-	console_start();
+	else
+	{
+		console_start();
+	}
 }
