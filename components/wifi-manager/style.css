@@ -298,6 +298,7 @@ input, textarea {
 }
 
 .progress-bar {
+    color: #fff;
     background-color: #037AF0;
 }
 
