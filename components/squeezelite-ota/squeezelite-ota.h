@@ -8,7 +8,7 @@
 #pragma once
 #include "esp_attr.h"
 #if RECOVERY_APPLICATION
-#define CODE_RAM_LOCATION IRAM_ATTR
+#define CODE_RAM_LOCATION
 #else
 #define CODE_RAM_LOCATION
 #endif

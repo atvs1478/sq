@@ -21,6 +21,7 @@
 #include "esp_err.h"
 #include "tcpip_adapter.h"
 #include "squeezelite-ota.h"
+#include "nvs_utilities.h"
 #include <time.h>
 #include <sys/time.h>
 #include <stdarg.h>
@@ -183,7 +184,7 @@ esp_err_t CODE_RAM_LOCATION init_config(esp_http_client_config_t * conf, const c
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
 	conf->cert_pem = (char *)server_cert_pem_start;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 1024*2;
+	conf->buffer_size = 1024;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
@@ -262,7 +263,7 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #define OTA_CORE 1
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*40, (void *)urlPtr, ESP_TASK_MAIN_PRIO+3, NULL, OTA_CORE);
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*10, (void *)urlPtr, ESP_TASK_MAIN_PRIO+3, NULL, OTA_CORE);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
@@ -277,8 +278,9 @@ esp_err_t start_ota(const char * bin_url, bool bFromAppMain)
 	return process_recovery_ota(bin_url);
 #else
 		ESP_LOGW(TAG, "Called to update the firmware from url: %s",bin_url);
+		store_nvs_value(NVS_TYPE_STR, "fwurl", bin_url);
 		ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
-		return guided_factory();
+	return guided_factory();
 	return ESP_OK;
 #endif
 }

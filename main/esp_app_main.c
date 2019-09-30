@@ -143,14 +143,13 @@ void app_main()
 	wifi_event_group = xEventGroupCreate();
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 	fwurl = process_ota_url();
-	
+
 	/* start the wifi manager */
 	led_blink(LED_GREEN, 250, 250);
 	wifi_manager_start();
 	wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 	wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 	console_start();
-
 	if(fwurl && strlen(fwurl)>0){
 		while(!bWifiConnected){
 			wait_for_wifi();

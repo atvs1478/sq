@@ -92,7 +92,6 @@ void CODE_RAM_LOCATION http_server_start(){
 		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
-
 void CODE_RAM_LOCATION http_server(void *pvParameters) {
 
 	struct netconn *conn, *newconn;
@@ -368,8 +367,7 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 								ESP_LOGI(TAG, "OTA parameter found!");
 								otaURL=strdup(last_parm);
 								bOTA=true;
-							}
-							if(strcmp(last_parm_name, "autoexec")==0){
+							}else if(strcmp(last_parm_name, "autoexec")==0){
 								autoexec_flag = atoi(last_parm);
 								wifi_manager_save_autoexec_flag(autoexec_flag);
 							}
@@ -398,7 +396,8 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 						if(bOTA){
 							ESP_LOGI(TAG, "Restarting to process OTA for url %s",otaURL);
 							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
-							esp_restart();
+							start_ota(otaURL,false);
+							free(otaURL);
 						}
 					}
 
