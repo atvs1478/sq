@@ -235,8 +235,8 @@ err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFi
 		if(strstr(info.namespace_name, current_namespace)){
 			if(!*bFirst){
 				netconn_write(conn, array_separator, strlen(array_separator), NETCONN_NOCOPY);
-				*bFirst=true;
 			}
+			*bFirst=false;
 			void * value = get_nvs_value_alloc(nvs_type,info.key);
 			if(value==NULL)
 			{
