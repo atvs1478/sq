@@ -35,6 +35,9 @@
                 <a class="nav-link" data-toggle="tab" href="#tab-gpio">GPIO</a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-system">System</a>
             </li>
             <li class="nav-item">
@@ -251,6 +254,22 @@
                 </table>
                 <div class="buttons">
                     <input id="save-gpio" type="button" class="btn btn-success" value="Save" />
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-nvs">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Key</th>
+                            <th scope="col">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nvsTable">
+                    </tbody>
+                </table>
+                <div class="buttons">
+                    <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
                 </div>
             </div>
 

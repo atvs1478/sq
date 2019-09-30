@@ -492,10 +492,16 @@ function checkStatus(){
             if (data["recovery"] === 1) {
                 recovery = true;
                 $("#otadiv").show();
+                $('a[href^="#tab-audio"]').hide();
+                $('a[href^="#tab-gpio"]').hide();
+                $('a[href^="#tab-nvs"]').show();
                 enableStatusTimer = true;
             } else {
                 recovery = false;
                 $("#otadiv").hide();
+                $('a[href^="#tab-audio"]').show();
+                $('a[href^="#tab-gpio"]').show();
+                //$('a[href^="#tab-nvs"]').hide();
                 enableStatusTimer = false;
             }
         }
@@ -530,25 +536,43 @@ function checkStatus(){
 
 function getConfig() {
     $.getJSON("/config.json", function(data) {
+        for (var key in data) {
+            if (data.hasOwnProperty(key)) {
+                if (key == 'autoexec') {
+                    if (data["autoexec"] === "1") {
+                        $("#autoexec-cb")[0].checked=true;
+                    } else {
+                        $("#autoexec-cb")[0].checked=false;
+                    }
+                } else if (key == 'autoexec1') {
+                    $("#autoexec1").val(data["autoexec1"]);
+                }
+
+                if (recovery) {
+                    $("tbody#nvsTable").append(
+                        "<tr>"+
+                            "<td>"+key+"</td>"+
+                            "<td>"+
+                                "<input type='text' class='form-control' id='nvs'+key value='"+data[key]+"'>"+
+                            "</td>"+
+                        "</tr>"
+                    );
+                    //TODO append empty line
+                }
+            }
+        }
+/*
         if (data.hasOwnProperty('autoexec')) {
             if (data["autoexec"] === 1) {
-                console.log('turn on autoexec');
                 $("#autoexec-cb")[0].checked=true;
             } else {
-                console.log('turn off autoexec');
                 $("#autoexec-cb")[0].checked=false;
             }
         }
-        if (data.hasOwnProperty('list')) {
-            data.list.forEach(function(line) {
-                let key = Object.keys(line)[0];
-                let val = Object.values(line)[0];
-                console.log(key, val);
-                if (key == 'autoexec1') {
-                    $("#autoexec1").val(val);
-                }
-            });
+        if (data.hasOwnProperty('autoexec')) {
+            $("#autoexec1").val(data["autoexec1"]);
         }
+        */
     })
     .fail(function() {
         console.log("failed to fetch config!");
