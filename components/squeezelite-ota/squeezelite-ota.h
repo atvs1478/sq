@@ -13,8 +13,8 @@
 #define CODE_RAM_LOCATION
 #endif
 
-esp_err_t CODE_RAM_LOCATION start_ota(const char * bin_url, bool bFromAppMain);
-const char * CODE_RAM_LOCATION ota_get_status();
-uint8_t CODE_RAM_LOCATION ota_get_pct_complete();
+esp_err_t start_ota(const char * bin_url, bool bFromAppMain);
+const char * ota_get_status();
+uint8_t ota_get_pct_complete();
 
 

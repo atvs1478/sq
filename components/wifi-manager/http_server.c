@@ -33,16 +33,19 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "http_server.h"
 #include "cmd_system.h"
-#include "../squeezelite-ota/squeezelite-ota.h"
-
+#include <inttypes.h>
+#include "squeezelite-ota.h"
+#include "nvs_utilities.h"
 #define NVS_PARTITION_NAME "nvs"
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
-static const char json_start[] = "{ \"autoexec\": %u, \"list\": [";
-static const char json_end[] = "]}";
-static const char template[] = "{ \"%s\": \"%s\" }";
-static const char array_separator[]=",";
+static const char json_start[] = "{\n";
+static const char json_end[] = "\n}";
+static const char template[] = " \"%s\": \"%s\" ";
+static const char template_u[] = " \"%s\": %u ";
+static const char template_i[] = " \"%s\": %i ";
+static const char array_separator[]=",\n";
 static char *s = "\"";
 static char *r = "\\\"";
 /* @brief task handle for the http server */
@@ -86,13 +89,13 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
-void CODE_RAM_LOCATION http_server_start(){
+void http_server_start(){
 
 	if(task_http_server == NULL){
 		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
-void CODE_RAM_LOCATION http_server(void *pvParameters) {
+void http_server(void *pvParameters) {
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -120,7 +123,7 @@ void CODE_RAM_LOCATION http_server(void *pvParameters) {
 }
 
 
-char* CODE_RAM_LOCATION http_server_get_header(char *request, char *header_name, int *len) {
+char* http_server_get_header(char *request, char *header_name, int *len) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -137,7 +140,7 @@ char* CODE_RAM_LOCATION http_server_get_header(char *request, char *header_name,
 	}
 	return NULL;
 }
-char* CODE_RAM_LOCATION http_server_search_header(char *request, char *header_name, int *len, char ** parm_name, char ** next_position, char * bufEnd) {
+char* http_server_search_header(char *request, char *header_name, int *len, char ** parm_name, char ** next_position, char * bufEnd) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -190,7 +193,7 @@ char* CODE_RAM_LOCATION http_server_search_header(char *request, char *header_na
 	ESP_LOGD(TAG, "No more match for : %s", header_name);
 	return NULL;
 }
-void CODE_RAM_LOCATION http_server_send_resource_file(struct netconn *conn,const uint8_t * start, const uint8_t * end, char * content_type,char * encoding){
+void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, const uint8_t * end, char * content_type,char * encoding){
 	uint16_t len=end - start;
 	size_t  buff_length= sizeof(http_hdr_template)+strlen(content_type)+strlen(encoding);
 	char * http_hdr=malloc(buff_length);
@@ -209,7 +212,80 @@ void CODE_RAM_LOCATION http_server_send_resource_file(struct netconn *conn,const
 	}
 }
 
-void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
+err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFirst){
+	nvs_entry_info_t info;
+
+	int locbuflen=1024+strlen(template)+1;
+	char * config_buffer = malloc(locbuflen);
+	memset(config_buffer, 0x00,locbuflen);
+
+	if(!config_buffer)
+	{
+		ESP_LOGE(TAG,"Unable to allocate buffer for config.json!");
+		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+		return ESP_FAIL;
+	}
+
+	nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, nvs_type);
+	if (it == NULL) {
+		ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
+	}
+	while (it != NULL){
+		nvs_entry_info(it, &info);
+		if(strstr(info.namespace_name, current_namespace)){
+			if(!*bFirst){
+				netconn_write(conn, array_separator, strlen(array_separator), NETCONN_NOCOPY);
+				*bFirst=true;
+			}
+			void * value = get_nvs_value_alloc(nvs_type,info.key);
+			if(value==NULL)
+			{
+				ESP_LOGE(TAG,"nvs read failed.");
+				free(config_buffer);
+				return ESP_FAIL;
+			}
+			switch (nvs_type) {
+				case NVS_TYPE_I8:
+					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int8_t*)value);
+					break;
+				case NVS_TYPE_I16:
+					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int16_t*)value);
+					break;
+				case NVS_TYPE_I32:
+					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int32_t*)value);
+					break;
+				case NVS_TYPE_U8:
+					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint8_t*)value);
+					break;
+				case NVS_TYPE_U16:
+					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint16_t*)value);
+					break;
+				case NVS_TYPE_U32:
+					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint32_t*)value);
+					break;
+				case NVS_TYPE_STR:
+					strreplace((char *)value, s, r);
+					snprintf(config_buffer, locbuflen-1, template, info.key, (char *)value);
+					break;
+				case NVS_TYPE_I64:
+				case NVS_TYPE_U64:
+				default:
+					ESP_LOGE(TAG, "nvs type %u not supported", nvs_type);
+					break;
+			}
+
+			ESP_LOGD(TAG,"Namespace %s, json chunk: %s", info.namespace_name, config_buffer);
+			netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
+			free(value );
+		}
+		it = nvs_entry_next(it);
+	}
+	free(config_buffer);
+	return ESP_OK;
+}
+
+
+void http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
 	char *buf = NULL;
@@ -292,56 +368,12 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 				}
 				else if(strstr(line, "GET /config.json ")){
 					ESP_LOGI(TAG,"Serving config.json");
-
-					char * autoexec_value=NULL;
-					uint8_t autoexec_flag=0;
-					int locbuflen=MAX_COMMAND_LINE_SIZE*4+strlen(template)+1;
-					char * config_buffer = malloc(locbuflen);
-
-					if(!config_buffer)
-					{
-						ESP_LOGE(TAG,"Unable to allocate buffer for config.json!");
-						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-					}
-					else
-					{
-						int i=1;
-						size_t l = 0;
-						nvs_entry_info_t info;
-
-						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-						autoexec_flag = wifi_manager_get_flag();
-						snprintf(config_buffer,locbuflen-1, json_start, autoexec_flag);
-						netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
-
-						ESP_LOGI(TAG, "About to get config from flash");
-						nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, NVS_TYPE_STR);
-						if (it == NULL) {
-							ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
-						}
-						while (it != NULL){
-							nvs_entry_info(it, &info);
-							if(strstr(info.namespace_name, current_namespace)){
-								if(i>1)
-								{
-									netconn_write(conn, array_separator, strlen(array_separator), NETCONN_NOCOPY);
-									ESP_LOGD(TAG,"%s", array_separator);
-								}
-
-								autoexec_value = wifi_manager_alloc_get_config(info.key, &l);
-								strreplace(autoexec_value, s, r);
-								ESP_LOGI(TAG,"Namespace %s, key=%s, value=%s", info.namespace_name, info.key,autoexec_value );
-								snprintf(config_buffer, locbuflen-1, template, info.key, autoexec_value);
-								netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
-								ESP_LOGD(TAG,"Freeing memory for command [%s] value [%s]", info.key, autoexec_value);
-								free(autoexec_value );
-								i++;
-							}
-							it = nvs_entry_next(it);
-						}
-						free(config_buffer);
-						netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
-					}
+					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
+					netconn_write(conn, json_start, strlen(json_start), NETCONN_NOCOPY);
+					ESP_LOGI(TAG, "About to get config from flash");
+					bool bFirst=true;
+					http_server_nvs_dump(conn,NVS_TYPE_STR  , &bFirst);
+					netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
 					ESP_LOGD(TAG,"Done serving config.json");
 				}
 				else if(strstr(line, "POST /config.json ")){
@@ -351,7 +383,6 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 					char * last_parm=save_ptr;
 					char * next_parm=save_ptr;
 					char  * last_parm_name=NULL;
-					uint8_t autoexec_flag=0;
 					bool bErrorFound=false;
 					bool bOTA=false;
 					char * otaURL=NULL;
@@ -367,14 +398,11 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 								ESP_LOGI(TAG, "OTA parameter found!");
 								otaURL=strdup(last_parm);
 								bOTA=true;
-							}else if(strcmp(last_parm_name, "autoexec")==0){
-								autoexec_flag = atoi(last_parm);
-								wifi_manager_save_autoexec_flag(autoexec_flag);
 							}
 							else {
 								if(lenA < MAX_COMMAND_LINE_SIZE ){
 									ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ Storing parameter");
-									wifi_manager_save_autoexec_config(last_parm,last_parm_name,lenA);
+									wifi_manager_save_config(last_parm,last_parm_name,lenA);
 								}
 								else
 								{
@@ -474,7 +502,7 @@ void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 	netbuf_delete(inbuf);
 }
 
-void CODE_RAM_LOCATION strreplace(char *src, char *str, char *rep)
+void strreplace(char *src, char *str, char *rep)
 {
     char *p = strstr(src, str);
     if (p)

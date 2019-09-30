@@ -53,13 +53,14 @@ void process_autoexec(){
 	int i=1;
 	char autoexec_name[21]={0};
 	char * autoexec_value=NULL;
-	uint8_t * autoexec_flag=NULL;
+	uint8_t autoexec_flag=0;
 
-	autoexec_flag = get_nvs_value_alloc(NVS_TYPE_U8, "autoexec");
+	char * str_flag = get_nvs_value_alloc(NVS_TYPE_STR, "autoexec");
 
-	if(autoexec_flag!=NULL ){
-		ESP_LOGI(TAG,"autoexec flag value found with value %u", *autoexec_flag);
-		if(*autoexec_flag == 1) {
+	if(str_flag !=NULL ){
+		autoexec_flag=atoi(str_flag);
+		ESP_LOGI(TAG,"autoexec flag value found with value %u", autoexec_flag);
+		if(autoexec_flag == 1) {
 			do {
 				snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i++);
 				ESP_LOGD(TAG,"Getting command name %s", autoexec_name);
@@ -76,31 +77,17 @@ void process_autoexec(){
 				}
 			} while(1);
 		}
-		free(autoexec_flag);
+		free(str_flag);
 	}
 	else
 	{
 		ESP_LOGD(TAG,"No matching command found for name autoexec. Adding default entries");
-		uint8_t autoexec_dft=0;
+		char autoexec_dft[]="0";
 		char autoexec1_dft[256]="squeezelite -o I2S -b 500:2000 -d all=info -M esp32";
-		store_nvs_value(NVS_TYPE_U8,"autoexec",&autoexec_dft);
+		store_nvs_value(NVS_TYPE_STR,"autoexec",autoexec_dft);
 		store_nvs_value(NVS_TYPE_STR,"autoexec1",autoexec1_dft);
 	}
 }
-//static void initialize_filesystem() {
-//	static wl_handle_t wl_handle;
-//	const esp_vfs_fat_mount_config_t mount_config = {
-//			.max_files = 10,
-//			.format_if_mount_failed = true,
-//			.allocation_unit_size = 4096
-//			};
-//	esp_err_t err = esp_vfs_fat_spiflash_mount(MOUNT_PATH, "storage",
-//			&mount_config, &wl_handle);
-//	if (err != ESP_OK) {
-//		ESP_LOGE(TAG, "Failed to mount FATFS (%s)", esp_err_to_name(err));
-//		return;
-//	}
-//}
 
 static void initialize_nvs() {
 	esp_err_t err = nvs_flash_init();
