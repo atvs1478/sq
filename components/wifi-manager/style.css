@@ -302,6 +302,11 @@ input, textarea {
     background-color: #037AF0;
 }
 
+span#flash-status {
+    padding-left: 15px;
+    font-size: 120%;
+}
+
 .footer {
   position: fixed;
   left: 0;

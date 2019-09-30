@@ -16,8 +16,9 @@ var recovery = false;
 var enableAPTimer = true;
 var enableStatusTimer = true;
 var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
-var pname, ver, otapct;
+var pname, ver, otapct, otadsc;
 var blockAjax = false;
+var blockFlashButton = false;
 
 var apList = null;
 var selectedSSID = "";
@@ -228,6 +229,8 @@ $(document).ready(function(){
     });
 
     $("#flash").on("click", function() {
+        if (blockFlashButton) return;
+        blockFlashButton = true;
         var url = $("#fwurl").val();
         $.ajax({
             url: '/config.json',
@@ -507,6 +510,16 @@ function checkStatus(){
             otapct = data['ota_pct'];
             $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
             $('.progress-bar').html(otapct+'%');
+        }
+        if(data.hasOwnProperty('ota_dsc') && data['ota_dsc'] != ''){
+            otadsc = data['ota_dsc'];
+            $("span#flash-status").html(otadsc);
+            if (otadsc.match(/Error:/) || otapct > 95) {
+                blockFlashButton = false;
+                enableStatusTimer = true;
+            }
+        } else {
+            $("span#flash-status").html('');
         }
         blockAjax = false;
     })
