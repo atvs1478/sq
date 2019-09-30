@@ -184,7 +184,7 @@ esp_err_t CODE_RAM_LOCATION init_config(esp_http_client_config_t * conf, const c
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
 	conf->cert_pem = (char *)server_cert_pem_start;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 1024;
+	conf->buffer_size = 4096;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
@@ -202,6 +202,7 @@ void CODE_RAM_LOCATION ota_task(void *pvParameter)
 	ota_status.bRedirectFound=false;
 	if(passedURL==NULL || strlen(passedURL)==0){
 		ESP_LOGE(TAG,"HTTP OTA called without a url");
+		ota_status.bOTAThreadStarted=false;
 		vTaskDelete(NULL);
 		return ;
 	}
@@ -219,6 +220,7 @@ void CODE_RAM_LOCATION ota_task(void *pvParameter)
     	triggerStatusJsonRefresh("Error: %s",esp_err_to_name(err));
     	wifi_manager_refresh_ota_json();
         ESP_LOGE(TAG, "Firmware upgrade failed with error : %s", esp_err_to_name(err));
+        ota_status.bOTAThreadStarted=false;
     }
 	FREE_RESET(ota_status.current_url);
 	FREE_RESET(ota_status.redirected_url);
@@ -263,7 +265,8 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #define OTA_CORE 1
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*10, (void *)urlPtr, ESP_TASK_MAIN_PRIO+3, NULL, OTA_CORE);
+
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+4, NULL, OTA_CORE);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
