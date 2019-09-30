@@ -17,7 +17,6 @@
 #include "driver/uart.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
-#include "esp_vfs_fat.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "pthread.h"
@@ -34,9 +33,6 @@ static void * console_thread();
 void console_start();
 static const char * TAG = "console";
 
-#if RECOVERY_APPLICATION ==1
-extern void start_ota(const char * bin_url);
-#endif
 
 
 /* Prompt to be printed before each line.
@@ -52,71 +48,6 @@ const char* prompt = LOG_COLOR_I "squeezelite-esp32> " LOG_RESET_COLOR;
 #define MOUNT_PATH "/data"
 #define HISTORY_PATH MOUNT_PATH "/history.txt"
 void run_command(char * line);
-//optListStruct * getOptionByName(char * option){
-//	optListStruct * curOpt=&optList[0];
-//	while(curOpt->optName !=NULL){
-//		if(!strcmp(curOpt->optName, option)){
-//			return curOpt;
-//		}
-//		curOpt++;
-//	}
-//	return NULL;
-//}
-//
-//static int list_options(int argc, char **argv)
-//{
-//	nvs_handle nvs;
-//	esp_err_t err;
-//
-//	err = nvs_open(current_namespace, NVS_READONLY, &nvs);
-//	if (err != ESP_OK) {
-//		return err;
-//	}
-//	//
-//	optListStruct * curOpt=&optList[0];
-//	printf("System Configuration Options.\n");
-//	while(curOpt->optName!=NULL){
-//        printf("Option: %s\n"
-//        		"     Description: %20s\n"
-//        		"     Default Value: %20s\n"
-//        		"     Current Value: ",curOpt->optName, curOpt->description, curOpt->defaultValue);
-//        size_t len;
-//        if ( (nvs_get_str(nvs, curOpt->optName, NULL, &len)) == ESP_OK) {
-//            char *str = (char *)malloc(len);
-//            if ( (nvs_get_str(nvs, curOpt->optName, str, &len)) == ESP_OK) {
-//                printf("%20s\n", str);
-//            }
-//            free(str);
-//        }
-//        else
-//        {
-//        	if(store_nvs_value(NVS_TYPE_STR, curOpt->optName,curOpt->defaultValue, strlen(curOpt->defaultValue))==ESP_OK)
-//        	{
-//        		printf("%20s\n", curOpt->defaultValue);
-//        	}
-//        	else
-//        	{
-//        		printf("Error.  Invalid key\n");
-//        	}
-//        }
-//        curOpt++;
-//	}
-//	printf("\n");
-//	nvs_close(nvs);
-//    return 0;
-//}
-//void register_list_options(){
-//	const esp_console_cmd_t config_list = {
-//		.command = "config-list",
-//		.help = "Lists available configuration options.",
-//		.hint = NULL,
-//		.func = &list_options,
-//		.argtable = NULL
-//	};
-//
-//	ESP_ERROR_CHECK( esp_console_cmd_register(&config_list) );
-//
-//}
 
 void process_autoexec(){
 	int i=1;
@@ -156,20 +87,20 @@ void process_autoexec(){
 		store_nvs_value(NVS_TYPE_STR,"autoexec1",autoexec1_dft);
 	}
 }
-static void initialize_filesystem() {
-	static wl_handle_t wl_handle;
-	const esp_vfs_fat_mount_config_t mount_config = {
-			.max_files = 10,
-			.format_if_mount_failed = true,
-			.allocation_unit_size = 4096
-			};
-	esp_err_t err = esp_vfs_fat_spiflash_mount(MOUNT_PATH, "storage",
-			&mount_config, &wl_handle);
-	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to mount FATFS (%s)", esp_err_to_name(err));
-		return;
-	}
-}
+//static void initialize_filesystem() {
+//	static wl_handle_t wl_handle;
+//	const esp_vfs_fat_mount_config_t mount_config = {
+//			.max_files = 10,
+//			.format_if_mount_failed = true,
+//			.allocation_unit_size = 4096
+//			};
+//	esp_err_t err = esp_vfs_fat_spiflash_mount(MOUNT_PATH, "storage",
+//			&mount_config, &wl_handle);
+//	if (err != ESP_OK) {
+//		ESP_LOGE(TAG, "Failed to mount FATFS (%s)", esp_err_to_name(err));
+//		return;
+//	}
+//}
 
 static void initialize_nvs() {
 	esp_err_t err = nvs_flash_init();
@@ -229,12 +160,12 @@ void initialize_console() {
 	linenoiseHistorySetMaxLen(100);
 
 	/* Load command history from filesystem */
-	linenoiseHistoryLoad(HISTORY_PATH);
+	//linenoiseHistoryLoad(HISTORY_PATH);
 }
 
 void console_start() {
 	initialize_nvs();
-	initialize_filesystem();
+	//initialize_filesystem();
 	initialize_console();
 
 	/* Register commands */
@@ -242,23 +173,29 @@ void console_start() {
 	register_system();
 	register_nvs();
 #if RECOVERY_APPLICATION!=1
-#warning "compiling for squeezelite"
 	register_squeezelite();
 #elif RECOVERY_APPLICATION==1
-#warning "compiling for recovery"
 	register_ota_cmd();
 #else
 #error "Unknown build configuration"
 #endif
 	register_i2ctools();
 	printf("\n"
+#if RECOVERY_APPLICATION
+			"****************************************************************\n"
+			"RECOVERY APPLICATION\n"
+			"This mode is used to flash Squeezelite into the OTA partition\n"
+			"****\n\n"
+#endif
 			"Type 'help' to get the list of commands.\n"
 			"Use UP/DOWN arrows to navigate through command history.\n"
 			"Press TAB when typing command name to auto-complete.\n"
 			"\n"
+#if !RECOVERY_APPLICATION
 			"To automatically execute lines at startup:\n"
 			"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
 			"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n"
+#endif
 			"\n"
 			"\n");
 
@@ -283,8 +220,7 @@ void console_start() {
     cfg.thread_name= "console";
     cfg.inherit_cfg = true;
 #if RECOVERY_APPLICATION
-    // make sure the stack is large enough for http processing with redirects.
-	cfg.stack_size = 1024*100 ;
+	cfg.stack_size = 4096 ;
 #endif
     esp_pthread_set_cfg(&cfg);
 	pthread_attr_t attr;
@@ -310,7 +246,9 @@ void run_command(char * line){
 	}
 }
 static void * console_thread() {
+#if !RECOVERY_APPLICATION
 	process_autoexec();
+#endif
 	/* Main loop */
 	while (1) {
 		/* Get a line using linenoise.

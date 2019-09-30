@@ -7,7 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include "../squeezelite-ota/cmd_ota.h"
+#include "cmd_ota.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -27,7 +27,7 @@
 #include "sdkconfig.h"
 
 static const char * TAG = "platform_esp32";
-extern void start_ota(const char * bin_url);
+extern esp_err_t start_ota(const char * bin_url, bool bFromAppMain);
 static struct {
     struct arg_str *url;
     struct arg_end *end;
@@ -45,9 +45,7 @@ static int perform_ota_update(int argc, char **argv)
 
     esp_err_t err=ESP_OK;
     ESP_LOGI(TAG, "Starting ota: %s", url);
-    start_ota(url);
-
-
+    start_ota(url,false);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "%s", esp_err_to_name(err));

@@ -56,7 +56,6 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/ip4_addr.h"
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
-#include "squeezelite-ota.h"
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
@@ -131,21 +130,21 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
 
-void wifi_manager_refresh_ota_json(){
+void CODE_RAM_LOCATION wifi_manager_refresh_ota_json(){
 	wifi_manager_send_message(EVENT_REFRESH_OTA, NULL);
 }
 
-void wifi_manager_scan_async(){
+void CODE_RAM_LOCATION wifi_manager_scan_async(){
 	wifi_manager_send_message(ORDER_START_WIFI_SCAN, NULL);
 }
 
-void wifi_manager_disconnect_async(){
+void CODE_RAM_LOCATION wifi_manager_disconnect_async(){
 	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
 	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
 
 
-void wifi_manager_start(){
+void CODE_RAM_LOCATION wifi_manager_start(){
 
 	/* disable the default wifi logging */
 	esp_log_level_set("wifi", ESP_LOG_NONE);
@@ -176,7 +175,7 @@ void wifi_manager_start(){
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
 }
 
-uint8_t wifi_manager_get_flag(){
+uint8_t CODE_RAM_LOCATION wifi_manager_get_flag(){
 	uint8_t value=0;
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -191,7 +190,7 @@ uint8_t wifi_manager_get_flag(){
 
 }
 
-char * wifi_manager_alloc_get_config(char * name, size_t * l){
+char * CODE_RAM_LOCATION wifi_manager_alloc_get_config(char * name, size_t * l){
 
 	size_t len=0;
 	char * value=NULL;
@@ -224,7 +223,7 @@ char * wifi_manager_alloc_get_config(char * name, size_t * l){
 
 }
 
-esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag){
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_autoexec_flag(uint8_t flag){
 	nvs_handle handle;
 	esp_err_t esp_err;
 	ESP_LOGI(TAG, "About to save autoexec flag to flash");
@@ -257,7 +256,7 @@ esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag){
 	return ESP_OK;
 }
 
-esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_autoexec_config(char * value, char * name, int len){
 	nvs_handle handle;
     esp_err_t esp_err;
     ESP_LOGI(TAG, "About to save config to flash. Name: %s, value: %s", name,value);
@@ -290,7 +289,7 @@ esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len){
 
 }
 
-esp_err_t wifi_manager_save_sta_config(){
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_sta_config(){
 	nvs_handle handle;
 	esp_err_t esp_err;
 	ESP_LOGI(TAG, "About to save config to flash");
@@ -332,7 +331,7 @@ esp_err_t wifi_manager_save_sta_config(){
 	return ESP_OK;
 }
 
-bool wifi_manager_fetch_wifi_sta_config(){
+bool CODE_RAM_LOCATION wifi_manager_fetch_wifi_sta_config(){
 	nvs_handle handle;
 	esp_err_t esp_err;
 
@@ -409,12 +408,12 @@ bool wifi_manager_fetch_wifi_sta_config(){
 }
 
 
-void wifi_manager_clear_ip_info_json(){
+void CODE_RAM_LOCATION wifi_manager_clear_ip_info_json(){
 	strcpy(ip_info_json, "{}\n");
 }
 
 
-void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
+void CODE_RAM_LOCATION wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	if(update_reason_code == UPDATE_OTA) {
 		update_reason_code = last_update_reason_code;
@@ -498,11 +497,11 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 }
 
 
-void wifi_manager_clear_access_points_json(){
+void CODE_RAM_LOCATION wifi_manager_clear_access_points_json(){
 	strcpy(accessp_json, "[]\n");
 }
 
-void wifi_manager_generate_acess_points_json(){
+void CODE_RAM_LOCATION wifi_manager_generate_acess_points_json(){
 	strcpy(accessp_json, "[");
 
 
@@ -531,7 +530,7 @@ void wifi_manager_generate_acess_points_json(){
 
 }
 
-bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
+bool CODE_RAM_LOCATION wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
 	if(wifi_manager_sta_ip_mutex){
 		if( xSemaphoreTake( wifi_manager_sta_ip_mutex, xTicksToWait ) == pdTRUE ) {
 			return true;
@@ -546,11 +545,11 @@ bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
 
 }
 
-void wifi_manager_unlock_sta_ip_string(){
+void CODE_RAM_LOCATION wifi_manager_unlock_sta_ip_string(){
 	xSemaphoreGive( wifi_manager_sta_ip_mutex );
 }
 
-void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
+void CODE_RAM_LOCATION wifi_manager_safe_update_sta_ip_string(uint32_t ip){
 	if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
 
 		struct ip4_addr ip4;
@@ -566,11 +565,11 @@ void wifi_manager_safe_update_sta_ip_string(uint32_t ip){
 	}
 }
 
-char* wifi_manager_get_sta_ip_string(){
+char* CODE_RAM_LOCATION wifi_manager_get_sta_ip_string(){
 	return wifi_manager_sta_ip;
 }
 
-bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
+bool CODE_RAM_LOCATION wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
 	if(wifi_manager_json_mutex){
 		if( xSemaphoreTake( wifi_manager_json_mutex, xTicksToWait ) == pdTRUE ) {
 			return true;
@@ -585,15 +584,15 @@ bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
 
 }
 
-void wifi_manager_unlock_json_buffer(){
+void CODE_RAM_LOCATION wifi_manager_unlock_json_buffer(){
 	xSemaphoreGive( wifi_manager_json_mutex );
 }
 
-char* wifi_manager_get_ap_list_json(){
+char* CODE_RAM_LOCATION wifi_manager_get_ap_list_json(){
 	return accessp_json;
 }
 
-esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
+esp_err_t CODE_RAM_LOCATION wifi_manager_event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
 
@@ -667,11 +666,11 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 	return ESP_OK;
 }
 
-wifi_config_t* wifi_manager_get_wifi_sta_config(){
+wifi_config_t* CODE_RAM_LOCATION wifi_manager_get_wifi_sta_config(){
 	return wifi_manager_config_sta;
 }
 
-void wifi_manager_connect_async(){
+void CODE_RAM_LOCATION wifi_manager_connect_async(){
 	/* in order to avoid a false positive on the front end app we need to quickly flush the ip json
 	 * There'se a risk the front end sees an IP or a password error when in fact
 	 * it's a remnant from a previous connection
@@ -684,11 +683,11 @@ void wifi_manager_connect_async(){
 }
 
 
-char* wifi_manager_get_ip_info_json(){
+char* CODE_RAM_LOCATION wifi_manager_get_ip_info_json(){
 	return ip_info_json;
 }
 
-void wifi_manager_destroy(){
+void CODE_RAM_LOCATION wifi_manager_destroy(){
 	vTaskDelete(task_wifi_manager);
 	task_wifi_manager = NULL;
 
@@ -717,7 +716,7 @@ void wifi_manager_destroy(){
 	wifi_manager_queue = NULL;
 }
 
-void wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
+void CODE_RAM_LOCATION wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
 	int total_unique;
 	wifi_ap_record_t * first_free;
 	total_unique=*aps;
@@ -768,27 +767,27 @@ void wifi_manager_filter_unique( wifi_ap_record_t * aplist, uint16_t * aps) {
 	*aps = total_unique;
 }
 
-BaseType_t wifi_manager_send_message_to_front(message_code_t code, void *param){
+BaseType_t CODE_RAM_LOCATION wifi_manager_send_message_to_front(message_code_t code, void *param){
 	queue_message msg;
 	msg.code = code;
 	msg.param = param;
 	return xQueueSendToFront( wifi_manager_queue, &msg, portMAX_DELAY);
 }
 
-BaseType_t wifi_manager_send_message(message_code_t code, void *param){
+BaseType_t CODE_RAM_LOCATION wifi_manager_send_message(message_code_t code, void *param){
 	queue_message msg;
 	msg.code = code;
 	msg.param = param;
 	return xQueueSend( wifi_manager_queue, &msg, portMAX_DELAY);
 }
 
-void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) ){
+void CODE_RAM_LOCATION wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) ){
 	if(cb_ptr_arr && message_code < MESSAGE_CODE_COUNT){
 		cb_ptr_arr[message_code] = func_ptr;
 	}
 }
 
-void wifi_manager( void * pvParameters ){
+void CODE_RAM_LOCATION wifi_manager( void * pvParameters ){
 	queue_message msg;
 	BaseType_t xStatus;
 	EventBits_t uxBits;

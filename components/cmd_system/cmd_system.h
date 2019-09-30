@@ -7,14 +7,14 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #pragma once
-
+#include "esp_system.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // Register system functions
 void register_system();
-void guided_factory();
+esp_err_t guided_factory();
 
 #ifdef __cplusplus
 }

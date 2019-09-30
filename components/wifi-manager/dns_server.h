@@ -34,7 +34,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #define MAIN_DNS_SERVER_H_
 #include <esp_system.h>
 #include <stdbool.h>
-
+#include "squeezelite-ota.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -126,9 +126,9 @@ typedef struct __attribute__((__packed__)) dns_answer_t{
 	uint32_t RDATA; /* For the sake of simplicity only ipv4 is supported, and as such it's a unsigned 32 bit */
 }dns_answer_t;
 
-void dns_server(void *pvParameters);
-void dns_server_start();
-void dns_server_stop();
+void CODE_RAM_LOCATION dns_server(void *pvParameters);
+void CODE_RAM_LOCATION dns_server_start();
+void CODE_RAM_LOCATION dns_server_stop();
 
 
 

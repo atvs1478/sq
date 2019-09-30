@@ -5,13 +5,16 @@
  *      Author: sle11
  */
 
-#ifndef COMPONENTS_SQUEEZELITE_OTA_SQUEEZELITE_OTA_H_
-#define COMPONENTS_SQUEEZELITE_OTA_SQUEEZELITE_OTA_H_
+#pragma once
+#include "esp_attr.h"
+#if RECOVERY_APPLICATION
+#define CODE_RAM_LOCATION IRAM_ATTR
+#else
+#define CODE_RAM_LOCATION
+#endif
 
-void start_ota(const char * bin_url);
-const char * ota_get_status();
-uint8_t ota_get_pct_complete();
+esp_err_t CODE_RAM_LOCATION start_ota(const char * bin_url, bool bFromAppMain);
+const char * CODE_RAM_LOCATION ota_get_status();
+uint8_t CODE_RAM_LOCATION ota_get_pct_complete();
 
 
-
-#endif /* COMPONENTS_SQUEEZELITE_OTA_SQUEEZELITE_OTA_H_ */

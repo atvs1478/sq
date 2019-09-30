@@ -101,24 +101,46 @@ static int restart(int argc, char **argv)
     ESP_LOGI(TAG, "Restarting");
     esp_restart();
 }
-void guided_factory()
+esp_err_t guided_factory()
 {
-    ESP_LOGI(TAG, "Rebooting to factory.");
-
+#if RECOVERY_APPLICATION
+	ESP_LOGW(TAG,"RECOVERY application is already active");
+	return ESP_OK;
+#else
+	bool bFound=false;
+    ESP_LOGI(TAG, "Looking for recovery partition.");
     const esp_partition_t *partition;
-	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
-	partition = (esp_partition_t *) esp_partition_get(it);
-	if(partition != NULL){
-		esp_ota_set_boot_partition(partition);
-	}
-	esp_partition_iterator_release(it);
-	esp_restart();
+	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
 
+	if(it == NULL){
+		ESP_LOGE(TAG,"Unable initialize partition iterator!");
+	}
+	else
+	{
+		partition = (esp_partition_t *) esp_partition_get(it);
+
+		if(partition != NULL){
+			ESP_LOGI(TAG, "Found recovery partition.");
+			esp_ota_set_boot_partition(partition);
+			bFound=true;
+		}
+		else
+		{
+			ESP_LOGE(TAG,"Recovery partition not found!  Unable to reboot to recovery.");
+		}
+		esp_partition_iterator_release(it);
+		if(bFound) {
+			ESP_LOGI(TAG, "Restarting!.");
+			esp_restart();
+		}
+	}
+#endif
+	return ESP_OK;
 }
 static int restart_factory(int argc, char **argv)
 {
 	guided_factory();
-	return 1;
+	return 0; // return fail.  This should never return... we're rebooting!
 }
 static void register_restart()
 {
@@ -134,8 +156,8 @@ static void register_restart()
 static void register_factory_boot()
 {
     const esp_console_cmd_t cmd = {
-        .command = "factory",
-        .help = "Resets and boot to factory (if available)",
+        .command = "recovery",
+        .help = "Resets and boot to recovery (if available)",
         .hint = NULL,
         .func = &restart_factory,
     };

@@ -39,13 +39,13 @@ extern "C" {
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
+#include "squeezelite-ota.h"
 
 #ifndef RECOVERY_APPLICATION
 #error "RECOVERY_APPLICATION not defined. Defaulting to squeezelite"
 #endif
 
 #if RECOVERY_APPLICATION==1
-#warning "compiling for recovery."
 #elif RECOVERY_APPLICATION==0
 #warning "compiling for squeezelite."
 #else
@@ -268,71 +268,71 @@ typedef struct{
 /**
  * Allocate heap memory for the wifi manager and start the wifi_manager RTOS task
  */
-void wifi_manager_start();
+void CODE_RAM_LOCATION wifi_manager_start();
 
 /**
  * Frees up all memory allocated by the wifi_manager and kill the task.
  */
-void wifi_manager_destroy();
+void CODE_RAM_LOCATION wifi_manager_destroy();
 
 /**
  * Filters the AP scan list to unique SSIDs
  */
-void filter_unique( wifi_ap_record_t * aplist, uint16_t * ap_num);
+void CODE_RAM_LOCATION  filter_unique( wifi_ap_record_t * aplist, uint16_t * ap_num);
 
 /**
  * Main task for the wifi_manager
  */
-void wifi_manager( void * pvParameters );
+void CODE_RAM_LOCATION wifi_manager( void * pvParameters );
 
 
-char* wifi_manager_get_ap_list_json();
-char* wifi_manager_get_ip_info_json();
+char* CODE_RAM_LOCATION wifi_manager_get_ap_list_json();
+char* CODE_RAM_LOCATION wifi_manager_get_ip_info_json();
 
-uint8_t wifi_manager_get_flag();
-char * wifi_manager_alloc_get_config(char * name, size_t * l);
+uint8_t CODE_RAM_LOCATION wifi_manager_get_flag();
+char * CODE_RAM_LOCATION wifi_manager_alloc_get_config(char * name, size_t * l);
 
 
 /**
  * @brief saves the current STA wifi config to flash ram storage.
  */
-esp_err_t wifi_manager_save_sta_config();
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_sta_config();
 
 /**
  * @brief saves the current configuration to flash ram storage
  */
-esp_err_t wifi_manager_save_autoexec_config(char * value, char * name, int len);
-esp_err_t wifi_manager_save_autoexec_flag(uint8_t flag);
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_autoexec_config(char * value, char * name, int len);
+esp_err_t CODE_RAM_LOCATION wifi_manager_save_autoexec_flag(uint8_t flag);
 
 
 /**
  * @brief fetch a previously STA wifi config in the flash ram storage.
  * @return true if a previously saved config was found, false otherwise.
  */
-bool wifi_manager_fetch_wifi_sta_config();
+bool CODE_RAM_LOCATION wifi_manager_fetch_wifi_sta_config();
 
-wifi_config_t* wifi_manager_get_wifi_sta_config();
+wifi_config_t* CODE_RAM_LOCATION wifi_manager_get_wifi_sta_config();
 
 /**
  * @brief A standard wifi event handler as recommended by Espressif
  */
-esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
+esp_err_t CODE_RAM_LOCATION wifi_manager_event_handler(void *ctx, system_event_t *event);
 
 
 /**
  * @brief requests a connection to an access point that will be process in the main task thread.
  */
-void wifi_manager_connect_async();
+void CODE_RAM_LOCATION wifi_manager_connect_async();
 
 /**
  * @brief requests a wifi scan
  */
-void wifi_manager_scan_async();
+void CODE_RAM_LOCATION wifi_manager_scan_async();
 
 /**
  * @brief requests to disconnect and forget about the access point.
  */
-void wifi_manager_disconnect_async();
+void CODE_RAM_LOCATION wifi_manager_disconnect_async();
 
 /**
  * @brief Tries to get access to json buffer mutex.
@@ -349,65 +349,65 @@ void wifi_manager_disconnect_async();
  * @param xTicksToWait The time in ticks to wait for the semaphore to become available.
  * @return true in success, false otherwise.
  */
-bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
+bool CODE_RAM_LOCATION wifi_manager_lock_json_buffer(TickType_t xTicksToWait);
 
 /**
  * @brief Releases the json buffer mutex.
  */
-void wifi_manager_unlock_json_buffer();
+void CODE_RAM_LOCATION wifi_manager_unlock_json_buffer();
 
 /**
  * @brief Generates the connection status json: ssid and IP addresses.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code);
+void CODE_RAM_LOCATION wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code);
 /**
  * @brief Clears the connection status json.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_clear_ip_info_json();
+void CODE_RAM_LOCATION wifi_manager_clear_ip_info_json();
 
 /**
  * @brief Generates the list of access points after a wifi scan.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_generate_acess_points_json();
+void CODE_RAM_LOCATION wifi_manager_generate_acess_points_json();
 
 /**
  * @brief Clear the list of access points.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_clear_access_points_json();
+void CODE_RAM_LOCATION wifi_manager_clear_access_points_json();
 
 
 /**
  * @brief Start the mDNS service
  */
-void wifi_manager_initialise_mdns();
+void CODE_RAM_LOCATION wifi_manager_initialise_mdns();
 
 
-bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait);
-void wifi_manager_unlock_sta_ip_string();
+bool CODE_RAM_LOCATION wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait);
+void CODE_RAM_LOCATION wifi_manager_unlock_sta_ip_string();
 
 /**
  * @brief gets the string representation of the STA IP address, e.g.: "192.168.1.69"
  */
-char* wifi_manager_get_sta_ip_string();
+char* CODE_RAM_LOCATION wifi_manager_get_sta_ip_string();
 
 /**
  * @brief thread safe char representation of the STA IP update
  */
-void wifi_manager_safe_update_sta_ip_string(uint32_t ip);
+void CODE_RAM_LOCATION wifi_manager_safe_update_sta_ip_string(uint32_t ip);
 
 
 /**
  * @brief Register a callback to a custom function when specific event message_code happens.
  */
-void wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) );
+void CODE_RAM_LOCATION wifi_manager_set_callback(message_code_t message_code, void (*func_ptr)(void*) );
 
 
-BaseType_t wifi_manager_send_message(message_code_t code, void *param);
-BaseType_t wifi_manager_send_message_to_front(message_code_t code, void *param);
+BaseType_t CODE_RAM_LOCATION wifi_manager_send_message(message_code_t code, void *param);
+BaseType_t CODE_RAM_LOCATION wifi_manager_send_message_to_front(message_code_t code, void *param);
 
 #ifdef __cplusplus
 }

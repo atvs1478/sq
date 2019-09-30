@@ -13,8 +13,8 @@
 #include "esp_vfs_fat.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-
 extern char current_namespace[];
+
 static const char * TAG = "platform_esp32";
 bool isNameValid(char * key){
 	bool bFound=false;

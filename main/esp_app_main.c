@@ -44,6 +44,8 @@
 #include "squeezelite-ota.h"
 
 static EventGroupHandle_t wifi_event_group;
+extern char current_namespace[];
+
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)
 
@@ -87,30 +89,75 @@ bool wait_for_wifi(){
 	}
     return connected;
 }
+static void initialize_nvs() {
+	esp_err_t err = nvs_flash_init();
+	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		err = nvs_flash_init();
+	}
+	ESP_ERROR_CHECK(err);
+}
+char * process_ota_url(){
+    nvs_handle nvs;
+    ESP_LOGI(TAG,"Checking for update url");
+    char * fwurl=get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
+	if(fwurl!=NULL)
+	{
+		ESP_LOGD(TAG,"Deleting nvs entry for Firmware URL %s", fwurl);
+		esp_err_t err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+		if (err == ESP_OK) {
+			err = nvs_erase_key(nvs, "fwurl");
+			if (err == ESP_OK) {
+				ESP_LOGD(TAG,"Firmware url erased from nvs.");
+				err = nvs_commit(nvs);
+				if (err == ESP_OK) {
+					ESP_LOGI(TAG, "Value with key '%s' erased", "fwurl");
+					ESP_LOGD(TAG,"nvs erase committed.");
+				}
+				else
+				{
+					ESP_LOGE(TAG,"Unable to commit nvs erase operation. Error : %s.",esp_err_to_name(err));
+				}
+			}
+			else
+			{
+				ESP_LOGE(TAG,"Error : %s. Unable to delete firmware url key.",esp_err_to_name(err));
+			}
+			nvs_close(nvs);
+		}
+		else
+		{
+			ESP_LOGE(TAG,"Error opening nvs: %s. Unable to delete firmware url key.",esp_err_to_name(err));
+		}
+	}
+	return fwurl;
+}
+
 
 void app_main()
 {
+	char * fwurl = NULL;
+	initialize_nvs();
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	led_config(LED_RED, LED_RED_GPIO, 0);
 	wifi_event_group = xEventGroupCreate();
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+	fwurl = process_ota_url();
 	
 	/* start the wifi manager */
 	led_blink(LED_GREEN, 250, 250);
 	wifi_manager_start();
 	wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 	wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
+	console_start();
 
-	char * fwurl = get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
 	if(fwurl && strlen(fwurl)>0){
 		while(!bWifiConnected){
 			wait_for_wifi();
+			taskYIELD();
 		}
 		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
-		start_ota(fwurl);
-	}
-	else
-	{
-		console_start();
+		start_ota(fwurl, true);
+		free(fwurl);
 	}
 }

@@ -33,6 +33,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 
 #include "http_server.h"
 #include "cmd_system.h"
+#include "../squeezelite-ota/squeezelite-ota.h"
 
 #define NVS_PARTITION_NAME "nvs"
 
@@ -48,7 +49,6 @@ static char *r = "\\\"";
 static TaskHandle_t task_http_server = NULL;
 extern char current_namespace[];
 
-extern void start_ota(const char * bin_url);
 /**
  * @brief embedded binary data.
  * @see file "component.mk"
@@ -86,14 +86,14 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 
 
 
-void http_server_start(){
+void CODE_RAM_LOCATION http_server_start(){
 
 	if(task_http_server == NULL){
 		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
 	}
 }
 
-void http_server(void *pvParameters) {
+void CODE_RAM_LOCATION http_server(void *pvParameters) {
 
 	struct netconn *conn, *newconn;
 	err_t err;
@@ -121,7 +121,7 @@ void http_server(void *pvParameters) {
 }
 
 
-char* http_server_get_header(char *request, char *header_name, int *len) {
+char* CODE_RAM_LOCATION http_server_get_header(char *request, char *header_name, int *len) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -138,7 +138,7 @@ char* http_server_get_header(char *request, char *header_name, int *len) {
 	}
 	return NULL;
 }
-char* http_server_search_header(char *request, char *header_name, int *len, char ** parm_name, char ** next_position, char * bufEnd) {
+char* CODE_RAM_LOCATION http_server_search_header(char *request, char *header_name, int *len, char ** parm_name, char ** next_position, char * bufEnd) {
 	*len = 0;
 	char *ret = NULL;
 	char *ptr = NULL;
@@ -191,7 +191,7 @@ char* http_server_search_header(char *request, char *header_name, int *len, char
 	ESP_LOGD(TAG, "No more match for : %s", header_name);
 	return NULL;
 }
-void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, const uint8_t * end, char * content_type,char * encoding){
+void CODE_RAM_LOCATION http_server_send_resource_file(struct netconn *conn,const uint8_t * start, const uint8_t * end, char * content_type,char * encoding){
 	uint16_t len=end - start;
 	size_t  buff_length= sizeof(http_hdr_template)+strlen(content_type)+strlen(encoding);
 	char * http_hdr=malloc(buff_length);
@@ -210,7 +210,7 @@ void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, 
 	}
 }
 
-void http_server_netconn_serve(struct netconn *conn) {
+void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
 	char *buf = NULL;
@@ -395,10 +395,10 @@ void http_server_netconn_serve(struct netconn *conn) {
 						netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY); //400 invalid request
 					}
 					else{
-						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 						if(bOTA){
-							ESP_LOGI(TAG, "Initiating OTA for url %s",otaURL);
-							start_ota(otaURL);
+							ESP_LOGI(TAG, "Restarting to process OTA for url %s",otaURL);
+							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
+							esp_restart();
 						}
 					}
 
@@ -475,7 +475,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 	netbuf_delete(inbuf);
 }
 
-void strreplace(char *src, char *str, char *rep)
+void CODE_RAM_LOCATION strreplace(char *src, char *str, char *rep)
 {
     char *p = strstr(src, str);
     if (p)
