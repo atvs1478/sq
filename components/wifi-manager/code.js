@@ -214,7 +214,7 @@ $(document).ready(function(){
             var id = $(this)[0].id;
             var pin = $(this).val();
             if (pin != '') {
-                headers[id] = pin;
+                headers["X-Custom-"+id] = pin;
             }
         });
         $.ajax({
@@ -222,8 +222,41 @@ $(document).ready(function(){
             dataType: 'json',
             method: 'POST',
             cache: false,
-            headers: JSON.stringify(headers),
-            data: { 'timestamp': Date.now() }
+            headers: headers,
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+        console.log('sent config JSON with headers:', JSON.stringify(headers));
+    });
+
+    $("#save-nvs").on("click", function() {
+        var headers = {};
+        $("input.nvs").each(function() {
+            var key = $(this)[0].id;
+            var val = $(this).val();
+            if (key != '') {
+                headers["X-Custom-"+key] = val;
+            }
+        });
+        var key = $("#nvs-new-key").val();
+        var val = $("#nvs-new-value").val();
+        if (key != '') {
+            headers["X-Custom-"+key] = val;
+        }
+        $.ajax({
+            url: '/config.json',
+            dataType: 'json',
+            method: 'POST',
+            cache: false,
+            headers: headers,
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
     });
@@ -503,7 +536,7 @@ function checkStatus(){
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').show();
-                //$('a[href^="#tab-nvs"]').hide();  //TODO
+                $('a[href^="#tab-nvs"]').hide();
                 $( "footer.footer" ).removeClass('recovery');
                 $( "footer.footer" ).addClass('sl');
                 enableStatusTimer = false;
@@ -549,34 +582,35 @@ function getConfig() {
                         $("#autoexec-cb")[0].checked=false;
                     }
                 } else if (key == 'autoexec1') {
-                    $("#autoexec1").val(data["autoexec1"]);
+                    $("input#autoexec1").val(data["autoexec1"]);
                 }
 
                 if (recovery) {
                     $("tbody#nvsTable").append(
                         "<tr>"+
                             "<td>"+key+"</td>"+
-                            "<td>"+
-                                "<input type='text' class='form-control' id='nvs'+key value='"+data[key]+"'>"+
+                            "<td class='value'>"+
+                                "<input type='text' class='form-control nvs' id='"+key+"'>"+
                             "</td>"+
                         "</tr>"
                     );
-                    //TODO append empty line
+                    $("input#"+key).val(data[key]);
+                    console.log("#"+key, data[key]);
                 }
             }
         }
-/*
-        if (data.hasOwnProperty('autoexec')) {
-            if (data["autoexec"] === 1) {
-                $("#autoexec-cb")[0].checked=true;
-            } else {
-                $("#autoexec-cb")[0].checked=false;
-            }
+        if (recovery) {
+            $("tbody#nvsTable").append(
+                "<tr>"+
+                    "<td>"+
+                        "<input type='text' class='form-control' id='nvs-new-key' placeholder='new key'>"+
+                    "</td>"+
+                    "<td>"+
+                        "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value'>"+
+                    "</td>"+
+                "</tr>"
+            );
         }
-        if (data.hasOwnProperty('autoexec')) {
-            $("#autoexec1").val(data["autoexec1"]);
-        }
-        */
     })
     .fail(function() {
         console.log("failed to fetch config!");

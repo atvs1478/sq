@@ -204,50 +204,36 @@
                     <thead>
                         <tr>
                             <th scope="col">Signal</th>
-                            <th scope="col">GPIO pin</th>
+                            <th scope="col">I2S pin</th>
+                            <th scope="col">SPDIF pin</th>
                         </tr>
                     </thead>
                     <tbody id="gpioTable">
                         <tr>
-                            <td><strong>I2S</strong></td><td></td>
-                        </tr>
-                        <tr>
-                            <td>I2S Bit clock</td>
+                            <td>Bit clock</td>
                             <td>
                                 <input type="text" class="form-control gpio" id="gpio-i2s-bc" maxlength="2" size="2">
                             </td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="gpio-spdif-bc" maxlength="2" size="2">
+                            </td>
                         </tr>
                         <tr>
-                            <td>I2S Word select</td>
+                            <td>Word select</td>
                             <td>
                                 <input type="text" class="form-control gpio" id="gpio-i2s-ws" maxlength="2" size="2">
                             </td>
+                            <td>
+                                <input type="text" class="form-control gpio" id="gpio-spdif-ws" maxlength="2" size="2">
+                            </td>
                         </tr>
                         <tr>
-                            <td>I2S Data</td>
+                            <td>Data</td>
                             <td>
                                 <input type="text" class="form-control gpio" id="gpio-i2s-data" maxlength="2" size="2">
                             </td>
-                        </tr>
-                        <tr>
-                            <td><strong>SPDIF</strong></td><td></td>
-                        </tr>
-                        <tr>
-                            <td>SPDIF Bit clock</td>
                             <td>
-                                <input type="text" class="form-control gpio" id="spdif-i2s-bc" maxlength="2" size="2">
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>SPDIF Word select</td>
-                            <td>
-                                <input type="text" class="form-control gpio" id="spdif-i2s-ws" maxlength="2" size="2">
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>SPDIF Data</td>
-                            <td>
-                                <input type="text" class="form-control gpio" id="spdif-i2s-data" maxlength="2" size="2">
+                                <input type="text" class="form-control gpio" id="gpio-spdif-data" maxlength="2" size="2">
                             </td>
                         </tr>
                     </tbody>

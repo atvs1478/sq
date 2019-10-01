@@ -323,3 +323,7 @@ span#flash-status {
 .recovery {
     background-color: #3c0505;
 }
+
+td.value {
+    width: 80%;
+}
