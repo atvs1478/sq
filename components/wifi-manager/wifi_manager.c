@@ -524,21 +524,26 @@ char* wifi_manager_get_sta_ip_string(){
 }
 
 bool wifi_manager_lock_json_buffer(TickType_t xTicksToWait){
+	ESP_LOGD(TAG,"Locking json buffer");
 	if(wifi_manager_json_mutex){
 		if( xSemaphoreTake( wifi_manager_json_mutex, xTicksToWait ) == pdTRUE ) {
+			ESP_LOGD(TAG,"Json buffer locked!");
 			return true;
 		}
 		else{
+			ESP_LOGD(TAG,"Semaphore take failed. Unable to lock json buffer mutex");
 			return false;
 		}
 	}
 	else{
+		ESP_LOGD(TAG,"Unable to lock json buffer mutex");
 		return false;
 	}
 
 }
 
 void wifi_manager_unlock_json_buffer(){
+	ESP_LOGD(TAG,"Unlocking json buffer!");
 	xSemaphoreGive( wifi_manager_json_mutex );
 }
 
