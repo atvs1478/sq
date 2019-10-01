@@ -316,3 +316,10 @@ span#flash-status {
   color: white;
   text-align: center;
 }
+
+.sl {
+    background-color: #053c1e;
+}
+.recovery {
+    background-color: #3c0505;
+}
