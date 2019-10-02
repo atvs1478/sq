@@ -419,11 +419,8 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	}
 
 
-
-#if RECOVERY_APPLICATION
 	cJSON_AddItemToObject(ip_info_cjson, "ota_dsc", cJSON_CreateString(ota_get_status()));
 	cJSON_AddNumberToObject(ip_info_cjson,"ota_pct",	ota_get_pct_complete()	);
-#endif
 
 	cJSON_AddItemToObject(ip_info_cjson, "Jack", cJSON_CreateString(JACK_LEVEL));
 	cJSON_AddNumberToObject(ip_info_cjson,"Voltage",	adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
