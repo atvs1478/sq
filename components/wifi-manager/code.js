@@ -528,8 +528,10 @@ function checkStatus(){
                 $('a[href^="#tab-audio"]').hide();
                 $('a[href^="#tab-gpio"]').hide();
                 $('a[href^="#tab-nvs"]').show();
-                $( "footer.footer" ).removeClass('sl');
-                $( "footer.footer" ).addClass('recovery');
+                $("footer.footer").removeClass('sl');
+                $("footer.footer").addClass('recovery');
+                $("#boot-button").html('Reboot');
+                $("#boot-form").attr('action', '/reboot.json');
                 enableStatusTimer = true;
             } else {
                 recovery = false;
@@ -537,8 +539,10 @@ function checkStatus(){
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').show();
                 $('a[href^="#tab-nvs"]').hide();
-                $( "footer.footer" ).removeClass('recovery');
-                $( "footer.footer" ).addClass('sl');
+                $("footer.footer").removeClass('recovery');
+                $("footer.footer").addClass('sl');
+                $("#boot-button").html('Recovery');
+                $("#boot-form").attr('action', '/recovery.json');
                 enableStatusTimer = false;
             }
         }
@@ -567,7 +571,7 @@ function checkStatus(){
         blockAjax = false;
     })
     .fail(function() {
-        //don't do anything, the server might be down while esp32 recalibrates radio
+        blockAjax = false;
     });
 }
 
@@ -585,32 +589,28 @@ function getConfig() {
                     $("input#autoexec1").val(data["autoexec1"]);
                 }
 
-                if (recovery) {
-                    $("tbody#nvsTable").append(
-                        "<tr>"+
-                            "<td>"+key+"</td>"+
-                            "<td class='value'>"+
-                                "<input type='text' class='form-control nvs' id='"+key+"'>"+
-                            "</td>"+
-                        "</tr>"
-                    );
-                    $("input#"+key).val(data[key]);
-                    console.log("#"+key, data[key]);
-                }
+                $("tbody#nvsTable").append(
+                    "<tr>"+
+                        "<td>"+key+"</td>"+
+                        "<td class='value'>"+
+                            "<input type='text' class='form-control nvs' id='"+key+"'>"+
+                        "</td>"+
+                    "</tr>"
+                );
+                $("input#"+key).val(data[key]);
+                console.log(key+": "+data[key]);    //TODO
             }
         }
-        if (recovery) {
-            $("tbody#nvsTable").append(
-                "<tr>"+
-                    "<td>"+
-                        "<input type='text' class='form-control' id='nvs-new-key' placeholder='new key'>"+
-                    "</td>"+
-                    "<td>"+
-                        "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value'>"+
-                    "</td>"+
-                "</tr>"
-            );
-        }
+        $("tbody#nvsTable").append(
+            "<tr>"+
+                "<td>"+
+                    "<input type='text' class='form-control' id='nvs-new-key' placeholder='new key'>"+
+                "</td>"+
+                "<td>"+
+                    "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value'>"+
+                "</td>"+
+            "</tr>"
+        );
     })
     .fail(function() {
         console.log("failed to fetch config!");

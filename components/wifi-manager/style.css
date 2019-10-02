@@ -327,3 +327,7 @@ span#flash-status {
 td.value {
     width: 80%;
 }
+
+#boot-div {
+    float: right;
+}
