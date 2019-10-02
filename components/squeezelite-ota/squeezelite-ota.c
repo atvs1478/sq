@@ -41,10 +41,10 @@
 static const char *TAG = "squeezelite-ota";
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
-extern bool wait_for_wifi();
-extern char current_namespace[];
+char * cert=NULL;
+
 static struct {
-	char status_text[31];
+	char status_text[81];
 	uint32_t ota_actual_len;
 	uint32_t ota_total_len;
 	char * redirected_url;
@@ -64,19 +64,28 @@ static esp_http_client_config_t ota_config;
 extern void wifi_manager_refresh_ota_json();
 
 void _printMemStats(){
-	ESP_LOGI(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
+	ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
 			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
-void triggerStatusJsonRefresh(const char * status, ...){
+void triggerStatusJsonRefresh(bool bDelay,const char * status, ...){
     va_list args;
     va_start(args, status);
-    snprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,status, args);
+    vsnprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,status, args);
     va_end(args);
     _printMemStats();
 	wifi_manager_refresh_ota_json();
+	if(bDelay){
+		ESP_LOGD(TAG,"Holding task...");
+	    vTaskDelay(700 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
+		ESP_LOGD(TAG,"Done holding task...");
+	}
+	else
+	{
+		taskYIELD();
+	}
 }
 const char * ota_get_status(){
 	if(!ota_status.bInitialized)
@@ -127,7 +136,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
 
-        if(ota_status.bOTAStarted) triggerStatusJsonRefresh("Installing...");
+        if(ota_status.bOTAStarted) triggerStatusJsonRefresh(true,"Installing...");
         ota_status.ota_total_len=0;
 		ota_status.ota_actual_len=0;
 		ota_status.lastpct=0;
@@ -182,7 +191,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 
 esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
 	memset(conf, 0x00, sizeof(esp_http_client_config_t));
-	conf->cert_pem = (char *)server_cert_pem_start;
+
+	conf->cert_pem =cert==NULL?(char *)server_cert_pem_start:cert;
 	conf->event_handler = _http_event_handler;
 	conf->buffer_size = 2048;
 	conf->disable_auto_redirect=true;
@@ -198,7 +208,6 @@ esp_err_t _erase_last_boot_app_partition(void)
 	uint16_t remain_size=0;
     const esp_partition_t *ota_partition=NULL;
     const esp_partition_t *ota_data_partition=NULL;
-	float erase_percent=0;
 	esp_err_t err=ESP_OK;
 
     ESP_LOGI(TAG, "Looking for OTA partition.");
@@ -236,14 +245,14 @@ esp_err_t _erase_last_boot_app_partition(void)
 	if(ota_data_partition==NULL || ota_partition==NULL){
 		return ESP_FAIL;
 	}
-	ESP_LOGI(TAG,"Erasing OTA partition");
+	ESP_LOGI(TAG,"Erasing flash ");
 	num_passes=ota_partition->size/OTA_FLASH_ERASE_BLOCK;
 	remain_size=ota_partition->size-(num_passes*OTA_FLASH_ERASE_BLOCK);
 
 	for(uint16_t i=0;i<num_passes;i++){
 		err=esp_partition_erase_range(ota_partition, 0, ota_partition->size);
-		erase_percent=100.0f*(float)i/num_passes;
-		triggerStatusJsonRefresh("Erasing OTA partition. %.1f%%",erase_percent);
+		ESP_LOGD(TAG,"Erasing flash (%u%%)",i/num_passes);
+		triggerStatusJsonRefresh(i%5==0?true:false,"Erasing flash (%u/%u)",i,num_passes);
 		taskYIELD();
 		if(err!=ESP_OK) return err;
 	}
@@ -251,7 +260,7 @@ esp_err_t _erase_last_boot_app_partition(void)
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);
 		if(err!=ESP_OK) return err;
 	}
-	triggerStatusJsonRefresh("Erasing OTA partition. 100%%");
+	triggerStatusJsonRefresh(false,"Erasing flash (100%%)");
 	taskYIELD();
 	return ESP_OK;
 }
@@ -262,7 +271,7 @@ void ota_task(void *pvParameter)
 
 	ota_status.bInitialized = true;
 	ESP_LOGD(TAG, "HTTP ota Thread started");
-	triggerStatusJsonRefresh("Initializing...");
+	triggerStatusJsonRefresh(true,"Initializing...");
 	ota_status.bRedirectFound=false;
 	if(passedURL==NULL || strlen(passedURL)==0){
 		ESP_LOGE(TAG,"HTTP OTA called without a url");
@@ -274,7 +283,7 @@ void ota_task(void *pvParameter)
 	FREE_RESET(pvParameter);
 
 	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
-	triggerStatusJsonRefresh("Erasing OTA partition");
+	triggerStatusJsonRefresh(true,"Erasing OTA partition");
 	esp_err_t err=_erase_last_boot_app_partition();
 	if(err!=ESP_OK){
 		ESP_LOGE(TAG,"Unable to erase last APP partition. Error: %s",esp_err_to_name(err));
@@ -287,13 +296,13 @@ void ota_task(void *pvParameter)
 	ESP_LOGI(TAG,"Calling esp_https_ota");
 	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
 	ota_status.bOTAStarted = true;
-	triggerStatusJsonRefresh("Starting OTA...");
+	triggerStatusJsonRefresh(true,"Starting OTA...");
 	err = esp_https_ota(&ota_config);
     if (err == ESP_OK) {
-    	triggerStatusJsonRefresh("Success!");
+    	triggerStatusJsonRefresh(true,"Success!");
         esp_restart();
     } else {
-    	triggerStatusJsonRefresh("Error: %s",esp_err_to_name(err));
+    	triggerStatusJsonRefresh(true,"Error: %s",esp_err_to_name(err));
     	wifi_manager_refresh_ota_json();
         ESP_LOGE(TAG, "Firmware upgrade failed with error : %s", esp_err_to_name(err));
         ota_status.bOTAThreadStarted=false;
@@ -305,11 +314,10 @@ void ota_task(void *pvParameter)
 }
 
 esp_err_t process_recovery_ota(const char * bin_url){
-#if RECOVERY_APPLICATION
+
 	// Initialize NVS.
 	int ret=0;
     esp_err_t err = nvs_flash_init();
-
     if(ota_status.bOTAThreadStarted){
 		ESP_LOGE(TAG,"OTA Already started. ");
 		return ESP_FAIL;
@@ -341,17 +349,18 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
 
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+1, NULL, OTA_CORE);
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO-1, NULL, OTA_CORE);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
     }
-#endif
+
     return ESP_OK;
 }
 
 esp_err_t start_ota(const char * bin_url, bool bFromAppMain)
 {
+//	uint8_t * get_nvs_value_alloc_default(NVS_TYPE_BLOB, "certs", server_cert_pem_start , server_cert_pem_end-server_cert_pem_start);
 #if RECOVERY_APPLICATION
 	return process_recovery_ota(bin_url);
 #else
