@@ -40,6 +40,7 @@ extern "C" {
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
 #include "squeezelite-ota.h"
+#include "cJSON.h"
 
 #ifndef RECOVERY_APPLICATION
 #error "RECOVERY_APPLICATION not defined. Defaulting to squeezelite"
@@ -172,18 +173,7 @@ extern "C" {
  */
 #define JSON_ONE_APP_SIZE					99
 
-/**
- * @brief Defines the maximum length in bytes of a JSON representation of the IP information
- * assuming all ips are 4*3 digits, and all characters in the ssid require to be escaped.
- * example: {"ssid":"abcdefghijklmnopqrstuvwxyz012345","ip":"192.168.1.119","netmask":"255.255.255.0","gw":"192.168.1.1","urc":0, "ota_dsc":"Installing...", "ota_pct":100}
- */
-#if RECOVERY_APPLICATION
-// recovery has more resources available. Let's use them to include more details about the OTA process
-#define JSON_IP_INFO_SIZE 					150+255
-#else
-// 40 chars for appname and version
-#define JSON_IP_INFO_SIZE 					150+40
-#endif
+
 
 
 /**
@@ -363,8 +353,8 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
  * @brief Clears the connection status json.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_clear_ip_info_json();
-
+cJSON * wifi_manager_clear_ip_info_json(cJSON **old);
+cJSON * wifi_manager_get_new_json(cJSON **old);
 /**
  * @brief Generates the list of access points after a wifi scan.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.

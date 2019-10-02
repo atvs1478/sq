@@ -58,6 +58,11 @@ Contains the freeRTOS task and all necessary support
 #include "esp_app_format.h"
 #include "driver/gpio.h"
 #include "driver/adc.h"
+#include "CJson.h"
+
+#ifndef RECOVERY_APPLICATION
+#define RECOVERY_APPLICATION 0
+#endif
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
@@ -79,6 +84,7 @@ uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
 char *accessp_json = NULL;
 char *ip_info_json = NULL;
+cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 static update_reason_code_t last_update_reason_code=0;
 
@@ -166,8 +172,8 @@ void wifi_manager_start(){
 	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
 	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
 	wifi_manager_clear_access_points_json();
-	ip_info_json = (char*)malloc(sizeof(char) * JSON_IP_INFO_SIZE);
-	wifi_manager_clear_ip_info_json();
+	ip_info_json = NULL;
+	ip_info_cjson = wifi_manager_clear_ip_info_json(&ip_info_cjson);
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 	memset(&wifi_settings.sta_static_ip_config, 0x00, sizeof(tcpip_adapter_ip_info_t));
@@ -370,102 +376,58 @@ bool wifi_manager_fetch_wifi_sta_config(){
 }
 
 
-void wifi_manager_clear_ip_info_json(){
-	strcpy(ip_info_json, "{}\n");
+cJSON * wifi_manager_get_new_json(cJSON **old){
+	cJSON * root=*old;
+	if(root!=NULL){
+	    cJSON_Delete(root);
+	    *old=NULL;
+	}
+	 return cJSON_CreateObject();
+}
+cJSON * wifi_manager_clear_ip_info_json(cJSON **old){
+	 cJSON *root = wifi_manager_get_new_json(old);
+ 	 cJSON_AddItemToObject(root, "message", cJSON_CreateString("Initializing"));
+ 	 return root;
 }
 
 
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
+	ip_info_cjson = wifi_manager_get_new_json(&ip_info_cjson);
 	if(update_reason_code == UPDATE_OTA) {
 		update_reason_code = last_update_reason_code;
 	}
-	else
-	{
+	else {
 		last_update_reason_code = update_reason_code;
 	}
+	const esp_app_desc_t* desc = esp_ota_get_app_description();
+	cJSON_AddItemToObject(ip_info_cjson, "project_name", cJSON_CreateString(desc->project_name));
+	cJSON_AddItemToObject(ip_info_cjson, "version", cJSON_CreateString(desc->version));
+	cJSON_AddNumberToObject(ip_info_cjson,"recovery",	RECOVERY_APPLICATION	);
+	cJSON_AddNumberToObject(ip_info_cjson, "urc", update_reason_code);
 	if(config){
-#if RECOVERY_APPLICATION
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%u,\"recovery\": 1,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
-#else
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\",\"recovery\": 0,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
-#endif
-		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-		const esp_app_desc_t* desc = esp_ota_get_app_description();
-		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
-		strcpy(ip_info_json, "{\"ssid\":");
-		json_print_string(config->sta.ssid,  (unsigned char*)(ip_info_json+strlen(ip_info_json)) );
+		cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
+
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
 			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-			char ip[IP4ADDR_STRLEN_MAX]; /* note: IP4ADDR_STRLEN_MAX is defined in lwip */
-			char gw[IP4ADDR_STRLEN_MAX];
-			char netmask[IP4ADDR_STRLEN_MAX];
-			strcpy(ip, ip4addr_ntoa(&ip_info.ip));
-			strcpy(netmask, ip4addr_ntoa(&ip_info.netmask));
-			strcpy(gw, ip4addr_ntoa(&ip_info.gw));
-
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
-					ip,
-					netmask,
-					gw,
-					(int)update_reason_code,
-					desc->project_name,
-					desc->version,
-
-
-#if RECOVERY_APPLICATION
-					ota_get_status(),
-					 ota_get_pct_complete(),
-#endif
-					 JACK_LEVEL,
-					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
-			);
-		}
-		else{
-			/* notify in the json output the reason code why this was updated without a connection */
-			snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
-								"0",
-								"0",
-								"0",
-								(int)update_reason_code,
-								desc->project_name,
-								desc->version,
-
-#if RECOVERY_APPLICATION
-								"",
-								0,
-#endif
-					 JACK_LEVEL,
-					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
-);
+			cJSON_AddItemToObject(ip_info_cjson, "ip", cJSON_CreateString(ip4addr_ntoa(&ip_info.ip)));
+			cJSON_AddItemToObject(ip_info_cjson, "netmask", cJSON_CreateString(ip4addr_ntoa(&ip_info.netmask)));
+			cJSON_AddItemToObject(ip_info_cjson, "gw", cJSON_CreateString(ip4addr_ntoa(&ip_info.gw)));
 		}
 	}
-	else{
+
+
 
 #if RECOVERY_APPLICATION
-				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
-
-#else
-				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\",\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
+	cJSON_AddItemToObject(ip_info_cjson, "ota_dsc", cJSON_CreateString(ota_get_status()));
+	cJSON_AddNumberToObject(ip_info_cjson,"ota_pct",	ota_get_pct_complete()	);
 #endif
 
+	cJSON_AddItemToObject(ip_info_cjson, "Jack", cJSON_CreateString(JACK_LEVEL));
+	cJSON_AddNumberToObject(ip_info_cjson,"Voltage",	adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
 
-		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
-		const esp_app_desc_t* desc = esp_ota_get_app_description();
-		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
-		snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
-		desc->project_name,
-		desc->version,
-#if RECOVERY_APPLICATION
-				ota_get_status(),
-					 ota_get_pct_complete(),
-#endif
-					 JACK_LEVEL,
-					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
-			);
-	}
 }
 
 
@@ -653,7 +615,7 @@ void wifi_manager_connect_async(){
 	 * it's a remnant from a previous connection
 	 */
 	if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-		wifi_manager_clear_ip_info_json();
+		wifi_manager_clear_ip_info_json(&ip_info_cjson);
 		wifi_manager_unlock_json_buffer();
 	}
 	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_USER);
@@ -661,7 +623,7 @@ void wifi_manager_connect_async(){
 
 
 char* wifi_manager_get_ip_info_json(){
-	return ip_info_json;
+	return cJSON_Print(ip_info_cjson);
 }
 
 void wifi_manager_destroy(){
@@ -674,7 +636,8 @@ void wifi_manager_destroy(){
 	free(accessp_json);
 	accessp_json = NULL;
 	free(ip_info_json);
-	ip_info_json = NULL;
+	cJSON_Delete(ip_info_cjson);
+	ip_info_cjson=NULL;
 	free(wifi_manager_sta_ip);
 	wifi_manager_sta_ip = NULL;
 	if(wifi_manager_config_sta){
@@ -889,12 +852,6 @@ void wifi_manager( void * pvParameters ){
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					wifi_manager_generate_ip_info_json( UPDATE_OTA );
 					wifi_manager_unlock_json_buffer();
-#if RECOVERY_APPLICATION
-					ESP_LOGI(TAG,"Refresh from OTA status: %s - flash percent: %d%% ",
-					ota_get_status(),
-					 ota_get_pct_complete());
-#endif
-
 				}
 				break;
 

@@ -79,11 +79,12 @@ void triggerStatusJsonRefresh(bool bDelay,const char * status, ...){
 	wifi_manager_refresh_ota_json();
 	if(bDelay){
 		ESP_LOGD(TAG,"Holding task...");
-	    vTaskDelay(700 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
+	    vTaskDelay(200 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
 		ESP_LOGD(TAG,"Done holding task...");
 	}
 	else
 	{
+		ESP_LOGI(TAG,"%s",ota_status.status_text);
 		taskYIELD();
 	}
 }
@@ -161,19 +162,17 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         }
         break;
     case HTTP_EVENT_ON_DATA:
-
-    	vTaskDelay(5/ portTICK_RATE_MS);
     	if(!ota_status.bOTAStarted)  {
     		ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
     	}
     	else if(ota_status.bOTAStarted && esp_http_client_get_status_code(evt->client) == 200 ){
 			ota_status.ota_actual_len+=evt->data_len;
-			if(ota_get_pct_complete()%2 == 0) ota_status.newpct = ota_get_pct_complete();
+			if(ota_get_pct_complete()%5 == 0) ota_status.newpct = ota_get_pct_complete();
 			if(ota_status.lastpct!=ota_status.newpct )
 			{
 				gettimeofday(&tv, NULL);
 				uint32_t elapsed_ms= (tv.tv_sec-ota_status.OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status.OTA_start.tv_usec)/1000;
-				ESP_LOGI(TAG,"OTA chunk : %d bytes (%d of %d) (%d pct), %d KB/s", evt->data_len, ota_status.ota_actual_len, ota_status.ota_total_len, ota_status.newpct, elapsed_ms>0?ota_status.ota_actual_len*1000/elapsed_ms/1024:0);
+				ESP_LOGI(TAG,"OTA progress : %d/%d (%d pct), %d KB/s", ota_status.ota_actual_len, ota_status.ota_total_len, ota_status.newpct, elapsed_ms>0?ota_status.ota_actual_len*1000/elapsed_ms/1024:0);
 				wifi_manager_refresh_ota_json();
 				ota_status.lastpct=ota_status.newpct;
 			}
@@ -194,7 +193,7 @@ esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
 
 	conf->cert_pem =cert==NULL?(char *)server_cert_pem_start:cert;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 2048;
+	conf->buffer_size = 2048*2;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
@@ -275,6 +274,7 @@ void ota_task(void *pvParameter)
 	ota_status.bRedirectFound=false;
 	if(passedURL==NULL || strlen(passedURL)==0){
 		ESP_LOGE(TAG,"HTTP OTA called without a url");
+		triggerStatusJsonRefresh(true,"Updating needs a URL!");
 		ota_status.bOTAThreadStarted=false;
 		vTaskDelete(NULL);
 		return ;
@@ -349,7 +349,7 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
 
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO-1, NULL, OTA_CORE);
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+1, NULL, OTA_CORE);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
