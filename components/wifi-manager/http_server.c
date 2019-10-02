@@ -92,7 +92,7 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 void http_server_start(){
 
 	if(task_http_server == NULL){
-		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_http_server);
+		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_http_server);
 	}
 }
 void http_server(void *pvParameters) {
@@ -386,6 +386,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					bool bErrorFound=false;
 					bool bOTA=false;
 					char * otaURL=NULL;
+					// make sure we terminate the netconn string
+					save_ptr[buflen-1]='\0';
 
 					while(last_parm!=NULL){
 						// Search will return

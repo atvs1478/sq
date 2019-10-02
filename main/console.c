@@ -59,7 +59,7 @@ void process_autoexec(){
 
 	if(str_flag !=NULL ){
 		autoexec_flag=atoi(str_flag);
-		ESP_LOGI(TAG,"autoexec flag value found with value %u", autoexec_flag);
+		ESP_LOGI(TAG,"autoexec flag value found with value %u, from string value: %s", autoexec_flag, str_flag);
 		if(autoexec_flag == 1) {
 			do {
 				snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i++);

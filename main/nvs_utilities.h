@@ -10,6 +10,7 @@ esp_err_t store_nvs_value(nvs_type_t type, const char *key, void * data);
 esp_err_t get_nvs_value(nvs_type_t type, const char *key, void*value, const uint8_t buf_size);
 void * get_nvs_value_alloc(nvs_type_t type, const char *key);
 esp_err_t erase_nvs(const char *key);
+void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size);
 #ifdef __cplusplus
 }
 #endif

@@ -99,6 +99,29 @@ esp_err_t store_nvs_value_len(nvs_type_t type, const char *key, void * data,
 	nvs_close(nvs);
 	return err;
 }
+
+void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
+
+	void * current_value = get_nvs_value_alloc(type, key);
+	if(current_value == NULL && default_value != NULL){
+		if(type == NVS_TYPE_BLOB && blob_size == 0){
+			ESP_LOGE(TAG,"Unable to store default value for BLOB object'  blob size was not specified");
+			return NULL;
+		}
+		else {
+			esp_err_t err = store_nvs_value_len(type, key, default_value, blob_size);
+			if(err!=ESP_OK){
+				ESP_LOGE(TAG,"Unable to store default nvs value. Error: %s",esp_err_to_name(err));
+				return NULL;
+			}
+		}
+	}
+	if(current_value == NULL){
+		current_value = get_nvs_value_alloc(type, key);
+	}
+	return current_value;
+}
+
 void * get_nvs_value_alloc(nvs_type_t type, const char *key) {
 	nvs_handle nvs;
 	esp_err_t err;

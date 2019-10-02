@@ -56,9 +56,17 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/ip4_addr.h"
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
+#include "driver/gpio.h"
+#include "driver/adc.h"
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+#endif
+#ifdef TAS575x
+#define JACK_GPIO	34
+#define JACK_LEVEL !gpio_get_level(JACK_GPIO)?"1":"0";
+#else
+#define JACK_LEVEL "N/A"
 #endif
 
 /* objects used to manipulate the main queue of events */
@@ -378,9 +386,9 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	}
 	if(config){
 #if RECOVERY_APPLICATION
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%u,\"recovery\": 1}\n";
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%u,\"recovery\": 1,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
 #else
-				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\",\"recovery\": 0}\n";
+				const char ip_info_json_format[] = ",\"ip\":\"%s\",\"netmask\":\"%s\",\"gw\":\"%s\",\"urc\":%d,\"project_name\":\"%s\",\"version\":\"%s\",\"recovery\": 0,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
 #endif
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 		const esp_app_desc_t* desc = esp_ota_get_app_description();
@@ -404,13 +412,15 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 					gw,
 					(int)update_reason_code,
 					desc->project_name,
-					desc->version
+					desc->version,
 
 
 #if RECOVERY_APPLICATION
-					,ota_get_status(),
-					 ota_get_pct_complete()
+					ota_get_status(),
+					 ota_get_pct_complete(),
 #endif
+					 JACK_LEVEL,
+					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
 			);
 		}
 		else{
@@ -421,31 +431,39 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 								"0",
 								(int)update_reason_code,
 								desc->project_name,
-								desc->version
+								desc->version,
 
 #if RECOVERY_APPLICATION
-					,"",
-					0
+								"",
+								0,
 #endif
+					 JACK_LEVEL,
+					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
 );
 		}
 	}
 	else{
+
 #if RECOVERY_APPLICATION
-				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d}\n";
+				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\", \"ota_dsc\":\"%s\", \"ota_pct\":%d,\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
+
 #else
-				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\"}\n";
+				const char ip_info_json_format[] = ",\"project_name\":\"%s\",\"version\":\"%s\",\"Jack\" : \"%s\",  \"Voltage\" : %.2f }\n";
 #endif
+
+
 		memset(ip_info_json, 0x00, JSON_IP_INFO_SIZE);
 		const esp_app_desc_t* desc = esp_ota_get_app_description();
 		/* to avoid declaring a new buffer we copy the data directly into the buffer at its correct address */
 		snprintf( (ip_info_json + strlen(ip_info_json)), JSON_IP_INFO_SIZE, ip_info_json_format,
 		desc->project_name,
-		desc->version
+		desc->version,
 #if RECOVERY_APPLICATION
-					,ota_get_status(),
-					 ota_get_pct_complete()
+				ota_get_status(),
+					 ota_get_pct_complete(),
 #endif
+					 JACK_LEVEL,
+					 adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1
 			);
 	}
 }
