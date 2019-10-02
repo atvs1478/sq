@@ -448,10 +448,10 @@ function checkStatus(){
     if (blockAjax) return;
     blockAjax = true;
     $.getJSON( "/status.json", function( data ) {
-        if(data.hasOwnProperty('ssid') && data['ssid'] != ""){
-            if(data["ssid"] === selectedSSID){
+        if (data.hasOwnProperty('ssid') && data['ssid'] != ""){
+            if (data["ssid"] === selectedSSID){
                 //that's a connection attempt
-                if(data["urc"] === 0){
+                if (data["urc"] === 0){
                     //got connection
                     $("#connected-to span").text(data["ssid"]);
                     $("#connect-details h1").text(data["ssid"]);
@@ -473,7 +473,7 @@ function checkStatus(){
                     enableAPTimer = false;
                     if (!recovery) enableStatusTimer = false;
                 }
-                else if(data["urc"] === 1){
+                else if (data["urc"] === 1){
                     //failed attempt
                     $("#connected-to span").text('');
                     $("#connect-details h1").text('');
@@ -497,7 +497,7 @@ function checkStatus(){
                     enableStatusTimer = true;
                 }
             }
-            else if(data.hasOwnProperty('urc') && data['urc'] === 0){
+            else if (data.hasOwnProperty('urc') && data['urc'] === 0){
                 //ESP32 is already connected to a wifi without having the user do anything
                 if( !($("#wifi-status").is(":visible")) ){
                     $("#connected-to span").text(data["ssid"]);
@@ -512,7 +512,7 @@ function checkStatus(){
                 if (!recovery) enableStatusTimer = false;
             }
         }
-        else if(data.hasOwnProperty('urc') && data['urc'] === 2){
+        else if (data.hasOwnProperty('urc') && data['urc'] === 2){
             //that's a manual disconnect
             if($("#wifi-status").is(":visible")){
                 $("#wifi-status").slideUp( "fast", function() {});
@@ -546,19 +546,19 @@ function checkStatus(){
                 enableStatusTimer = false;
             }
         }
-        if(data.hasOwnProperty('project_name') && data['project_name'] != ''){
+        if (data.hasOwnProperty('project_name') && data['project_name'] != ''){
             pname = data['project_name'];
         }
-        if(data.hasOwnProperty('version') && data['version'] != ''){
+        if (data.hasOwnProperty('version') && data['version'] != ''){
             ver = data['version'];
             $("span#foot-fw").html("fw: <strong>"+ver+"</strong>, mode: <strong>"+pname+"</strong>");
         }
-        if(data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
+        if (data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
             otapct = data['ota_pct'];
             $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
             $('.progress-bar').html(otapct+'%');
         }
-        if(data.hasOwnProperty('ota_dsc') && data['ota_dsc'] != ''){
+        if (data.hasOwnProperty('ota_dsc') && data['ota_dsc'] != ''){
             otadsc = data['ota_dsc'];
             $("span#flash-status").html(otadsc);
             if (otadsc.match(/Error:/) || otapct > 95) {
@@ -567,6 +567,14 @@ function checkStatus(){
             }
         } else {
             $("span#flash-status").html('');
+        }
+        if (data.hasOwnProperty('message') && data['message'] != ''){
+            $('#message').html(data['message']);
+            $("#content").fadeTo("slow", 0.3, function() {
+                $("#message").show(500).delay(5000).hide(500, function() {
+                    $("#content").fadeTo("slow", 1.0);
+                });
+            });
         }
         blockAjax = false;
     })
@@ -598,7 +606,6 @@ function getConfig() {
                     "</tr>"
                 );
                 $("input#"+key).val(data[key]);
-                console.log(key+": "+data[key]);    //TODO
             }
         }
         $("tbody#nvsTable").append(
