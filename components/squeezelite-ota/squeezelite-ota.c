@@ -79,7 +79,7 @@ void triggerStatusJsonRefresh(bool bDelay,const char * status, ...){
 	wifi_manager_refresh_ota_json();
 	if(bDelay){
 		ESP_LOGD(TAG,"Holding task...");
-	    vTaskDelay(1500 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
+	    vTaskDelay(700 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
 		ESP_LOGD(TAG,"Done holding task...");
 	}
 	else
