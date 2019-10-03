@@ -308,6 +308,7 @@ $(document).ready(function(){
     $('#fwcheck').on("click", function(){
         $("#releaseTable").html("");
         $.getJSON(releaseURL, function(data) {
+            var i=0;
             data.forEach(function(release) {
                 var url = '';
                 release.assets.forEach(function(asset) {
@@ -321,21 +322,55 @@ $(document).ready(function(){
                 body = body.replace(/[\s\S]+(### Revision Log[\s\S]+)### ESP-IDF Version Used[\s\S]+/, "$1");
                 body = body.replace(/- \(.+?\) /g, "- ");
                 var [date, time] = release.created_at.split('T');
+                var trclass = (i++ > 6)?' hide':'';
                 $("#releaseTable").append(
-                    "<tr>"+
-                    "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
-                    "<td>"+idf+"</td>"+
-                    "<td>"+date+"</td>"+
-                    "<td>"+cfg+"</td>"+
-                    "<td>"+branch+"</td>"+
-                    "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
+                    "<tr class='release"+trclass+"'>"+
+                        "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
+                        "<td>"+idf+"</td>"+
+                        "<td>"+date+"</td>"+
+                        "<td>"+cfg+"</td>"+
+                        "<td>"+branch+"</td>"+
+                        "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
                     "</tr>"
                 );
             });
+            if (i > 7) {
+                $("#releaseTable").append(
+                    "<tr id='showall'>"+
+                        "<td colspan='6'>"+
+                            "<input type='button' id='showallbutton' class='btn btn-info' value='Show older releases' />"+
+                        "</td>"+
+                    "</tr>"
+                );
+                $('#showallbutton').on("click", function(){
+                    $("tr.hide").removeClass("hide");
+                    $("tr#showall").addClass("hide");
+                });
+            }
+            $("#searchfw").css("display", "inline");
         })
         .fail(function() {
             alert("failed to fetch release history!");
         });
+    });
+
+    $('input#searchinput').on("input", function(){
+        var s = $('input#searchinput').val();
+        var re = new RegExp(s, "gi");
+        if (s.length == 0) {
+            $("tr.release").removeClass("hide");
+        } else if (s.length < 3) {
+            $("tr.release").addClass("hide");
+        } else {
+            $("tr.release").addClass("hide");
+            $("tr.release").each(function(tr){
+                $(this).find('td').each (function() {
+                    if ($(this).html().match(re)) {
+                        $(this).parent().removeClass('hide');
+                    }
+                });
+            });
+        }
     });
 
     //first time the page loads: attempt to get the connection status and start the wifi scan
