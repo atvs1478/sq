@@ -66,7 +66,7 @@ Contains the freeRTOS task and all necessary support
 #endif
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
-#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+#define SQUEEZELITE_ESP32_RELEASE_URL https://github.com/sle118/squeezelite-esp32/releases
 #endif
 #ifdef TAS575x
 #define JACK_GPIO	34
@@ -187,7 +187,7 @@ void wifi_manager_start(){
 	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
 	host_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
-	char * release_url = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	char * release_url = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "release_url", QUOTE(SQUEEZELITE_ESP32_RELEASE_URL), 0);
 	if(release_url == NULL){
 		ESP_LOGE(TAG,"Unable to retrieve the release url from nvs");
 	}

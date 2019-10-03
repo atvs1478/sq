@@ -150,7 +150,7 @@ void register_default_nvs(){
 	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", QUOTE(CONFIG_BT_SINK_PIN), 0);
 	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
-	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "release_url", QUOTE(SQUEEZELITE_ESP32_RELEASE_URL), 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);

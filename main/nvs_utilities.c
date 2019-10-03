@@ -114,7 +114,7 @@ void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * defa
 		else {
 			esp_err_t err = store_nvs_value_len(type, key, default_value, blob_size);
 			if(err!=ESP_OK){
-				ESP_LOGE(TAG,"Unable to store default nvs value. Error: %s",esp_err_to_name(err));
+				ESP_LOGE(TAG,"Unable to store default nvs value for key %s. Error: %s", key,esp_err_to_name(err));
 				return NULL;
 			}
 			else{
