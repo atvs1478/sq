@@ -356,3 +356,8 @@ div#message {
 tr.hide {
     display: none;
 }
+
+#searchfw {
+    float: right;
+    display: none;
+}

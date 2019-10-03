@@ -343,15 +343,34 @@ $(document).ready(function(){
                     "</tr>"
                 );
                 $('#showallbutton').on("click", function(){
-                    console.log('show all');
                     $("tr.hide").removeClass("hide");
                     $("tr#showall").addClass("hide");
                 });
             }
+            $("#searchfw").css("display", "inline");
         })
         .fail(function() {
             alert("failed to fetch release history!");
         });
+    });
+
+    $('input#searchinput').on("input", function(){
+        var s = $('input#searchinput').val();
+        var re = new RegExp(s, "gi");
+        if (s.length == 0) {
+            $("tr.release").removeClass("hide");
+        } else if (s.length < 3) {
+            $("tr.release").addClass("hide");
+        } else {
+            $("tr.release").addClass("hide");
+            $("tr.release").each(function(tr){
+                $(this).find('td').each (function() {
+                    if ($(this).html().match(re)) {
+                        $(this).parent().removeClass('hide');
+                    }
+                });
+            });
+        }
     });
 
     //first time the page loads: attempt to get the connection status and start the wifi scan
