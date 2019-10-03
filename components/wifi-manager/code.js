@@ -181,7 +181,12 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec": autoexec },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
         console.log('sent config JSON with headers:', autoexec);
         console.log('now triggering reboot');
@@ -190,7 +195,12 @@ $(document).ready(function(){
             dataType: 'json',
             method: 'POST',
             cache: false,
-            data: { 'timestamp': Date.now()}
+            data: { 'timestamp': Date.now()},
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
     });
 
@@ -207,6 +217,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
             }
         });
         console.log('sent config JSON with headers:', autoexec1);
@@ -231,6 +242,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -260,6 +272,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -275,7 +288,12 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-fwurl": url },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
         enableStatusTimer = true;
     });
@@ -433,7 +451,12 @@ function performConnect(conntype){
         method: 'POST',
         cache: false,
         headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd },
-        data: { 'timestamp': Date.now()}
+        data: { 'timestamp': Date.now()},
+        error: function (xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+            if (thrownError != '') showMessage(thrownError);
+        }
     });
 
     //now we can re-set the intervals regardless of result
@@ -608,12 +631,7 @@ function checkStatus(){
             $("span#flash-status").html('');
         }
         if (data.hasOwnProperty('message') && data['message'] != ''){
-            $('#message').html(data['message']);
-            $("#content").fadeTo("slow", 0.3, function() {
-                $("#message").show(500).delay(5000).hide(500, function() {
-                    $("#content").fadeTo("slow", 1.0);
-                });
-            });
+            showMessage(data['message']);
         }
         blockAjax = false;
     })
@@ -660,5 +678,14 @@ function getConfig() {
     })
     .fail(function() {
         console.log("failed to fetch config!");
+    });
+}
+
+function showMessage(message) {
+    $('#message').html(message);
+    $("#content").fadeTo("slow", 0.3, function() {
+        $("#message").show(500).delay(5000).hide(500, function() {
+            $("#content").fadeTo("slow", 1.0);
+        });
     });
 }
