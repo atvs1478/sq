@@ -19,6 +19,7 @@ var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
+var lastMsg = '';
 
 var apList = null;
 var selectedSSID = "";
@@ -631,7 +632,11 @@ function checkStatus(){
             $("span#flash-status").html('');
         }
         if (data.hasOwnProperty('message') && data['message'] != ''){
-            showMessage(data['message']);
+            var msg = data['message'];
+            if (msg != lastMsg) {
+                showMessage(msg);
+                lastMsg = msg;
+            }
         }
         blockAjax = false;
     })
