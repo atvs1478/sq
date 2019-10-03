@@ -475,12 +475,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 						if(buff){
 							netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 							netconn_write(conn, buff, strlen(buff), NETCONN_NOCOPY);
-
-							wifi_manager_unlock_json_buffer();
 						}
 						else{
 							netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
 						}
+						wifi_manager_unlock_json_buffer();
 					}
 					else{
 						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);

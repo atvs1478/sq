@@ -148,24 +148,24 @@ char * process_ota_url(){
 
 void register_default_nvs(){
 	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", QUOTE(CONFIG_BT_SINK_PIN), 0);
+	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
 	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
-	nvs_value_set_default(NVS_TYPE_STR, "release_url", QUOTE(SQUEEZELITE_ESP32_RELEASE_URL), 0);
+	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",QUOTE(CONFIG_DEFAULT_AP_CHANNEL) , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_ssid",CONFIG_DEFAULT_AP_SSID , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "ap_password", CONFIG_DEFAULT_AP_PASSWORD, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
 	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "a2dp_device_name", CONFIG_A2DP_DEV_NAME, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
 
-	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", QUOTE(CONFIG_BT_SINK), 0);
+	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
 	enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
 	free(flag);
-	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_airplay", QUOTE(CONFIG_AIRPLAY_SINK), 0);
+	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 	enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
 	free(flag);
 

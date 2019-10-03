@@ -24,7 +24,9 @@
 #ifndef QUOTE
 #define QUOTE(name) #name
 #endif
-
+#ifndef STR
+#define STR(macro)  QUOTE(macro)
+#endif
 #define ESP_LOG_DEBUG_EVENT(tag,e) ESP_LOGD(tag,"evt: " e)
 
 

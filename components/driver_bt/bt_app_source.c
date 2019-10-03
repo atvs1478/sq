@@ -15,7 +15,7 @@
 #include "esp_wifi.h"
 #include "freertos/timers.h"
 #include "argtable3/argtable3.h"
-
+#include "nvs_utilities.h"
 #include "bt_app_core.h"
 #include "trace.h"
 
@@ -119,13 +119,12 @@ static uint8_t s_peer_bdname[ESP_BT_GAP_MAX_BDNAME_LEN + 1];
 static int s_a2d_state = APP_AV_STATE_IDLE;
 static int s_media_state = APP_AV_MEDIA_STATE_IDLE;
 static uint32_t s_pkt_cnt = 0;
-
 static TimerHandle_t s_tmr;
 
 static struct {
 	int control_delay;
 	int connect_timeout_delay;
-	char sink_name[32];
+	char * sink_name;
 } squeezelite_conf;	
 
 void hal_bluetooth_init(const char * options)
@@ -167,10 +166,13 @@ void hal_bluetooth_init(const char * options)
 	}
 	if(squeezelite_args.sink_name->count == 0)
 	{
-		ESP_LOGD(TAG,"Using default sink name : %s",CONFIG_A2DP_SINK_NAME);
-		strncpy(squeezelite_conf.sink_name, CONFIG_A2DP_SINK_NAME, 32);
+		squeezelite_conf.sink_name = get_nvs_value_alloc_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
+    	if(squeezelite_conf.sink_name  == NULL){
+    		ESP_LOGW(TAG,"Unable to retrieve the a2dp sink name from nvs");
+    		squeezelite_conf.sink_name = strdup(CONFIG_A2DP_SINK_NAME);
+    	}
 	} else {
-		strncpy(squeezelite_conf.sink_name, squeezelite_args.sink_name->sval[0], 32);
+		squeezelite_conf.sink_name=strdup(squeezelite_args.sink_name->sval[0]);
 	}
 	if(squeezelite_args.connect_timeout_delay->count == 0)
 	{
@@ -507,9 +509,19 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
     case BT_APP_EVT_STACK_UP: {
     	ESP_LOGI(TAG,"BT Stack going up.");
         /* set up device name */
-        char *dev_name = CONFIG_A2DP_DEV_NAME;
-        esp_bt_dev_set_device_name(dev_name);
-        ESP_LOGI(TAG,"Preparing to connect to device: %s",CONFIG_A2DP_SINK_NAME);
+
+
+        char * a2dp_dev_name = 	get_nvs_value_alloc_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+    	if(a2dp_dev_name  == NULL){
+    		ESP_LOGW(TAG,"Unable to retrieve the a2dp device name from nvs");
+    		esp_bt_dev_set_device_name(CONFIG_A2DP_DEV_NAME);
+    	}
+    	else {
+    		esp_bt_dev_set_device_name(a2dp_dev_name);
+    		free(a2dp_dev_name);
+    	}
+
+        ESP_LOGI(TAG,"Preparing to connect");
 
         /* register GAP callback function */
         esp_bt_gap_register_callback(bt_app_gap_cb);

@@ -66,7 +66,7 @@ Contains the freeRTOS task and all necessary support
 #endif
 
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
-#define SQUEEZELITE_ESP32_RELEASE_URL https://github.com/sle118/squeezelite-esp32/releases
+#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
 #ifdef TAS575x
 #define JACK_GPIO	34
@@ -329,7 +329,7 @@ cJSON * wifi_manager_get_new_json(cJSON **old){
 }
 cJSON * wifi_manager_clear_ip_info_json(cJSON **old){
 	 cJSON *root = wifi_manager_get_new_json(old);
- 	 cJSON_AddItemToObject(root, "message", cJSON_CreateString("Initializing"));
+// 	 cJSON_AddItemToObject(root, "message", cJSON_CreateString("Initializing"));
  	 return root;
 }
 

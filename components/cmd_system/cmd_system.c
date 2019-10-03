@@ -104,7 +104,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		ESP_LOGW(TAG,"RECOVERY application is already active");
 		return ESP_OK;
 	}
-#else
+#endif
 	bool bFound=false;
     ESP_LOGI(TAG, "Looking for partition type %u",partition_subtype);
     const esp_partition_t *partition;
@@ -116,7 +116,6 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 	else
 	{
 		partition = (esp_partition_t *) esp_partition_get(it);
-
 		if(partition != NULL){
 			ESP_LOGI(TAG, "Found partition type %u",partition_subtype);
 			esp_ota_set_boot_partition(partition);
@@ -132,7 +131,6 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 			esp_restart();
 		}
 	}
-#endif
 	return ESP_OK;
 }
 
@@ -140,6 +138,8 @@ static int restart(int argc, char **argv)
 {
     ESP_LOGI(TAG, "Restarting");
     guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
+    // If we're still alive, then there may not be an ota partition to boot from
+    guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
 esp_err_t guided_factory(){

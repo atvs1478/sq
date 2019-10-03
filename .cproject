@@ -239,7 +239,7 @@
                             							
                             <targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1831977109" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
                             							
-                            <builder arguments="&quot;C:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot; -j8 EXTRA_CPPFLAGS=&quot;-DRECOVERY_APPLICATION=1&quot;" command="python" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+                            <builder arguments="&quot;C:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot; -j8 EXTRA_CPPFLAGS=&quot;-DRECOVERY_APPLICATION=1 -DSQUEEZELITE_ESP32_RELEASE_URL=\&quot;https://github.com/sle118/squeezelite-esp32/releases\&quot; &quot;" command="python" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
                             							
                             <tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.1302011176" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
                                 								
