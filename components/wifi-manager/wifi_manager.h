@@ -279,18 +279,11 @@ void wifi_manager( void * pvParameters );
 char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
 
-char * wifi_manager_alloc_get_config(char * name, size_t * l);
-
 
 /**
  * @brief saves the current STA wifi config to flash ram storage.
  */
 esp_err_t wifi_manager_save_sta_config();
-
-/**
- * @brief saves the current configuration to flash ram storage
- */
-esp_err_t wifi_manager_save_config(char * value, char * name, int len);
 
 
 /**

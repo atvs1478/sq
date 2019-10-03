@@ -109,6 +109,7 @@ extern struct outputstate output;
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
+extern bool jack_mutes_amp;
 
 static log_level loglevel;
 static bool running, isI2SStarted;
@@ -433,7 +434,9 @@ static void *output_thread_i2s() {
 		TIME_MEASUREMENT_START(timer_start);
 		
 		LOCK;
-				
+		if(jack_mutes_amp){
+			// todo: implement some muting logic
+		}
 		// manage led display
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);

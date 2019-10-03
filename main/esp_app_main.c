@@ -40,12 +40,14 @@
 #include "lwip/netdb.h"
 #include "nvs_utilities.h"
 #include "http_server.h"
+#include "trace.h"
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"
 
 static EventGroupHandle_t wifi_event_group;
-extern char current_namespace[];
-
+bool enable_bt_sink=false;
+bool enable_airplay=false;
+bool jack_mutes_amp=false;
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)
 
@@ -60,6 +62,9 @@ char * fwurl = NULL;
 #define LED_RED_GPIO	0
 #endif
 static bool bWifiConnected=false;
+
+
+
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -104,7 +109,7 @@ char * process_ota_url(){
 	if(fwurl!=NULL)
 	{
 		ESP_LOGD(TAG,"Deleting nvs entry for Firmware URL %s", fwurl);
-		esp_err_t err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+		esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
 		if (err == ESP_OK) {
 			err = nvs_erase_key(nvs, "fwurl");
 			if (err == ESP_OK) {
@@ -133,11 +138,50 @@ char * process_ota_url(){
 	return fwurl;
 }
 
+//CONFIG_SDIF_NUM=0
+//CONFIG_SPDIF_BCK_IO=26
+//CONFIG_SPDIF_WS_IO=25
+//CONFIG_SPDIF_DO_IO=15
+//CONFIG_A2DP_CONTROL_DELAY_MS=500
+//CONFIG_A2DP_CONNECT_TIMEOUT_MS=1000
+//CONFIG_WIFI_MANAGER_MAX_RETRY=2
+
+void register_default_nvs(){
+	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", QUOTE(CONFIG_BT_SINK_PIN), 0);
+	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
+	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",QUOTE(CONFIG_DEFAULT_AP_CHANNEL) , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ssid",CONFIG_DEFAULT_AP_SSID , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_password", CONFIG_DEFAULT_AP_PASSWORD, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
+	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "a2dp_device_name", CONFIG_A2DP_DEV_NAME, 0);
+
+	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", QUOTE(CONFIG_BT_SINK), 0);
+	enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+	free(flag);
+	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_airplay", QUOTE(CONFIG_AIRPLAY_SINK), 0);
+	enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+	free(flag);
+
+	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
+	jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+	free(flag);
+
+
+
+}
 
 void app_main()
 {
 	char * fwurl = NULL;
 	initialize_nvs();
+	register_default_nvs();
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	led_config(LED_RED, LED_RED_GPIO, 0);
 	wifi_event_group = xEventGroupCreate();

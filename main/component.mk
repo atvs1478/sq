@@ -7,4 +7,6 @@
 # please read the SDK documents if you need to do this.
 #
 CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG
+COMPONENT_ADD_INCLUDEDIRS += $(COMPONENT_PATH)/../tools
+COMPONENT_EXTRA_INCLUDES += $(PROJECT_PATH)/components/tools/
 LDFLAGS += -s

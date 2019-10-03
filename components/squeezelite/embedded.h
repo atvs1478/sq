@@ -1,6 +1,6 @@
 #ifndef EMBEDDED_H
 #define EMBEDDED_H
-
+#include "esp_system.h"
 #include <inttypes.h>
 
 /* 	must provide 
@@ -41,7 +41,10 @@ uint32_t 	_gettime_ms_(void);
 int			pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr, 
 				   void *(*start_routine)( void * ), void *arg, char *name);
 			
-// these are here as they can be #define to nothing			
+// these are here as they can be #define to nothing
+extern bool enable_bt_sink;
+extern bool enable_airplay;
+
 void 		register_external(void);
 void 		deregister_external(void);
 				   

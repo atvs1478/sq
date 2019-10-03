@@ -50,7 +50,6 @@ static char *s = "\"";
 static char *r = "\\\"";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
-extern char current_namespace[];
 
 /**
  * @brief embedded binary data.
@@ -74,14 +73,14 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 
 
 /* const http headers stored in ROM */
-const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAccept-Ranges: bytes\nContent-Length: %d\nContent-Encoding: %s\n\n";
-const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\n\n";
-const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\n\n";
-const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\n\n";
+const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAccept-Ranges: bytes\nContent-Length: %d\nContent-Encoding: %s\nAccess-Control-Allow-Origin: *\n\n";
+const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\nAccess-Control-Allow-Origin: *\n\n";
+const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\nAccess-Control-Allow-Origin: *\n\n";
+const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
-const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\n\n";
+const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
 const static char http_redirect_hdr_end[] = "/\n\n";
 
@@ -308,12 +307,18 @@ void http_server_netconn_serve(struct netconn *conn) {
 			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
 			int lenH = 0;
 			char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
+			const char * host_name=NULL;
+			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK){
+				ESP_LOGE(TAG,"Unable to get host name. Error: %s",esp_err_to_name(err));
+			}
+
 			/* determine if Host is from the STA IP address */
 			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
 			bool access_from_sta_ip = lenH > 0?strstr(host, wifi_manager_get_sta_ip_string()):false;
 			wifi_manager_unlock_sta_ip_string();
+			bool access_from_host_name = (host_name!=NULL) && strstr(host, host_name);
 
-			if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !access_from_sta_ip) {
+			if (lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !(access_from_sta_ip || access_from_host_name)) {
 				ESP_LOGI(TAG,"Redirecting to default AP IP Address : %s", DEFAULT_AP_IP);
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, DEFAULT_AP_IP, sizeof(DEFAULT_AP_IP) - 1, NETCONN_NOCOPY);
@@ -402,16 +407,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 								bOTA=true;
 							}
 							else {
-								if(lenA < MAX_COMMAND_LINE_SIZE ){
 									ESP_LOGD(TAG, "http_server_netconn_serve: config.json/ Storing parameter");
-									wifi_manager_save_config(last_parm,last_parm_name,lenA);
-								}
-								else
-								{
-									ESP_LOGE(TAG,"length is too long : %s = %s", last_parm_name, last_parm);
-									last_parm=NULL;
-									bErrorFound=true;
-								}
+									err= store_nvs_value(NVS_TYPE_STR, last_parm_name , last_parm);
+									if(err!=ESP_OK) ESP_LOGE(TAG,"Unable to save nvs value. Error: %s",esp_err_to_name(err));
 							}
 						}
 						if(last_parm_name!=NULL) {

@@ -96,21 +96,19 @@ static void register_version()
 
 /** 'restart' command restarts the program */
 
-static int restart(int argc, char **argv)
-{
-    ESP_LOGI(TAG, "Restarting");
-    esp_restart();
-}
-esp_err_t guided_factory()
+
+esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 {
 #if RECOVERY_APPLICATION
-	ESP_LOGW(TAG,"RECOVERY application is already active");
-	return ESP_OK;
+	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
+		ESP_LOGW(TAG,"RECOVERY application is already active");
+		return ESP_OK;
+	}
 #else
 	bool bFound=false;
-    ESP_LOGI(TAG, "Looking for recovery partition.");
+    ESP_LOGI(TAG, "Looking for partition type %u",partition_subtype);
     const esp_partition_t *partition;
-	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, partition_subtype, NULL);
 
 	if(it == NULL){
 		ESP_LOGE(TAG,"Unable initialize partition iterator!");
@@ -120,13 +118,13 @@ esp_err_t guided_factory()
 		partition = (esp_partition_t *) esp_partition_get(it);
 
 		if(partition != NULL){
-			ESP_LOGI(TAG, "Found recovery partition.");
+			ESP_LOGI(TAG, "Found partition type %u",partition_subtype);
 			esp_ota_set_boot_partition(partition);
 			bFound=true;
 		}
 		else
 		{
-			ESP_LOGE(TAG,"Recovery partition not found!  Unable to reboot to recovery.");
+			ESP_LOGE(TAG,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
 		}
 		esp_partition_iterator_release(it);
 		if(bFound) {
@@ -137,9 +135,20 @@ esp_err_t guided_factory()
 #endif
 	return ESP_OK;
 }
+
+static int restart(int argc, char **argv)
+{
+    ESP_LOGI(TAG, "Restarting");
+    guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
+	return 0; // return fail.  This should never return... we're rebooting!
+}
+esp_err_t guided_factory(){
+	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
+	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
+}
 static int restart_factory(int argc, char **argv)
 {
-	guided_factory();
+	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
 static void register_restart()

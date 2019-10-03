@@ -11,7 +11,7 @@
 #include "esp_pthread.h"
 #include "esp_system.h"
 #include "freertos/timers.h"
-
+#include "nvs_utilities.h"
 #include "raop.h"
 
 #include "log_util.h"
@@ -23,7 +23,6 @@
 #endif
 
 static const char * TAG = "platform";
-extern char current_namespace[];
 
 log_level	raop_loglevel = lINFO;
 log_level	util_loglevel;
@@ -58,12 +57,13 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
     ESP_ERROR_CHECK( mdns_init() );
     ESP_ERROR_CHECK( mdns_hostname_set(hostname) );
         
-    if (nvs_open(current_namespace, NVS_READONLY, &nvs) == ESP_OK) {
-		size_t len = sizeof(sink_name) - 1;
-		nvs_get_str(nvs, "airplay_name", sink_name, &len);
-		nvs_close(nvs);
-	}	
-	
+    char * sink_name_buffer= get_nvs_value_alloc(NVS_TYPE_STR, "airplay_name");
+    if(sink_name_buffer != NULL){
+    	memset(sink_name, 0x00, sizeof(sink_name));
+    	strncpy(sink_name,sizeof(sink_name)-1, sink_name_buffer );
+    	free(sink_name_buffer);
+    }
+
 	ESP_LOGI(TAG, "mdns hostname set to: [%s] with servicename %s", hostname, sink_name);
 
     // create RAOP instance, latency is set by controller

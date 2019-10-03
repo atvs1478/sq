@@ -59,6 +59,7 @@ Contains the freeRTOS task and all necessary support
 #include "driver/gpio.h"
 #include "driver/adc.h"
 #include "cJSON.h"
+#include "nvs_utilities.h"
 
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0
@@ -84,6 +85,7 @@ uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records;
 char *accessp_json = NULL;
 char *ip_info_json = NULL;
+char *host_name = NULL;
 cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 static update_reason_code_t last_update_reason_code=0;
@@ -113,7 +115,6 @@ struct wifi_settings_t wifi_settings = {
 
 
 const char wifi_manager_nvs_namespace[] = "config";
-extern char current_namespace[];
 
 EventGroupHandle_t wifi_manager_event_group;
 
@@ -185,77 +186,19 @@ void wifi_manager_start(){
 	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
 	wifi_manager_safe_update_sta_ip_string((uint32_t)0);
 
+	host_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
+	char * release_url = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	if(release_url == NULL){
+		ESP_LOGE(TAG,"Unable to retrieve the release url from nvs");
+	}
+	else {
+		free(release_url);
+	}
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
-}
-
-
-char * wifi_manager_alloc_get_config(char * name, size_t * l){
-
-	size_t len=0;
-	char * value=NULL;
-
-	nvs_handle handle;
-	ESP_LOGD(TAG, "About to get config value %s from flash",name);
-	esp_err_t esp_err=nvs_open(current_namespace, NVS_READWRITE, &handle);
-	if(esp_err==ESP_ERR_NVS_NOT_INITIALIZED){
-		ESP_LOGE(TAG,"Unable to open nvs namespace %s. nvs is not initialized.",wifi_manager_nvs_namespace);
-	}
-	else if( esp_err == ESP_OK) {
-		if (nvs_get_str(handle, name, NULL, &len)==ESP_OK) {
-			value=(char *)malloc(len);
-			memset(value,0x0, len);
-			nvs_get_str(handle, name, value, &len);
-			*l=len;
-			ESP_LOGD(TAG,"Found value %s, length %u = %s",name,*l,value);
-		}
-		else
-		{
-			ESP_LOGW(TAG, "Value %s does one exist in flash",name);
-		}
-		nvs_close(handle);
-	}
-	else
-	{
-		ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace,esp_err, esp_err_to_name(esp_err));
-	}
-	return value;
 
 }
 
-
-esp_err_t wifi_manager_save_config(char * value, char * name, int len){
-	nvs_handle handle;
-    esp_err_t esp_err;
-    ESP_LOGI(TAG, "About to save config to flash. Name: %s, value: %s", name,value);
-	esp_err = nvs_open(current_namespace, NVS_READWRITE, &handle);
-	if(esp_err==ESP_ERR_NVS_NOT_INITIALIZED){
-			ESP_LOGE(TAG,"Unable to open nvs namespace %s. nvs is not initialized.",wifi_manager_nvs_namespace);
-	}
-	else if (esp_err != ESP_OK) {
-			ESP_LOGE(TAG,"Unable to open nvs namespace %s. Error: %d, %s", wifi_manager_nvs_namespace, esp_err, esp_err_to_name(esp_err));
-			return esp_err;
-		}
-    esp_err = nvs_set_str(handle, name, value);
-	if (esp_err != ESP_OK){
-		ESP_LOGE(TAG,"Unable to save value %s=%s",name,value);
-		nvs_close(handle);
-		return esp_err;
-	}
-
-	esp_err = nvs_commit(handle);
-	if (esp_err != ESP_OK){
-		ESP_LOGE(TAG,"nvs commit error");
-		return esp_err;
-	}
-
-	nvs_close(handle);
-
-	ESP_LOGD(TAG, "wifi_manager_wrote %s=%s with length %i", name, value, len);
-
-	return ESP_OK;
-
-}
 
 esp_err_t wifi_manager_save_sta_config(){
 	nvs_handle handle;
@@ -626,7 +569,7 @@ char* wifi_manager_get_ip_info_json(){
 void wifi_manager_destroy(){
 	vTaskDelete(task_wifi_manager);
 	task_wifi_manager = NULL;
-
+	free(host_name);
 	/* heap buffers */
 	free(accessp_records);
 	accessp_records = NULL;
@@ -729,7 +672,7 @@ void wifi_manager( void * pvParameters ){
 	BaseType_t xStatus;
 	EventBits_t uxBits;
 	uint8_t	retries = 0;
-
+	esp_err_t err=ESP_OK;
 
 	/* initialize the tcp stack */
 	tcpip_adapter_init();
@@ -782,7 +725,6 @@ void wifi_manager( void * pvParameters ){
 	ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, wifi_settings.ap_bandwidth));
 	ESP_ERROR_CHECK(esp_wifi_set_ps(wifi_settings.sta_power_save));
 
-
 	/* STA - Wifi Station configuration setup */
 	tcpip_adapter_dhcp_status_t status;
 	if(wifi_settings.sta_static_ip) {
@@ -802,14 +744,11 @@ void wifi_manager( void * pvParameters ){
 		ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
 		if (status!=TCPIP_ADAPTER_DHCP_STARTED)
 			ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
-	}
-
-
+		}
 
 	/* by default the mode is STA because wifi_manager will not start the access point unless it has to! */
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_start());
-
 
 	/* start http server */
 	http_server_start();
@@ -906,6 +845,10 @@ void wifi_manager( void * pvParameters ){
 				else{
 					/* update config to latest and attempt connection */
 					ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
+					ESP_LOGI(TAG,"Setting host name to : %s",host_name);
+					if((err=tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, host_name)) !=ESP_OK){
+						ESP_LOGE(TAG,"Unable to set host name. Error: %s",esp_err_to_name(err));
+					}
 					ESP_ERROR_CHECK(esp_wifi_connect());
 				}
 

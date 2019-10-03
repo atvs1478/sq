@@ -22,7 +22,7 @@
 #include "esp_a2dp_api.h"
 #include "esp_avrc_api.h"
 #include "nvs.h"
-
+#include "nvs_utilities.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -43,12 +43,11 @@
 #define CONFIG_BT_NAME	"ESP32-BT"
 #endif
 
-extern char current_namespace[];
-
 /* event for handler "bt_av_hdl_stack_up */
 enum {
     BT_APP_EVT_STACK_UP = 0,
 };
+char * bt_name = NULL;
 
 static void (*bt_app_a2d_cmd_cb)(bt_sink_cmd_t cmd, ...);
 static void (*bt_app_a2d_data_cb)(const uint8_t *data, uint32_t len);
@@ -467,17 +466,9 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
     switch (event) {
     case BT_APP_EVT_STACK_UP: {
         /* set up device name */
-		nvs_handle nvs;
-        char dev_name[32] = CONFIG_BT_NAME;
-				
-		if (nvs_open(current_namespace, NVS_READONLY, &nvs) == ESP_OK) {
-			size_t len = 31;
-			nvs_get_str(nvs, "bt_name", dev_name, &len);
-			nvs_close(nvs);
-		}	
-				
-		esp_bt_dev_set_device_name(dev_name);
-		
+		bt_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
+		esp_bt_dev_set_device_name(bt_name);
+		free(bt_name);
         esp_bt_gap_register_callback(bt_app_gap_cb);
 
         /* initialize AVRCP controller */

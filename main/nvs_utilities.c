@@ -13,9 +13,11 @@
 #include "esp_vfs_fat.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-extern char current_namespace[];
 
+const char current_namespace[] = "config";
+const char settings_partition[] = "settings";
 static const char * TAG = "platform_esp32";
+
 bool isNameValid(char * key){
 	bool bFound=false;
 	nvs_handle nvs;
@@ -99,9 +101,10 @@ esp_err_t store_nvs_value_len(nvs_type_t type, const char *key, void * data,
 	nvs_close(nvs);
 	return err;
 }
-
+void nvs_value_set_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
+	free(get_nvs_value_alloc_default(type, key, default_value, blob_size));
+}
 void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
-
 	void * current_value = get_nvs_value_alloc(type, key);
 	if(current_value == NULL && default_value != NULL){
 		if(type == NVS_TYPE_BLOB && blob_size == 0){
@@ -113,6 +116,9 @@ void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * defa
 			if(err!=ESP_OK){
 				ESP_LOGE(TAG,"Unable to store default nvs value. Error: %s",esp_err_to_name(err));
 				return NULL;
+			}
+			else{
+				ESP_LOGI(TAG,"Stored new default value for key %s", key);
 			}
 		}
 	}

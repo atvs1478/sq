@@ -9,5 +9,5 @@
 
 CFLAGS += -fstack-usage \
 	-I$(COMPONENT_PATH)/../tools	\
-	-I$(COMPONENT_PATH)/../codecs/inc/alac
-	
+	-I$(COMPONENT_PATH)/../codecs/inc/alac \
+	-I$(PROJECT_PATH)/main/	

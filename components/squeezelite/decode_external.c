@@ -269,29 +269,27 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
  * We provide the generic codec register option
  */
 void register_external(void) {
-#ifdef CONFIG_BT_SINK	
-	if (!strcasestr(output.device, "BT ")) {
-		bt_sink_init(bt_sink_cmd_handler, sink_data_handler);
-		LOG_INFO("Initializing BT sink");
+	if (!strcasestr(output.device, "BT ") ) {
+		if(enable_bt_sink){
+			bt_sink_init(bt_sink_cmd_handler, sink_data_handler);
+			LOG_INFO("Initializing BT sink");
+		}
 	} else {
 		LOG_WARN("Cannot be a BT sink and source");
 	}	
-#endif	
-#ifdef CONFIG_AIRPLAY_SINK
-	raop_sink_init(raop_sink_cmd_handler, raop_sink_data_handler);
-	LOG_INFO("Initializing AirPlay sink");		
-#endif
+	if(enable_airplay){
+		raop_sink_init(raop_sink_cmd_handler, raop_sink_data_handler);
+		LOG_INFO("Initializing AirPlay sink");
+	}
 }
 
 void deregister_external(void) {
-#ifdef CONFIG_BT_SINK	
-	if (!strcasestr(output.device, "BT ")) {
+	if (!strcasestr(output.device, "BT ") && enable_bt_sink) {
 		bt_sink_deinit();
 		LOG_INFO("Stopping BT sink");
 	}
-#endif	
-#ifdef CONFIG_AIRPLAY_SINK
-	raop_sink_deinit();
-	LOG_INFO("Stopping AirPlay sink");		
-#endif
+	if(enable_airplay){
+		raop_sink_deinit();
+		LOG_INFO("Stopping AirPlay sink");
+	}
 }

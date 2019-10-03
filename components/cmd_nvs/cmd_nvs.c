@@ -24,7 +24,7 @@ extern "C" {
 #include "esp_err.h"
 #include "cmd_nvs.h"
 #include "nvs.h"
-
+#include "nvs_utilities.h"
 
 typedef struct {
     nvs_type_t type;
@@ -47,7 +47,6 @@ static const type_str_pair_t type_str_pair[] = {
 
 static const size_t TYPE_STR_PAIR_SIZE = sizeof(type_str_pair) / sizeof(type_str_pair[0]);
 static const char *ARG_TYPE_STR = "type can be: i8, u8, i16, u16 i32, u32 i64, u64, str, blob";
-char current_namespace[] = "config";
 static const char * TAG = "platform_esp32";
 
 static struct {
@@ -72,11 +71,6 @@ static struct {
     struct arg_str *namespace;
     struct arg_end *end;
 } erase_all_args;
-
-static struct {
-    struct arg_str *namespace;
-    struct arg_end *end;
-} namespace_args;
 
 static struct {
     struct arg_str *partition;
@@ -175,7 +169,7 @@ static esp_err_t set_value_in_nvs(const char *key, const char *str_type, const c
         return ESP_ERR_NVS_TYPE_MISMATCH;
     }
 
-    err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+    err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
     if (err != ESP_OK) {
         return err;
     }
@@ -262,7 +256,7 @@ static esp_err_t get_value_from_nvs(const char *key, const char *str_type)
         return ESP_ERR_NVS_TYPE_MISMATCH;
     }
 
-    err = nvs_open(current_namespace, NVS_READONLY, &nvs);
+    err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
     if (err != ESP_OK) {
         return err;
     }
@@ -339,7 +333,7 @@ static esp_err_t erase(const char *key)
 {
     nvs_handle nvs;
 
-    esp_err_t err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+    esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
     if (err == ESP_OK) {
         err = nvs_erase_key(nvs, key);
         if (err == ESP_OK) {
@@ -358,7 +352,7 @@ static esp_err_t erase_all(const char *name)
 {
     nvs_handle nvs;
 
-    esp_err_t err = nvs_open(current_namespace, NVS_READWRITE, &nvs);
+    esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
     if (err == ESP_OK) {
         err = nvs_erase_all(nvs);
         if (err == ESP_OK) {
@@ -457,19 +451,7 @@ static int erase_namespace(int argc, char **argv)
     return 0;
 }
 
-static int set_namespace(int argc, char **argv)
-{
-    int nerrors = arg_parse(argc, argv, (void **) &namespace_args);
-    if (nerrors != 0) {
-        arg_print_errors(stderr, namespace_args.end, argv[0]);
-        return 1;
-    }
 
-    const char *namespace = namespace_args.namespace->sval[0];
-    strlcpy(current_namespace, namespace, sizeof(current_namespace));
-    ESP_LOGI(TAG, "Namespace set to '%s'", current_namespace);
-    return 0;
-}
 
 static int list(const char *part, const char *name, const char *str_type)
 {
@@ -528,8 +510,6 @@ void register_nvs()
     erase_all_args.namespace = arg_str1(NULL, NULL, "<namespace>", "namespace to be erased");
     erase_all_args.end = arg_end(2);
 
-    namespace_args.namespace = arg_str1(NULL, NULL, "<namespace>", "namespace of the partition to be selected");
-    namespace_args.end = arg_end(2);
     list_args.partition = arg_str1(NULL, NULL, "<partition>", "partition name");
     list_args.namespace = arg_str0("n", "namespace", "<namespace>", "namespace name");
     list_args.type = arg_str0("t", "type", "<type>", ARG_TYPE_STR);
@@ -571,13 +551,6 @@ void register_nvs()
         .argtable = &erase_all_args
     };
 
-    const esp_console_cmd_t namespace_cmd = {
-        .command = "nvs_namespace",
-        .help = "Set current namespace",
-        .hint = NULL,
-        .func = &set_namespace,
-        .argtable = &namespace_args
-    };
 
     const esp_console_cmd_t list_entries_cmd = {
            .command = "nvs_list",
@@ -593,7 +566,6 @@ void register_nvs()
     ESP_ERROR_CHECK(esp_console_cmd_register(&set_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&get_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_cmd));
-    ESP_ERROR_CHECK(esp_console_cmd_register(&namespace_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_namespace_cmd));
 }
 #ifdef __cplusplus
