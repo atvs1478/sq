@@ -36,18 +36,15 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <inttypes.h>
 #include "squeezelite-ota.h"
 #include "nvs_utilities.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "cJSON.h"
+
 #define NVS_PARTITION_NAME "nvs"
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
-static const char json_start[] = "{\n";
-static const char json_end[] = "\n}";
-static const char template[] = " \"%s\": \"%s\" ";
-static const char template_u[] = " \"%s\": %u ";
-static const char template_i[] = " \"%s\": %i ";
-static const char array_separator[]=",\n";
-static char *s = "\"";
-static char *r = "\\\"";
+cJSON * nvs_json=NULL;
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 
@@ -210,20 +207,42 @@ void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, 
 		free(http_hdr);
 	}
 }
+#define NUM_BUFFER_LEN 101
 
 err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFirst){
 	nvs_entry_info_t info;
-
-	int locbuflen=1024+strlen(template)+1;
-	char * config_buffer = malloc(locbuflen);
-	memset(config_buffer, 0x00,locbuflen);
-
-	if(!config_buffer)
-	{
-		ESP_LOGE(TAG,"Unable to allocate buffer for config.json!");
-		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-		return ESP_FAIL;
+	char * num_buffer = NULL;
+	if(nvs_json!=NULL){
+		cJSON_Delete(nvs_json);
+		nvs_json=NULL;
 	}
+	nvs_json = cJSON_CreateObject();
+	num_buffer = malloc(NUM_BUFFER_LEN);
+//
+//
+//	cJSON_AddItemToObject(ip_info_cjson, "version", cJSON_CreateString(desc->version));
+//	cJSON_AddNumberToObject(ip_info_cjson,"recovery",	RECOVERY_APPLICATION	);
+//	cJSON_AddNumberToObject(ip_info_cjson, "urc", update_reason_code);
+//	if(config){
+//		cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
+//
+//		if(update_reason_code == UPDATE_CONNECTION_OK){
+//			/* rest of the information is copied after the ssid */
+//			tcpip_adapter_ip_info_t ip_info;
+//			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
+//			cJSON_AddItemToObject(ip_info_cjson, "ip", cJSON_CreateString(ip4addr_ntoa(&ip_info.ip)));
+//			cJSON_AddItemToObject(ip_info_cjson, "netmask", cJSON_CreateString(ip4addr_ntoa(&ip_info.netmask)));
+//			cJSON_AddItemToObject(ip_info_cjson, "gw", cJSON_CreateString(ip4addr_ntoa(&ip_info.gw)));
+//		}
+//	}
+//
+//
+//	cJSON_AddItemToObject(ip_info_cjson, "ota_dsc", cJSON_CreateString(ota_get_status()));
+//	cJSON_AddNumberToObject(ip_info_cjson,"ota_pct",	ota_get_pct_complete()	);
+//
+//	cJSON_AddItemToObject(ip_info_cjson, "Jack", cJSON_CreateString(JACK_LEVEL));
+//
+//
 
 	nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, nvs_type);
 	if (it == NULL) {
@@ -231,40 +250,38 @@ err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFi
 	}
 	while (it != NULL){
 		nvs_entry_info(it, &info);
+		memset(num_buffer,0x00,NUM_BUFFER_LEN);
 		if(strstr(info.namespace_name, current_namespace)){
-			if(!*bFirst){
-				netconn_write(conn, array_separator, strlen(array_separator), NETCONN_NOCOPY);
-			}
-			*bFirst=false;
 			void * value = get_nvs_value_alloc(nvs_type,info.key);
 			if(value==NULL)
 			{
 				ESP_LOGE(TAG,"nvs read failed.");
-				free(config_buffer);
+				netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY); //200ok
+				free(num_buffer);
+				cJSON_Delete(nvs_json);
 				return ESP_FAIL;
 			}
 			switch (nvs_type) {
 				case NVS_TYPE_I8:
-					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int8_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int8_t*)value);
 					break;
 				case NVS_TYPE_I16:
-					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int16_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int16_t*)value);
 					break;
 				case NVS_TYPE_I32:
-					snprintf(config_buffer, locbuflen-1, template_i, info.key, *(int32_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int32_t*)value);
 					break;
 				case NVS_TYPE_U8:
-					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint8_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint8_t*)value);
 					break;
 				case NVS_TYPE_U16:
-					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint16_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint16_t*)value);
 					break;
 				case NVS_TYPE_U32:
-					snprintf(config_buffer, locbuflen-1, template_u, info.key, *(uint32_t*)value);
+					snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint32_t*)value);
 					break;
 				case NVS_TYPE_STR:
-					strreplace((char *)value, s, r);
-					snprintf(config_buffer, locbuflen-1, template, info.key, (char *)value);
+					// string will be processed directly below
 					break;
 				case NVS_TYPE_I64:
 				case NVS_TYPE_U64:
@@ -272,14 +289,17 @@ err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFi
 					ESP_LOGE(TAG, "nvs type %u not supported", nvs_type);
 					break;
 			}
-
-			ESP_LOGD(TAG,"Namespace %s, json chunk: %s", info.namespace_name, config_buffer);
-			netconn_write(conn, config_buffer, strlen(config_buffer), NETCONN_NOCOPY);
+			cJSON_AddItemToObject(nvs_json, info.key, cJSON_CreateString((nvs_type==NVS_TYPE_STR)?(char *)value:num_buffer));
 			free(value );
 		}
 		it = nvs_entry_next(it);
 	}
-	free(config_buffer);
+	ESP_LOGD(TAG,"config json : %s\n", cJSON_Print(nvs_json));
+
+	netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
+	netconn_write(conn, cJSON_Print(nvs_json), strlen(cJSON_Print(nvs_json)), NETCONN_NOCOPY);
+	cJSON_Delete(nvs_json);
+	free(num_buffer);
 	return ESP_OK;
 }
 
@@ -373,12 +393,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else if(strstr(line, "GET /config.json ")){
 					ESP_LOGI(TAG,"Serving config.json");
-					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, json_start, strlen(json_start), NETCONN_NOCOPY);
 					ESP_LOGI(TAG, "About to get config from flash");
 					bool bFirst=true;
 					http_server_nvs_dump(conn,NVS_TYPE_STR  , &bFirst);
-					netconn_write(conn, json_end, strlen(json_end), NETCONN_NOCOPY);
 					ESP_LOGD(TAG,"Done serving config.json");
 				}
 				else if(strstr(line, "POST /config.json ")){
