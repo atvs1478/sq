@@ -173,7 +173,7 @@ $(document).ready(function(){
         $( "#wifi" ).slideDown( "fast", function() {})
     });
 
-    $("#autoexec-cb").on("click", function() {
+    $("input#autoexec-cb").on("click", function() {
         autoexec = (this.checked)?1:0;
         $.ajax({
             url: '/config.json',
@@ -194,7 +194,7 @@ $(document).ready(function(){
         });
     });
 
-    $("#save-autoexec1").on("click", function() {
+    $("input#save-autoexec1").on("click", function() {
         autoexec1 = $("#autoexec1").val();
 
         $.ajax({
@@ -203,12 +203,16 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec1": autoexec1 },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
         });
         console.log('sent config JSON with headers:', autoexec1);
     });
 
-    $("#save-gpio").on("click", function() {
+    $("input#save-gpio").on("click", function() {
         var headers = {};
         $("input.gpio").each(function() {
             var id = $(this)[0].id;
