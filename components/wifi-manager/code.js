@@ -175,14 +175,16 @@ $(document).ready(function(){
     });
 
     $("input#autoexec-cb").on("click", function() {
+        var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
+        data['autoexec'] = autoexec;
         $.ajax({
             url: '/config.json',
             dataType: 'json',
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec": autoexec },
-            data: { 'timestamp': Date.now() },
+            data: data,
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -206,7 +208,9 @@ $(document).ready(function(){
     });
 
     $("input#save-autoexec1").on("click", function() {
+        var data = { 'timestamp': Date.now() };
         autoexec1 = $("#autoexec1").val();
+        data['autoexec1'] = autoexec1;
 
         $.ajax({
             url: '/config.json',
@@ -214,7 +218,7 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec1": autoexec1 },
-            data: { 'timestamp': Date.now() },
+            data: data,
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -225,12 +229,14 @@ $(document).ready(function(){
     });
 
     $("input#save-gpio").on("click", function() {
+        var data = { 'timestamp': Date.now() };
         var headers = {};
         $("input.gpio").each(function() {
             var id = $(this)[0].id;
             var pin = $(this).val();
             if (pin != '') {
                 headers["X-Custom-"+id] = pin;
+                data[id] = pin;
             }
         });
         $.ajax({
@@ -239,7 +245,7 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: headers,
-            data: { 'timestamp': Date.now() },
+            data: data,
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -251,17 +257,20 @@ $(document).ready(function(){
 
     $("#save-nvs").on("click", function() {
         var headers = {};
+        var data = { 'timestamp': Date.now() };
         $("input.nvs").each(function() {
             var key = $(this)[0].id;
             var val = $(this).val();
             if (key != '') {
                 headers["X-Custom-"+key] = val;
+                data[key] = val;
             }
         });
         var key = $("#nvs-new-key").val();
         var val = $("#nvs-new-value").val();
         if (key != '') {
             headers["X-Custom-"+key] = val;
+            data[key] = val;
         }
         $.ajax({
             url: '/config.json',
@@ -269,7 +278,7 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: headers,
-            data: { 'timestamp': Date.now() },
+            data: data,
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -280,16 +289,18 @@ $(document).ready(function(){
     });
 
     $("#flash").on("click", function() {
+        var data = { 'timestamp': Date.now() };
         if (blockFlashButton) return;
         blockFlashButton = true;
         var url = $("#fwurl").val();
+        data['fwurl'] = url;
         $.ajax({
             url: '/config.json',
             dataType: 'json',
             method: 'POST',
             cache: false,
             headers: { "X-Custom-fwurl": url },
-            data: { 'timestamp': Date.now() },
+            data: data,
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
