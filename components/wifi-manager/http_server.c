@@ -480,7 +480,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 				}
 				else if(strstr(line, "POST /reboot.json ")){
-					esp_restart();
+					guided_restart_ota();
 				}
 				else if(strstr(line, "POST /recovery.json ")){
 					guided_factory();

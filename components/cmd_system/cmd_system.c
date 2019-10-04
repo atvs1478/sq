@@ -142,6 +142,12 @@ static int restart(int argc, char **argv)
     guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
+esp_err_t guided_restart_ota(){
+    guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
+    // If we're still alive, then there may not be an ota partition to boot from
+    guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
+	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
+}
 esp_err_t guided_factory(){
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
