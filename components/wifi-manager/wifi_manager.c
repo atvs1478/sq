@@ -30,7 +30,7 @@ Contains the freeRTOS task and all necessary support
 */
 
 #include "wifi_manager.h"
-
+#include "platform_esp32.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -318,7 +318,6 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 }
 
-
 cJSON * wifi_manager_get_new_json(cJSON **old){
 	cJSON * root=*old;
 	if(root!=NULL){
@@ -559,6 +558,20 @@ void wifi_manager_connect_async(){
 		wifi_manager_unlock_json_buffer();
 	}
 	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_USER);
+}
+
+void set_status_message(message_severity_t severity, const char * message){
+	if(ip_info_cjson==NULL){
+		ip_info_cjson = wifi_manager_get_new_json(&ip_info_cjson);
+	}
+	if(ip_info_cjson==NULL){
+		ESP_LOGE(TAG,"Error setting status message. Unable to allocate cJSON.");
+		return;
+	}
+	cJSON * item=cJSON_GetObjectItem(ip_info_cjson, "message");
+	item = wifi_manager_get_new_json(&item);
+	cJSON_AddItemToObject(item, "severity", cJSON_CreateString(severity==INFO?"INFO":severity==WARNING?"WARNING":severity==ERROR?"ERROR":"" ));
+	cJSON_AddItemToObject(item, "text", cJSON_CreateString(message));
 }
 
 

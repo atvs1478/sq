@@ -26,6 +26,7 @@
 #include "sdkconfig.h"
 #include "esp_partition.h"
 #include "esp_ota_ops.h"
+#include "platform_esp32.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -112,6 +113,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 
 	if(it == NULL){
 		ESP_LOGE(TAG,"Unable initialize partition iterator!");
+		set_status_message(ERROR, "Reboot failed. Cannot iterate through partitions");
 	}
 	else
 	{
@@ -120,10 +122,12 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 			ESP_LOGI(TAG, "Found partition type %u",partition_subtype);
 			esp_ota_set_boot_partition(partition);
 			bFound=true;
+			set_status_message(WARNING, "Rebooting!");
 		}
 		else
 		{
 			ESP_LOGE(TAG,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
+			set_status_message(ERROR, "Partition not found.");
 		}
 		esp_partition_iterator_release(it);
 		if(bFound) {
@@ -131,6 +135,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 			esp_restart();
 		}
 	}
+
 	return ESP_OK;
 }
 
