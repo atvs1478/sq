@@ -19,6 +19,7 @@ var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
+var lastMsg = '';
 
 var apList = null;
 var selectedSSID = "";
@@ -173,7 +174,7 @@ $(document).ready(function(){
         $( "#wifi" ).slideDown( "fast", function() {})
     });
 
-    $("#autoexec-cb").on("click", function() {
+    $("input#autoexec-cb").on("click", function() {
         autoexec = (this.checked)?1:0;
         $.ajax({
             url: '/config.json',
@@ -181,7 +182,12 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec": autoexec },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
         console.log('sent config JSON with headers:', autoexec);
         console.log('now triggering reboot');
@@ -190,11 +196,16 @@ $(document).ready(function(){
             dataType: 'json',
             method: 'POST',
             cache: false,
-            data: { 'timestamp': Date.now()}
+            data: { 'timestamp': Date.now()},
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
     });
 
-    $("#save-autoexec1").on("click", function() {
+    $("input#save-autoexec1").on("click", function() {
         autoexec1 = $("#autoexec1").val();
 
         $.ajax({
@@ -203,12 +214,17 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec1": autoexec1 },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
         console.log('sent config JSON with headers:', autoexec1);
     });
 
-    $("#save-gpio").on("click", function() {
+    $("input#save-gpio").on("click", function() {
         var headers = {};
         $("input.gpio").each(function() {
             var id = $(this)[0].id;
@@ -227,6 +243,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -256,6 +273,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -271,7 +289,12 @@ $(document).ready(function(){
             method: 'POST',
             cache: false,
             headers: { "X-Custom-fwurl": url },
-            data: { 'timestamp': Date.now() }
+            data: { 'timestamp': Date.now() },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (thrownError != '') showMessage(thrownError);
+            }
         });
         enableStatusTimer = true;
     });
@@ -429,7 +452,12 @@ function performConnect(conntype){
         method: 'POST',
         cache: false,
         headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd },
-        data: { 'timestamp': Date.now()}
+        data: { 'timestamp': Date.now()},
+        error: function (xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+            if (thrownError != '') showMessage(thrownError);
+        }
     });
 
     //now we can re-set the intervals regardless of result
@@ -604,12 +632,11 @@ function checkStatus(){
             $("span#flash-status").html('');
         }
         if (data.hasOwnProperty('message') && data['message'] != ''){
-            $('#message').html(data['message']);
-            $("#content").fadeTo("slow", 0.3, function() {
-                $("#message").show(500).delay(5000).hide(500, function() {
-                    $("#content").fadeTo("slow", 1.0);
-                });
-            });
+            var msg = data['message'];
+            if (msg != lastMsg) {
+                showMessage(msg);
+                lastMsg = msg;
+            }
         }
         blockAjax = false;
     })
@@ -656,5 +683,14 @@ function getConfig() {
     })
     .fail(function() {
         console.log("failed to fetch config!");
+    });
+}
+
+function showMessage(message) {
+    $('#message').html(message);
+    $("#content").fadeTo("slow", 0.3, function() {
+        $("#message").show(500).delay(5000).hide(500, function() {
+            $("#content").fadeTo("slow", 1.0);
+        });
     });
 }
