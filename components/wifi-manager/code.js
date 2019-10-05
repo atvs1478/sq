@@ -175,10 +175,10 @@ $(document).ready(function(){
     });
 
     $("input#autoexec-cb").on("click", function() {
-        showMessage('please wait for the ESP32 to reboot', 'WARNING');
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
         data['autoexec'] = autoexec;
+        showMessage('please wait for the ESP32 to reboot', 'WARNING');
         $.ajax({
             url: '/config.json',
             dataType: 'json',
@@ -665,6 +665,7 @@ function getConfig() {
     $.getJSON("/config.json", function(data) {
         for (var key in data) {
             if (data.hasOwnProperty(key)) {
+                console.log(key+": "+data[key]);
                 if (key == 'autoexec') {
                     if (data["autoexec"] === "1") {
                         $("#autoexec-cb")[0].checked=true;
