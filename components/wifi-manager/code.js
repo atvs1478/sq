@@ -440,6 +440,7 @@ function performConnect(conntype){
     stopRefreshAPInterval();
 
     var pwd;
+    var dhcp-name $("#dhcp-name").val();;
     if (conntype == 'manual') {
         //Grab the manual SSID and PWD
         selectedSSID=$('#manual_ssid').val();
@@ -463,7 +464,7 @@ function performConnect(conntype){
         dataType: 'json',
         method: 'POST',
         cache: false,
-        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd },
+        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcp-name },
         data: { 'timestamp': Date.now()},
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);
