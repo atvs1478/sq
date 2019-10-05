@@ -188,7 +188,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
         console.log('sent config JSON with headers:', autoexec);
@@ -202,7 +202,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
     });
@@ -222,7 +222,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
         console.log('sent config JSON with headers:', autoexec1);
@@ -249,7 +249,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -282,7 +282,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -304,7 +304,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError);
+                if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
         });
         enableStatusTimer = true;
@@ -467,7 +467,7 @@ function performConnect(conntype){
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);
             console.log(thrownError);
-            if (thrownError != '') showMessage(thrownError);
+            if (thrownError != '') showMessage(thrownError, 'ERROR');
         }
     });
 
@@ -643,9 +643,10 @@ function checkStatus(){
             $("span#flash-status").html('');
         }
         if (data.hasOwnProperty('message') && data['message'] != ''){
-            var msg = data['message'];
+            var msg = data['message'].text;
+            var severity = data['message'].severity;
             if (msg != lastMsg) {
-                showMessage(msg);
+                showMessage(msg, severity);
                 lastMsg = msg;
             }
         }
@@ -697,7 +698,14 @@ function getConfig() {
     });
 }
 
-function showMessage(message) {
+function showMessage(message, severity) {
+    if (severity == 'INFO') {
+        $('#message').css('background', '#6af');
+    } else if (severity == 'WARNING') {
+        $('#message').css('background', '#ff0');
+    } else {
+        $('#message').css('background', '#f00');
+    }
     $('#message').html(message);
     $("#content").fadeTo("slow", 0.3, function() {
         $("#message").show(500).delay(5000).hide(500, function() {
