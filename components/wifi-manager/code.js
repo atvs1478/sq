@@ -657,6 +657,7 @@ function checkStatus(){
         blockAjax = false;
     })
     .fail(function() {
+        showMessage('Could not get status.json!', 'ERROR');
         blockAjax = false;
     });
 }
@@ -665,7 +666,6 @@ function getConfig() {
     $.getJSON("/config.json", function(data) {
         for (var key in data) {
             if (data.hasOwnProperty(key)) {
-                console.log(key+": "+data[key]);
                 if (key == 'autoexec') {
                     if (data["autoexec"] === "1") {
                         $("#autoexec-cb")[0].checked=true;
@@ -673,10 +673,10 @@ function getConfig() {
                         $("#autoexec-cb")[0].checked=false;
                     }
                 } else if (key == 'autoexec1') {
-                    $("input#autoexec1").val(data["autoexec1"]);
+                    $("textarea#autoexec1").val(data[key]);
                 } else if (key == 'host_name') {
-                    $("dhcp-name1").val(data["host_name"]);
-                    $("dhcp-name2").val(data["host_name"]);
+                    $("dhcp-name1").val(data[key]);
+                    $("dhcp-name2").val(data[key]);
                 }
 
                 $("tbody#nvsTable").append(
@@ -702,6 +702,7 @@ function getConfig() {
         );
     })
     .fail(function() {
+        showMessage('Could not get config.json!', 'ERROR');
         console.log("failed to fetch config!");
     });
 }
