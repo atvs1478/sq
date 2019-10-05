@@ -440,13 +440,15 @@ function performConnect(conntype){
     stopRefreshAPInterval();
 
     var pwd;
-    var dhcpname = $("#dhcp-name").val();;
+    var dhcpname;
     if (conntype == 'manual') {
         //Grab the manual SSID and PWD
         selectedSSID=$('#manual_ssid').val();
         pwd = $("#manual_pwd").val();
+        dhcpname= $("#dhcp-name2").val();;
     }else{
         pwd = $("#pwd").val();
+        dhcpname= $("#dhcp-name1").val();;
     }
     //reset connection 
     $( "#loading" ).show();
@@ -671,6 +673,9 @@ function getConfig() {
                     }
                 } else if (key == 'autoexec1') {
                     $("input#autoexec1").val(data["autoexec1"]);
+                } else if (key == 'host_name') {
+                    $("dhcp-name1").val(data["host_name"]);
+                    $("dhcp-name2").val(data["host_name"]);
                 }
 
                 $("tbody#nvsTable").append(
