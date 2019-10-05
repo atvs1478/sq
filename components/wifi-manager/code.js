@@ -175,6 +175,7 @@ $(document).ready(function(){
     });
 
     $("input#autoexec-cb").on("click", function() {
+        showMessage('please wait for the ESP32 to reboot', 'WARNING');
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
         data['autoexec'] = autoexec;
