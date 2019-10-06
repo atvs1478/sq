@@ -656,8 +656,10 @@ function checkStatus(){
         }
         blockAjax = false;
     })
-    .fail(function() {
-        showMessage('Could not get status.json!', 'ERROR');
+    .fail(function(xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+        if (thrownError != '') showMessage(thrownError, 'ERROR');
         blockAjax = false;
     });
 }
@@ -701,9 +703,11 @@ function getConfig() {
             "</tr>"
         );
     })
-    .fail(function() {
-        showMessage('Could not get config.json!', 'ERROR');
-        console.log("failed to fetch config!");
+    .fail(function(xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+        if (thrownError != '') showMessage(thrownError, 'ERROR');
+        blockAjax = false;
     });
 }
 
