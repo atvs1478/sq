@@ -666,7 +666,7 @@ function checkStatus(){
 
 function getConfig() {
     $.getJSON("/config.json", function(data) {
-        for (var key in data) {
+        Object.keys(data).sort().forEach(function(key, i) {
             if (data.hasOwnProperty(key)) {
                 if (key == 'autoexec') {
                     if (data["autoexec"] === "1") {
@@ -691,7 +691,7 @@ function getConfig() {
                 );
                 $("input#"+key).val(data[key]);
             }
-        }
+        });
         $("tbody#nvsTable").append(
             "<tr>"+
                 "<td>"+
