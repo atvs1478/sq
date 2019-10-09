@@ -193,7 +193,7 @@ esp_err_t init_config(esp_http_client_config_t * conf, const char * url){
 
 	conf->cert_pem =cert==NULL?(char *)server_cert_pem_start:cert;
 	conf->event_handler = _http_event_handler;
-	conf->buffer_size = 2048*2;
+	conf->buffer_size = 2048*4;
 	conf->disable_auto_redirect=true;
 	conf->skip_cert_common_name_check = false;
 	conf->url = strdup(url);
