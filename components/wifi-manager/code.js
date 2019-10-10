@@ -361,9 +361,9 @@ $(document).ready(function(){
                 $("#releaseTable").append(
                     "<tr class='release"+trclass+"'>"+
                         "<td data-toggle='tooltip' title='"+body+"'>"+ver+"</td>"+
-                        "<td>"+idf+"</td>"+
                         "<td>"+date+"</td>"+
                         "<td>"+cfg+"</td>"+
+                        "<td>"+idf+"</td>"+
                         "<td>"+branch+"</td>"+
                         "<td><input id='generate-command' type='button' class='btn btn-success' value='Select' data-url='"+url+"' onclick='setURL(this);' /></td>"+
                     "</tr>"
