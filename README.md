@@ -3,9 +3,6 @@ An automated build was configured to produce binaries on a regular basis, from c
 
 https://github.com/sle118/squeezelite-esp32/releases
  
-
-
-
 # Configuration
 1/ setup WiFi
 - Boot the esp, look for a new wifi access point showing up and connect to it.  Default build ssid and passwords are "squeezelite"/"squeezelite". 
@@ -51,14 +48,26 @@ To add options that require quotes ("), escape them with \". For example, so use
 
 nvs_set autoexec1 str -v "squeezelite -o \"BT -n 'MySpeaker'\" -b 500:2000 -R -u m -Z 192000 -r \"44100-44100\""
 
-# Additional misc notes to do your owm build
+# Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
-- make defconfig
+```
+make defconfig
+```
 Then adapt the config file to your wifi/BT/I2C device (can alos be done on the command line)
-- make menuconfig
-Then 
-- make -j4
-- make flash monitor
+```
+make menuconfig
+```
+Then you will need to build the recovery binary and squeezelite binary:
+```
+# Build recovery.bin, bootloader.bin, ota_data_initial.bin, partitions.bin  
+PROJECT_NAME="recovery" make -j4 all EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=1'
+# Now force a rebuild by touching all the files which may have a RECOVERY_APPLICATION specific source compile logic
+find . \( -name "*.cpp" -o -name "*.c" -o -name "*.h" \) -type f -print0 | xargs -0 grep -l "RECOVERY_APPLICATION" | xargs touch
+# Build squeezelite.bin
+PROJECT_NAME="squeezelite" make -j4 app EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=0'
+
+make flash monitor
+```
 
 Once the application is running, under monitor, you can monitor the system activity. 
 
