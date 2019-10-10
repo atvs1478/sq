@@ -604,7 +604,7 @@ function checkStatus(){
                 recovery = true;
                 $("#otadiv").show();
                 $('a[href^="#tab-audio"]').hide();
-                $('a[href^="#tab-gpio"]').hide();
+                $('a[href^="#tab-gpio"]').show();
                 $('a[href^="#tab-nvs"]').show();
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
@@ -615,7 +615,7 @@ function checkStatus(){
                 recovery = false;
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
-                $('a[href^="#tab-gpio"]').show();
+                $('a[href^="#tab-gpio"]').hide();
                 $('a[href^="#tab-nvs"]').hide();
                 $("footer.footer").removeClass('recovery');
                 $("footer.footer").addClass('sl');
