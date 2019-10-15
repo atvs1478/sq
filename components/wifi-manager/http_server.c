@@ -39,14 +39,18 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <stdio.h>
 #include <stdlib.h>
 #include "cJSON.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define NVS_PARTITION_NAME "nvs"
+#define NUM_BUFFER_LEN 101
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
-cJSON * nvs_json=NULL;
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
+SemaphoreHandle_t http_server_config_mutex = NULL;
 
 /**
  * @brief embedded binary data.
@@ -92,7 +96,7 @@ void http_server_start(){
 	}
 }
 void http_server(void *pvParameters) {
-
+	http_server_config_mutex = xSemaphoreCreateMutex();
 	struct netconn *conn, *newconn;
 	err_t err;
 	conn = netconn_new(NETCONN_TCP);
@@ -114,7 +118,8 @@ void http_server(void *pvParameters) {
 
 	netconn_close(conn);
 	netconn_delete(conn);
-
+	vSemaphoreDelete(http_server_config_mutex);
+	wifi_manager_json_mutex = NULL;
 	vTaskDelete( NULL );
 }
 
@@ -207,18 +212,12 @@ void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, 
 		free(http_hdr);
 	}
 }
-#define NUM_BUFFER_LEN 101
 
 err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFirst){
 	nvs_entry_info_t info;
 	char * num_buffer = NULL;
-	if(nvs_json!=NULL){
-		cJSON_Delete(nvs_json);
-		nvs_json=NULL;
-	}
-	nvs_json = cJSON_CreateObject();
+	cJSON * nvs_json = cJSON_CreateObject();
 	num_buffer = malloc(NUM_BUFFER_LEN);
-
 	nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, nvs_type);
 	if (it == NULL) {
 		ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
@@ -277,6 +276,57 @@ err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFi
 	free(num_buffer);
 	return ESP_OK;
 }
+
+void http_server_process_config(struct netconn *conn, 	struct netbuf *inbuf){
+
+	// Here, we are passed a buffer which contains the http request
+
+//		netbuf_data(inbuf, (void**)&buf, &buflen);
+//		err = netconn_recv(conn, &inbuf);
+//		if (err == ERR_OK) {
+//
+//		/* extract the first line of the request */
+//		char *save_ptr = buf;
+//		char *line = strtok_r(save_ptr, new_line, &save_ptr);
+//		ESP_LOGD(TAG,"Processing line %s",line);
+
+	char *last = NULL;
+	char *ptr = NULL;
+	last = ptr = inbuf;
+	bool bHeaders= true;
+	while(ptr!=NULL && *ptr != '\0'){
+		// Move to the end of the line, or to the end of the buffer
+		if(bHeaders){
+			while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
+				ptr++;
+			}
+			// terminate the header string
+			*ptr = '\0';
+			if( *ptr+1 == '\n' ) {
+				*ptr+1='\0';
+				ptr+=2;
+			}
+			if(ptr==last) break;
+			if(strlen(last)>0){
+				ESP_LOGD(TAG,"Found Header Line %s ", last);
+				//Content-Type: application/json
+			}
+			else {
+				ESP_LOGD(TAG,"Found end of headers");
+				bHeaders = false;
+			}
+			last=ptr;
+		}
+		else {
+			ESP_LOGD(TAG,"Body content: %s", last);
+			cJSON * json = cJSON_Parse(last);
+			cJSON_Delete(json);
+		}
+	}
+	return ;
+
+}
+
 
 
 void http_server_netconn_serve(struct netconn *conn) {
@@ -369,8 +419,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				else if(strstr(line, "GET /config.json ")){
 					ESP_LOGI(TAG,"Serving config.json");
 					ESP_LOGI(TAG, "About to get config from flash");
-					bool bFirst=true;
-					http_server_nvs_dump(conn,NVS_TYPE_STR  , &bFirst);
+					http_server_nvs_dump(conn,NVS_TYPE_STR);
 					ESP_LOGD(TAG,"Done serving config.json");
 				}
 				else if(strstr(line, "POST /config.json ")){
@@ -385,6 +434,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					char * otaURL=NULL;
 					// make sure we terminate the netconn string
 					save_ptr[buflen-1]='\0';
+
+					http_server_process_config(conn);
 
 					while(last_parm!=NULL){
 						// Search will return
@@ -491,6 +542,30 @@ void http_server_netconn_serve(struct netconn *conn) {
 	}
 	/* free the buffer */
 	netbuf_delete(inbuf);
+}
+
+bool http_server_lock_json_object(TickType_t xTicksToWait){
+	ESP_LOGD(TAG,"Locking config json object");
+	if(http_server_config_mutex){
+		if( xSemaphoreTake( http_server_config_mutex, xTicksToWait ) == pdTRUE ) {
+			ESP_LOGD(TAG,"config Json object locked!");
+			return true;
+		}
+		else{
+			ESP_LOGD(TAG,"Semaphore take failed. Unable to lock config Json object mutex");
+			return false;
+		}
+	}
+	else{
+		ESP_LOGD(TAG,"Unable to lock config Json object mutex");
+		return false;
+	}
+
+}
+
+void http_server__unlock_json_object(){
+	ESP_LOGD(TAG,"Unlocking json buffer!");
+	xSemaphoreGive( http_server_config_mutex );
 }
 
 void strreplace(char *src, char *str, char *rep)
