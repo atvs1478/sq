@@ -194,21 +194,29 @@ $(document).ready(function(){
                 console.log(thrownError);
                 if (thrownError != '') showMessage(thrownError, 'ERROR');
             }
-        });
-        console.log('sent config JSON with headers:', autoexec);
-        console.log('now triggering reboot');
-        $.ajax({
-            url: '/reboot.json',
-            dataType: 'text',
-            method: 'POST',
-            cache: false,
-            contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify({ 'timestamp': Date.now()}),
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
-            }
+            complete: function(response) {
+                var returnedResponse = JSON.parse(response.responseText);
+                console.log(response.responseText);
+                console.log('sent config JSON with headers:', autoexec);
+                console.log('now triggering reboot');
+                $.ajax({
+                    url: '/reboot.json',
+                    dataType: 'text',
+                    method: 'POST',
+                    cache: false,
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({ 'timestamp': Date.now()}),
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log(xhr.status);
+                        console.log(thrownError);
+                        if (thrownError != '') showMessage(thrownError, 'ERROR');
+                    }
+                    complete: function(response) {
+                    	console.log('reboot call completed');
+
+                    }
+                });
+            }            
         });
     });
 
