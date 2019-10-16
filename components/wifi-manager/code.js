@@ -193,7 +193,7 @@ $(document).ready(function(){
                 console.log(xhr.status);
                 console.log(thrownError);
                 if (thrownError != '') showMessage(thrownError, 'ERROR');
-            }
+            },
             complete: function(response) {
                 var returnedResponse = JSON.parse(response.responseText);
                 console.log(response.responseText);
@@ -210,7 +210,7 @@ $(document).ready(function(){
                         console.log(xhr.status);
                         console.log(thrownError);
                         if (thrownError != '') showMessage(thrownError, 'ERROR');
-                    }
+                    },
                     complete: function(response) {
                     	console.log('reboot call completed');
 
