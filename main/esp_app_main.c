@@ -101,6 +101,14 @@ static void initialize_nvs() {
 		err = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(err);
+
+	err = nvs_flash_init_partition(settings_partition);
+	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_ERROR_CHECK(nvs_flash_erase_partition(settings_partition));
+		err = nvs_flash_init_partition(settings_partition);
+	}
+	ESP_ERROR_CHECK(err);
+
 }
 char * process_ota_url(){
     nvs_handle nvs;

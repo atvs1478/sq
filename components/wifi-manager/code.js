@@ -162,10 +162,12 @@ $(document).ready(function(){
 
         $.ajax({
             url: '/connect.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'DELETE',
             cache: false,
-            data: { 'timestamp': Date.now()}
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify({ 'timestamp': Date.now()})
+            
         });
 
         startCheckStatusInterval();
@@ -181,11 +183,12 @@ $(document).ready(function(){
         showMessage('please wait for the ESP32 to reboot', 'WARNING');
         $.ajax({
             url: '/config.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec": autoexec },
-            data: data,
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -196,10 +199,11 @@ $(document).ready(function(){
         console.log('now triggering reboot');
         $.ajax({
             url: '/reboot.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
-            data: { 'timestamp': Date.now()},
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify({ 'timestamp': Date.now()}),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -215,11 +219,12 @@ $(document).ready(function(){
 
         $.ajax({
             url: '/config.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
             headers: { "X-Custom-autoexec1": autoexec1 },
-            data: data,
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -227,6 +232,7 @@ $(document).ready(function(){
             }
         });
         console.log('sent config JSON with headers:', autoexec1);
+        console.log('sent data:', JSON.stringify(data));
     });
 
     $("input#save-gpio").on("click", function() {
@@ -242,11 +248,12 @@ $(document).ready(function(){
         });
         $.ajax({
             url: '/config.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
             headers: headers,
-            data: data,
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -254,6 +261,7 @@ $(document).ready(function(){
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
+        console.log('sent config JSON with data:', JSON.stringify(data));
     });
 
     $("#save-nvs").on("click", function() {
@@ -275,11 +283,12 @@ $(document).ready(function(){
         }
         $.ajax({
             url: '/config.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
             headers: headers,
-            data: data,
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -287,6 +296,7 @@ $(document).ready(function(){
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
+        console.log('sent config JSON with data:', JSON.stringify(data));
     });
 
     $("#flash").on("click", function() {
@@ -297,11 +307,12 @@ $(document).ready(function(){
         data['fwurl'] = url;
         $.ajax({
             url: '/config.json',
-            dataType: 'json',
+            dataType: 'text',
             method: 'POST',
             cache: false,
             headers: { "X-Custom-fwurl": url },
-            data: data,
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -463,10 +474,11 @@ function performConnect(conntype){
 
     $.ajax({
         url: '/connect.json',
-        dataType: 'json',
+        dataType: 'text',
         method: 'POST',
         cache: false,
         headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
+        contentType: 'application/json; charset=utf-8',
         data: { 'timestamp': Date.now()},
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);

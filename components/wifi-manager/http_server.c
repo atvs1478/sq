@@ -75,13 +75,13 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 
 /* const http headers stored in ROM */
 const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAccept-Ranges: bytes\nContent-Length: %d\nContent-Encoding: %s\nAccess-Control-Allow-Origin: *\n\n";
-const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\nAccess-Control-Allow-Origin: *\n\n";
+const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
-const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\nAccess-Control-Allow-Origin: *\n\n";
+const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
 const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
 const static char http_redirect_hdr_end[] = "/\n\n";
 
@@ -119,7 +119,7 @@ void http_server(void *pvParameters) {
 	netconn_close(conn);
 	netconn_delete(conn);
 	vSemaphoreDelete(http_server_config_mutex);
-	wifi_manager_json_mutex = NULL;
+	http_server_config_mutex = NULL;
 	vTaskDelete( NULL );
 }
 
@@ -213,12 +213,12 @@ void http_server_send_resource_file(struct netconn *conn,const uint8_t * start, 
 	}
 }
 
-err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFirst){
+err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type){
 	nvs_entry_info_t info;
 	char * num_buffer = NULL;
 	cJSON * nvs_json = cJSON_CreateObject();
 	num_buffer = malloc(NUM_BUFFER_LEN);
-	nvs_iterator_t it = nvs_entry_find(NVS_PARTITION_NAME, NULL, nvs_type);
+	nvs_iterator_t it = nvs_entry_find(settings_partition, NULL, nvs_type);
 	if (it == NULL) {
 		ESP_LOGW(TAG, "No nvs entry found in %s",NVS_PARTITION_NAME );
 	}
@@ -277,7 +277,7 @@ err_t http_server_nvs_dump(struct netconn *conn, nvs_type_t nvs_type, bool * bFi
 	return ESP_OK;
 }
 
-void http_server_process_config(struct netconn *conn, 	struct netbuf *inbuf){
+void http_server_process_config(struct netconn *conn, 	char *inbuf){
 
 	// Here, we are passed a buffer which contains the http request
 
@@ -289,7 +289,7 @@ void http_server_process_config(struct netconn *conn, 	struct netbuf *inbuf){
 //		char *save_ptr = buf;
 //		char *line = strtok_r(save_ptr, new_line, &save_ptr);
 //		ESP_LOGD(TAG,"Processing line %s",line);
-
+	ESP_LOGD(TAG,"Processing request buffer: \n%s",inbuf);
 	char *last = NULL;
 	char *ptr = NULL;
 	last = ptr = inbuf;
@@ -301,12 +301,19 @@ void http_server_process_config(struct netconn *conn, 	struct netbuf *inbuf){
 				ptr++;
 			}
 			// terminate the header string
+			if( *(ptr) == '\0' ) {
+				ESP_LOGD(TAG, "End of buffer found");
+				return;
+			}
 			*ptr = '\0';
-			if( *ptr+1 == '\n' ) {
-				*ptr+1='\0';
+			if( *(ptr+1) == '\n' ) {
+				*(ptr+1)='\0';
 				ptr+=2;
 			}
-			if(ptr==last) break;
+			if(ptr==last) {
+				ESP_LOGD(TAG,"Processing body. ");
+				break;
+			}
 			if(strlen(last)>0){
 				ESP_LOGD(TAG,"Found Header Line %s ", last);
 				//Content-Type: application/json
@@ -318,9 +325,12 @@ void http_server_process_config(struct netconn *conn, 	struct netbuf *inbuf){
 			last=ptr;
 		}
 		else {
-			ESP_LOGD(TAG,"Body content: %s", last);
-			cJSON * json = cJSON_Parse(last);
-			cJSON_Delete(json);
+			//ESP_LOGD(TAG,"Body content: %s", last);
+			//cJSON * json = cJSON_Parse(last);
+			//cJSON_Delete(json);
+			//todo:  implement body json parsing
+			// right now, body is coming as compressed, so we need some type of decompression to happen.
+			return;
 		}
 	}
 	return ;
@@ -345,7 +355,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 		/* extract the first line of the request */
 		char *save_ptr = buf;
 		char *line = strtok_r(save_ptr, new_line, &save_ptr);
-		ESP_LOGD(TAG,"Processing line %s",line);
+		ESP_LOGD(TAG,"http_server_netconn_serve Processing line %s, socket: %u",line, conn->socket);
 
 		if(line) {
 
@@ -401,7 +411,7 @@ void http_server_netconn_serve(struct netconn *conn) {
                 //dynamic stuff
 				else if(strstr(line, "GET /ap.json ")) {
 					/* if we can get the mutex, write the last version of the AP list */
-					ESP_LOGI(TAG,"Processing ap.json request");
+					ESP_LOGI(TAG,"Processing ap.json request for socket %u",conn->socket);
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY);
 						char *buff = wifi_manager_get_ap_list_json();
@@ -415,15 +425,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 					/* request a wifi scan */
 					ESP_LOGI(TAG,"Starting wifi scan");
 					wifi_manager_scan_async();
+					ESP_LOGI(TAG,"Done serving ap.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "GET /config.json ")){
-					ESP_LOGI(TAG,"Serving config.json");
+					ESP_LOGI(TAG,"Serving config.json for socket %u",conn->socket);
 					ESP_LOGI(TAG, "About to get config from flash");
 					http_server_nvs_dump(conn,NVS_TYPE_STR);
-					ESP_LOGD(TAG,"Done serving config.json");
+					ESP_LOGD(TAG,"Done serving config.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "POST /config.json ")){
-					ESP_LOGI(TAG,"Serving POST config.json");
+					ESP_LOGI(TAG,"Serving POST config.json for socket %u",conn->socket);
 
 					int lenA=0;
 					char * last_parm=save_ptr;
@@ -435,7 +446,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 					// make sure we terminate the netconn string
 					save_ptr[buflen-1]='\0';
 
-					http_server_process_config(conn);
+					// todo:  implement json body parsing
+					//http_server_process_config(conn,save_ptr);
 
 					while(last_parm!=NULL){
 						// Search will return
@@ -471,10 +483,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 							free(otaURL);
 						}
 					}
+					ESP_LOGI(TAG,"Done Serving POST config.json for socket %u",conn->socket);
 
 				} 
 				else if(strstr(line, "POST /connect.json ")) {
-					ESP_LOGI(TAG, "http_server_netconn_serve: POST /connect.json");
+					ESP_LOGI(TAG, "http_server_netconn_serve: POST /connect.json for socket %u",conn->socket);
 					bool found = false;
 					int lenS = 0, lenP = 0;
 					char *ssid = NULL, *password = NULL;
@@ -498,21 +511,27 @@ void http_server_netconn_serve(struct netconn *conn) {
 						ESP_LOGE(TAG, "bad request the authentification header is not complete/not the correct format");
 					}
 
+					ESP_LOGI(TAG, "http_server_netconn_serve: done serving connect.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "DELETE /connect.json ")) {
-					ESP_LOGI(TAG, "http_server_netconn_serve: DELETE /connect.json");
+					ESP_LOGI(TAG, "http_server_netconn_serve: DELETE /connect.json for socket %u",conn->socket);
 					/* request a disconnection from wifi and forget about it */
 					wifi_manager_disconnect_async();
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
+					ESP_LOGI(TAG, "http_server_netconn_serve: done serving DELETE /connect.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "POST /reboot.json ")){
+					ESP_LOGI(TAG, "http_server_netconn_serve: POST reboot.json for socket %u",conn->socket);
 					guided_restart_ota();
+					ESP_LOGI(TAG, "http_server_netconn_serve: done serving POST reboot.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "POST /recovery.json ")){
+					ESP_LOGI(TAG, "http_server_netconn_serve: POST recovery.json for socket %u",conn->socket);
 					guided_factory();
+					ESP_LOGI(TAG, "http_server_netconn_serve: done serving POST recovery.json for socket %u",conn->socket);
 				}
 				else if(strstr(line, "GET /status.json ")){
-					ESP_LOGI(TAG,"Serving status.json");
+					ESP_LOGI(TAG,"Serving status.json for socket %u",conn->socket);
 					if(wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 						char *buff = wifi_manager_get_ip_info_json();
 						if(buff){
@@ -528,15 +547,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 						netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
 						ESP_LOGE(TAG, "http_server_netconn_serve: GET /status failed to obtain mutex");
 					}
+					ESP_LOGI(TAG,"Done Serving status.json for socket %u",conn->socket);
 				}
 				else{
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGE(TAG, "bad request");
+					ESP_LOGE(TAG, "bad request for socket %u",conn->socket);
 				}
 			}
 		}
 		else{
-			ESP_LOGE(TAG, "URL Not found. Sending 404.");
+			ESP_LOGE(TAG, "URL Not found. Sending 404. for socket %u",conn->socket);
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
 	}
@@ -563,7 +583,7 @@ bool http_server_lock_json_object(TickType_t xTicksToWait){
 
 }
 
-void http_server__unlock_json_object(){
+void http_server_unlock_json_object(){
 	ESP_LOGD(TAG,"Unlocking json buffer!");
 	xSemaphoreGive( http_server_config_mutex );
 }
