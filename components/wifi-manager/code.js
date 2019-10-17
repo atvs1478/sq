@@ -195,7 +195,7 @@ $(document).ready(function(){
                 if (thrownError != '') showMessage(thrownError, 'ERROR');
             },
             complete: function(response) {
-                var returnedResponse = JSON.parse(response.responseText);
+                //var returnedResponse = JSON.parse(response.responseText);
                 console.log(response.responseText);
                 console.log('sent config JSON with headers:', autoexec);
                 console.log('now triggering reboot');
