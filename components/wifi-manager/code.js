@@ -54,7 +54,7 @@ function startCheckStatusInterval(){
 
 function startRefreshAPInterval(){
     RefreshAPIIntervalActive = true;
-    refreshAPInterval = setTimeout(refreshAP, 2800);
+    refreshAPInterval = setTimeout(refreshAP(false), 2800);
 }
 
 function RepeatCheckStatusInterval(){
@@ -430,8 +430,13 @@ $(document).ready(function(){
         enableStatusTimer = true;
     });
 
+    $('#updateAP').on("click", function(){
+        refreshAP(true);
+        console.log("refresh AP");
+    });
+
     //first time the page loads: attempt to get the connection status and start the wifi scan
-    refreshAP();
+    refreshAP(false);
     getConfig();
 
     //start timers
@@ -518,8 +523,8 @@ function rssiToIcon(rssi){
     }
 }
 
-function refreshAP(){
-    if (!enableAPTimer) return;
+function refreshAP(force){
+    if (!enableAPTimer && !force) return;
     $.getJSON( "/ap.json", function( data ) {
         if(data.length > 0){
             //sort by signal strength

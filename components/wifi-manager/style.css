@@ -362,3 +362,8 @@ tr.hide {
     float: right;
     display: none;
 }
+
+button#updateAP {
+    float: right;
+    display: inline;
+}
