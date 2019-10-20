@@ -213,7 +213,6 @@ $(document).ready(function(){
                     },
                     complete: function(response) {
                     	console.log('reboot call completed');
-
                     }
                 });
             }            
@@ -425,6 +424,10 @@ $(document).ready(function(){
                 });
             });
         }
+    });
+
+    $('#boot-button').on("click", function(){
+        enableStatusTimer = true;
     });
 
     //first time the page loads: attempt to get the connection status and start the wifi scan
