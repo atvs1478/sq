@@ -269,7 +269,7 @@ input.gpio {
   transform: translateX(1.5rem); //translateX(0.75rem);
 }
 
-textarea#autoexec1, textarea#fwurl {
+textarea#autoexec1, textarea#fwurl, div#upload {
     width: 80%;
 }
 
