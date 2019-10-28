@@ -38,7 +38,6 @@ Contains the freeRTOS task and all necessary support
 
 #include "dns_server.h"
 #include "http_server.h"
-#include "json.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -82,8 +81,8 @@ SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
 uint16_t ap_num = MAX_AP_NUM;
-wifi_ap_record_t *accessp_records;
-char *accessp_json = NULL;
+wifi_ap_record_t *accessp_records=NULL;
+cJSON * accessp_cjson=NULL;
 char *ip_info_json = NULL;
 char *host_name = NULL;
 cJSON * ip_info_cjson=NULL;
@@ -161,16 +160,10 @@ void wifi_manager_disconnect_async(){
 
 void wifi_manager_start(){
 
-	/* disable the default wifi logging */
-	esp_log_level_set("wifi", ESP_LOG_NONE);
-
-
 	/* memory allocation */
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
 	wifi_manager_json_mutex = xSemaphoreCreateMutex();
-	accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * MAX_AP_NUM);
-	accessp_json = (char*)malloc(MAX_AP_NUM * JSON_ONE_APP_SIZE + 4); /* 4 bytes for json encapsulation of "[\n" and "]\0" */
-	wifi_manager_clear_access_points_json();
+	accessp_cjson = wifi_manager_clear_ap_list_json(&accessp_cjson);
 	ip_info_json = NULL;
 	ip_info_cjson = wifi_manager_clear_ip_info_json(&ip_info_cjson);
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
@@ -323,6 +316,16 @@ cJSON * wifi_manager_get_new_json(cJSON **old){
 	ESP_LOGD(TAG,"wifi_manager_get_new_json done");
 	 return cJSON_CreateObject();
 }
+cJSON * wifi_manager_get_new_array_json(cJSON **old){
+	ESP_LOGD(TAG,"wifi_manager_get_new_array_json called");
+	cJSON * root=*old;
+	if(root!=NULL){
+	    cJSON_Delete(root);
+	    *old=NULL;
+	}
+	ESP_LOGD(TAG,"wifi_manager_get_new_array_json done");
+	return cJSON_CreateArray();
+}
 cJSON * wifi_manager_get_basic_info(cJSON **old){
 	const esp_app_desc_t* desc = esp_ota_get_app_description();
 	ESP_LOGD(TAG,"wifi_manager_get_basic_info called");
@@ -343,6 +346,13 @@ cJSON * wifi_manager_clear_ip_info_json(cJSON **old){
 	ESP_LOGD(TAG,"wifi_manager_clear_ip_info_json done");
  	 return root;
 }
+cJSON * wifi_manager_clear_ap_list_json(cJSON **old){
+	ESP_LOGD(TAG,"wifi_manager_clear_ap_list_json called");
+	cJSON *root = wifi_manager_get_new_array_json(old);
+	ESP_LOGD(TAG,"wifi_manager_clear_ap_list_json done");
+ 	return root;
+}
+
 
 
 void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code){
@@ -372,38 +382,39 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	ESP_LOGD(TAG,"wifi_manager_generate_ip_info_json done");
 }
 
-
-void wifi_manager_clear_access_points_json(){
-	strcpy(accessp_json, "[]\n");
-}
-
-void wifi_manager_generate_acess_points_json(){
-	strcpy(accessp_json, "[");
-
-
-	const char oneap_str[] = ",\"chan\":%d,\"rssi\":%d,\"auth\":%d}%c\n";
-
-	/* stack buffer to hold on to one AP until it's copied over to accessp_json */
-	char one_ap[JSON_ONE_APP_SIZE];
+void wifi_manager_generate_access_points_json(cJSON ** ap_list){
+	char szMacStr[15]={0};
+	*ap_list = wifi_manager_get_new_array_json(ap_list);
+	if(*ap_list==NULL) return;
 	for(int i=0; i<ap_num;i++){
-
-		wifi_ap_record_t ap = accessp_records[i];
-
-		/* ssid needs to be json escaped. To save on heap memory it's directly printed at the correct address */
-		strcat(accessp_json, "{\"ssid\":");
-		json_print_string( (unsigned char*)ap.ssid,  (unsigned char*)(accessp_json+strlen(accessp_json)) );
-
-		/* print the rest of the json for this access point: no more string to escape */
-		snprintf(one_ap, (size_t)JSON_ONE_APP_SIZE, oneap_str,
-				ap.primary,
-				ap.rssi,
-				ap.authmode,
-				i==ap_num-1?']':',');
-
-		/* add it to the list */
-		strcat(accessp_json, one_ap);
+		cJSON * ap = cJSON_CreateObject();
+		if(ap == NULL) {
+			ESP_LOGE(TAG,"Unable to allocate memory for access point entry #%d",i);
+			return;
+		}
+		cJSON * radio = cJSON_CreateObject();
+		if(radio == NULL) {
+			ESP_LOGE(TAG,"Unable to allocate memory for access point entry #%d",i);
+			cJSON_Delete(ap);
+			return;
+		}
+		wifi_ap_record_t ap_rec = accessp_records[i];
+		cJSON_AddNumberToObject(ap, "chan", ap_rec.primary);
+		cJSON_AddNumberToObject(ap, "rssi", ap_rec.rssi);
+		cJSON_AddNumberToObject(ap, "auth", ap_rec.authmode);
+		cJSON_AddItemToObject(ap, "ssid", cJSON_CreateString((char *)ap_rec.ssid));
+		memset(szMacStr, 0x00, sizeof(szMacStr));
+		snprintf(szMacStr, sizeof(szMacStr)-1,MACSTR, MAC2STR(ap_rec.bssid));
+		cJSON_AddItemToObject(ap, "bssid", cJSON_CreateString(szMacStr));
+		cJSON_AddNumberToObject(radio, "b", ap_rec.phy_11b?1:0);
+		cJSON_AddNumberToObject(radio, "g", ap_rec.phy_11g?1:0);
+		cJSON_AddNumberToObject(radio, "n", ap_rec.phy_11n?1:0);
+		cJSON_AddNumberToObject(radio, "low_rate", ap_rec.phy_lr?1:0);
+		cJSON_AddItemToObject(ap,"radio", radio);
+		cJSON_AddItemToArray(*ap_list, ap);
+		ESP_LOGD(TAG,"New access point found: %s", cJSON_Print(ap));
 	}
-
+	ESP_LOGD(TAG,"Full access point list: %s", cJSON_Print(*ap_list));
 }
 
 bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){
@@ -470,7 +481,7 @@ void wifi_manager_unlock_json_buffer(){
 }
 
 char* wifi_manager_get_ap_list_json(){
-	return accessp_json;
+	return cJSON_Print(accessp_cjson);
 }
 
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
@@ -589,13 +600,11 @@ void wifi_manager_destroy(){
 	task_wifi_manager = NULL;
 	free(host_name);
 	/* heap buffers */
-	free(accessp_records);
-	accessp_records = NULL;
-	free(accessp_json);
-	accessp_json = NULL;
 	free(ip_info_json);
 	cJSON_Delete(ip_info_cjson);
+	cJSON_Delete(accessp_cjson);
 	ip_info_cjson=NULL;
+	accessp_cjson=NULL;
 	free(wifi_manager_sta_ip);
 	wifi_manager_sta_ip = NULL;
 	if(wifi_manager_config_sta){
@@ -786,20 +795,25 @@ void wifi_manager( void * pvParameters ){
 				/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
 				 * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
 				ESP_LOGD(TAG,"Getting AP list records");
-				ap_num = MAX_AP_NUM;
-				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
+				if(ap_num>0){
+					accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * ap_num);
+					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+				}
 				/* make sure the http server isn't trying to access the list while it gets refreshed */
 				ESP_LOGD(TAG,"Preparing to build ap JSON list");
 				if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
 					/* Will remove the duplicate SSIDs from the list and update ap_num */
 					wifi_manager_filter_unique(accessp_records, &ap_num);
-					wifi_manager_generate_acess_points_json();
+					wifi_manager_generate_access_points_json(&accessp_cjson);
 					wifi_manager_unlock_json_buffer();
 					ESP_LOGD(TAG,"Done building ap JSON list");
+
 				}
 				else{
 					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
 				}
+				free(accessp_records);
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) {

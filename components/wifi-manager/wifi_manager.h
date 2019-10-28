@@ -278,7 +278,7 @@ void wifi_manager( void * pvParameters );
 
 char* wifi_manager_get_ap_list_json();
 char* wifi_manager_get_ip_info_json();
-
+cJSON * wifi_manager_clear_ap_list_json(cJSON **old);
 
 /**
  * @brief saves the current STA wifi config to flash ram storage.
@@ -352,7 +352,7 @@ cJSON * wifi_manager_get_new_json(cJSON **old);
  * @brief Generates the list of access points after a wifi scan.
  * @note This is not thread-safe and should be called only if wifi_manager_lock_json_buffer call is successful.
  */
-void wifi_manager_generate_acess_points_json();
+void wifi_manager_generate_access_points_json(cJSON ** ap_list);
 
 /**
  * @brief Clear the list of access points.
