@@ -835,8 +835,14 @@ void wifi_manager( void * pvParameters ){
 				/* if a scan is already in progress this message is simply ignored thanks to the WIFI_MANAGER_SCAN_BIT uxBit */
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if(! (uxBits & WIFI_MANAGER_SCAN_BIT) ){
-					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
-					ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
+					if(esp_wifi_scan_start(&scan_config, false)!=ESP_OK){
+						ESP_LOGW(TAG,"Unable to start scan; wifi is trying to connect");
+//						set_status_message(WARNING, "Wifi Connecting. Cannot start scan.");
+					}
+					else {
+						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
+					}
+
 				}
 
 				/* callback */
