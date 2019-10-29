@@ -54,7 +54,7 @@ function startCheckStatusInterval(){
 
 function startRefreshAPInterval(){
     RefreshAPIIntervalActive = true;
-    refreshAPInterval = setTimeout(refreshAP(false), 2800);
+    refreshAPInterval = setTimeout(refreshAP(false), 4500); // leave enough time for the initial scan
 }
 
 function RepeatCheckStatusInterval(){
@@ -572,7 +572,7 @@ function checkStatus(){
 
                     //update wait screen
                     $( "#loading" ).hide();
-                    $( "#connect-success" ).append("<p>Your IP address now is: " + text(data["ip"]) + "</p>");
+                    $( "#connect-success" ).text("<p>Your IP address now is: " + data["ip"] + "</p>");
                     $( "#connect-success" ).show();
                     $( "#connect-fail" ).hide();
 

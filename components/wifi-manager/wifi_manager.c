@@ -89,6 +89,9 @@ cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
 static update_reason_code_t last_update_reason_code=0;
 
+static int32_t total_connected_time=0;
+static int64_t last_connected=0;
+static uint16_t num_disconnect=0;
 
 void (**cb_ptr_arr)(void*) = NULL;
 
@@ -143,7 +146,10 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
-
+bool isGroupBitSet(uint8_t bit){
+	EventBits_t uxBits= xEventGroupGetBits(wifi_manager_event_group);
+	return (uxBits & bit);
+}
 void wifi_manager_refresh_ota_json(){
 	wifi_manager_send_message(EVENT_REFRESH_OTA, NULL);
 }
@@ -535,6 +541,7 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 	case SYSTEM_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_GOT_IP");
         xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
+        last_connected = esp_timer_get_time();
         wifi_manager_send_message(EVENT_STA_GOT_IP, (void*)event->event_info.got_ip.ip_info.ip.addr );
         break;
 
@@ -544,6 +551,9 @@ esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event)
 
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
+        total_connected_time+=((esp_timer_get_time()-last_connected)/(1000*1000));
+        num_disconnect++;
+        ESP_LOGW(TAG,"Wifi disconnected. Number of disconnects: %d, Average time connected: %d", num_disconnect, num_disconnect>0?(total_connected_time/num_disconnect):0);
 
 		/* if a DISCONNECT message is posted while a scan is in progress this scan will NEVER end, causing scan to never work again. For this reason SCAN_BIT is cleared too */
 		xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT | WIFI_MANAGER_SCAN_BIT);
@@ -799,21 +809,26 @@ void wifi_manager( void * pvParameters ){
 				if(ap_num>0){
 					accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * ap_num);
 					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
-				}
-				/* make sure the http server isn't trying to access the list while it gets refreshed */
-				ESP_LOGD(TAG,"Preparing to build ap JSON list");
-				if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
-					/* Will remove the duplicate SSIDs from the list and update ap_num */
-					wifi_manager_filter_unique(accessp_records, &ap_num);
-					wifi_manager_generate_access_points_json(&accessp_cjson);
-					wifi_manager_unlock_json_buffer();
-					ESP_LOGD(TAG,"Done building ap JSON list");
+					/* make sure the http server isn't trying to access the list while it gets refreshed */
+					ESP_LOGD(TAG,"Preparing to build ap JSON list");
+					if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
+						/* Will remove the duplicate SSIDs from the list and update ap_num */
+						wifi_manager_filter_unique(accessp_records, &ap_num);
+						wifi_manager_generate_access_points_json(&accessp_cjson);
+						wifi_manager_unlock_json_buffer();
+						ESP_LOGD(TAG,"Done building ap JSON list");
 
+					}
+					else{
+						ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
+					}
+					free(accessp_records);
 				}
 				else{
-					ESP_LOGE(TAG, "could not get access to json mutex in wifi_scan");
+					//
+					ESP_LOGD(TAG,"No AP Found.  Emptying the list.");
+					accessp_cjson = wifi_manager_get_new_array_json(&accessp_cjson);
 				}
-				free(accessp_records);
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) {
@@ -833,8 +848,7 @@ void wifi_manager( void * pvParameters ){
 				ESP_LOGD(TAG, "MESSAGE: ORDER_START_WIFI_SCAN");
 
 				/* if a scan is already in progress this message is simply ignored thanks to the WIFI_MANAGER_SCAN_BIT uxBit */
-				uxBits = xEventGroupGetBits(wifi_manager_event_group);
-				if(! (uxBits & WIFI_MANAGER_SCAN_BIT) ){
+				if(! isGroupBitSet(WIFI_MANAGER_SCAN_BIT) ){
 					if(esp_wifi_scan_start(&scan_config, false)!=ESP_OK){
 						ESP_LOGW(TAG,"Unable to start scan; wifi is trying to connect");
 //						set_status_message(WARNING, "Wifi Connecting. Cannot start scan.");
@@ -842,8 +856,11 @@ void wifi_manager( void * pvParameters ){
 					else {
 						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
 					}
-
 				}
+				else {
+					ESP_LOGW(TAG,"Scan already in progress!");
+				}
+
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
@@ -1030,10 +1047,9 @@ void wifi_manager( void * pvParameters ){
 			case ORDER_START_AP:
 				ESP_LOGI(TAG, "MESSAGE: ORDER_START_AP");
 				esp_wifi_set_mode(WIFI_MODE_APSTA);
-
-				//http_server_start();
 				dns_server_start();
-
+				ESP_LOGD(TAG,"AP Starting, requesting wifi scan.");
+				wifi_manager_scan_async();
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
@@ -1067,6 +1083,7 @@ void wifi_manager( void * pvParameters ){
 				else { abort(); }
 
 				/* bring down DNS hijack */
+				ESP_LOGD(TAG,"Stopping dns server.");
 				dns_server_stop();
 
 				/* callback */

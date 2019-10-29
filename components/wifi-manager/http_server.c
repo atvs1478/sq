@@ -511,11 +511,15 @@ void http_server_netconn_serve(struct netconn *conn) {
 						memset(config, 0x00, sizeof(wifi_config_t));
 						memcpy(config->sta.ssid, ssid, lenS);
 						memcpy(config->sta.password, password, lenP);
-						ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call, with ssid: %s, password: %s", ssid, password);
+						ESP_LOGD(TAG, "http_server_netconn_serve: wifi_manager_connect_async() call, with ssid: %s, password: %s", config->sta.ssid, config->sta.password);
 						wifi_manager_connect_async();
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 						found = true;
 					}
+					else{
+						ESP_LOGE(TAG,"SSID or Password invalid");
+					}
+
 
 					if(!found) {
 						/* bad request the authentification header is not complete/not the correct format */
