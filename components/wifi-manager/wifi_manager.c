@@ -191,6 +191,29 @@ void wifi_manager_start(){
 	else {
 		free(release_url);
 	}
+
+
+
+	char * value = get_nvs_value_alloc_default(NVS_TYPE_STR, "ap_ssid", CONFIG_DEFAULT_AP_SSID, 0);
+	if(value!=NULL){
+		memcpy(wifi_settings.ap_ssid, value, sizeof(wifi_settings.ap_ssid)-1);
+		free(value);
+	}
+	value = get_nvs_value_alloc_default(NVS_TYPE_STR, "ap_pwd", DEFAULT_AP_PASSWORD, 0);
+	if(value!=NULL){
+		memcpy(wifi_settings.ap_pwd, value, sizeof(wifi_settings.ap_pwd)-1);
+		free(value);
+	}
+
+	value = get_nvs_value_alloc_default(NVS_TYPE_STR, "ap_channel", CONFIG_DEFAULT_AP_CHANNEL, 0);
+	if(value!=NULL){
+		wifi_settings.ap_channel=atoi(value);
+		free(value);
+	}
+
+	/* Fetch configuration from nvs	 */
+	wifi_manager_fetch_wifi_sta_config();
+
 	/* start wifi manager task */
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
 
@@ -250,7 +273,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		}
 		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
-		//memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
+		memset(&wifi_settings, 0x00, sizeof(struct wifi_settings_t));
 
 		/* allocate buffer */
 		size_t sz = sizeof(wifi_settings);
@@ -343,6 +366,9 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
 	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(JACK_LEVEL));
 	cJSON_AddNumberToObject(root,"Voltage",	adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
+	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
+	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);
+
 	ESP_LOGD(TAG,"wifi_manager_get_basic_info done");
 	return root;
 }
@@ -726,13 +752,10 @@ void wifi_manager( void * pvParameters ){
 		.show_hidden = true
 	};
 
-
 	/* default wifi config */
 	wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
 	ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-
-
 
 	/* SoftAP - Wifi Access Point configuration setup */
 	tcpip_adapter_ip_info_t info;
@@ -747,6 +770,7 @@ void wifi_manager( void * pvParameters ){
 			.beacon_interval = DEFAULT_AP_BEACON_INTERVAL,
 		},
 	};
+
 	memcpy(ap_config.ap.ssid, wifi_settings.ap_ssid , sizeof(wifi_settings.ap_ssid));
 	memcpy(ap_config.ap.password, wifi_settings.ap_pwd, sizeof(wifi_settings.ap_pwd));
 
@@ -790,7 +814,7 @@ void wifi_manager( void * pvParameters ){
 	/* start http server */
 	http_server_start();
 
-	/* enqueue first event: load previous config */
+	/* enqueue first event: load previous config and start AP or STA mode */
 	wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
 
 

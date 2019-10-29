@@ -572,7 +572,7 @@ function checkStatus(){
 
                     //update wait screen
                     $( "#loading" ).hide();
-                    $( "#connect-success" ).text("<p>Your IP address now is: " + data["ip"] + "</p>");
+                    $( "#connect-success" ).text("Your IP address now is: " + data["ip"] );
                     $( "#connect-success" ).show();
                     $( "#connect-fail" ).hide();
 
