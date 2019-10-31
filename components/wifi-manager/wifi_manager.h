@@ -113,8 +113,6 @@ extern "C" {
  */
 #define DEFAULT_AP_PASSWORD 				CONFIG_DEFAULT_AP_PASSWORD
 
-/** @brief Defines the hostname broadcasted by mDNS */
-#define DEFAULT_HOSTNAME					"esp32"
 
 /** @brief Defines access point's bandwidth.
  *  Value: WIFI_BW_HT20 for 20 MHz  or  WIFI_BW_HT40 for 40 MHz
@@ -229,21 +227,15 @@ typedef enum connection_request_made_by_code_t{
 }connection_request_made_by_code_t;
 
 /**
- * The actual WiFi settings in use
+ * The wifi manager settings in use
  */
 struct wifi_settings_t{
-	uint8_t ap_ssid[MAX_SSID_SIZE];
-	uint8_t ap_pwd[MAX_PASSWORD_SIZE];
-	uint8_t ap_channel;
-	uint8_t ap_ssid_hidden;
-	wifi_bandwidth_t ap_bandwidth;
 	bool sta_only;
-	wifi_ps_type_t sta_power_save;
 	bool sta_static_ip;
+	wifi_ps_type_t sta_power_save;
 	tcpip_adapter_ip_info_t sta_static_ip_config;
 };
 extern struct wifi_settings_t wifi_settings;
-
 
 /**
  * @brief Structure used to store one message in the queue.
@@ -298,6 +290,13 @@ wifi_config_t* wifi_manager_get_wifi_sta_config();
  * @brief A standard wifi event handler as recommended by Espressif
  */
 esp_err_t wifi_manager_event_handler(void *ctx, system_event_t *event);
+
+
+
+/**
+ * @brief Registers handler for wifi and ip events
+ */
+void wifi_manager_register_handlers();
 
 
 /**
@@ -378,7 +377,7 @@ char* wifi_manager_get_sta_ip_string();
 /**
  * @brief thread safe char representation of the STA IP update
  */
-void wifi_manager_safe_update_sta_ip_string(uint32_t ip);
+void wifi_manager_safe_update_sta_ip_string(struct ip4_addr * ip4);
 
 
 /**

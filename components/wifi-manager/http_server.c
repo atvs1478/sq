@@ -86,11 +86,8 @@ const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: htt
 const static char http_redirect_hdr_end[] = "/\n\n";
 
 
-
-
-
 void http_server_start() {
-
+	ESP_LOGD(TAG,"http_server_start ");
 	if(task_http_server == NULL) {
 		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_http_server);
 	}
@@ -355,24 +352,43 @@ void http_server_netconn_serve(struct netconn *conn) {
 	char *buf = NULL;
 	u16_t buflen;
 	err_t err;
+	ip_addr_t remote_add;
+	u16_t port;
+
 	const char new_line[2] = "\n";
+	char * ap_ip_address= get_nvs_value_alloc_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
+	if(ap_ip_address==NULL){
+		ESP_LOGE(TAG,"Unable to retrieve default AP IP Address");
+		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+		netconn_close(conn);
+		netbuf_delete(inbuf);
+		return;
+	}
+
+	netconn_getaddr(conn,	&remote_add,	&port,	0);
+	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
 
 	err = netconn_recv(conn, &inbuf);
 	if(err == ERR_OK) {
 
 		netbuf_data(inbuf, (void**)&buf, &buflen);
 		dump_net_buffer(buf, buflen);
-
+		int lenH = 0;
 		/* extract the first line of the request */
 		char *save_ptr = buf;
 		char *line = strtok_r(save_ptr, new_line, &save_ptr);
-		ESP_LOGD(TAG,"http_server_netconn_serve Processing line %s",line);
+		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
+		char * host = malloc(lenH+1);
+		memset(host,0x00,lenH+1);
+		if(lenH>0){
+			strlcpy(host,temphost,lenH+1);
+		}
+		ESP_LOGD(TAG,"http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
 
 		if(line) {
 
 			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
-			int lenH = 0;
-			char *host = http_server_get_header(save_ptr, "Host: ", &lenH);
+
 			const char * host_name=NULL;
 			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
 				ESP_LOGE(TAG,"Unable to get host name. Error: %s",esp_err_to_name(err));
@@ -384,10 +400,11 @@ void http_server_netconn_serve(struct netconn *conn) {
 			wifi_manager_unlock_sta_ip_string();
 			bool access_from_host_name = (host_name!=NULL) && strstr(host, host_name);
 
-			if(lenH > 0 && !strstr(host, DEFAULT_AP_IP) && !(access_from_sta_ip || access_from_host_name)) {
-				ESP_LOGI(TAG,"Redirecting to default AP IP Address : %s", DEFAULT_AP_IP);
+			//todo:  if default IP address is changed for the AP mode in the nvs settings, then this will not work because comparison is done against default value only
+			if(lenH > 0 && !strstr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
+				ESP_LOGI(TAG,"Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, DEFAULT_AP_IP, sizeof(DEFAULT_AP_IP) - 1, NETCONN_NOCOPY);
+				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
 				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
 			}
 			else {
@@ -571,14 +588,16 @@ void http_server_netconn_serve(struct netconn *conn) {
 				}
 				else {
 					netconn_write(conn, http_400_hdr, sizeof(http_400_hdr) - 1, NETCONN_NOCOPY);
-					ESP_LOGE(TAG, "bad request");
+					ESP_LOGE(TAG, "bad request from host: %s, request %s",remote_address, line);
 				}
 			}
 		}
 		else {
-			ESP_LOGE(TAG, "URL Not found. Sending 404.");
+			ESP_LOGE(TAG, "URL not found processing for remote host : %s",remote_address);
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
+		free(host);
+
 	}
 	//-1 if there is no next part
 	// 1 if moved to the next part but now there is no next part
@@ -588,6 +607,9 @@ void http_server_netconn_serve(struct netconn *conn) {
 		netbuf_data(inbuf, (void**)&buf, &buflen);
 		dump_net_buffer(buf, buflen);
 	}
+
+	free(ap_ip_address);
+	free(remote_address);
 	netconn_close(conn);
 	netbuf_delete(inbuf);
 	/* free the buffer */
