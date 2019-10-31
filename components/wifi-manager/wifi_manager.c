@@ -320,33 +320,33 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		FREE_AND_NULL(buff);
 
 		/* settings */
-		sz = sizeof(wifi_settings);
-		buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
-		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
-		if(esp_err != ESP_OK){
-			// SSID was found, we should have some settings as well.  Log this as an error
-			ESP_LOGW(TAG,"No wifi settings found in nvs. Freeing nvs buffer");
-			FREE_AND_NULL(buff);
-			ESP_LOGD(TAG,"Closing nvs Handle");
-			nvs_close(handle);
-			ESP_LOGD(TAG,"load sta config done");
-			return wifi_manager_config_sta->sta.ssid[0] != '\0';
-		}
-		if(sz!=sizeof(wifi_settings)){
-			ESP_LOGW(TAG,"Unable to retrieve settings buffer from nvs.  Size did not match");
-		}
-		else {
-			ESP_LOGD(TAG,"Copying configuration restored from nvs");
-			memcpy(&wifi_settings, buff, sz);
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-		}
-		FREE_AND_NULL(buff);
+//		sz = sizeof(wifi_settings);
+//		buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
+//		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
+//		if(esp_err != ESP_OK){
+//			// SSID was found, we should have some settings as well.  Log this as an error
+//			ESP_LOGW(TAG,"No wifi settings found in nvs. Freeing nvs buffer");
+//			FREE_AND_NULL(buff);
+//			ESP_LOGD(TAG,"Closing nvs Handle");
+//			nvs_close(handle);
+//			ESP_LOGD(TAG,"load sta config done");
+//			return wifi_manager_config_sta->sta.ssid[0] != '\0';
+//		}
+//		if(sz!=sizeof(wifi_settings)){
+//			ESP_LOGW(TAG,"Unable to retrieve settings buffer from nvs.  Size did not match");
+//		}
+//		else {
+//			ESP_LOGD(TAG,"Copying configuration restored from nvs");
+//			memcpy(&wifi_settings, buff, sz);
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
+//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+//		}
+//		FREE_AND_NULL(buff);
 		nvs_close(handle);
 
 		return wifi_manager_config_sta->sta.ssid[0] != '\0';
@@ -479,7 +479,7 @@ void wifi_manager_generate_access_points_json(cJSON ** ap_list){
 		cJSON_AddItemToArray(*ap_list, ap);
 		ESP_LOGD(TAG,"New access point found: %s", cJSON_Print(ap));
 	}
-	ESP_LOGD(TAG,"Full access point list: %s", cJSON_Print(*ap_list));
+	ESP_LOGV(TAG,"Full access point list: %s", cJSON_Print(*ap_list));
 }
 
 bool wifi_manager_lock_sta_ip_string(TickType_t xTicksToWait){

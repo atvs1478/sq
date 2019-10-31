@@ -45,7 +45,7 @@
 #include "squeezelite-ota.h"
 #include <math.h>
 
-static EventGroupHandle_t wifi_event_group;
+EventGroupHandle_t wifi_event_group;
 bool enable_bt_sink=false;
 bool enable_airplay=false;
 bool jack_mutes_amp=false;
@@ -185,6 +185,7 @@ void register_default_nvs(){
 	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
 	nvs_value_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+	nvs_value_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
 	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
 	enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
@@ -214,9 +215,15 @@ void app_main()
 
 	/* start the wifi manager */
 	led_blink(LED_GREEN, 250, 250);
-	wifi_manager_start();
-	wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
-	wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
+	char * bypass_wm = get_nvs_value_alloc_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+	if((strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0)){
+		ESP_LOGW(TAG,"wifi manager is disabled. Please use wifi commands to connect to your wifi access point.");
+	}
+	else {
+		wifi_manager_start();
+		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
+		wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
+	}
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
 		while(!bWifiConnected){

@@ -150,6 +150,7 @@ void console_start() {
 	esp_console_register_help_command();
 	register_system();
 	register_nvs();
+	register_wifi();
 #if RECOVERY_APPLICATION!=1
 	register_squeezelite();
 #elif RECOVERY_APPLICATION==1
