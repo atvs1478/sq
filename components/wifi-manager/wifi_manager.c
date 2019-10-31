@@ -1279,12 +1279,12 @@ void wifi_manager( void * pvParameters ){
 					}
 
 					/* erase configuration */
-//					if(wifi_manager_config_sta){
-//						ESP_LOGI(TAG, "Erasing WiFi Configuration.");
-//						memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-//						/* save NVS memory */
-//						wifi_manager_save_sta_config();
-//					}
+					if(wifi_manager_config_sta){
+						ESP_LOGI(TAG, "Erasing WiFi Configuration.");
+						memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+						/* save NVS memory */
+						wifi_manager_save_sta_config();
+					}
 					/* start SoftAP */
 					ESP_LOGD(TAG, "Disconnect processing complete. Ordering an AP start.");
 					wifi_manager_send_message(ORDER_START_AP, NULL);
@@ -1311,12 +1311,12 @@ void wifi_manager( void * pvParameters ){
 						xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
 
 						/* erase configuration that could not be used to connect */
-						if(wifi_manager_config_sta){
-							ESP_LOGW(TAG, "Erasing wifi manager config.");
-							memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-							/* save empty connection info in NVS memory */
-							wifi_manager_save_sta_config();
-						}
+//						if(wifi_manager_config_sta){
+//							ESP_LOGW(TAG, "Erasing wifi manager config.");
+//							memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
+//							/* save empty connection info in NVS memory */
+//							wifi_manager_save_sta_config();
+//						}
 						ESP_LOGD(TAG, "Issuing ORDER_START_AP to trigger AP start.");
 						/* start SoftAP */
 						wifi_manager_send_message(ORDER_START_AP, NULL);
