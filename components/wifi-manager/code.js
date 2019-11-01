@@ -28,7 +28,7 @@ var checkStatusInterval = null;
 
 var StatusIntervalActive = false;
 var RefreshAPIIntervalActive = false;
-
+var LastRecoveryState=null;
 var output = '';
 
 function stopCheckStatusInterval(){
@@ -176,6 +176,16 @@ $(document).ready(function(){
         $( "#wifi" ).slideDown( "fast", function() {})
     });
 
+    $("input#show-nvs").on("click", function() {
+        this.checked=this.checked?1:0;
+        if(this.checked){
+            $('a[href^="#tab-nvs"]').show();
+        } else {
+            $('a[href^="#tab-nvs"]').hide();
+        }
+
+    });
+    
     $("input#autoexec-cb").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
@@ -628,12 +638,21 @@ function checkStatus(){
             enableStatusTimer = true;
         }
         if (data.hasOwnProperty('recovery')) {
+            if(LastRecoveryState != data["recovery"]){
+                LastRecoveryState = data["recovery"];
+                $("input#show-nvs")[0].checked=LastRecoveryState==1?true:false;
+            }
+            if($("input#show-nvs")[0].checked){
+                    $('a[href^="#tab-nvs"]').show();
+            } else{
+                $('a[href^="#tab-nvs"]').hide();
+            }
+
             if (data["recovery"] === 1) {
                 recovery = true;
                 $("#otadiv").show();
                 $('a[href^="#tab-audio"]').hide();
                 $('a[href^="#tab-gpio"]').show();
-                $('a[href^="#tab-nvs"]').show();
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
                 $("#boot-button").html('Reboot');
@@ -644,7 +663,6 @@ function checkStatus(){
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').hide();
-                $('a[href^="#tab-nvs"]').hide();
                 $("footer.footer").removeClass('recovery');
                 $("footer.footer").addClass('sl');
                 $("#boot-button").html('Recovery');

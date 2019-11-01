@@ -300,7 +300,7 @@
                     <h2>Firmware URL:</h2>
                     <textarea id="fwurl" maxlength="350"></textarea>
                     <div class="buttons">
-                        <input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
+                    	<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
                     </div>
                     <div id="otadiv">
                         <div class="progress" id="progress">
@@ -325,8 +325,12 @@
                             <li>cJSON, &copy; 2009-2017, Dave Gamble and cJSON contributors. Licensed under the MIT License.</li>
                         </ul>
                     </div>
+	                <h2>Show NVS Editor</h2>
+	                <div class="custom-control custom-switch">
+	                      <input type="checkbox" class="custom-control-input" id="show-nvs" checked="checked">
+	                      <label class="custom-control-label" for="show-nvs"></label>
+	                </div>
                 </div>
-
             </div>
             <footer class="footer"><span id="foot-fw"></span><span id="foot-wifi"></span></footer>
             <iframe width="0" height="0" border="0" name="dummyframe" id="dummyframe"></iframe>
