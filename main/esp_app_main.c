@@ -49,6 +49,7 @@ EventGroupHandle_t wifi_event_group;
 bool enable_bt_sink=false;
 bool enable_airplay=false;
 bool jack_mutes_amp=false;
+bool bypass_wifi_manager=false;
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)
 
@@ -216,10 +217,14 @@ void app_main()
 	/* start the wifi manager */
 	led_blink(LED_GREEN, 250, 250);
 	char * bypass_wm = get_nvs_value_alloc_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
-	if((strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0)){
-		ESP_LOGW(TAG,"wifi manager is disabled. Please use wifi commands to connect to your wifi access point.");
+	bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
+
+
+	if(bypass_wifi_manager){
+		ESP_LOGW(TAG,"\n\nwifi manager is disabled. Please use wifi commands to connect to your wifi access point.\n\n");
 	}
 	else {
+		ESP_LOGW(TAG,"\n\nwifi manager is ENABLED. Starting...\n\n");
 		wifi_manager_start();
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);

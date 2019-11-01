@@ -32,7 +32,7 @@
 #include "tcpip_adapter.h"
 #include "esp_event.h"
 #include "led.h"
-
+extern bool bypass_wifi_manager;
 #define JOIN_TIMEOUT_MS (10000)
 
 extern EventGroupHandle_t wifi_event_group;
@@ -92,7 +92,7 @@ static void initialise_wifi(void)
         return;
     }
     tcpip_adapter_init();
-    wifi_event_group = xEventGroupCreate();
+    // Now moved to esp_app_main: wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
@@ -194,5 +194,7 @@ void register_wifi_join()
 void register_wifi()
 {
     register_wifi_join();
-    initialise_wifi();
+    if(bypass_wifi_manager){
+    	initialise_wifi();
+    }
 }
