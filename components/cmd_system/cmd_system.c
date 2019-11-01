@@ -138,12 +138,15 @@ static int restart(int argc, char **argv)
 {
     ESP_LOGW(TAG, "Restarting");
     esp_restart();
-
-//    guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
-//    // If we're still alive, then there may not be an ota partition to boot from
-//    guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
-//	return 0; // return fail.  This should never return... we're rebooting!
+    return 0;
 }
+
+void simple_restart()
+{
+	ESP_LOGW(TAG, "Restarting");
+    esp_restart();
+}
+
 esp_err_t guided_restart_ota(){
     guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
     // If we're still alive, then there may not be an ota partition to boot from

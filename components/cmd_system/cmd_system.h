@@ -16,6 +16,7 @@ extern "C" {
 void register_system();
 esp_err_t guided_factory();
 esp_err_t guided_restart_ota();
+void simple_restart();
 
 #ifdef __cplusplus
 }

@@ -210,7 +210,7 @@ $(document).ready(function(){
                 console.log('sent config JSON with headers:', autoexec);
                 console.log('now triggering reboot');
                 $.ajax({
-                    url: '/reboot.json',
+                    url: '/reboot_ota.json',
                     dataType: 'text',
                     method: 'POST',
                     cache: false,
@@ -439,7 +439,10 @@ $(document).ready(function(){
     $('#boot-button').on("click", function(){
         enableStatusTimer = true;
     });
-
+    $('#reboot-button').on("click", function(){
+        enableStatusTimer = true;
+    });
+    
     $('#updateAP').on("click", function(){
         refreshAP(true);
         console.log("refresh AP");
@@ -656,7 +659,7 @@ function checkStatus(){
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
                 $("#boot-button").html('Reboot');
-                $("#boot-form").attr('action', '/reboot.json');
+                $("#boot-form").attr('action', '/reboot_ota.json');
                 enableStatusTimer = true;
             } else {
                 recovery = false;

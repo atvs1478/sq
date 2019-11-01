@@ -60,7 +60,7 @@ void process_autoexec(){
 		ESP_LOGW(TAG, "Procesing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
 	}
 #if RECOVERY_APPLICATION
-	ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.")
+	ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.");
 #endif
 
 	if(str_flag !=NULL ){
