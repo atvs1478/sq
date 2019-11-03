@@ -79,10 +79,10 @@ Contains the freeRTOS task and all necessary support
 #define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
-
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
+bool bHasConnected=false;
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records=NULL;
 cJSON * accessp_cjson=NULL;
@@ -154,6 +154,43 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
+char * get_disconnect_code_desc(uint8_t reason){
+	switch (reason) {
+		case 1	: return "UNSPECIFIED"; break;
+		case 2	: return "AUTH_EXPIRE"; break;
+		case 3	: return "AUTH_LEAVE"; break;
+		case 4	: return "ASSOC_EXPIRE"; break;
+		case 5	: return "ASSOC_TOOMANY"; break;
+		case 6	: return "NOT_AUTHED"; break;
+		case 7	: return "NOT_ASSOCED"; break;
+		case 8	: return "ASSOC_LEAVE"; break;
+		case 9	: return "ASSOC_NOT_AUTHED"; break;
+		case 10	: return "DISASSOC_PWRCAP_BAD"; break;
+		case 11	: return "DISASSOC_SUPCHAN_BAD"; break;
+		case 12	: return "<n/a>"; break;
+		case 13	: return "IE_INVALID"; break;
+		case 14	: return "MIC_FAILURE"; break;
+		case 15	: return "4WAY_HANDSHAKE_TIMEOUT"; break;
+		case 16	: return "GROUP_KEY_UPDATE_TIMEOUT"; break;
+		case 17	: return "IE_IN_4WAY_DIFFERS"; break;
+		case 18	: return "GROUP_CIPHER_INVALID"; break;
+		case 19	: return "PAIRWISE_CIPHER_INVALID"; break;
+		case 20	: return "AKMP_INVALID"; break;
+		case 21	: return "UNSUPP_RSN_IE_VERSION"; break;
+		case 22	: return "INVALID_RSN_IE_CAP"; break;
+		case 23	: return "802_1X_AUTH_FAILED"; break;
+		case 24	: return "CIPHER_SUITE_REJECTED"; break;
+		case 200	: return "BEACON_TIMEOUT"; break;
+		case 201	: return "NO_AP_FOUND"; break;
+		case 202	: return "AUTH_FAIL"; break;
+		case 203	: return "ASSOC_FAIL"; break;
+		case 204	: return "HANDSHAKE_TIMEOUT"; break;
+		default: return "UNKNOWN"; break;
+	}
+	return "";
+}
+
+
 bool isGroupBitSet(uint8_t bit){
 	EventBits_t uxBits= xEventGroupGetBits(wifi_manager_event_group);
 	return (uxBits & bit);
@@ -174,7 +211,7 @@ void wifi_manager_disconnect_async(){
 void wifi_manager_init_wifi(){
 	/* event handler and event group for the wifi driver */
 	wifi_manager_event_group = xEventGroupCreate();
-
+	bHasConnected=false;
 	// Now Initialize the Wifi Stack
     tcpip_adapter_init();
     wifi_manager_event_group = xEventGroupCreate();
@@ -679,7 +716,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 //		    		reason of disconnection
 				wifi_event_sta_disconnected_t * s =(wifi_event_sta_disconnected_t*)event_data;
 				char * bssid = get_mac_string(s->bssid);
-				ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED. From BSSID: %s, reason code: %d", STR_OR_BLANK(bssid),s->reason);
+				ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED. From BSSID: %s, reason code: %d (%s)", STR_OR_BLANK(bssid),s->reason, get_disconnect_code_desc(s->reason));
 				FREE_AND_NULL(bssid);
 				if(last_connected>0) total_connected_time+=((esp_timer_get_time()-last_connected)/(1000*1000));
 				last_connected = 0;
@@ -918,7 +955,6 @@ void wifi_manager_register_handlers(){
 	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_STOP, &event_handler, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &event_handler, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &event_handler, NULL));
-//	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT, &event_handler, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, &event_handler, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &event_handler, NULL));
@@ -1190,7 +1226,7 @@ void wifi_manager( void * pvParameters ){
 				else{
 					memcpy(&disc_event,(wifi_event_sta_disconnected_t*)msg.param,sizeof(disc_event));
 					free(msg.param);
-					ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d", disc_event.reason);
+					ESP_LOGI(TAG, "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d (%s)", disc_event.reason, get_disconnect_code_desc(disc_event.reason));
 				}
 
 				/* this even can be posted in numerous different conditions
@@ -1291,7 +1327,7 @@ void wifi_manager( void * pvParameters ){
 
 					if(retries < WIFI_MANAGER_MAX_RETRY){
 						ESP_LOGD(TAG, "Issuing ORDER_CONNECT_STA to retry connection.");
-						retries++;
+						if(!bHasConnected) retries++;
 						wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_AUTO_RECONNECT);
 					}
 					else{
@@ -1366,6 +1402,7 @@ void wifi_manager( void * pvParameters ){
 				/* bring down DNS hijack */
 				ESP_LOGD(TAG,"Stopping dns server.");
 				dns_server_stop();
+				bHasConnected=true;
 
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
