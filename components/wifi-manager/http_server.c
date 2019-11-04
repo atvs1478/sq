@@ -354,23 +354,22 @@ void http_server_netconn_serve(struct netconn *conn) {
 	err_t err;
 	ip_addr_t remote_add;
 	u16_t port;
-
+	ESP_LOGD(TAG,"Serving page.  Getting device AP address.");
 	const char new_line[2] = "\n";
 	char * ap_ip_address= get_nvs_value_alloc_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
 	if(ap_ip_address==NULL){
 		ESP_LOGE(TAG,"Unable to retrieve default AP IP Address");
 		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
 		netconn_close(conn);
-		netbuf_delete(inbuf);
 		return;
 	}
-
+	ESP_LOGD(TAG,"Getting remote device IP address.");
 	netconn_getaddr(conn,	&remote_add,	&port,	0);
 	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
-
+	ESP_LOGD(TAG,"Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
 	err = netconn_recv(conn, &inbuf);
 	if(err == ERR_OK) {
-
+		ESP_LOGD(TAG,"Getting data buffer.");
 		netbuf_data(inbuf, (void**)&buf, &buflen);
 		dump_net_buffer(buf, buflen);
 		int lenH = 0;
@@ -388,7 +387,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 		if(line) {
 
 			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
-
 			const char * host_name=NULL;
 			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
 				ESP_LOGE(TAG,"Unable to get host name. Error: %s",esp_err_to_name(err));
@@ -400,7 +398,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 			wifi_manager_unlock_sta_ip_string();
 			bool access_from_host_name = (host_name!=NULL) && strstr(host, host_name);
 
-			//todo:  if default IP address is changed for the AP mode in the nvs settings, then this will not work because comparison is done against default value only
 			if(lenH > 0 && !strstr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
 				ESP_LOGI(TAG,"Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
@@ -608,14 +605,6 @@ void http_server_netconn_serve(struct netconn *conn) {
 		}
 		free(host);
 
-	}
-	//-1 if there is no next part
-	// 1 if moved to the next part but now there is no next part
-	// 0 if moved to the next part and there are still more parts
-	while(netbuf_next(inbuf) != -1) {
-		ESP_LOGD(TAG,"More data found from the connection!");
-		netbuf_data(inbuf, (void**)&buf, &buflen);
-		dump_net_buffer(buf, buflen);
 	}
 
 	free(ap_ip_address);

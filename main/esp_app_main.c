@@ -97,19 +97,26 @@ bool wait_for_wifi(){
     return connected;
 }
 static void initialize_nvs() {
+	ESP_LOGI(TAG,"Initializing nvs from flash");
 	esp_err_t err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_LOGW(TAG,"Error %s. Erasing nvs flash", esp_err_to_name(err));
 		ESP_ERROR_CHECK(nvs_flash_erase());
 		err = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(err);
-
+	ESP_LOGI(TAG,"Initializing nvs from partition %s",settings_partition);
 	err = nvs_flash_init_partition(settings_partition);
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_LOGW(TAG,"Error %s. Erasing nvs on partition %s",esp_err_to_name(err),settings_partition);
 		ESP_ERROR_CHECK(nvs_flash_erase_partition(settings_partition));
 		err = nvs_flash_init_partition(settings_partition);
 	}
+	if(err!=ESP_OK){
+		ESP_LOGE(TAG,"nvs init completed with error %s",esp_err_to_name(err));
+	}
 	ESP_ERROR_CHECK(err);
+	ESP_LOGD(TAG,"nvs init completed");
 
 }
 char * process_ota_url(){
@@ -206,6 +213,7 @@ void register_default_nvs(){
 void app_main()
 {
 	char * fwurl = NULL;
+	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
 	register_default_nvs();
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
