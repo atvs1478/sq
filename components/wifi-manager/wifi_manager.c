@@ -210,59 +210,90 @@ void wifi_manager_disconnect_async(){
 
 void wifi_manager_init_wifi(){
 	/* event handler and event group for the wifi driver */
+	ESP_LOGD(TAG, "Initializing wifi.  Creating event group");
 	wifi_manager_event_group = xEventGroupCreate();
 	bHasConnected=false;
 	// Now Initialize the Wifi Stack
+	ESP_LOGD(TAG, "Initializing wifi. Initializing tcp_ip adapter");
     tcpip_adapter_init();
-    wifi_manager_event_group = xEventGroupCreate();
+    ESP_LOGD(TAG, "Initializing wifi. Creating the default event loop");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_LOGD(TAG, "Initializing wifi. Getting default wifi configuration");
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_LOGD(TAG, "Initializing wifi. Initializing wifi. ");
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+    ESP_LOGD(TAG, "Initializing wifi. Calling register handlers");
     wifi_manager_register_handlers();
+    ESP_LOGD(TAG, "Initializing wifi. Setting WiFi storage as RAM");
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+    ESP_LOGD(TAG, "Initializing wifi. Setting WiFi mode to WIFI_MODE_NULL");
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_NULL) );
+    ESP_LOGD(TAG, "Initializing wifi. Starting wifi");
     ESP_ERROR_CHECK( esp_wifi_start() );
+    ESP_LOGD(TAG, "Initializing wifi. done");
 }
 
 void wifi_manager_start(){
 
 
 	/* memory allocation */
+	ESP_LOGD(TAG, "wifi_manager_start.  Creating message queue");
 	wifi_manager_queue = xQueueCreate( 3, sizeof( queue_message) );
+	ESP_LOGD(TAG, "wifi_manager_start.  Creating mutexes");
 	wifi_manager_json_mutex = xSemaphoreCreateMutex();
 	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
 
-
+	ESP_LOGD(TAG, "wifi_manager_start.  Creating access point json structure");
+	accessp_cjson = NULL;
 	accessp_cjson = wifi_manager_clear_ap_list_json(&accessp_cjson);
 	ip_info_json = NULL;
+	ESP_LOGD(TAG, "wifi_manager_start.  Creating status jcon structure");
 	ip_info_cjson = wifi_manager_clear_ip_info_json(&ip_info_cjson);
 
+	ESP_LOGD(TAG, "wifi_manager_start.  Allocating memory for wifi configuration structure");
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 	memset(&wifi_settings, 0x00, sizeof(wifi_settings));
 
+	ESP_LOGD(TAG, "wifi_manager_start.  Allocating memory for callback functions registration");
 	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )) * MESSAGE_CODE_COUNT);
 	for(int i=0; i<MESSAGE_CODE_COUNT; i++){
 		cb_ptr_arr[i] = NULL;
 	}
 
+	ESP_LOGD(TAG, "About to set the STA IP String to 0.0.0.0");
 	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
 	wifi_manager_safe_update_sta_ip_string(NULL);
 
+	ESP_LOGD(TAG, "Retrieving host name from nvs");
 	host_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
+	if(host_name ==NULL){
+		ESP_LOGE(TAG, "Could not retrieve host name from nvs");
+	}
+	else {
+		ESP_LOGD(TAG, "Found host name %s ", host_name);
+	}
+
+	ESP_LOGD(TAG, "Getting release url ");
 	char * release_url = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "release_url", QUOTE(SQUEEZELITE_ESP32_RELEASE_URL), 0);
 	if(release_url == NULL){
 		ESP_LOGE(TAG,"Unable to retrieve the release url from nvs");
 	}
+	else {
+		ESP_LOGD(TAG, "Found release url %s", release_url);
+	}
 
+	ESP_LOGD(TAG, "About to call init wifi");
 	wifi_manager_init_wifi();
 
+
 	/* Fetch configuration from nvs	 */
+	ESP_LOGD(TAG, "About to fetch wifi sta config structure");
 	wifi_manager_fetch_wifi_sta_config();
 
 	/* start wifi manager task */
+	ESP_LOGD(TAG, "Creating wifi manager task");
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
-
 }
 
 
@@ -1054,8 +1085,6 @@ void wifi_manager( void * pvParameters ){
 
 	/* enqueue first event: load previous config and start AP or STA mode */
 	wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
-
-
 	/* main processing loop */
 	for(;;){
 		xStatus = xQueueReceive( wifi_manager_queue, &msg, portMAX_DELAY );
