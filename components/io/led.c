@@ -21,6 +21,8 @@
 #define MAX_LED	8
 #define BLOCKTIME	10	// up to portMAX_DELAY
 
+static const char TAG[] = "led";
+
 static struct led_s {
 	gpio_num_t gpio;
 	bool on;
@@ -37,6 +39,7 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 	if (!led->timer) return;
 	
 	led->on = !led->on;
+	ESP_LOGD(TAG,"led vCallbackFunction setting gpio %d level", led->gpio);
 	gpio_set_level(led->gpio, led->on ? led->onstate : !led->onstate);
 	
 	// was just on for a while
@@ -49,6 +52,7 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	if (!leds[idx].gpio) return false;
 	
+	ESP_LOGD(TAG,"led_blink_core");
 	if (leds[idx].timer) {
 		// normal requests waits if a pop is pending
 		if (!pushed && leds[idx].pushed) {
@@ -71,16 +75,23 @@ bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	leds[idx].offtime = offtime;	
 			
 	if (ontime == 0) {
+		ESP_LOGD(TAG,"led %d, setting reverse level", idx);
 		gpio_set_level(leds[idx].gpio, !leds[idx].onstate);
 	} else if (offtime == 0) {
+		ESP_LOGD(TAG,"led %d, setting level", idx);
 		gpio_set_level(leds[idx].gpio, leds[idx].onstate);
 	} else {
-		if (!leds[idx].timer) leds[idx].timer = xTimerCreate("ledTimer", ontime / portTICK_RATE_MS, pdFALSE, (void *)&leds[idx], vCallbackFunction);
+		if (!leds[idx].timer) {
+			ESP_LOGD(TAG,"led %d, Creating timer", idx);
+			leds[idx].timer = xTimerCreate("ledTimer", ontime / portTICK_RATE_MS, pdFALSE, (void *)&leds[idx], vCallbackFunction);
+		}
         leds[idx].on = true;
+        ESP_LOGD(TAG,"led %d, Setting gpio %d", idx, leds[idx].gpio);
 		gpio_set_level(leds[idx].gpio, leds[idx].onstate);
+		ESP_LOGD(TAG,"led %d, Starting timer.", idx);
 		if (xTimerStart(leds[idx].timer, BLOCKTIME) == pdFAIL) return false;
 	}
-	
+	ESP_LOGD(TAG,"led %d, led_blink_core_done", idx);
 	return true;
 } 
 
@@ -94,14 +105,17 @@ bool led_unpush(int idx) {
 }	
 
 bool led_config(int idx, gpio_num_t gpio, int onstate) {
+	ESP_LOGD(TAG,"Index %d, GPIO %d, on state %s", idx, gpio, onstate>0?"On":"Off");
 	if (idx >= MAX_LED) return false;
 	leds[idx].gpio = gpio;
 	leds[idx].onstate = onstate;
-	
+	ESP_LOGD(TAG,"Index %d, GPIO %d, on state %s. Selecting GPIO pad", idx, gpio, onstate>0?"On":"Off");
 	gpio_pad_select_gpio(gpio);
+	ESP_LOGD(TAG,"Index %d, GPIO %d, on state %s. Setting direction to OUTPUT", idx, gpio, onstate>0?"On":"Off");
 	gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
+	ESP_LOGD(TAG,"Index %d, GPIO %d, on state %s. Setting State to %d", idx, gpio, onstate>0?"On":"Off", onstate);
 	gpio_set_level(gpio, !onstate);
-	
+	ESP_LOGD(TAG,"Done configuring the led");
 	return true;
 }
 

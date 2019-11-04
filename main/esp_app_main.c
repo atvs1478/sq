@@ -179,54 +179,91 @@ u16_t get_adjusted_volume(u16_t volume){
 }
 
 void register_default_nvs(){
-	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
-	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
-	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ssid",CONFIG_DEFAULT_AP_SSID , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_password", CONFIG_DEFAULT_AP_PASSWORD, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
-	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
-	nvs_value_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
+
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_name", CONFIG_BT_NAME);
+	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
+	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "host_name", "squeezelite-esp32");
+	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", SQUEEZELITE_ESP32_RELEASE_URL);
+	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_address",CONFIG_DEFAULT_AP_IP );
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY );
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK );
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL));
+	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ssid",CONFIG_DEFAULT_AP_SSID );
+	nvs_value_set_default(NVS_TYPE_STR, "ap_ssid",CONFIG_DEFAULT_AP_SSID , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_password", CONFIG_DEFAULT_AP_PASSWORD);
+	nvs_value_set_default(NVS_TYPE_STR, "ap_password", CONFIG_DEFAULT_AP_PASSWORD, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_name",CONFIG_AIRPLAY_NAME);
+	nvs_value_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_port", CONFIG_AIRPLAY_PORT);
+	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
+	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_dev_name", CONFIG_A2DP_DEV_NAME);
+	nvs_value_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
+	nvs_value_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
 	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
 	enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
 	free(flag);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
 	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 	enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
 	free(flag);
-
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "jack_mutes_amp", "n");
 	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
 	free(flag);
-
-
-
+	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
 void app_main()
 {
 	char * fwurl = NULL;
+
+	ESP_LOGD(TAG,"Creating event group for wifi");
+	wifi_event_group = xEventGroupCreate();
+	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
+	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+
+
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
+	ESP_LOGD(TAG,"Registering default values");
 	register_default_nvs();
-	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
-	led_config(LED_RED, LED_RED_GPIO, 0);
-	wifi_event_group = xEventGroupCreate();
-	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+
+	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
 
-	/* start the wifi manager */
-	led_blink(LED_GREEN, 250, 250);
-	char * bypass_wm = get_nvs_value_alloc_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
-	bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 
+	ESP_LOGD(TAG,"Getting value for WM bypass, nvs 'bypass_wm'");
+	char * bypass_wm = get_nvs_value_alloc_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+	if(bypass_wm==NULL)
+	{
+		ESP_LOGE(TAG, "Unable to retrieve the Wifi Manager bypass flag");
+		bypass_wifi_manager = false;
+	}
+	else {
+		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
+	}
+
+	ESP_LOGD(TAG,"Configuring Green led");
+	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
+	ESP_LOGD(TAG,"Configuring Red led");
+	led_config(LED_RED, LED_RED_GPIO, 0);
+
+	/* start the wifi manager */
+	ESP_LOGD(TAG,"Blinking led");
+	led_blink(LED_GREEN, 250, 250);
 
 	if(bypass_wifi_manager){
 		ESP_LOGW(TAG,"\n\nwifi manager is disabled. Please use wifi commands to connect to your wifi access point.\n\n");
@@ -237,6 +274,7 @@ void app_main()
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 	}
+
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
 		while(!bWifiConnected){
