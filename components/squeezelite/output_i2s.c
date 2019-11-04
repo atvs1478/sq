@@ -196,6 +196,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	loglevel = level;
 	
 #ifdef TAS575x
+	LOG_INFO("Initializing TAS575x ");
 	gpio_pad_select_gpio(JACK_GPIO);
 	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
 			
@@ -358,7 +359,11 @@ void output_close_i2s(void) {
  */
 bool output_volume_i2s(unsigned left, unsigned right) {
 #ifdef TAS575x	
-	if (!spdif) gpio_set_level(VOLUME_GPIO, left || right);
+
+	if (!spdif) {
+		LOG_INFO("Setting TAS575x volume GPIO");
+		gpio_set_level(VOLUME_GPIO, left || right);
+	}
 #endif	
  return false;	
 } 
