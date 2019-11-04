@@ -230,6 +230,7 @@ void wifi_manager_init_wifi(){
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_NULL) );
     ESP_LOGD(TAG, "Initializing wifi. Starting wifi");
     ESP_ERROR_CHECK( esp_wifi_start() );
+    taskYIELD();  /* allows the freeRTOS scheduler to take over if needed. */
     ESP_LOGD(TAG, "Initializing wifi. done");
 }
 
