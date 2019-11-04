@@ -108,11 +108,11 @@ static TaskHandle_t task_wifi_manager = NULL;
 /**
  * The actual WiFi settings in use
  */
-struct wifi_settings_t wifi_settings = {
-	.sta_only = DEFAULT_STA_ONLY,
-	.sta_power_save = DEFAULT_STA_POWER_SAVE,
-	.sta_static_ip = 0
-};
+//struct wifi_settings_t wifi_settings = {
+//	.sta_only = DEFAULT_STA_ONLY,
+//	.sta_power_save = DEFAULT_STA_POWER_SAVE,
+//	.sta_static_ip = 0
+//};
 
 
 /* wifi scanner config */
@@ -253,7 +253,7 @@ void wifi_manager_start(){
 	ESP_LOGD(TAG, "wifi_manager_start.  Allocating memory for wifi configuration structure");
 	wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 	memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
-	memset(&wifi_settings, 0x00, sizeof(wifi_settings));
+//	memset(&wifi_settings, 0x00, sizeof(wifi_settings));
 
 	ESP_LOGD(TAG, "wifi_manager_start.  Allocating memory for callback functions registration");
 	cb_ptr_arr = malloc(  sizeof(   sizeof( void (*)( void* ) )) * MESSAGE_CODE_COUNT);
@@ -286,11 +286,6 @@ void wifi_manager_start(){
 	ESP_LOGD(TAG, "About to call init wifi");
 	wifi_manager_init_wifi();
 
-
-	/* Fetch configuration from nvs	 */
-	ESP_LOGD(TAG, "About to fetch wifi sta config structure");
-	wifi_manager_fetch_wifi_sta_config();
-
 	/* start wifi manager task */
 	ESP_LOGD(TAG, "Creating wifi manager task");
 	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
@@ -321,11 +316,11 @@ esp_err_t wifi_manager_save_sta_config(){
 			return esp_err;
 		}
 
-		esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
-		if (esp_err != ESP_OK) {
-			ESP_LOGE(TAG,"Unable to save wifi_settings in name namespace %s. Error %s", wifi_manager_nvs_namespace, esp_err_to_name(esp_err));
-			return esp_err;
-		}
+//		esp_err = nvs_set_blob(handle, "settings", &wifi_settings, sizeof(wifi_settings));
+//		if (esp_err != ESP_OK) {
+//			ESP_LOGE(TAG,"Unable to save wifi_settings in name namespace %s. Error %s", wifi_manager_nvs_namespace, esp_err_to_name(esp_err));
+//			return esp_err;
+//		}
 
 		esp_err = nvs_commit(handle);
 		if (esp_err != ESP_OK) {
@@ -335,10 +330,10 @@ esp_err_t wifi_manager_save_sta_config(){
 		nvs_close(handle);
 
 		ESP_LOGD(TAG, "wifi_manager_wrote wifi_sta_config: ssid:%s password:%s",wifi_manager_config_sta->sta.ssid,wifi_manager_config_sta->sta.password);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+//		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip): %i",wifi_settings.sta_static_ip);
+//		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
+//		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
+//		ESP_LOGD(TAG, "wifi_manager_wrote wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
 
 	}
 
@@ -353,15 +348,17 @@ bool wifi_manager_fetch_wifi_sta_config(){
 
 	ESP_LOGD(TAG,"Fetching wifi sta config.");
 	if(nvs_open(wifi_manager_nvs_namespace, NVS_READONLY, &handle) == ESP_OK){
-
 		if(wifi_manager_config_sta == NULL){
+			ESP_LOGD(TAG,"Allocating memory for structure.");
 			wifi_manager_config_sta = (wifi_config_t*)malloc(sizeof(wifi_config_t));
 		}
 		memset(wifi_manager_config_sta, 0x00, sizeof(wifi_config_t));
 
 		/* ssid */
+		ESP_LOGD(TAG,"Fetching value for ssid.");
 		size_t sz = sizeof(wifi_manager_config_sta->sta.ssid);
 		uint8_t *buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
+		memset(buff,0x00,sizeof(uint8_t) * sz);
 		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
 		if(esp_err != ESP_OK){
 			ESP_LOGI(TAG,"No ssid found in nvs.");
@@ -369,52 +366,24 @@ bool wifi_manager_fetch_wifi_sta_config(){
 			nvs_close(handle);
 			return false;
 		}
-		memcpy(wifi_manager_config_sta->sta.ssid, buff, sz);
+		memcpy(wifi_manager_config_sta->sta.ssid, buff, sizeof(wifi_manager_config_sta->sta.ssid));
 		FREE_AND_NULL(buff);
 		ESP_LOGI(TAG, "wifi_manager_fetch_wifi_sta_config: ssid:%s ",wifi_manager_config_sta->sta.ssid);
 
 				/* password */
 		sz = sizeof(wifi_manager_config_sta->sta.password);
 		buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
+		memset(buff,0x00,sizeof(uint8_t) * sz);
 		esp_err = nvs_get_blob(handle, "password", buff, &sz);
 		if(esp_err != ESP_OK){
 			// Don't take this as an error. This could be an opened access point?
 			ESP_LOGW(TAG,"No wifi password found in nvs");
 		}
 		else {
-			memcpy(wifi_manager_config_sta->sta.password, buff, sz);
+			memcpy(wifi_manager_config_sta->sta.password, buff, sizeof(wifi_manager_config_sta->sta.password));
 			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_sta_config: password:%s",wifi_manager_config_sta->sta.password);
 		}
 		FREE_AND_NULL(buff);
-
-		/* settings */
-//		sz = sizeof(wifi_settings);
-//		buff = (uint8_t*)malloc(sizeof(uint8_t) * sz);
-//		esp_err = nvs_get_blob(handle, "settings", buff, &sz);
-//		if(esp_err != ESP_OK){
-//			// SSID was found, we should have some settings as well.  Log this as an error
-//			ESP_LOGW(TAG,"No wifi settings found in nvs. Freeing nvs buffer");
-//			FREE_AND_NULL(buff);
-//			ESP_LOGD(TAG,"Closing nvs Handle");
-//			nvs_close(handle);
-//			ESP_LOGD(TAG,"load sta config done");
-//			return wifi_manager_config_sta->sta.ssid[0] != '\0';
-//		}
-//		if(sz!=sizeof(wifi_settings)){
-//			ESP_LOGW(TAG,"Unable to retrieve settings buffer from nvs.  Size did not match");
-//		}
-//		else {
-//			ESP_LOGD(TAG,"Copying configuration restored from nvs");
-//			memcpy(&wifi_settings, buff, sz);
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_only (0 = APSTA, 1 = STA when connected):%i",wifi_settings.sta_only);
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_power_save (1 = yes):%i",wifi_settings.sta_power_save);
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip (0 = dhcp client, 1 = static ip):%i",wifi_settings.sta_static_ip);
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_static_ip_config: IP: %s , GW: %s , Mask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw), ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_ip_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip));
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_gw_addr: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw));
-//			ESP_LOGI(TAG, "wifi_manager_fetch_wifi_settings: sta_netmask: %s", ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-//		}
-//		FREE_AND_NULL(buff);
 		nvs_close(handle);
 
 		return wifi_manager_config_sta->sta.ssid[0] != '\0';
@@ -1159,7 +1128,7 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case ORDER_LOAD_AND_RESTORE_STA:
-				ESP_LOGI(TAG, "MESSAGE: ORDER_LOAD_AND_RESTORE_STA");
+				ESP_LOGI(TAG, "MESSAGE: ORDER_LOAD_AND_RESTORE_STA. About to fetch wifi STA configuration");
 				if(wifi_manager_fetch_wifi_sta_config()){
 					ESP_LOGI(TAG, "Saved wifi found on startup. Will attempt to connect.");
 					wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_RESTORE_CONNECTION);
@@ -1191,19 +1160,20 @@ void wifi_manager( void * pvParameters ){
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_RESTORE_STA_BIT);
 
 					/* STA - Wifi Station configuration setup */
-					if(wifi_settings.sta_static_ip) {
-						// There's a static ip address configured, so
-						ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
-										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip),
-										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw),
-										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
-
-						/* stop DHCP client*/
-						ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
-						/* assign a static IP to the STA network interface */
-						ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &wifi_settings.sta_static_ip_config));
-						}
-					else {
+					//todo:  support static ip address
+//					if(wifi_settings.sta_static_ip) {
+//						// There's a static ip address configured, so
+//						ESP_LOGI(TAG, "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
+//										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip),
+//										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw),
+//										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
+//
+//						/* stop DHCP client*/
+//						ESP_ERROR_CHECK(tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA));
+//						/* assign a static IP to the STA network interface */
+//						ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &wifi_settings.sta_static_ip_config));
+//						}
+//					else {
 						/* start DHCP client if not started*/
 						tcpip_adapter_dhcp_status_t status;
 						ESP_LOGD(TAG, "wifi_manager: Checking if DHCP client for STA interface is running");
@@ -1211,7 +1181,7 @@ void wifi_manager( void * pvParameters ){
 						if (status!=TCPIP_ADAPTER_DHCP_STARTED) {
 							ESP_LOGI(TAG, "wifi_manager: Start DHCP client for STA interface");
 							ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
-						}
+//						}
 					}
 				}
 

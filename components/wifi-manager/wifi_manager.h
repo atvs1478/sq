@@ -229,13 +229,13 @@ typedef enum connection_request_made_by_code_t{
 /**
  * The wifi manager settings in use
  */
-struct wifi_settings_t{
-	bool sta_only;
-	bool sta_static_ip;
-	wifi_ps_type_t sta_power_save;
-	tcpip_adapter_ip_info_t sta_static_ip_config;
-};
-extern struct wifi_settings_t wifi_settings;
+//struct wifi_settings_t{
+//	bool sta_only;
+//	bool sta_static_ip;
+//	wifi_ps_type_t sta_power_save;
+//	tcpip_adapter_ip_info_t sta_static_ip_config;
+//};
+//extern struct wifi_settings_t wifi_settings;
 
 /**
  * @brief Structure used to store one message in the queue.
