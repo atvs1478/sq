@@ -213,6 +213,7 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 			break;
 		}
 		case RAOP_SETUP:
+			// we need a fair bit of space for RTP process
 			_buf_resize(outputbuf, RAOP_OUTPUT_SIZE);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;

@@ -1,0 +1,4 @@
+- in squeezelite some buffers (stream, output, header, recv) are allocated 
+although they are almost static (expect output). This creates a risk of 
+memory fragmentation, especially because the large output is re-allocated for
+AirPlay
