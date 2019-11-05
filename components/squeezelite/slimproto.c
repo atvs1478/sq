@@ -533,13 +533,16 @@ static void process(u8_t *pack, int len) {
 static bool running;
 
 static void slimproto_run() {
-	static u8_t buffer[MAXBUF];
+	static u8_t *buffer = NULL;
 	int  expect = 0;
 	int  got    = 0;
 	u32_t now;
 	static u32_t last = 0;
 	event_handle ehandles[2];
 	int timeouts = 0;
+	
+	// just to avoid having to free that up at multiple places
+	if (!buffer) buffer = malloc(MAXBUF);
 
 	set_readwake_handles(ehandles, sock, wake_e);
 
@@ -623,12 +626,15 @@ static void slimproto_run() {
 			bool _start_output = false;
 			decode_state _decode_state;
 			disconnect_code disconnect_code;
-			static char header[MAX_HEADER];
+			static char *header = NULL;
 			size_t header_len = 0;
 #if IR
 			bool _sendIR   = false;
 			u32_t ir_code, ir_ts;
 #endif
+			// just to avoid allocating it at every pass
+			if (!header) header = malloc(MAX_HEADER);
+			
 			last = now;
 
 			LOCK_S;
