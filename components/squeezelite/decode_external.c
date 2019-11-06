@@ -35,6 +35,10 @@ extern struct buffer *outputbuf;
 // this is the only system-wide loglevel variable
 extern log_level loglevel;
 
+// not great to have these here, but they should not be in embedded.h
+bool enable_bt_sink;
+bool enable_airplay;
+
 #define RAOP_OUTPUT_SIZE (RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
 
 static raop_event_t	raop_state;

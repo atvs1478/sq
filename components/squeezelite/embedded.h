@@ -1,6 +1,6 @@
 #ifndef EMBEDDED_H
 #define EMBEDDED_H
-#include "esp_system.h"
+
 #include <inttypes.h>
 
 /* 	must provide 
@@ -8,6 +8,7 @@
 		- pthread_create_name
 		- stack size
 		- s16_t, s32_t, s64_t and u64_t
+		- EXT_BSS 
 	can overload (use #define)
 		- exit
 		- gettime_ms
@@ -25,6 +26,7 @@
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
 //#define BASE_CAP "Model=squeezelite,AccuratePlayPoints=0,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION	
+#define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 
 typedef int16_t   s16_t;
 typedef int32_t   s32_t;
@@ -41,10 +43,6 @@ uint32_t 	_gettime_ms_(void);
 int			pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr, 
 				   void *(*start_routine)( void * ), void *arg, char *name);
 			
-// these are here as they can be #define to nothing
-extern bool enable_bt_sink;
-extern bool enable_airplay;
-
 void 		register_external(void);
 void 		deregister_external(void);
 				   
