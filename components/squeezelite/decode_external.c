@@ -35,6 +35,10 @@ extern struct buffer *outputbuf;
 // this is the only system-wide loglevel variable
 extern log_level loglevel;
 
+// not great to have these here, but they should not be in embedded.h
+bool enable_bt_sink;
+bool enable_airplay;
+
 #define RAOP_OUTPUT_SIZE (RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
 
 static raop_event_t	raop_state;
@@ -213,6 +217,7 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 			break;
 		}
 		case RAOP_SETUP:
+			// we need a fair bit of space for RTP process
 			_buf_resize(outputbuf, RAOP_OUTPUT_SIZE);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;
