@@ -48,7 +48,7 @@ extern "C" {
 
 #if RECOVERY_APPLICATION==1
 #elif RECOVERY_APPLICATION==0
-#warning "compiling for squeezelite."
+#pragma message "compiling for squeezelite."
 #else
 #error "unknown configuration"
 #endif
@@ -268,8 +268,8 @@ void  filter_unique( wifi_ap_record_t * aplist, uint16_t * ap_num);
 void wifi_manager( void * pvParameters );
 
 
-char* wifi_manager_get_ap_list_json();
-char* wifi_manager_get_ip_info_json();
+char* wifi_manager_alloc_get_ap_list_json();
+char* wifi_manager_alloc_get_ip_info_json();
 cJSON * wifi_manager_clear_ap_list_json(cJSON **old);
 
 /**

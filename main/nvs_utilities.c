@@ -1,3 +1,4 @@
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "nvs_utilities.h"
 
 #include <stdio.h>
@@ -13,10 +14,78 @@
 #include "esp_vfs_fat.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "nvs_utilities.h"
 
 const char current_namespace[] = "config";
 const char settings_partition[] = "settings";
-static const char * TAG = "platform_esp32";
+static const char * TAG = "nvs_utilities";
+
+void initialize_nvs() {
+	ESP_LOGI(TAG,  "Initializing flash nvs ");
+	esp_err_t err = nvs_flash_init();
+	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_LOGW(TAG,  "%s. Erasing nvs flash", esp_err_to_name(err));
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		err = nvs_flash_init();
+	}
+	if(err != ESP_OK){
+		ESP_LOGE(TAG,  "nvs_flash_init failed. %s.", esp_err_to_name(err));
+	}
+	ESP_ERROR_CHECK(err);
+	ESP_LOGI(TAG,  "Initializing nvs partition %s",settings_partition);
+	err = nvs_flash_init_partition(settings_partition);
+	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_LOGW(TAG,  "%s. Erasing nvs on partition %s",esp_err_to_name(err),settings_partition);
+		ESP_ERROR_CHECK(nvs_flash_erase_partition(settings_partition));
+		err = nvs_flash_init_partition(settings_partition);
+	}
+	if(err!=ESP_OK){
+		ESP_LOGE(TAG,  "nvs_flash_init_partition failed. %s",esp_err_to_name(err));
+	}
+	ESP_ERROR_CHECK(err);
+	ESP_LOGD(TAG,  "nvs init completed");
+}
+
+esp_err_t nvs_load_config(){
+	nvs_entry_info_t info;
+	esp_err_t err = ESP_OK;
+	size_t malloc_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+	size_t malloc_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+
+	nvs_iterator_t it = nvs_entry_find(settings_partition, NULL, NVS_TYPE_ANY);
+	if(it == NULL) {
+		ESP_LOGW(TAG,   "empty nvs partition %s, namespace %s",settings_partition,current_namespace );
+	}
+	while (it != NULL) {
+		nvs_entry_info(it, &info);
+
+		if(strstr(info.namespace_name, current_namespace)) {
+			void * value = get_nvs_value_alloc(info.type,info.key);
+			if(value==NULL)
+			{
+				ESP_LOGE(TAG,  "nvs read failed.");
+				return ESP_FAIL;
+			}
+			config_set_value(info.type, info.key, value);
+			free(value );
+		}
+		it = nvs_entry_next(it);
+	}
+	char * json_string= config_alloc_get_json(false);
+	if(json_string!=NULL) {
+		ESP_LOGD(TAG,  "config json : %s\n", json_string);
+		free(json_string);
+	}
+	ESP_LOGD(TAG,"Config memory usage.  Heap internal:%zu (min:%zu) (used:%zu) external:%zu (min:%zu) (used:%zd)",
+						heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+						malloc_int-heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
+						malloc_spiram -heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	return err;
+}
+
 
 esp_err_t store_nvs_value(nvs_type_t type, const char *key, void * data) {
 	if (type == NVS_TYPE_BLOB)
@@ -61,39 +130,12 @@ esp_err_t store_nvs_value_len(nvs_type_t type, const char *key, void * data,
 	if (err == ESP_OK) {
 		err = nvs_commit(nvs);
 		if (err == ESP_OK) {
-			ESP_LOGI(TAG, "Value stored under key '%s'", key);
+			ESP_LOGI(TAG,   "Value stored under key '%s'", key);
 		}
 	}
 	nvs_close(nvs);
 	return err;
 }
-void nvs_value_set_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
-	free(get_nvs_value_alloc_default(type, key, default_value, blob_size));
-}
-void * get_nvs_value_alloc_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
-	void * current_value = get_nvs_value_alloc(type, key);
-	if(current_value == NULL && default_value != NULL){
-		if(type == NVS_TYPE_BLOB && blob_size == 0){
-			ESP_LOGE(TAG,"Unable to store default value for BLOB object'  blob size was not specified");
-			return NULL;
-		}
-		else {
-			esp_err_t err = store_nvs_value_len(type, key, default_value, blob_size);
-			if(err!=ESP_OK){
-				ESP_LOGE(TAG,"Unable to store default nvs value for key %s. Error: %s", key,esp_err_to_name(err));
-				return NULL;
-			}
-			else{
-				ESP_LOGI(TAG,"Stored new default value for key %s", key);
-			}
-		}
-	}
-	if(current_value == NULL){
-		current_value = get_nvs_value_alloc(type, key);
-	}
-	return current_value;
-}
-
 void * get_nvs_value_alloc(nvs_type_t type, const char *key) {
 	nvs_handle nvs;
 	esp_err_t err;
@@ -101,7 +143,7 @@ void * get_nvs_value_alloc(nvs_type_t type, const char *key) {
 
 	err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READONLY, &nvs);
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG,"Could not open the nvs storage.");
+		ESP_LOGE(TAG,  "Could not open the nvs storage.");
 		return NULL;
 	}
 
@@ -145,7 +187,7 @@ void * get_nvs_value_alloc(nvs_type_t type, const char *key) {
 		}
 	}
 	if(err!=ESP_OK){
-		ESP_LOGD(TAG,"Value not found for key %s",key);
+		ESP_LOGD(TAG,  "Value not found for key %s",key);
 		if(value!=NULL)
 			free(value);
 		value=NULL;
@@ -215,7 +257,7 @@ esp_err_t erase_nvs(const char *key)
         if (err == ESP_OK) {
             err = nvs_commit(nvs);
             if (err == ESP_OK) {
-                ESP_LOGI(TAG, "Value with key '%s' erased", key);
+                ESP_LOGI(TAG,   "Value with key '%s' erased", key);
             }
         }
         nvs_close(nvs);

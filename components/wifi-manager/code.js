@@ -289,14 +289,17 @@ $(document).ready(function(){
             var val = $(this).val();
             if (key != '') {
                 headers["X-Custom-"+key] = val;
-                data[key] = val;
+                data[key] = {};
+                data[key].value = val;
+                data[key].type = 33;
             }
         });
         var key = $("#nvs-new-key").val();
         var val = $("#nvs-new-value").val();
         if (key != '') {
             headers["X-Custom-"+key] = val;
-            data[key] = val;
+            data[key] = {};
+            data[key].value = val;
         }
         $.ajax({
             url: '/config.json',
@@ -454,7 +457,7 @@ $(document).ready(function(){
 
     //start timers
     startCheckStatusInterval();
-    startRefreshAPInterval();
+    //startRefreshAPInterval();
 
     $('[data-toggle="tooltip"]').tooltip({
         html: true,
@@ -718,16 +721,16 @@ function getConfig() {
         Object.keys(data).sort().forEach(function(key, i) {
             if (data.hasOwnProperty(key)) {
                 if (key == 'autoexec') {
-                    if (data["autoexec"] === "1") {
+                    if (data["autoexec"].value === "1") {
                         $("#autoexec-cb")[0].checked=true;
                     } else {
                         $("#autoexec-cb")[0].checked=false;
                     }
                 } else if (key == 'autoexec1') {
-                    $("textarea#autoexec1").val(data[key]);
+                    $("textarea#autoexec1").val(data[key].value);
                 } else if (key == 'host_name') {
-                    $("dhcp-name1").val(data[key]);
-                    $("dhcp-name2").val(data[key]);
+                    $("dhcp-name1").val(data[key].value);
+                    $("dhcp-name2").val(data[key].value);
                 }
 
                 $("tbody#nvsTable").append(
@@ -738,7 +741,7 @@ function getConfig() {
                         "</td>"+
                     "</tr>"
                 );
-                $("input#"+key).val(data[key]);
+                $("input#"+key).val(data[key].value);
             }
         });
         $("tbody#nvsTable").append(

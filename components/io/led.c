@@ -50,7 +50,7 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 }
 
 bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
-	if (!leds[idx].gpio) return false;
+	if (!leds[idx].gpio || leds[idx].gpio<0 ) return false;
 	
 	ESP_LOGD(TAG,"led_blink_core");
 	if (leds[idx].timer) {
@@ -96,7 +96,7 @@ bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 } 
 
 bool led_unpush(int idx) {
-	if (!leds[idx].gpio) return false;
+	if (!leds[idx].gpio || leds[idx].gpio<0) return false;
 	
 	led_blink_core(idx, leds[idx].pushedon, leds[idx].pushedoff, true);
 	leds[idx].pushed = false;
@@ -105,6 +105,10 @@ bool led_unpush(int idx) {
 }	
 
 bool led_config(int idx, gpio_num_t gpio, int onstate) {
+	if(gpio<0){
+		ESP_LOGW(TAG,"LED GPIO not configured");
+		return false;
+	}
 	ESP_LOGD(TAG,"Index %d, GPIO %d, on state %s", idx, gpio, onstate>0?"On":"Off");
 	if (idx >= MAX_LED) return false;
 	leds[idx].gpio = gpio;

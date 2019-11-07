@@ -48,13 +48,13 @@ static void * squeezelite_thread(){
 //  Let's not wait on WiFi to allow squeezelite to run in bluetooth mode
 //	ESP_LOGI(TAG,"Waiting for WiFi.");
 //	while(!wait_for_wifi()){usleep(100000);};
-	ESP_LOGD(TAG ,"Number of args received: %u",thread_parms.argc );
-	ESP_LOGD(TAG ,"Values:");
+	ESP_LOGV(TAG ,"Number of args received: %u",thread_parms.argc );
+	ESP_LOGV(TAG ,"Values:");
     for(int i = 0;i<thread_parms.argc; i++){
-    	ESP_LOGD(TAG ,"     %s",thread_parms.argv[i]);
+    	ESP_LOGV(TAG ,"     %s",thread_parms.argv[i]);
     }
 
-    ESP_LOGD(TAG,"Starting Squeezelite runner Thread");
+    ESP_LOGV(TAG,"Starting Squeezelite runner Thread");
     esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
     cfg.thread_name= "squeezelite-run";
     cfg.inherit_cfg = true;
@@ -80,9 +80,9 @@ static int launchsqueezelite(int argc, char **argv)
 {
 	ESP_LOGV(TAG ,"Begin");
 
-    ESP_LOGD(TAG, "Parameters:");
+	ESP_LOGV(TAG, "Parameters:");
     for(int i = 0;i<argc; i++){
-    	ESP_LOGD(TAG, "     %s",argv[i]);
+    	ESP_LOGV(TAG, "     %s",argv[i]);
     }
     ESP_LOGV(TAG,"Saving args in thread structure");
 
@@ -102,7 +102,7 @@ static int launchsqueezelite(int argc, char **argv)
 		thread_parms.argv[thread_parms.argc++]=strdup("-?");
 	}
 
-    ESP_LOGD(TAG,"Starting Squeezelite Thread");
+	ESP_LOGD(TAG,"Starting Squeezelite Thread");
     esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
     cfg.thread_name= "squeezelite";
     cfg.inherit_cfg = true;

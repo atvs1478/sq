@@ -55,7 +55,7 @@ void process_autoexec(){
 	char * autoexec_value=NULL;
 	uint8_t autoexec_flag=0;
 
-	char * str_flag = get_nvs_value_alloc(NVS_TYPE_STR, "autoexec");
+	char * str_flag = config_alloc_get(NVS_TYPE_STR, "autoexec");
 	if(!bypass_wifi_manager){
 		ESP_LOGW(TAG, "Procesing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
 	}
@@ -65,12 +65,12 @@ void process_autoexec(){
 
 	if(str_flag !=NULL ){
 		autoexec_flag=atoi(str_flag);
-		ESP_LOGI(TAG,"autoexec flag value found with value %u, from string value: %s", autoexec_flag, str_flag);
+		ESP_LOGI(TAG,"autoexec is set to %s auto-process", autoexec_flag>0?"perform":"skip");
 		if(autoexec_flag == 1) {
 			do {
 				snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i++);
 				ESP_LOGD(TAG,"Getting command name %s", autoexec_name);
-				autoexec_value= get_nvs_value_alloc(NVS_TYPE_STR, autoexec_name);
+				autoexec_value= config_alloc_get(NVS_TYPE_STR, autoexec_name);
 				if(autoexec_value!=NULL ){
 					if(!bypass_wifi_manager && strstr(autoexec_value, "join ")!=NULL ){
 						ESP_LOGW(TAG,"Ignoring wifi join command.");
@@ -97,11 +97,7 @@ void process_autoexec(){
 	}
 	else
 	{
-		ESP_LOGD(TAG,"No matching command found for name autoexec. Adding default entries");
-		char autoexec_dft[]="0";
-		char autoexec1_dft[256]="squeezelite -o I2S -b 500:2000 -d all=info -M esp32";
-		store_nvs_value(NVS_TYPE_STR,"autoexec",autoexec_dft);
-		store_nvs_value(NVS_TYPE_STR,"autoexec1",autoexec1_dft);
+		ESP_LOGD(TAG,"No matching command found for name autoexec.");
 	}
 }
 
@@ -262,6 +258,8 @@ static void * console_thread() {
 		run_command(line);
 		/* linenoise allocates line buffer on the heap, so need to free it */
 		linenoiseFree(line);
+		config_commit_to_nvs();
+		taskYIELD();
 	}
 	return NULL;
 }

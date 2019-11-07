@@ -27,6 +27,7 @@
 #include "esp_partition.h"
 #include "esp_ota_ops.h"
 #include "platform_esp32.h"
+#include "nvs_utilities.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -126,6 +127,9 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		}
 		esp_partition_iterator_release(it);
 		if(bFound) {
+			if(!wait_for_commit()){
+				ESP_LOGW(TAG,"Unable to commit configuration. ");
+			}
 			ESP_LOGI(TAG, "Restarting!.");
 			esp_restart();
 		}
@@ -136,6 +140,9 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 
 static int restart(int argc, char **argv)
 {
+	if(!wait_for_commit()){
+		ESP_LOGW(TAG,"Unable to commit configuration. ");
+	}
     ESP_LOGW(TAG, "Restarting");
     esp_restart();
     return 0;
@@ -143,6 +150,10 @@ static int restart(int argc, char **argv)
 
 void simple_restart()
 {
+	if(!wait_for_commit()){
+		ESP_LOGW(TAG,"Unable to commit configuration. ");
+	}
+
 	ESP_LOGW(TAG, "Restarting");
     esp_restart();
 }

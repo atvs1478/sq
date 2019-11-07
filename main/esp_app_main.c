@@ -44,6 +44,8 @@
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"
 #include <math.h>
+#include "config.h"
+
 
 EventGroupHandle_t wifi_event_group;
 bool enable_bt_sink=false;
@@ -52,16 +54,17 @@ bool jack_mutes_amp=false;
 bool bypass_wifi_manager=false;
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)
-
+#define LOCAL_MAC_SIZE 20
 static const char TAG[] = "esp_app_main";
+#define DEFAULT_HOST_NAME "squeezelite"
 char * fwurl = NULL;
 
 #ifdef CONFIG_SQUEEZEAMP
 #define LED_GREEN_GPIO 	12
 #define LED_RED_GPIO	13
 #else
-#define LED_GREEN_GPIO 	0
-#define LED_RED_GPIO	0
+#define LED_GREEN_GPIO 	-1
+#define LED_RED_GPIO	-1
 #endif
 static bool bWifiConnected=false;
 
@@ -96,61 +99,14 @@ bool wait_for_wifi(){
 	}
     return connected;
 }
-static void initialize_nvs() {
-	ESP_LOGI(TAG,"Initializing nvs from flash");
-	esp_err_t err = nvs_flash_init();
-	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-		ESP_LOGW(TAG,"Error %s. Erasing nvs flash", esp_err_to_name(err));
-		ESP_ERROR_CHECK(nvs_flash_erase());
-		err = nvs_flash_init();
-	}
-	ESP_ERROR_CHECK(err);
-	ESP_LOGI(TAG,"Initializing nvs from partition %s",settings_partition);
-	err = nvs_flash_init_partition(settings_partition);
-	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-		ESP_LOGW(TAG,"Error %s. Erasing nvs on partition %s",esp_err_to_name(err),settings_partition);
-		ESP_ERROR_CHECK(nvs_flash_erase_partition(settings_partition));
-		err = nvs_flash_init_partition(settings_partition);
-	}
-	if(err!=ESP_OK){
-		ESP_LOGE(TAG,"nvs init completed with error %s",esp_err_to_name(err));
-	}
-	ESP_ERROR_CHECK(err);
-	ESP_LOGD(TAG,"nvs init completed");
 
-}
 char * process_ota_url(){
-    nvs_handle nvs;
     ESP_LOGI(TAG,"Checking for update url");
-    char * fwurl=get_nvs_value_alloc(NVS_TYPE_STR, "fwurl");
+    char * fwurl=config_alloc_get(NVS_TYPE_STR, "fwurl");
 	if(fwurl!=NULL)
 	{
 		ESP_LOGD(TAG,"Deleting nvs entry for Firmware URL %s", fwurl);
-		esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
-		if (err == ESP_OK) {
-			err = nvs_erase_key(nvs, "fwurl");
-			if (err == ESP_OK) {
-				ESP_LOGD(TAG,"Firmware url erased from nvs.");
-				err = nvs_commit(nvs);
-				if (err == ESP_OK) {
-					ESP_LOGI(TAG, "Value with key '%s' erased", "fwurl");
-					ESP_LOGD(TAG,"nvs erase committed.");
-				}
-				else
-				{
-					ESP_LOGE(TAG,"Unable to commit nvs erase operation. Error : %s.",esp_err_to_name(err));
-				}
-			}
-			else
-			{
-				ESP_LOGE(TAG,"Error : %s. Unable to delete firmware url key.",esp_err_to_name(err));
-			}
-			nvs_close(nvs);
-		}
-		else
-		{
-			ESP_LOGE(TAG,"Error opening nvs: %s. Unable to delete firmware url key.",esp_err_to_name(err));
-		}
+		config_delete_key("fwurl");
 	}
 	return fwurl;
 }
@@ -164,7 +120,7 @@ char * process_ota_url(){
 //CONFIG_WIFI_MANAGER_MAX_RETRY=2
 u16_t get_adjusted_volume(u16_t volume){
 
-	char * str_factor = get_nvs_value_alloc_default(NVS_TYPE_STR, "volumefactor", "3", 0);
+	char * str_factor = config_alloc_get_default(NVS_TYPE_STR, "volumefactor", "3", 0);
 	if(str_factor != NULL ){
 
 		float factor = atof(str_factor);
@@ -175,54 +131,103 @@ u16_t get_adjusted_volume(u16_t volume){
 		ESP_LOGW(TAG,"Error retrieving volume factor.  Returning unmodified volume level. ");
 		return volume;
 	}
-
 }
 
 void register_default_nvs(){
+	uint8_t mac[6];
+	char macStr[LOCAL_MAC_SIZE+1];
+	char default_ap_name[strlen(CONFIG_DEFAULT_AP_SSID)+sizeof(macStr)];
+	char default_host_name[strlen(DEFAULT_HOST_NAME)+sizeof(macStr)];
+	char default_command_line[strlen(CONFIG_DEFAULT_COMMAND_LINE)+sizeof(macStr)];
 
 
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_name", CONFIG_BT_NAME);
-	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_name", CONFIG_BT_NAME, 0);
+	esp_read_mac((uint8_t *)&mac, ESP_MAC_WIFI_STA);
+	snprintf(macStr, LOCAL_MAC_SIZE-1,"-%x%x%x", mac[3], mac[4], mac[5]);
+
+	strcpy(default_ap_name,CONFIG_DEFAULT_AP_SSID);
+	strcat(default_ap_name,macStr);
+
+	strcpy(default_host_name,DEFAULT_HOST_NAME);
+	strcat(default_host_name,macStr);
+
+	if(!strstr(CONFIG_DEFAULT_COMMAND_LINE, "-n %s")){
+		snprintf(default_command_line, sizeof(default_command_line)-1,CONFIG_DEFAULT_COMMAND_LINE,default_host_name);
+	}
+	else{
+		strncpy(default_command_line, CONFIG_DEFAULT_COMMAND_LINE,sizeof(default_command_line)-1);
+		strncat(default_command_line, "-n ",sizeof(default_command_line)-1);
+		strncat(default_command_line, default_host_name,sizeof(default_command_line)-1);
+	}
+
+
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec", "1");
+	config_set_default(NVS_TYPE_STR,"autoexec","1", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec1",default_command_line);
+	config_set_default(NVS_TYPE_STR,"autoexec1",default_command_line,0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "volumefactor", "3");
+	config_set_default(NVS_TYPE_STR, "volumefactor", "3", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", CONFIG_BT_NAME);
+	config_set_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
-	nvs_value_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "host_name", "squeezelite-esp32");
-	nvs_value_set_default(NVS_TYPE_STR, "host_name", "squeezelite-esp32", 0);
+	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "host_name", default_host_name);
+	config_set_default(NVS_TYPE_STR, "host_name", default_host_name, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", SQUEEZELITE_ESP32_RELEASE_URL);
-	nvs_value_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	config_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_address",CONFIG_DEFAULT_AP_IP );
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
+	config_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY );
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
+	config_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK );
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
+	config_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL));
-	nvs_value_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ssid",CONFIG_DEFAULT_AP_SSID );
-	nvs_value_set_default(NVS_TYPE_STR, "ap_ssid",CONFIG_DEFAULT_AP_SSID , 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_password", CONFIG_DEFAULT_AP_PASSWORD);
-	nvs_value_set_default(NVS_TYPE_STR, "ap_password", CONFIG_DEFAULT_AP_PASSWORD, 0);
+	config_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ssid", default_ap_name);
+	config_set_default(NVS_TYPE_STR, "ap_ssid",default_ap_name , 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD);
+	config_set_default(NVS_TYPE_STR, "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_name",CONFIG_AIRPLAY_NAME);
-	nvs_value_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
+	config_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_port", CONFIG_AIRPLAY_PORT);
-	nvs_value_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
+	config_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
-	nvs_value_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
+	config_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_dev_name", CONFIG_A2DP_DEV_NAME);
-	nvs_value_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+	config_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
-	nvs_value_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
-	char * flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
-	enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-	free(flag);
+	char * flag = config_alloc_get_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
+	if(flag !=NULL){
+		enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+		free(flag);
+	}
+	else {
+		ESP_LOGE(TAG,"Unable to get flag 'enable_bt_sink'");
+	}
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
-	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
-	enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-	free(flag);
+	flag = config_alloc_get_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
+	if(flag !=NULL){
+		enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+		free(flag);
+	}
+	else {
+		ESP_LOGE(TAG,"Unable to get flag 'enable_airplay'");
+	}
+
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "jack_mutes_amp", "n");
-	flag = get_nvs_value_alloc_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
-	jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-	free(flag);
+	flag = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
+
+	if(flag !=NULL){
+		jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
+		free(flag);
+	}
+	else {
+		ESP_LOGE(TAG,"Unable to get flag 'jack_mutes_amp'");
+	}
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
@@ -238,6 +243,9 @@ void app_main()
 
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
+	ESP_LOGI(TAG,"Setting up config subsystem.");
+	config_init();
+
 	ESP_LOGD(TAG,"Registering default values");
 	register_default_nvs();
 
@@ -246,7 +254,7 @@ void app_main()
 
 
 	ESP_LOGD(TAG,"Getting value for WM bypass, nvs 'bypass_wm'");
-	char * bypass_wm = get_nvs_value_alloc_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+	char * bypass_wm = config_alloc_get_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 	if(bypass_wm==NULL)
 	{
 		ESP_LOGE(TAG, "Unable to retrieve the Wifi Manager bypass flag");
@@ -257,6 +265,7 @@ void app_main()
 	}
 
 	ESP_LOGD(TAG,"Configuring Green led");
+
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	ESP_LOGD(TAG,"Configuring Red led");
 	led_config(LED_RED, LED_RED_GPIO, 0);

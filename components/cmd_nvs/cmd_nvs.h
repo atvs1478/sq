@@ -7,6 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #pragma once
+#include "nvs_flash.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,7 +15,7 @@ extern "C" {
 
 // Register NVS functions
 void register_nvs();
-
+const char *type_to_str(nvs_type_t type);
 #ifdef __cplusplus
 }
 #endif

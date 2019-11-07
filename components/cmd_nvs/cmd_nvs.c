@@ -91,7 +91,7 @@ static nvs_type_t str_to_type(const char *type)
 
     return NVS_TYPE_ANY;
 }
-static const char *type_to_str(nvs_type_t type)
+const char *type_to_str(nvs_type_t type)
 {
     for (int i = 0; i < TYPE_STR_PAIR_SIZE; i++) {
         const type_str_pair_t *p = &type_str_pair[i];

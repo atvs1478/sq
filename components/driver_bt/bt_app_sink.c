@@ -402,7 +402,7 @@ void bt_sink_init(bt_cmd_cb_t cmd_cb, bt_data_cb_t data_cb)
      */
     esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_FIXED;
 
-    char * pin_code = get_nvs_value_alloc_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+    char * pin_code = config_alloc_get_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
     if(strlen(pin_code)>ESP_BT_PIN_CODE_LEN){
 
     	ESP_LOGW(BT_AV_TAG, "BT Sink pin code [%s] too long. ", pin_code);
@@ -487,7 +487,7 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
     switch (event) {
     case BT_APP_EVT_STACK_UP: {
         /* set up device name */
-		bt_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
+		bt_name = (char * )config_alloc_get_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
 		esp_bt_dev_set_device_name(bt_name);
 		free(bt_name);
         esp_bt_gap_register_callback(bt_app_gap_cb);

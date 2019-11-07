@@ -166,7 +166,7 @@ void hal_bluetooth_init(const char * options)
 	}
 	if(squeezelite_args.sink_name->count == 0)
 	{
-		squeezelite_conf.sink_name = get_nvs_value_alloc_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
+		squeezelite_conf.sink_name = config_alloc_get_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
     	if(squeezelite_conf.sink_name  == NULL){
     		ESP_LOGW(TAG,"Unable to retrieve the a2dp sink name from nvs");
     		squeezelite_conf.sink_name = strdup(CONFIG_A2DP_SINK_NAME);
@@ -511,7 +511,7 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
         /* set up device name */
 
 
-        char * a2dp_dev_name = 	get_nvs_value_alloc_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+        char * a2dp_dev_name = 	config_alloc_get_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
     	if(a2dp_dev_name  == NULL){
     		ESP_LOGW(TAG,"Unable to retrieve the a2dp device name from nvs");
     		esp_bt_dev_set_device_name(CONFIG_A2DP_DEV_NAME);
