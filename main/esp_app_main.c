@@ -150,14 +150,10 @@ void register_default_nvs(){
 	strcpy(default_host_name,DEFAULT_HOST_NAME);
 	strcat(default_host_name,macStr);
 
-	if(!strstr(CONFIG_DEFAULT_COMMAND_LINE, "-n %s")){
-		snprintf(default_command_line, sizeof(default_command_line)-1,CONFIG_DEFAULT_COMMAND_LINE,default_host_name);
-	}
-	else{
-		strncpy(default_command_line, CONFIG_DEFAULT_COMMAND_LINE,sizeof(default_command_line)-1);
-		strncat(default_command_line, "-n ",sizeof(default_command_line)-1);
-		strncat(default_command_line, default_host_name,sizeof(default_command_line)-1);
-	}
+
+	strncpy(default_command_line, CONFIG_DEFAULT_COMMAND_LINE,sizeof(default_command_line)-1);
+	strncat(default_command_line, " -n ",sizeof(default_command_line)-1);
+	strncat(default_command_line, default_host_name,sizeof(default_command_line)-1);
 
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec", "1");

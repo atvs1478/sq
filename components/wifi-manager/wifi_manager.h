@@ -54,7 +54,6 @@ extern "C" {
 #endif
 
 
-#define DEFAULT_COMMAND_LINE  CONFIG_DEFAULT_COMMAND_LINE
 
 /**
  * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.

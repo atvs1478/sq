@@ -247,7 +247,6 @@ void wifi_manager_init_wifi(){
     taskYIELD();
     ESP_LOGD(TAG,   "Initializing wifi. done");
 }
-
 void wifi_manager_start(){
 
 
@@ -259,6 +258,7 @@ void wifi_manager_start(){
 	wifi_manager_sta_ip_mutex = xSemaphoreCreateMutex();
 
 	ESP_LOGD(TAG,   "wifi_manager_start.  Creating access point json structure");
+
 	accessp_cjson = NULL;
 	accessp_cjson = wifi_manager_clear_ap_list_json(&accessp_cjson);
 	ip_info_json = NULL;

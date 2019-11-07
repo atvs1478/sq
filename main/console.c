@@ -258,7 +258,6 @@ static void * console_thread() {
 		run_command(line);
 		/* linenoise allocates line buffer on the heap, so need to free it */
 		linenoiseFree(line);
-		config_commit_to_nvs();
 		taskYIELD();
 	}
 	return NULL;

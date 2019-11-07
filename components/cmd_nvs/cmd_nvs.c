@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -494,8 +494,7 @@ static int list_entries(int argc, char **argv)
 }
 void register_nvs()
 {
-	esp_log_level_set(TAG, ESP_LOG_VERBOSE);
-    set_args.key = arg_str1(NULL, NULL, "<key>", "key of the value to be set");
+	set_args.key = arg_str1(NULL, NULL, "<key>", "key of the value to be set");
     set_args.type = arg_str1(NULL, NULL, "<type>", ARG_TYPE_STR);
     set_args.value = arg_str1("v", "value", "<value>", "value to be stored");
     set_args.end = arg_end(2);

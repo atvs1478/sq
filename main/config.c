@@ -44,13 +44,13 @@
 #define CONFIG_COMMIT_DELAY 1000
 #define LOCK_MAX_WAIT 20*CONFIG_COMMIT_DELAY
 static const char * TAG = "config";
-cJSON * nvs_json=NULL;
-TimerHandle_t timer;
-SemaphoreHandle_t config_mutex = NULL;
-EventGroupHandle_t config_group;
+static cJSON * nvs_json=NULL;
+static TimerHandle_t timer;
+static SemaphoreHandle_t config_mutex = NULL;
+static EventGroupHandle_t config_group;
 /* @brief indicate that the ESP32 is currently connected. */
-const int CONFIG_PENDING_CHANGE_BIT = BIT0;
-const int CONFIG_LOAD_BIT = BIT1;
+static const int CONFIG_PENDING_CHANGE_BIT = BIT0;
+static const int CONFIG_LOAD_BIT = BIT1;
 
 bool config_lock(TickType_t xTicksToWait);
 void config_unlock();
@@ -62,12 +62,38 @@ cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value
 static void vCallbackFunction( TimerHandle_t xTimer );
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 
+static void * malloc_fn(size_t sz){
+	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
+	if(ptr==NULL){
+		ESP_LOGE(TAG,"malloc_fn:  unable to allocate memory!");
+	}
+	return ptr;
+}
+static void * free_fn(void * ptr){
+	if(ptr!=NULL){
+		free(ptr);
+	}
+	else {
+		ESP_LOGW(TAG,"free_fn: Cannot free null pointer!");
+	}
+	return NULL;
+}
+void init_cJSON(){
+	static cJSON_Hooks hooks;
+	// initialize cJSON hooks it uses SPIRAM memory
+	// as opposed to IRAM
+	hooks.malloc_fn=&malloc_fn;
+    hooks.free_fn=&free_fn;
+	cJSON_InitHooks(&hooks);
+}
 void config_init(){
 	ESP_LOGD(TAG, "Creating mutex for Config");
 	config_mutex = xSemaphoreCreateMutex();
 	ESP_LOGD(TAG, "Creating event group");
 	config_group = xEventGroupCreate();
 	ESP_LOGD(TAG, "Loading config from nvs");
+
+	init_cJSON();
 	if(nvs_json !=NULL){
 		cJSON_Delete(nvs_json);
 	}
@@ -154,7 +180,6 @@ cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value
 			else {
 				ESP_LOGD(TAG,"Failed to print entry");
 			}
-			cJSON_Delete(chg_flag);
 			ESP_LOGI(TAG, "Setting changed flag config [%s]", key);
 			config_set_entry_changed_flag(entry,true);
 			ESP_LOGI(TAG, "Updating config [%s]", key);
@@ -195,28 +220,35 @@ nvs_type_t config_get_entry_type(cJSON * entry){
 	return entry_type->valuedouble;
 }
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag){
+	ESP_LOGV(TAG, "config_set_entry_changed_flag: begin");
 	if(entry==NULL){
 		ESP_LOGE(TAG,"null pointer received!");
 		return;
 	}
 	bool bIsConfigLoading=((xEventGroupGetBits(config_group) & CONFIG_LOAD_BIT)!=0);
 	bool changedFlag=bIsConfigLoading?false:flag;
+	ESP_LOGV(TAG, "config_set_entry_changed_flag: retrieving chg flag from entry");
 	cJSON * changed = cJSON_GetObjectItemCaseSensitive(entry, "chg");
 	if(changed ==NULL ) {
-		ESP_LOGV(TAG, "Adding change flag. ");
+		ESP_LOGV(TAG, "config_set_entry_changed_flag: chg flag not found. Adding. ");
 		cJSON_AddBoolToObject(entry,"chg",changedFlag);
 	}
 	else {
+		ESP_LOGV(TAG, "config_set_entry_changed_flag: Existing change flag found. ");
 		if(cJSON_IsTrue(changed) && changedFlag){
 			ESP_LOGW(TAG, "Commit flag not changed!");
 		}
 		else{
-			ESP_LOGV(TAG, "Updating change flag to %s",changedFlag?"TRUE":"FALSE");
-			cJSON_Delete(changed);
-			cJSON_AddBoolToObject(entry,"chg",changedFlag);
+			ESP_LOGV(TAG, "config_set_entry_changed_flag: Updating change flag to %s",changedFlag?"TRUE":"FALSE");
+			changed->type = changedFlag?cJSON_True:cJSON_False ;
 		}
 	}
-	if(changedFlag) config_raise_change(true);
+
+	if(changedFlag) {
+		ESP_LOGV(TAG, "config_set_entry_changed_flag: Calling config_raise_change. ");
+		config_raise_change(true);
+	}
+	ESP_LOGV(TAG, "config_set_entry_changed_flag: done. ");
 }
 cJSON_bool config_is_entry_changed(cJSON * entry){
 	if(entry==NULL){
@@ -427,12 +459,16 @@ void config_unlock() {
 }
 
 static void vCallbackFunction( TimerHandle_t xTimer ) {
+	static int cnt=0;
 	if(config_has_changes()){
 		ESP_LOGI(TAG, "configuration has some uncommitted entries");
 		config_commit_to_nvs();
 	}
 	else{
-		ESP_LOGV(TAG,"commit timer: commit flag not set");
+		if(++cnt>=15){
+			ESP_LOGV(TAG,"commit timer: commit flag not set");
+			cnt=0;
+		}
 	}
 	xTimerReset( xTimer, 10 );
 }
