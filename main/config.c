@@ -49,7 +49,7 @@ static TimerHandle_t timer;
 static SemaphoreHandle_t config_mutex = NULL;
 static EventGroupHandle_t config_group;
 /* @brief indicate that the ESP32 is currently connected. */
-static const int CONFIG_PENDING_CHANGE_BIT = BIT0;
+static const int CONFIG_NO_COMMIT_PENDING = BIT0;
 static const int CONFIG_LOAD_BIT = BIT1;
 
 bool config_lock(TickType_t xTicksToWait);
@@ -170,7 +170,7 @@ cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value
 			ESP_LOGV(TAG,"Failed to print existing entry");
 		}
 		// set commit flag as equal so we can compare
-		cJSON * chg_flag =cJSON_AddBoolToObject(entry,"chg",config_is_entry_changed(existing));
+		cJSON_AddBoolToObject(entry,"chg",config_is_entry_changed(existing));
 		if(!cJSON_Compare(entry,existing,false)){
 			char * entry_str = cJSON_PrintUnformatted(entry);
 			if(entry_str!=NULL){
@@ -421,24 +421,23 @@ void config_commit_to_nvs(){
 	config_unlock();
 }
 bool config_has_changes(){
-	return  (xEventGroupGetBits(config_group) & CONFIG_PENDING_CHANGE_BIT)!=0;
+	return  (xEventGroupGetBits(config_group) & CONFIG_NO_COMMIT_PENDING)==0;
 }
 
 
 bool wait_for_commit(){
-	bool needs_commit=(xEventGroupGetBits(config_group) & CONFIG_PENDING_CHANGE_BIT)!=0;
-	if(needs_commit){
-		ESP_LOGD(TAG,"Waiting for config commit ...");
-		needs_commit = (xEventGroupWaitBits(config_group, CONFIG_PENDING_CHANGE_BIT,pdFALSE, pdTRUE, (CONFIG_COMMIT_DELAY*5) / portTICK_PERIOD_MS) & CONFIG_PENDING_CHANGE_BIT)!=0;
-		if(needs_commit){
-			ESP_LOGE(TAG,"Timeout waiting for config commit.");
+	bool commit_pending=(xEventGroupGetBits(config_group) & CONFIG_NO_COMMIT_PENDING)==0;
+	while (commit_pending){
+		ESP_LOGW(TAG,"Waiting for config commit ...");
+		commit_pending = (xEventGroupWaitBits(config_group, CONFIG_NO_COMMIT_PENDING,pdFALSE, pdTRUE, (CONFIG_COMMIT_DELAY*2) / portTICK_PERIOD_MS) & CONFIG_NO_COMMIT_PENDING)==0;
+		if(commit_pending){
+			ESP_LOGW(TAG,"Timeout waiting for config commit.");
 	    }
-	    else
-	    {
+	    else {
 	    	ESP_LOGI(TAG,"Config committed!");
 	    }
 	}
-	return needs_commit;
+	return commit_pending;
 }
 
 bool config_lock(TickType_t xTicksToWait) {
@@ -472,16 +471,16 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 	}
 	xTimerReset( xTimer, 10 );
 }
-void config_raise_change(bool flag){
-	if(config_set_group_bit(CONFIG_PENDING_CHANGE_BIT,flag))
+void config_raise_change(bool change_found){
+	if(config_set_group_bit(CONFIG_NO_COMMIT_PENDING,!change_found))
 	{
-		ESP_LOGD(TAG,"Config change indicator was %s",flag?"Set":"Cleared");
+		ESP_LOGD(TAG,"Config commit set to %s",change_found?"Pending Commit":"Committed");
 	}
 }
 bool config_set_group_bit(int bit_num,bool flag){
 	bool result = true;
 	int curFlags=xEventGroupGetBits(config_group);
-	if((curFlags & CONFIG_LOAD_BIT) && bit_num == CONFIG_PENDING_CHANGE_BIT ){
+	if((curFlags & CONFIG_LOAD_BIT) && bit_num == CONFIG_NO_COMMIT_PENDING ){
 		ESP_LOGD(TAG,"Loading config, ignoring changes");
 		result = false;
 	}
