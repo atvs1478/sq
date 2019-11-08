@@ -44,11 +44,18 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "freertos/task.h"
 #include "config.h"
 
+#define HTTP_STACK_SIZE	(5*1024)
 
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
+static StaticTask_t task_http_buffer;
+#if RECOVERY_APPLICATION
+static StackType_t task_http_stack[HTTP_STACK_SIZE];
+#else
+static StackType_t EXT_RAM_ATTR task_http_stack[HTTP_STACK_SIZE];
+#endif
 SemaphoreHandle_t http_server_config_mutex = NULL;
 
 /**
@@ -88,7 +95,8 @@ const static char http_redirect_hdr_end[] = "/\n\n";
 void http_server_start() {
 	ESP_LOGD(TAG,  "http_server_start ");
 	if(task_http_server == NULL) {
-		xTaskCreate(&http_server, "http_server", 1024*5, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_http_server);
+		task_http_server = xTaskCreateStatic( (TaskFunction_t) &http_server, "http_server", HTTP_STACK_SIZE, NULL, 
+										 WIFI_MANAGER_TASK_PRIORITY, task_http_stack, &task_http_buffer);
 	}
 }
 void http_server(void *pvParameters) {
