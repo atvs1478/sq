@@ -132,44 +132,46 @@ u16_t get_adjusted_volume(u16_t volume){
 		return volume;
 	}
 }
-
+#define DEFAULT_NAME_WITH_MAC(var,defval) char var[strlen(defval)+sizeof(macStr)]; strcpy(var,defval); strcat(var,macStr)
 void register_default_nvs(){
 	uint8_t mac[6];
 	char macStr[LOCAL_MAC_SIZE+1];
-	char default_ap_name[strlen(CONFIG_DEFAULT_AP_SSID)+sizeof(macStr)];
-	char default_host_name[strlen(DEFAULT_HOST_NAME)+sizeof(macStr)];
 	char default_command_line[strlen(CONFIG_DEFAULT_COMMAND_LINE)+sizeof(macStr)];
-
 
 	esp_read_mac((uint8_t *)&mac, ESP_MAC_WIFI_STA);
 	snprintf(macStr, LOCAL_MAC_SIZE-1,"-%x%x%x", mac[3], mac[4], mac[5]);
 
-	strcpy(default_ap_name,CONFIG_DEFAULT_AP_SSID);
-	strcat(default_ap_name,macStr);
 
-	strcpy(default_host_name,DEFAULT_HOST_NAME);
-	strcat(default_host_name,macStr);
+	DEFAULT_NAME_WITH_MAC(default_bt_name,CONFIG_BT_NAME);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", default_bt_name);
+	config_set_default(NVS_TYPE_STR, "bt_name", default_bt_name, 0);
 
+	DEFAULT_NAME_WITH_MAC(default_host_name,DEFAULT_HOST_NAME);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "host_name", default_host_name);
+	config_set_default(NVS_TYPE_STR, "host_name", default_host_name, 0);
+
+	DEFAULT_NAME_WITH_MAC(default_airplay_name,CONFIG_AIRPLAY_NAME);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_name",default_airplay_name);
+	config_set_default(NVS_TYPE_STR, "airplay_name",default_airplay_name , 0);
+
+	DEFAULT_NAME_WITH_MAC(default_ap_name,CONFIG_DEFAULT_AP_SSID);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ssid", default_ap_name);
+	config_set_default(NVS_TYPE_STR, "ap_ssid",default_ap_name , 0);
 
 	strncpy(default_command_line, CONFIG_DEFAULT_COMMAND_LINE,sizeof(default_command_line)-1);
 	strncat(default_command_line, " -n ",sizeof(default_command_line)-1);
 	strncat(default_command_line, default_host_name,sizeof(default_command_line)-1);
 
-
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec", "1");
 	config_set_default(NVS_TYPE_STR,"autoexec","1", 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec1",default_command_line);
 	config_set_default(NVS_TYPE_STR,"autoexec1",default_command_line,0);
-
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "volumefactor", "3");
 	config_set_default(NVS_TYPE_STR, "volumefactor", "3", 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", CONFIG_BT_NAME);
-	config_set_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
-
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
+	config_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
 	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "host_name", default_host_name);
-	config_set_default(NVS_TYPE_STR, "host_name", default_host_name, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", SQUEEZELITE_ESP32_RELEASE_URL);
 	config_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_address",CONFIG_DEFAULT_AP_IP );
@@ -180,16 +182,10 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL));
 	config_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ssid", default_ap_name);
-	config_set_default(NVS_TYPE_STR, "ap_ssid",default_ap_name , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD);
 	config_set_default(NVS_TYPE_STR, "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD, 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_name",CONFIG_AIRPLAY_NAME);
-	config_set_default(NVS_TYPE_STR, "airplay_name",CONFIG_AIRPLAY_NAME , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_port", CONFIG_AIRPLAY_PORT);
 	config_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
-	config_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_dev_name", CONFIG_A2DP_DEV_NAME);
 	config_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
