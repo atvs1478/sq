@@ -6,6 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -37,7 +38,7 @@
 
 #include "esp_ota_ops.h"
 
-#define OTA_FLASH_ERASE_BLOCK (1024*100)
+#define OTA_FLASH_ERASE_BLOCK (4096*100)
 static const char *TAG = "squeezelite-ota";
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
@@ -205,6 +206,7 @@ esp_err_t _erase_last_boot_app_partition(void)
 {
 	uint16_t num_passes=0;
 	uint16_t remain_size=0;
+	uint16_t single_pass_size=0;
     const esp_partition_t *ota_partition=NULL;
     const esp_partition_t *ota_data_partition=NULL;
 	esp_err_t err=ESP_OK;
@@ -246,14 +248,17 @@ esp_err_t _erase_last_boot_app_partition(void)
 	}
 	ESP_LOGI(TAG,"Erasing flash ");
 	num_passes=ota_partition->size/OTA_FLASH_ERASE_BLOCK;
+	single_pass_size= ota_partition->size/num_passes;
+
 	remain_size=ota_partition->size-(num_passes*OTA_FLASH_ERASE_BLOCK);
 
 	for(uint16_t i=0;i<num_passes;i++){
-		err=esp_partition_erase_range(ota_partition, 0, ota_partition->size);
-		ESP_LOGD(TAG,"Erasing flash (%u%%)",i/num_passes);
-		triggerStatusJsonRefresh(i%5==0?true:false,"Erasing flash (%u/%u)",i,num_passes);
-		taskYIELD();
+		err=esp_partition_erase_range(ota_partition, i*single_pass_size, single_pass_size);
 		if(err!=ESP_OK) return err;
+		ESP_LOGD(TAG,"Erasing flash (%u%%)",i/num_passes);
+		ESP_LOGD(TAG,"Pass %d of %d, with chunks of %d bytes, from %d to %d", i+1, num_passes,single_pass_size,i*single_pass_size,i*single_pass_size+single_pass_size);
+		triggerStatusJsonRefresh(i%2==0?true:false,"Erasing flash (%u/%u)",i,num_passes);
+		taskYIELD();
 	}
 	if(remain_size>0){
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);

@@ -437,7 +437,7 @@ bool wait_for_commit(){
 	    	ESP_LOGI(TAG,"Config committed!");
 	    }
 	}
-	return commit_pending;
+	return !commit_pending;
 }
 
 bool config_lock(TickType_t xTicksToWait) {
@@ -564,6 +564,12 @@ void config_delete_key(const char *key){
 	if(entry !=NULL){
 		ESP_LOGI(TAG, "Removing config key [%s]", entry->string);
 		cJSON_Delete(entry);
+		char * struc_str = cJSON_PrintUnformatted(nvs_json);
+		if(struc_str!=NULL){
+			ESP_LOGV(TAG, "Structure after delete \n%s", struc_str);
+			free(struc_str);
+		}
+
 	}
 	else {
 		ESP_LOGW(TAG, "Unable to remove config key [%s]: not found.", key);

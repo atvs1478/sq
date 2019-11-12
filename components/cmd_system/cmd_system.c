@@ -102,6 +102,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		return ESP_OK;
 	}
 #endif
+	esp_err_t err = ESP_OK;
 	bool bFound=false;
     ESP_LOGI(TAG, "Looking for partition type %u",partition_subtype);
     const esp_partition_t *partition;
@@ -115,10 +116,17 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 	{
 		partition = (esp_partition_t *) esp_partition_get(it);
 		if(partition != NULL){
-			ESP_LOGI(TAG, "Found partition type %u",partition_subtype);
-			esp_ota_set_boot_partition(partition);
-			bFound=true;
-			set_status_message(WARNING, "Rebooting!");
+			ESP_LOGI(TAG, "Found application partition sub type %u",partition_subtype);
+			err=esp_ota_set_boot_partition(partition);
+			if(err!=ESP_OK){
+				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));
+				set_status_message(ERROR, "Unable to select partition for reboot.");
+			}
+			else{
+				bFound=true;
+				set_status_message(WARNING, "Rebooting!");
+			}
+
 		}
 		else
 		{

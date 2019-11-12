@@ -232,7 +232,6 @@ void app_main()
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 
-
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
 	ESP_LOGI(TAG,"Setting up config subsystem.");
@@ -275,15 +274,18 @@ void app_main()
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 	}
-
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
+#if RECOVERY_APPLICATION
 		while(!bWifiConnected){
 			wait_for_wifi();
 			taskYIELD();
 		}
 		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
 		start_ota(fwurl, true);
+#else
+		ESP_LOGE(TAG,"Restarted to application partition. We're not going to perform OTA!");
+#endif
 		free(fwurl);
 	}
 }
