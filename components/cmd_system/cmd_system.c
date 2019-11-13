@@ -6,14 +6,13 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include "esp_log.h"
 #include "esp_console.h"
 #include "esp_system.h"
-#include "esp_sleep.h"
 #include "esp_spi_flash.h"
 #include "driver/rtc_io.h"
 #include "driver/uart.h"
@@ -28,13 +27,15 @@
 #include "esp_ota_ops.h"
 #include "platform_esp32.h"
 #include "nvs_utilities.h"
+#include "esp_sleep.h"
+#include "driver/uart.h"            // for the uart driver access
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
 #endif
 
 
-static const char * TAG = "platform_esp32";
+static const char * TAG = "cmd_system";
 
 static void register_free();
 static void register_heap();
@@ -43,6 +44,7 @@ static void register_restart();
 static void register_deep_sleep();
 static void register_light_sleep();
 static void register_factory_boot();
+static void register_restart_ota();
 #if WITH_TASKS_INFO
 static void register_tasks();
 #endif
@@ -56,6 +58,7 @@ void register_system()
     register_deep_sleep();
     register_light_sleep();
     register_factory_boot();
+    register_restart_ota();
 #if WITH_TASKS_INFO
     register_tasks();
 #endif
@@ -99,6 +102,17 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 #if RECOVERY_APPLICATION
 	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
 		ESP_LOGW(TAG,"RECOVERY application is already active");
+		ESP_LOGW(TAG, "Restarting after tx complete");
+		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		esp_restart();
+		return ESP_OK;
+	}
+#else
+	if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
+		ESP_LOGW(TAG,"SQUEEZELITE application is already active");
+		ESP_LOGW(TAG, "Restarting after tx complete");
+		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		esp_restart();
 		return ESP_OK;
 	}
 #endif
@@ -115,30 +129,36 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 	else
 	{
 		partition = (esp_partition_t *) esp_partition_get(it);
+		ESP_LOGD(TAG, "Releasing partition iterator");
+		esp_partition_iterator_release(it);
 		if(partition != NULL){
 			ESP_LOGI(TAG, "Found application partition %s sub type %u", partition->label,partition_subtype);
 			err=esp_ota_set_boot_partition(partition);
 			if(err!=ESP_OK){
 				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));
+				bFound=false;
 				set_status_message(ERROR, "Unable to select partition for reboot.");
 			}
 			else{
+				ESP_LOGW(TAG, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);
 				bFound=true;
 				set_status_message(WARNING, "Rebooting!");
 			}
-
 		}
 		else
 		{
 			ESP_LOGE(TAG,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
 			set_status_message(ERROR, "Partition not found.");
 		}
-		esp_partition_iterator_release(it);
+		ESP_LOGD(TAG, "Yielding to other processes");
+		taskYIELD();
 		if(bFound) {
+			ESP_LOGW(TAG,"Configuration %s changes. ",config_has_changes()?"has":"does not have");
 			if(!wait_for_commit()){
 				ESP_LOGW(TAG,"Unable to commit configuration. ");
 			}
-			ESP_LOGI(TAG, "Restarting!.");
+			ESP_LOGW(TAG, "Restarting after tx complete");
+			uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
 			esp_restart();
 		}
 	}
@@ -148,37 +168,48 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 
 static int restart(int argc, char **argv)
 {
+	ESP_LOGW(TAG, "\n\nPerforming a simple restart to the currently active partition.");
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
-    ESP_LOGW(TAG, "Restarting");
+	ESP_LOGW(TAG, "Restarting after tx complete");
+    uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
     esp_restart();
     return 0;
 }
 
 void simple_restart()
 {
+	ESP_LOGW(TAG,"\n\n Called to perform a simple system reboot.");
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
 
-	ESP_LOGW(TAG, "Restarting");
+	ESP_LOGW(TAG, "Restarting after tx complete");
+	uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
     esp_restart();
 }
 
 esp_err_t guided_restart_ota(){
+	ESP_LOGW(TAG,"\n\nCalled for a reboot to OTA Application");
     guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
-    // If we're still alive, then there may not be an ota partition to boot from
-    guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 esp_err_t guided_factory(){
+	ESP_LOGW(TAG,"\n\nCalled for a reboot to recovery application");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 static int restart_factory(int argc, char **argv)
 {
+	ESP_LOGW(TAG, "Executing guided boot into recovery");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
+	return 0; // return fail.  This should never return... we're rebooting!
+}
+static int restart_ota(int argc, char **argv)
+{
+	ESP_LOGW(TAG, "Executing guided boot into ota app 0");
+	guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
 static void register_restart()
@@ -188,6 +219,16 @@ static void register_restart()
         .help = "Software reset of the chip",
         .hint = NULL,
         .func = &restart,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+static void register_restart_ota()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "restart_ota",
+        .help = "Selects the ota app partition to boot from and performa a software reset of the chip",
+        .hint = NULL,
+        .func = &restart_ota,
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }

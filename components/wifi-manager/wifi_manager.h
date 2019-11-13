@@ -200,9 +200,23 @@ typedef enum message_code_t {
 	EVENT_SCAN_DONE = 13,
 	EVENT_STA_GOT_IP = 14,
 	EVENT_REFRESH_OTA = 15,
-	MESSAGE_CODE_COUNT = 16 /* important for the callback array */
+	ORDER_RESTART_OTA = 16,
+	ORDER_RESTART_RECOVERY = 17,
+	ORDER_RESTART_OTA_URL = 18,
+	ORDER_RESTART = 19,
+	MESSAGE_CODE_COUNT = 20 /* important for the callback array */
 
 }message_code_t;
+
+typedef enum reboot_type_t{
+	OTA,
+	RECOVERY,
+	RESTART,
+} reboot_type_t;
+void wifi_manager_reboot(reboot_type_t rtype);
+void wifi_manager_reboot_ota(char * url);
+
+
 
 /**
  * @brief simplified reason codes for a lost connection.

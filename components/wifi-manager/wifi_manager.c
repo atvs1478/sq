@@ -61,6 +61,7 @@ Contains the freeRTOS task and all necessary support
 #include "driver/adc.h"
 #include "cJSON.h"
 #include "nvs_utilities.h"
+#include "cmd_system.h"
 
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0
@@ -218,6 +219,35 @@ void wifi_manager_scan_async(){
 }
 
 void wifi_manager_disconnect_async(){
+	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
+	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
+}
+
+void wifi_manager_reboot_ota(char * url){
+	if(url == NULL){
+		wifi_manager_send_message(ORDER_RESTART_OTA, NULL);
+	}
+	else {
+		wifi_manager_send_message(ORDER_RESTART_OTA_URL,strdup(url) );
+	}
+
+}
+
+void wifi_manager_reboot(reboot_type_t rtype){
+	switch (rtype) {
+	case OTA:
+		wifi_manager_send_message(ORDER_RESTART_OTA, NULL);
+		break;
+	case RECOVERY:
+		wifi_manager_send_message(ORDER_RESTART_RECOVERY, NULL);
+		break;
+	case RESTART:
+		wifi_manager_send_message(ORDER_RESTART, NULL);
+		break;
+		default:
+			ESP_LOGE(TAG,"Unknown reboot type %d", rtype);
+			break;
+	}
 	wifi_manager_send_message(ORDER_DISCONNECT_STA, NULL);
 	//xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_WIFI_DISCONNECT_BIT); TODO: delete
 }
@@ -1432,6 +1462,20 @@ void wifi_manager( void * pvParameters ){
 				/* callback */
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 
+				break;
+			case  ORDER_RESTART_OTA:
+				guided_restart_ota();
+				break;
+			case  ORDER_RESTART_OTA_URL:
+				start_ota(msg.param,false);
+				free(msg.param);
+				break;
+
+			case  ORDER_RESTART_RECOVERY:
+				guided_factory();
+				break;
+			case	ORDER_RESTART:
+				simple_restart();
 				break;
 			default:
 				break;

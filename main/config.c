@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "config.h"
 #include "nvs_utilities.h"
 
@@ -565,7 +565,7 @@ void config_delete_key(const char *key){
 		ESP_LOGV(TAG, "Structure before delete \n%s", struc_str);
 		free(struc_str);
 	}
-	cJSON * entry = cJSON_GetObjectItemCaseSensitive(nvs_json, key);
+	cJSON * entry = cJSON_DetachItemFromObjectCaseSensitive(nvs_json, key);
 	if(entry !=NULL){
 		ESP_LOGI(TAG, "Removing config key [%s]", entry->string);
 		cJSON_Delete(entry);
@@ -574,7 +574,6 @@ void config_delete_key(const char *key){
 			ESP_LOGV(TAG, "Structure after delete \n%s", struc_str);
 			free(struc_str);
 		}
-
 	}
 	else {
 		ESP_LOGW(TAG, "Unable to remove config key [%s]: not found.", key);

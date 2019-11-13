@@ -474,11 +474,8 @@ void http_server_netconn_serve(struct netconn *conn) {
 							ESP_LOGW(TAG,   "Starting process OTA for url %s",otaURL);
 #else
 							ESP_LOGW(TAG,   "Restarting system to process OTA for url %s",otaURL);
-							// close the connection cleanly
-							netconn_close(conn);
-							netconn_delete(conn);
 #endif
-							start_ota(otaURL,false);
+							wifi_manager_reboot_ota(otaURL);
 							free(otaURL);
 						}
 					}
@@ -537,23 +534,23 @@ void http_server_netconn_serve(struct netconn *conn) {
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 					netconn_close(conn);
 					netconn_delete(conn);
-					guided_restart_ota();
+					wifi_manager_reboot(OTA);
 					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST reboot.json");
 				}
 				else if(strstr(line, "POST /reboot.json ")) {
-					ESP_LOGI(TAG,   "http_server_netconn_serve: POST restart.json");
+					ESP_LOGI(TAG,   "http_server_netconn_serve: POST reboot.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 					netconn_close(conn);
 					netconn_delete(conn);
-					simple_restart();
-					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST restart.json");
+					wifi_manager_reboot(RESTART);
+					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST reboot.json");
 				}
 				else if(strstr(line, "POST /recovery.json ")) {
 					ESP_LOGI(TAG,   "http_server_netconn_serve: POST recovery.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
 					netconn_close(conn);
 					netconn_delete(conn);
-					guided_factory();
+					wifi_manager_reboot(RECOVERY);
 					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST recovery.json");
 				}
 				else if(strstr(line, "GET /status.json ")) {

@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -175,8 +175,10 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 				uint32_t elapsed_ms= (tv.tv_sec-ota_status.OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status.OTA_start.tv_usec)/1000;
 				ESP_LOGI(TAG,"OTA progress : %d/%d (%d pct), %d KB/s", ota_status.ota_actual_len, ota_status.ota_total_len, ota_status.newpct, elapsed_ms>0?ota_status.ota_actual_len*1000/elapsed_ms/1024:0);
 				wifi_manager_refresh_ota_json();
+
 				ota_status.lastpct=ota_status.newpct;
 			}
+			taskYIELD();
         }
         break;
     case HTTP_EVENT_ON_FINISH:

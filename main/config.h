@@ -10,7 +10,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-bool config_has_uncommitted();
+bool config_has_changes();
 void config_commit_to_nvs();
 void config_start_timer();
 void config_init();
