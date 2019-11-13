@@ -83,7 +83,7 @@ void init_cJSON(){
 	// initialize cJSON hooks it uses SPIRAM memory
 	// as opposed to IRAM
 	hooks.malloc_fn=&malloc_fn;
-    hooks.free_fn=&free_fn;
+    //hooks.free_fn=&free_fn;
 	cJSON_InitHooks(&hooks);
 }
 void config_init(){
