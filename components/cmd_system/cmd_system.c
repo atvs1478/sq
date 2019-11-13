@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -116,7 +116,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 	{
 		partition = (esp_partition_t *) esp_partition_get(it);
 		if(partition != NULL){
-			ESP_LOGI(TAG, "Found application partition sub type %u",partition_subtype);
+			ESP_LOGI(TAG, "Found application partition %s sub type %u", partition->label,partition_subtype);
 			err=esp_ota_set_boot_partition(partition);
 			if(err!=ESP_OK){
 				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));

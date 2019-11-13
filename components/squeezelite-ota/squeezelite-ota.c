@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -338,7 +338,8 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #define OTA_CORE 1
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+1, NULL, OTA_CORE);
+    //ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL, OTA_CORE);
+    ret=xTaskCreate(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
