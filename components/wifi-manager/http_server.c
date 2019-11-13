@@ -350,14 +350,17 @@ void http_server_netconn_serve(struct netconn *conn) {
 			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
 				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
 			}
+			else {
+				ESP_LOGI(TAG,"System host name %s, http requested host: %s. They %s",host_name, host,strcasestr(host,host_name)?"match":"don't match" );
+			}
 
 			/* determine if Host is from the STA IP address */
 			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-			bool access_from_sta_ip = lenH > 0?strstr(host, wifi_manager_get_sta_ip_string()):false;
+			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
 			wifi_manager_unlock_sta_ip_string();
-			bool access_from_host_name = (host_name!=NULL) && strstr(host, host_name);
+			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
 
-			if(lenH > 0 && !strstr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
+			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
 				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
 				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
 				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
