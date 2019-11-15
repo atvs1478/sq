@@ -340,8 +340,8 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #define OTA_CORE 1
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
-    //ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL, OTA_CORE);
-    ret=xTaskCreate(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL);
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+1, NULL, OTA_CORE);
+    //ret=xTaskCreate(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
