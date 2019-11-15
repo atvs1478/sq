@@ -109,7 +109,8 @@ extern struct outputstate output;
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
-extern bool jack_mutes_amp;
+
+bool jack_mutes_amp = false;
 
 static log_level loglevel;
 static bool running, isI2SStarted;
@@ -120,6 +121,7 @@ static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
 static size_t dma_buf_frames;
+static int jack_status = -1;		// 0 = inserted
 
 DECLARE_ALL_MIN_MAX;
 
@@ -154,7 +156,7 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 
 #define I2C_PORT	0
 #define I2C_ADDR	0x4c
-#define VOLUME_GPIO	33
+#define VOLUME_GPIO	14
 #define JACK_GPIO	34
 
 struct tas575x_cmd_s {
@@ -438,10 +440,17 @@ static void *output_thread_i2s() {
 			
 		TIME_MEASUREMENT_START(timer_start);
 		
-		LOCK;
-		if(jack_mutes_amp){
-			// todo: implement some muting logic
+		// handle jack insertion as a polling function (to avoid to have to do de-bouncing)
+		if (gpio_get_level(JACK_GPIO) != jack_status) {
+			jack_status = gpio_get_level(JACK_GPIO);
+			if (jack_mutes_amp) {
+				//gpio_set_level(VOLUME_GPIO, jack_status);
+				LOG_INFO("Changing jack status %d", jack_status);
+			}	
 		}
+		
+		LOCK;
+		
 		// manage led display
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
@@ -464,7 +473,7 @@ static void *output_thread_i2s() {
 		} else if (output.state == OUTPUT_STOPPED) {
 			synced = false;
 		}
-		
+					
 		oframes = 0;
 		output.updated = gettime_ms();
 		output.frames_played_dmp = output.frames_played;
@@ -493,7 +502,7 @@ static void *output_thread_i2s() {
 		}
 		
 		UNLOCK;
-		
+				
 		// now send all the data
 		TIME_MEASUREMENT_START(timer_start);
 		

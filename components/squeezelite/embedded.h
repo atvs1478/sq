@@ -8,11 +8,11 @@
 		- pthread_create_name
 		- stack size
 		- s16_t, s32_t, s64_t and u64_t
-		- EXT_BSS 
 	can overload (use #define)
 		- exit
 		- gettime_ms
 		- BASE_CAP
+		- EXT_BSS 		
 	recommended to add platform specific include(s) here
 */	
 	

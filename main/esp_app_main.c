@@ -47,11 +47,12 @@
 #include <math.h>
 #include "config.h"
 
+extern bool enable_bt_sink;
+extern bool enable_airplay;
+extern bool jack_mutes_amp;
 
 EventGroupHandle_t wifi_event_group;
-bool enable_bt_sink=false;
-bool enable_airplay=false;
-bool jack_mutes_amp=false;
+
 bool bypass_wifi_manager=false;
 const int CONNECTED_BIT = BIT0;
 #define JOIN_TIMEOUT_MS (10000)

@@ -442,6 +442,10 @@ void _wake_create(event_event*);
 #define wake_close(e) CloseHandle(e)
 #endif
 
+#ifndef EXT_BSS
+#define EXT_BSS
+#endif
+
 // printf/scanf formats for u64_t
 #if (LINUX && __WORDSIZE == 64) || (FREEBSD && __LP64__)
 #define FMT_u64 "%lu"
