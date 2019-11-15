@@ -38,7 +38,7 @@
 
 #include "esp_ota_ops.h"
 
-#define OTA_FLASH_ERASE_BLOCK (1024*100)
+#define OTA_FLASH_ERASE_BLOCK (4096*10)
 static const char *TAG = "squeezelite-ota";
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
