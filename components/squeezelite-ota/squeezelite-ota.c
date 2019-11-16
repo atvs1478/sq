@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -38,7 +38,6 @@
 
 #include "esp_ota_ops.h"
 
-#define OTA_FLASH_ERASE_BLOCK (4096*10)
 static const char *TAG = "squeezelite-ota";
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
@@ -178,7 +177,6 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 
 				ota_status.lastpct=ota_status.newpct;
 			}
-			taskYIELD();
         }
         break;
     case HTTP_EVENT_ON_FINISH:
@@ -208,7 +206,7 @@ esp_err_t _erase_last_boot_app_partition(void)
 {
 	uint16_t num_passes=0;
 	uint16_t remain_size=0;
-	uint16_t single_pass_size=0;
+	uint32_t single_pass_size=0;
     const esp_partition_t *ota_partition=NULL;
     const esp_partition_t *ota_data_partition=NULL;
 	esp_err_t err=ESP_OK;
@@ -221,7 +219,7 @@ esp_err_t _erase_last_boot_app_partition(void)
 	else {
 		ota_partition = (esp_partition_t *) esp_partition_get(it);
 		if(ota_partition != NULL){
-			ESP_LOGI(TAG, "Found OTA partition.");
+			ESP_LOGI(TAG, "Found OTA partition: %s.",ota_partition->label);
 		}
 		else {
 			ESP_LOGE(TAG,"OTA partition not found!  Unable update application.");
@@ -248,19 +246,31 @@ esp_err_t _erase_last_boot_app_partition(void)
 	if(ota_data_partition==NULL || ota_partition==NULL){
 		return ESP_FAIL;
 	}
-	ESP_LOGI(TAG,"Erasing flash ");
-	num_passes=ota_partition->size/OTA_FLASH_ERASE_BLOCK;
-	single_pass_size= ota_partition->size/num_passes;
 
-	remain_size=ota_partition->size-(num_passes*OTA_FLASH_ERASE_BLOCK);
 
+    char * ota_erase_size=config_alloc_get(NVS_TYPE_STR, "ota_erase_blk");
+	if(ota_erase_size!=NULL) {
+		single_pass_size = atol(ota_erase_size);
+		ESP_LOGD(TAG,"OTA Erase block size is %d (from string: %s)",single_pass_size, ota_erase_size );
+		free(ota_erase_size);
+	}
+	else {
+		ESP_LOGW(TAG,"OTA Erase block config not found");
+		single_pass_size = OTA_FLASH_ERASE_BLOCK;
+	}
+	ESP_LOGI(TAG,"Erasing flash partition of size %u", ota_partition->size);
+	num_passes=ota_partition->size/single_pass_size;
+	remain_size=ota_partition->size-(num_passes*single_pass_size);
+	ESP_LOGD(TAG,"Erasing in %d passes with blocks of %d bytes, ", num_passes,single_pass_size);
 	for(uint16_t i=0;i<num_passes;i++){
-		err=esp_partition_erase_range(ota_partition, i*single_pass_size, single_pass_size);
-		if(err!=ESP_OK) return err;
 		ESP_LOGD(TAG,"Erasing flash (%u%%)",i/num_passes);
 		ESP_LOGD(TAG,"Pass %d of %d, with chunks of %d bytes, from %d to %d", i+1, num_passes,single_pass_size,i*single_pass_size,i*single_pass_size+single_pass_size);
-		triggerStatusJsonRefresh(i%2==0?true:false,"Erasing flash (%u/%u)",i,num_passes);
-		taskYIELD();
+		err=esp_partition_erase_range(ota_partition, i*single_pass_size, single_pass_size);
+		if(err!=ESP_OK) return err;
+//		triggerStatusJsonRefresh(i%10==0?true:false,"Erasing flash (%u/%u)",i,num_passes);
+		if(i%10) {
+			triggerStatusJsonRefresh(false,"Erasing flash (%u/%u)",i,num_passes);
+		}
 	}
 	if(remain_size>0){
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);
@@ -322,6 +332,7 @@ void ota_task(void *pvParameter)
 
 esp_err_t process_recovery_ota(const char * bin_url){
 	int ret = 0;
+	uint16_t stack_size, task_priority;
     if(ota_status.bOTAThreadStarted){
 		ESP_LOGE(TAG,"OTA Already started. ");
 		return ESP_FAIL;
@@ -340,7 +351,28 @@ esp_err_t process_recovery_ota(const char * bin_url){
 #define OTA_CORE 1
 #endif
     ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,urlPtr);
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+1, NULL, OTA_CORE);
+    char * num_buffer=config_alloc_get(NVS_TYPE_STR, "ota_stack");
+  	if(num_buffer!=NULL) {
+  		stack_size= atol(num_buffer);
+  		free(num_buffer);
+  		num_buffer=NULL;
+  	}
+  	else {
+		ESP_LOGW(TAG,"OTA stack size config not found");
+  		stack_size = OTA_STACK_SIZE;
+  	}
+  	num_buffer=config_alloc_get(NVS_TYPE_STR, "ota_prio");
+	if(num_buffer!=NULL) {
+		task_priority= atol(num_buffer);
+		free(num_buffer);
+		num_buffer=NULL;
+	}
+	else {
+		ESP_LOGW(TAG,"OTA task priority not found");
+		task_priority= OTA_TASK_PRIOTITY;
+  	}
+  	ESP_LOGD(TAG,"OTA task stack size %d, priority %d (%d %s ESP_TASK_MAIN_PRIO)",stack_size , task_priority, abs(task_priority-ESP_TASK_MAIN_PRIO), task_priority-ESP_TASK_MAIN_PRIO>0?"above":"below");
+    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", stack_size , (void *)urlPtr, task_priority, NULL, OTA_CORE);
     //ret=xTaskCreate(&ota_task, "ota_task", 1024*20, (void *)urlPtr, ESP_TASK_MAIN_PRIO+2, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");

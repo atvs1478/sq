@@ -51,11 +51,11 @@ static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 static StaticTask_t task_http_buffer;
-#if RECOVERY_APPLICATION
-static StackType_t task_http_stack[HTTP_STACK_SIZE];
-#else
+//#if RECOVERY_APPLICATION
+//static StackType_t task_http_stack[HTTP_STACK_SIZE];
+//#else
 static StackType_t EXT_RAM_ATTR task_http_stack[HTTP_STACK_SIZE];
-#endif
+//#endif
 SemaphoreHandle_t http_server_config_mutex = NULL;
 
 /**
@@ -351,7 +351,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
 			}
 			else {
-				ESP_LOGI(TAG,"System host name %s, http requested host: %s. They %s",host_name, host,strcasestr(host,host_name)?"match":"don't match" );
+				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
 			}
 
 			/* determine if Host is from the STA IP address */

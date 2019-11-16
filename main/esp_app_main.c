@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "platform_esp32.h"
 #include "led.h"
 #include <stdio.h>
@@ -192,6 +192,20 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+
+	char number_buffer[101] = {};
+	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ota_erase_blk", number_buffer);
+	config_set_default(NVS_TYPE_STR, "ota_erase_blk", number_buffer, 0);
+
+	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_STACK_SIZE);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ota_stack", number_buffer);
+	config_set_default(NVS_TYPE_STR, "ota_stack", number_buffer, 0);
+
+	snprintf(number_buffer,sizeof(number_buffer)-1,"%d",OTA_TASK_PRIOTITY);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ota_prio", number_buffer);
+	config_set_default(NVS_TYPE_STR, "ota_prio", number_buffer, 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
 	char * flag = config_alloc_get_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
 	if(flag !=NULL){
