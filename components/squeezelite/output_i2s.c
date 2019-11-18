@@ -440,6 +440,7 @@ static void *output_thread_i2s() {
 			
 		TIME_MEASUREMENT_START(timer_start);
 		
+#ifdef TAS575x
 		// handle jack insertion as a polling function (to avoid to have to do de-bouncing)
 		if (gpio_get_level(JACK_GPIO) != jack_status) {
 			jack_status = gpio_get_level(JACK_GPIO);
@@ -448,7 +449,7 @@ static void *output_thread_i2s() {
 				LOG_INFO("Changing jack status %d", jack_status);
 			}	
 		}
-		
+#endif
 		LOCK;
 		
 		// manage led display

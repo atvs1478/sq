@@ -207,8 +207,8 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
-	config_set_default(NVS_TYPE_U16, "test_num", (uint16_t)2, 0);
+//	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
+//	config_set_default(NVS_TYPE_U16, "test_num", (uint16_t)2, 0);
 
 
 	char number_buffer[101] = {};
