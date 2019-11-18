@@ -113,6 +113,20 @@ char * process_ota_url(){
 	return fwurl;
 }
 
+esp_log_level_t  get_log_level_from_char(char * level){
+	if(!strcasecmp(level, "NONE"    )) { return ESP_LOG_NONE  ;}
+	if(!strcasecmp(level, "ERROR"   )) { return ESP_LOG_ERROR ;}
+	if(!strcasecmp(level, "WARN"    )) { return ESP_LOG_WARN  ;}
+	if(!strcasecmp(level, "INFO"    )) { return ESP_LOG_INFO  ;}
+	if(!strcasecmp(level, "DEBUG"   )) { return ESP_LOG_DEBUG ;}
+	if(!strcasecmp(level, "VERBOSE" )) { return ESP_LOG_VERBOSE;}
+	return ESP_LOG_WARN;
+}
+void set_log_level(char * tag, char * level){
+	esp_log_level_set(tag, get_log_level_from_char(level));
+}
+
+
 //CONFIG_SDIF_NUM=0
 //CONFIG_SPDIF_BCK_IO=26
 //CONFIG_SPDIF_WS_IO=25
@@ -192,6 +206,10 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
+	config_set_default(NVS_TYPE_U16, "test_num", (uint16_t)2, 0);
+
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);

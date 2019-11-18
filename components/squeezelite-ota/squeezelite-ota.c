@@ -6,7 +6,9 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+#ifndef LOG_LOCAL_LEVEL
 #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -284,6 +286,7 @@ esp_err_t _erase_last_boot_app_partition(void)
 void ota_task(void *pvParameter)
 {
 	char * passedURL=(char *)pvParameter;
+	esp_err_t err = ESP_OK;
 
 	ota_status.bInitialized = true;
 	ESP_LOGD(TAG, "HTTP ota Thread started");
@@ -299,16 +302,16 @@ void ota_task(void *pvParameter)
 	ota_status.current_url= strdup(passedURL);
 	FREE_RESET(pvParameter);
 
-	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
-	triggerStatusJsonRefresh(true,"Erasing OTA partition");
-	esp_err_t err=_erase_last_boot_app_partition();
-	if(err!=ESP_OK){
-		ESP_LOGE(TAG,"Unable to erase last APP partition. Error: %s",esp_err_to_name(err));
-		FREE_RESET(ota_status.current_url);
-		FREE_RESET(ota_status.redirected_url);
-
-	    vTaskDelete(NULL);
-	}
+//	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
+//	triggerStatusJsonRefresh(true,"Erasing OTA partition");
+//	esp_err_t err=_erase_last_boot_app_partition();
+//	if(err!=ESP_OK){
+//		ESP_LOGE(TAG,"Unable to erase last APP partition. Error: %s",esp_err_to_name(err));
+//		FREE_RESET(ota_status.current_url);
+//		FREE_RESET(ota_status.redirected_url);
+//
+//	    vTaskDelete(NULL);
+//	}
 
 	ESP_LOGI(TAG,"Calling esp_https_ota");
 	init_config(&ota_config,ota_status.bRedirectFound?ota_status.redirected_url:ota_status.current_url);
