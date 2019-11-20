@@ -316,7 +316,7 @@ void app_main()
 			taskYIELD();
 		}
 		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
-		start_ota(fwurl, true);
+		start_ota(fwurl);
 #else
 		ESP_LOGE(TAG,"Restarted to application partition. We're not going to perform OTA!");
 #endif

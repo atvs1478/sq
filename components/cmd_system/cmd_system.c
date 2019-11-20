@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_INFO
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -128,6 +128,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 	}
 	else
 	{
+		ESP_LOGD(TAG, "Found partition. Getting info.");
 		partition = (esp_partition_t *) esp_partition_get(it);
 		ESP_LOGD(TAG, "Releasing partition iterator");
 		esp_partition_iterator_release(it);

@@ -21,7 +21,7 @@
 #define OTA_FLASH_ERASE_BLOCK (uint32_t)512000
 #define OTA_STACK_SIZE 5120
 #define OTA_TASK_PRIOTITY 6
-esp_err_t start_ota(const char * bin_url, bool bFromAppMain);
+esp_err_t start_ota(const char * bin_url);
 const char * ota_get_status();
 uint8_t ota_get_pct_complete();
 

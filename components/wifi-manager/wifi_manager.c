@@ -1464,17 +1464,21 @@ void wifi_manager( void * pvParameters ){
 
 				break;
 			case  ORDER_RESTART_OTA:
+				ESP_LOGD(TAG,   "Calling guided_restart_ota.");
 				guided_restart_ota();
 				break;
 			case  ORDER_RESTART_OTA_URL:
-				start_ota(msg.param,false);
+				ESP_LOGD(TAG,   "Calling start_ota.");
+				start_ota(msg.param);
 				free(msg.param);
 				break;
 
 			case  ORDER_RESTART_RECOVERY:
+				ESP_LOGD(TAG,   "Calling guided_factory.");
 				guided_factory();
 				break;
 			case	ORDER_RESTART:
+				ESP_LOGD(TAG,   "Calling simple_restart.");
 				simple_restart();
 				break;
 			default:

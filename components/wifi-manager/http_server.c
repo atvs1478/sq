@@ -533,26 +533,20 @@ void http_server_netconn_serve(struct netconn *conn) {
 					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving DELETE /connect.json");
 				}
 				else if(strstr(line, "POST /reboot_ota.json ")) {
-					ESP_LOGI(TAG,   "http_server_netconn_serve: POST reboot.json");
+					ESP_LOGI(TAG,   "http_server_netconn_serve: POST reboot_ota.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
-					netconn_close(conn);
-					netconn_delete(conn);
 					wifi_manager_reboot(OTA);
-					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST reboot.json");
+					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST reboot_ota.json");
 				}
 				else if(strstr(line, "POST /reboot.json ")) {
 					ESP_LOGI(TAG,   "http_server_netconn_serve: POST reboot.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
-					netconn_close(conn);
-					netconn_delete(conn);
 					wifi_manager_reboot(RESTART);
 					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST reboot.json");
 				}
 				else if(strstr(line, "POST /recovery.json ")) {
 					ESP_LOGI(TAG,   "http_server_netconn_serve: POST recovery.json");
 					netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); /* 200 ok */
-					netconn_close(conn);
-					netconn_delete(conn);
 					wifi_manager_reboot(RECOVERY);
 					ESP_LOGI(TAG,   "http_server_netconn_serve: done serving POST recovery.json");
 				}

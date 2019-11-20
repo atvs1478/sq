@@ -640,7 +640,7 @@ esp_err_t process_recovery_ota(const char * bin_url){
     return ESP_OK;
 }
 
-esp_err_t start_ota(const char * bin_url, bool bFromAppMain)
+esp_err_t start_ota(const char * bin_url)
 {
 //	uint8_t * config_alloc_get_default(NVS_TYPE_BLOB, "certs", server_cert_pem_start , server_cert_pem_end-server_cert_pem_start);
 #if RECOVERY_APPLICATION
