@@ -7,7 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #ifndef LOG_LOCAL_LEVEL
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -537,8 +537,6 @@ void RECOVERY_IRAM_FUNCTION ota_task(void *pvParameter)
                 }
             }
             _printMemStats();
-            ESP_LOGD(TAG, "Writing data len %d", data_read);
-            ESP_LOGI(TAG, "OTA image magic byte 0x%02x", ota_write_data[0]);
             err = esp_ota_write( update_handle, (const void *)ota_write_data, data_read);
             if (err != ESP_OK) {
             	triggerStatusJsonRefresh(true,"Error: OTA Partition write failure. (%s)",esp_err_to_name(err));
