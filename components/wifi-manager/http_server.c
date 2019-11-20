@@ -51,11 +51,11 @@ static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 static StaticTask_t task_http_buffer;
-//#if RECOVERY_APPLICATION
-//static StackType_t task_http_stack[HTTP_STACK_SIZE];
-//#else
+#if RECOVERY_APPLICATION
+static StackType_t task_http_stack[HTTP_STACK_SIZE];
+#else
 static StackType_t EXT_RAM_ATTR task_http_stack[HTTP_STACK_SIZE];
-//#endif
+#endif
 SemaphoreHandle_t http_server_config_mutex = NULL;
 
 /**

@@ -63,6 +63,7 @@ static void vCallbackFunction( TimerHandle_t xTimer );
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 
 static void * malloc_fn(size_t sz){
+
 	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
 	if(ptr==NULL){
 		ESP_LOGE(TAG,"malloc_fn:  unable to allocate memory!");
@@ -82,9 +83,13 @@ void init_cJSON(){
 	static cJSON_Hooks hooks;
 	// initialize cJSON hooks it uses SPIRAM memory
 	// as opposed to IRAM
+#ifndef RECOVERY_APPLICATION
+	// In squeezelite mode, allocate memory from PSRAM.  Otherwise allocate from internal RAM
+	// as recovery will lock flash access when erasing FLASH or writing to OTA partition.
 	hooks.malloc_fn=&malloc_fn;
     //hooks.free_fn=&free_fn;
 	cJSON_InitHooks(&hooks);
+#endif
 }
 void config_init(){
 	ESP_LOGD(TAG, "Creating mutex for Config");
@@ -502,6 +507,7 @@ bool config_set_group_bit(int bit_num,bool flag){
 	}
 	return result;
 }
+//void config_set_default_uint16(const char *key, uint16_t value) { }
 void config_set_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 		ESP_LOGE(TAG, "Unable to lock config");

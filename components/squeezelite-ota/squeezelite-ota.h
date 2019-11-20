@@ -9,9 +9,14 @@
 #include "esp_attr.h"
 #if RECOVERY_APPLICATION
 #define CODE_RAM_LOCATION
+#define RECOVERY_IRAM_FUNCTION IRAM_ATTR
 #else
+#define RECOVERY_IRAM_FUNCTION
 #define CODE_RAM_LOCATION
 #endif
+
+
+
 // ERASE BLOCK needs to be a multiple of wear leveling's sector size
 #define OTA_FLASH_ERASE_BLOCK (uint32_t)512000
 #define OTA_STACK_SIZE 5120
