@@ -15,7 +15,7 @@ extern "C" {
 
 // Register NVS functions
 void register_nvs();
-const char *type_to_str(nvs_type_t type);
+
 #ifdef __cplusplus
 }
 #endif

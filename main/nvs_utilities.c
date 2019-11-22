@@ -20,6 +20,55 @@ const char current_namespace[] = "config";
 const char settings_partition[] = "settings";
 static const char * TAG = "nvs_utilities";
 
+typedef struct {
+    nvs_type_t type;
+    const char *str;
+} type_str_pair_t;
+
+static const type_str_pair_t type_str_pair[] = {
+    { NVS_TYPE_I8, "i8" },
+    { NVS_TYPE_U8, "u8" },
+    { NVS_TYPE_U16, "u16" },
+    { NVS_TYPE_I16, "i16" },
+    { NVS_TYPE_U32, "u32" },
+    { NVS_TYPE_I32, "i32" },
+    { NVS_TYPE_U64, "u64" },
+    { NVS_TYPE_I64, "i64" },
+    { NVS_TYPE_STR, "str" },
+    { NVS_TYPE_BLOB, "blob" },
+    { NVS_TYPE_ANY, "any" },
+};
+
+static const size_t TYPE_STR_PAIR_SIZE = sizeof(type_str_pair) / sizeof(type_str_pair[0]);
+void print_blob(const char *blob, size_t len)
+{
+    for (int i = 0; i < len; i++) {
+        printf("%02x", blob[i]);
+    }
+    printf("\n");
+}
+nvs_type_t str_to_type(const char *type)
+{
+    for (int i = 0; i < TYPE_STR_PAIR_SIZE; i++) {
+        const type_str_pair_t *p = &type_str_pair[i];
+        if (strcmp(type, p->str) == 0) {
+            return  p->type;
+        }
+    }
+
+    return NVS_TYPE_ANY;
+}
+const char *type_to_str(nvs_type_t type)
+{
+    for (int i = 0; i < TYPE_STR_PAIR_SIZE; i++) {
+        const type_str_pair_t *p = &type_str_pair[i];
+        if (p->type == type) {
+            return  p->str;
+        }
+    }
+
+    return "Unknown";
+}
 void initialize_nvs() {
 	ESP_LOGI(TAG,  "Initializing flash nvs ");
 	esp_err_t err = nvs_flash_init();

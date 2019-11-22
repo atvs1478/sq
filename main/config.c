@@ -61,7 +61,16 @@ bool config_set_group_bit(int bit_num,bool flag);
 cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value);
 static void vCallbackFunction( TimerHandle_t xTimer );
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
-
+#define IMPLEMENT_SET_DEFAULT(t,nt) void config_set_default_## t (const char *key, t  value){\
+	void * pval = malloc(sizeof(value));\
+	*((t *) pval) = value;\
+	config_set_default(nt, key,pval,0);\
+	free(pval); }
+#define IMPLEMENT_GET_NUM(t,nt) esp_err_t config_get_## t (const char *key, t *  value){\
+		void * pval = config_alloc_get(nt, key);\
+		if(pval!=NULL){ *value = *(t * )pval; free(pval); return ESP_OK; }\
+		return ESP_FAIL;}
+#ifdef RECOVERY_APPLICATION
 static void * malloc_fn(size_t sz){
 
 	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
@@ -79,6 +88,7 @@ static void * free_fn(void * ptr){
 	}
 	return NULL;
 }
+#endif
 void init_cJSON(){
 	static cJSON_Hooks hooks;
 	// initialize cJSON hooks it uses SPIRAM memory
@@ -118,52 +128,71 @@ void config_start_timer(){
     }
 
 }
+
+nvs_type_t  config_get_item_type(cJSON * entry){
+	if(entry==NULL){
+		ESP_LOGE(TAG,"null pointer received!");
+		return true;
+	}
+	cJSON * item_type = cJSON_GetObjectItemCaseSensitive(entry, "type");
+	if(item_type ==NULL ) {
+		ESP_LOGE(TAG, "Item type not found! ");
+		return 0;
+	}
+	ESP_LOGD(TAG,"Found item type %f",item_type->valuedouble);
+	return item_type->valuedouble;
+}
+
+
 cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value){
-	char * num_buffer = NULL;
-	num_buffer = malloc(NUM_BUFFER_LEN);
-	memset(num_buffer,0x00,NUM_BUFFER_LEN);
 	cJSON * entry = cJSON_CreateObject();
 
+	double numvalue = 0;
 	if(entry == NULL) {
 		ESP_LOGE(TAG, "Unable to allocate memory for entry %s",key);
 		return NULL;
 	}
-	cJSON_AddNumberToObject(entry,"type", nvs_type	);
-	switch (nvs_type) {
-		case NVS_TYPE_I8:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int8_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(int8_t*)value	);
-			break;
-		case NVS_TYPE_I16:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int16_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(int16_t*)value	);
-			break;
-		case NVS_TYPE_I32:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%i", *(int32_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(int32_t*)value	);
-			break;
-		case NVS_TYPE_U8:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint8_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(uint8_t*)value	);
-			break;
-		case NVS_TYPE_U16:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint16_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(uint16_t*)value	);
-			break;
-		case NVS_TYPE_U32:
-			snprintf(num_buffer, NUM_BUFFER_LEN-1, "%u", *(uint32_t*)value);
-			cJSON_AddNumberToObject(entry,"value", *(uint32_t*)value	);
-			break;
-		case NVS_TYPE_STR:
-			cJSON_AddStringToObject(entry, "value", (char *)value);
-			break;
-		case NVS_TYPE_I64:
-		case NVS_TYPE_U64:
-		default:
-			ESP_LOGE(TAG, "nvs type %u not supported", nvs_type);
-			break;
-	}
+
 	cJSON * existing = cJSON_GetObjectItemCaseSensitive(nvs_json, key);
+	if(existing !=NULL && nvs_type == NVS_TYPE_STR && config_get_item_type(existing) != NVS_TYPE_STR  ) {
+		ESP_LOGW(TAG, "Storing numeric value from string");
+		numvalue = atof((char *)value);
+		cJSON_AddNumberToObject(entry,"value", numvalue	);
+		nvs_type_t exist_type = config_get_item_type(existing);
+		ESP_LOGW(TAG, "Stored  value %f from string %s as type %d",numvalue, (char *)value,exist_type);
+		cJSON_AddNumberToObject(entry,"type", exist_type);
+	}
+	else {
+		cJSON_AddNumberToObject(entry,"type", nvs_type	);
+		switch (nvs_type) {
+			case NVS_TYPE_I8:
+				cJSON_AddNumberToObject(entry,"value", *(int8_t*)value	);
+				break;
+			case NVS_TYPE_I16:
+				cJSON_AddNumberToObject(entry,"value", *(int16_t*)value	);
+				break;
+			case NVS_TYPE_I32:
+				cJSON_AddNumberToObject(entry,"value", *(int32_t*)value	);
+				break;
+			case NVS_TYPE_U8:
+				cJSON_AddNumberToObject(entry,"value", *(uint8_t*)value	);
+				break;
+			case NVS_TYPE_U16:
+				cJSON_AddNumberToObject(entry,"value", *(uint16_t*)value	);
+				break;
+			case NVS_TYPE_U32:
+				cJSON_AddNumberToObject(entry,"value", *(uint32_t*)value	);
+				break;
+			case NVS_TYPE_STR:
+				cJSON_AddStringToObject(entry, "value", (char *)value);
+				break;
+			case NVS_TYPE_I64:
+			case NVS_TYPE_U64:
+			default:
+				ESP_LOGE(TAG, "nvs type %u not supported", nvs_type);
+				break;
+		}
+	}
 	if(existing!=NULL ) {
 		ESP_LOGV(TAG, "Changing existing entry [%s].", key);
 		char * exist_str = cJSON_PrintUnformatted(existing);
@@ -207,7 +236,6 @@ cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value
 		config_set_entry_changed_flag(entry,true);
 		cJSON_AddItemToObject(nvs_json, key, entry);
 	}
-	free(num_buffer);
 
 	return entry;
 }
@@ -222,6 +250,7 @@ nvs_type_t config_get_entry_type(cJSON * entry){
 		ESP_LOGE(TAG, "Entry type not found in nvs cache for existing setting.");
 		return 0;
 	}
+	ESP_LOGV(TAG,"Found type %s",type_to_str(entry_type->valuedouble));
 	return entry_type->valuedouble;
 }
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag){
@@ -267,6 +296,10 @@ cJSON_bool config_is_entry_changed(cJSON * entry){
 	}
 	return cJSON_IsTrue(changed);
 }
+
+
+
+
 void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry){
 	void * value=NULL;
 	if(entry==NULL){
@@ -300,7 +333,6 @@ void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry){
 
 		return NULL;
 	}
-
 	if (nvs_type == NVS_TYPE_I8) {
 		value=malloc(sizeof(int8_t));
 		*(int8_t *)value = (int8_t)entry_value->valuedouble;
@@ -507,7 +539,7 @@ bool config_set_group_bit(int bit_num,bool flag){
 	}
 	return result;
 }
-//void config_set_default_uint16(const char *key, uint16_t value) { }
+
 void config_set_default(nvs_type_t type, const char *key, void * default_value, size_t blob_size) {
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 		ESP_LOGE(TAG, "Unable to lock config");
@@ -672,3 +704,16 @@ esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
 	return result;
 }
 
+IMPLEMENT_SET_DEFAULT(uint8_t,NVS_TYPE_U8);
+IMPLEMENT_SET_DEFAULT(int8_t,NVS_TYPE_I8);
+IMPLEMENT_SET_DEFAULT(uint16_t,NVS_TYPE_U16);
+IMPLEMENT_SET_DEFAULT(int16_t,NVS_TYPE_I16);
+IMPLEMENT_SET_DEFAULT(uint32_t,NVS_TYPE_U32);
+IMPLEMENT_SET_DEFAULT(int32_t,NVS_TYPE_I32);
+
+IMPLEMENT_GET_NUM(uint8_t,NVS_TYPE_U8);
+IMPLEMENT_GET_NUM(int8_t,NVS_TYPE_I8);
+IMPLEMENT_GET_NUM(uint16_t,NVS_TYPE_U16);
+IMPLEMENT_GET_NUM(int16_t,NVS_TYPE_I16);
+IMPLEMENT_GET_NUM(uint32_t,NVS_TYPE_U32);
+IMPLEMENT_GET_NUM(int32_t,NVS_TYPE_I32);

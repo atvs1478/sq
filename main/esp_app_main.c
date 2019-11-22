@@ -50,6 +50,9 @@
 extern bool enable_bt_sink;
 extern bool enable_airplay;
 extern bool jack_mutes_amp;
+static const char certs_namespace[] = "certificates";
+static const char certs_key[] = "blob";
+static const char certs_version[] = "version";
 
 EventGroupHandle_t wifi_event_group;
 
@@ -69,6 +72,8 @@ char * fwurl = NULL;
 #define LED_RED_GPIO	-1
 #endif
 static bool bWifiConnected=false;
+extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
+extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
 
 
@@ -125,6 +130,108 @@ esp_log_level_t  get_log_level_from_char(char * level){
 void set_log_level(char * tag, char * level){
 	esp_log_level_set(tag, get_log_level_from_char(level));
 }
+esp_err_t update_certificates(){
+//	server_cert_pem_start
+//	server_cert_pem_end
+
+	nvs_handle handle;
+	esp_err_t esp_err;
+    esp_app_desc_t running_app_info;
+
+	ESP_LOGI(TAG,   "About to check if certificates need to be updated in flash");
+	esp_err = nvs_open_from_partition(settings_partition, certs_namespace, NVS_READWRITE, &handle);
+	if (esp_err != ESP_OK) {
+		ESP_LOGE(TAG,  "Unable to open name namespace %s. Error %s", certs_namespace, esp_err_to_name(esp_err));
+		return esp_err;
+	}
+
+	const esp_partition_t *running = esp_ota_get_running_partition();
+	if(running->subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY ){
+		ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", running->label, running->type, running->subtype, running->address);
+
+	}
+
+	if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
+		ESP_LOGI(TAG, "Running version: %s", running_app_info.version);
+	}
+
+
+	size_t len=0;
+	char *str=NULL;
+	bool changed=false;
+	if ( (esp_err= nvs_get_str(handle, certs_version, NULL, &len)) == ESP_OK) {
+		str=(char *)malloc(len);
+		if ( (esp_err = nvs_get_str(handle,  certs_version, str, &len)) == ESP_OK) {
+			printf("String associated with key '%s' is %s \n", certs_version, str);
+		}
+	}
+	if(str!=NULL){
+		if(strcmp((char *)running_app_info.version,(char *)str )){
+			// Versions are different
+			ESP_LOGW(TAG,"Found a different software version. Updating certificates");
+			changed=true;
+		}
+		free(str);
+	}
+	else {
+		ESP_LOGW(TAG,"No certificate found. Adding certificates");
+		changed=true;
+	}
+
+	if(changed){
+
+		esp_err = nvs_set_blob(handle, certs_key, server_cert_pem_start, (server_cert_pem_end-server_cert_pem_start));
+		if(esp_err!=ESP_OK){
+			ESP_LOGE(TAG, "Failed to store certificate data: %s", esp_err_to_name(esp_err));
+		}
+		else {
+			ESP_LOGI(TAG,"Updated stored https certificates");
+			esp_err = nvs_set_str(handle,  certs_version, running_app_info.version);
+			if(esp_err!=ESP_OK){
+				ESP_LOGE(TAG, "Failed to store app version: %s", esp_err_to_name(esp_err));
+			}
+			else {
+				esp_err = nvs_commit(handle);
+				if(esp_err!=ESP_OK){
+					ESP_LOGE(TAG, "Failed to commit certificate changes: %s", esp_err_to_name(esp_err));
+				}
+			}
+		}
+	}
+
+	nvs_close(handle);
+	return ESP_OK;
+}
+const char * get_certificate(){
+	nvs_handle handle;
+	esp_err_t esp_err;
+	char *blob =NULL;
+//
+	ESP_LOGD(TAG,  "Fetching certificate.");
+	esp_err = nvs_open_from_partition(settings_partition, certs_namespace, NVS_READONLY, &handle);
+	if(esp_err == ESP_OK){
+        size_t len;
+        esp_err = nvs_get_blob(handle, certs_key, NULL, &len);
+        if( esp_err == ESP_OK) {
+            blob = (char *)malloc(len);
+            esp_err = nvs_get_blob(handle, certs_key, blob, &len);
+            if ( esp_err  == ESP_OK) {
+                printf("Blob associated with key '%s' is %d bytes long: \n", certs_key, len);
+            }
+        }
+        else{
+        	ESP_LOGE(TAG,  "Unable to get the existing blob from namespace %s. [%s]", certs_namespace, esp_err_to_name(esp_err));
+        }
+        nvs_close(handle);
+	}
+	else{
+		ESP_LOGE(TAG,  "Unable to open name namespace %s. [%s]", certs_namespace, esp_err_to_name(esp_err));
+	}
+	return blob;
+}
+
+
+
 
 
 //CONFIG_SDIF_NUM=0
@@ -207,8 +314,7 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
-//	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
-//	config_set_default(NVS_TYPE_U16, "test_num", (uint16_t)2, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
 
 
 	char number_buffer[101] = {};
@@ -260,7 +366,7 @@ void register_default_nvs(){
 void app_main()
 {
 	char * fwurl = NULL;
-
+	esp_err_t update_certificates();
 	ESP_LOGD(TAG,"Creating event group for wifi");
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
@@ -268,11 +374,17 @@ void app_main()
 
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
+
 	ESP_LOGI(TAG,"Setting up config subsystem.");
 	config_init();
 
-	ESP_LOGD(TAG,"Registering default values");
+	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
+
+#if !RECOVERY_APPLICATION
+	ESP_LOGI(TAG,"Checking if certificates need to be updated");
+	update_certificates();
+#endif
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
