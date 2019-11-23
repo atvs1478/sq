@@ -729,8 +729,8 @@ function getConfig() {
                 } else if (key == 'autoexec1') {
                     $("textarea#autoexec1").val(data[key].value);
                 } else if (key == 'host_name') {
-                    $("dhcp-name1").val(data[key].value);
-                    $("dhcp-name2").val(data[key].value);
+                    $("input#dhcp-name1").val(data[key].value);
+                    $("input#dhcp-name2").val(data[key].value);
                 }
 
                 $("tbody#nvsTable").append(
