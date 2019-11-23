@@ -28,7 +28,7 @@ var checkStatusInterval = null;
 
 var StatusIntervalActive = false;
 var RefreshAPIIntervalActive = false;
-
+var LastRecoveryState=null;
 var output = '';
 
 function stopCheckStatusInterval(){
@@ -54,7 +54,7 @@ function startCheckStatusInterval(){
 
 function startRefreshAPInterval(){
     RefreshAPIIntervalActive = true;
-    refreshAPInterval = setTimeout(refreshAP(false), 2800);
+    refreshAPInterval = setTimeout(refreshAP(false), 4500); // leave enough time for the initial scan
 }
 
 function RepeatCheckStatusInterval(){
@@ -176,6 +176,16 @@ $(document).ready(function(){
         $( "#wifi" ).slideDown( "fast", function() {})
     });
 
+    $("input#show-nvs").on("click", function() {
+        this.checked=this.checked?1:0;
+        if(this.checked){
+            $('a[href^="#tab-nvs"]').show();
+        } else {
+            $('a[href^="#tab-nvs"]').hide();
+        }
+
+    });
+    
     $("input#autoexec-cb").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
@@ -200,7 +210,7 @@ $(document).ready(function(){
                 console.log('sent config JSON with headers:', autoexec);
                 console.log('now triggering reboot');
                 $.ajax({
-                    url: '/reboot.json',
+                    url: '/reboot_ota.json',
                     dataType: 'text',
                     method: 'POST',
                     cache: false,
@@ -279,14 +289,17 @@ $(document).ready(function(){
             var val = $(this).val();
             if (key != '') {
                 headers["X-Custom-"+key] = val;
-                data[key] = val;
+                data[key] = {};
+                data[key].value = val;
+                data[key].type = 33;
             }
         });
         var key = $("#nvs-new-key").val();
         var val = $("#nvs-new-value").val();
         if (key != '') {
             headers["X-Custom-"+key] = val;
-            data[key] = val;
+            data[key] = {};
+            data[key].value = val;
         }
         $.ajax({
             url: '/config.json',
@@ -429,7 +442,10 @@ $(document).ready(function(){
     $('#boot-button').on("click", function(){
         enableStatusTimer = true;
     });
-
+    $('#reboot-button').on("click", function(){
+        enableStatusTimer = true;
+    });
+    
     $('#updateAP').on("click", function(){
         refreshAP(true);
         console.log("refresh AP");
@@ -441,7 +457,7 @@ $(document).ready(function(){
 
     //start timers
     startCheckStatusInterval();
-    startRefreshAPInterval();
+    //startRefreshAPInterval();
 
     $('[data-toggle="tooltip"]').tooltip({
         html: true,
@@ -572,7 +588,7 @@ function checkStatus(){
 
                     //update wait screen
                     $( "#loading" ).hide();
-                    $( "#connect-success" ).append("<p>Your IP address now is: " + text(data["ip"]) + "</p>");
+                    $( "#connect-success" ).text("Your IP address now is: " + data["ip"] );
                     $( "#connect-success" ).show();
                     $( "#connect-fail" ).hide();
 
@@ -628,23 +644,31 @@ function checkStatus(){
             enableStatusTimer = true;
         }
         if (data.hasOwnProperty('recovery')) {
+            if(LastRecoveryState != data["recovery"]){
+                LastRecoveryState = data["recovery"];
+                $("input#show-nvs")[0].checked=LastRecoveryState==1?true:false;
+            }
+            if($("input#show-nvs")[0].checked){
+                    $('a[href^="#tab-nvs"]').show();
+            } else{
+                $('a[href^="#tab-nvs"]').hide();
+            }
+
             if (data["recovery"] === 1) {
                 recovery = true;
                 $("#otadiv").show();
                 $('a[href^="#tab-audio"]').hide();
                 $('a[href^="#tab-gpio"]').show();
-                $('a[href^="#tab-nvs"]').show();
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
                 $("#boot-button").html('Reboot');
-                $("#boot-form").attr('action', '/reboot.json');
+                $("#boot-form").attr('action', '/reboot_ota.json');
                 enableStatusTimer = true;
             } else {
                 recovery = false;
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').hide();
-                $('a[href^="#tab-nvs"]').hide();
                 $("footer.footer").removeClass('recovery');
                 $("footer.footer").addClass('sl');
                 $("#boot-button").html('Recovery');
@@ -697,16 +721,16 @@ function getConfig() {
         Object.keys(data).sort().forEach(function(key, i) {
             if (data.hasOwnProperty(key)) {
                 if (key == 'autoexec') {
-                    if (data["autoexec"] === "1") {
+                    if (data["autoexec"].value === "1") {
                         $("#autoexec-cb")[0].checked=true;
                     } else {
                         $("#autoexec-cb")[0].checked=false;
                     }
                 } else if (key == 'autoexec1') {
-                    $("textarea#autoexec1").val(data[key]);
+                    $("textarea#autoexec1").val(data[key].value);
                 } else if (key == 'host_name') {
-                    $("dhcp-name1").val(data[key]);
-                    $("dhcp-name2").val(data[key]);
+                    $("dhcp-name1").val(data[key].value);
+                    $("dhcp-name2").val(data[key].value);
                 }
 
                 $("tbody#nvsTable").append(
@@ -717,7 +741,7 @@ function getConfig() {
                         "</td>"+
                     "</tr>"
                 );
-                $("input#"+key).val(data[key]);
+                $("input#"+key).val(data[key].value);
             }
         });
         $("tbody#nvsTable").append(

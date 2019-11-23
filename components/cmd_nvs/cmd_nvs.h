@@ -7,6 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #pragma once
+#include "nvs_flash.h"
 
 #ifdef __cplusplus
 extern "C" {

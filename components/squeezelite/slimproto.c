@@ -533,14 +533,14 @@ static void process(u8_t *pack, int len) {
 static bool running;
 
 static void slimproto_run() {
-	static u8_t buffer[MAXBUF];
+	static u8_t EXT_BSS buffer[MAXBUF];
 	int  expect = 0;
 	int  got    = 0;
 	u32_t now;
 	static u32_t last = 0;
 	event_handle ehandles[2];
 	int timeouts = 0;
-
+	
 	set_readwake_handles(ehandles, sock, wake_e);
 
 	while (running && !new_server) {
@@ -623,12 +623,13 @@ static void slimproto_run() {
 			bool _start_output = false;
 			decode_state _decode_state;
 			disconnect_code disconnect_code;
-			static char header[MAX_HEADER];
+			static char EXT_BSS header[MAX_HEADER];
 			size_t header_len = 0;
 #if IR
 			bool _sendIR   = false;
 			u32_t ir_code, ir_ts;
 #endif
+			
 			last = now;
 
 			LOCK_S;

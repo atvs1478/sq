@@ -305,6 +305,7 @@ void rtp_end(rtp_t *ctx)
 		pthread_join(ctx->thread, NULL);
 #else
 		xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
+		vTaskDelete(ctx->thread);
 		free(ctx->xStack);
 		heap_caps_free(ctx->xTaskBuffer);
 #endif
@@ -709,7 +710,7 @@ static void *rtp_thread_func(void *arg) {
 
 #ifndef WIN32
 	xTaskNotify(ctx->joiner, 0, eNoAction);
-	vTaskDelete(NULL);
+	vTaskSuspend(NULL);
 #endif
 
 	return NULL;

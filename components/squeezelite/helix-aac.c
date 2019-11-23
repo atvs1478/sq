@@ -45,6 +45,7 @@ struct helixaac {
 	HAACDecoder hAac;
 	u8_t type;
 	u8_t *write_buf;
+	u8_t *wrap_buf;
 	// following used for mp4 only
 	u32_t consume;
 	u32_t pos;
@@ -418,13 +419,11 @@ static decode_state helixaac_decode(void) {
 	}
 
 	if (bytes_wrap < WRAPBUF_LEN && bytes_total > WRAPBUF_LEN) {
-
 		// make a local copy of frames which may have wrapped round the end of streambuf
-		static u8_t buf[WRAPBUF_LEN];
-		memcpy(buf, streambuf->readp, bytes_wrap);
-		memcpy(buf + bytes_wrap, streambuf->buf, WRAPBUF_LEN - bytes_wrap);
+		memcpy(a->wrap_buf, streambuf->readp, bytes_wrap);
+		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, WRAPBUF_LEN - bytes_wrap);
 		
-		sptr = buf;
+		sptr = a->wrap_buf;
 		bytes = bytes_wrap = WRAPBUF_LEN;
 	} else {
 
@@ -590,6 +589,7 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 	} else {
 		a->hAac = HAAC(a, InitDecoder);	
 		a->write_buf = malloc(FRAME_BUF * BYTES_PER_FRAME);
+		a->wrap_buf = malloc(WRAPBUF_LEN);
 	}
 }
 
@@ -605,6 +605,7 @@ static void helixaac_close(void) {
 		a->stsc = NULL;
 	}
 	free(a->write_buf);
+	free(a->wrap_buf);
 }
 
 static bool load_helixaac() {

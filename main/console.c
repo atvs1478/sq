@@ -32,7 +32,7 @@ pthread_t thread_console;
 static void * console_thread();
 void console_start();
 static const char * TAG = "console";
-
+extern bool bypass_wifi_manager;
 
 
 /* Prompt to be printed before each line.
@@ -55,19 +55,35 @@ void process_autoexec(){
 	char * autoexec_value=NULL;
 	uint8_t autoexec_flag=0;
 
-	char * str_flag = get_nvs_value_alloc(NVS_TYPE_STR, "autoexec");
+	char * str_flag = config_alloc_get(NVS_TYPE_STR, "autoexec");
+	if(!bypass_wifi_manager){
+		ESP_LOGW(TAG, "Procesing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
+	}
+#if RECOVERY_APPLICATION
+	ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.");
+#endif
 
 	if(str_flag !=NULL ){
 		autoexec_flag=atoi(str_flag);
-		ESP_LOGI(TAG,"autoexec flag value found with value %u, from string value: %s", autoexec_flag, str_flag);
+		ESP_LOGI(TAG,"autoexec is set to %s auto-process", autoexec_flag>0?"perform":"skip");
 		if(autoexec_flag == 1) {
 			do {
 				snprintf(autoexec_name,sizeof(autoexec_name)-1,"autoexec%u",i++);
 				ESP_LOGD(TAG,"Getting command name %s", autoexec_name);
-				autoexec_value= get_nvs_value_alloc(NVS_TYPE_STR, autoexec_name);
+				autoexec_value= config_alloc_get(NVS_TYPE_STR, autoexec_name);
 				if(autoexec_value!=NULL ){
-					ESP_LOGI(TAG,"Running command %s = %s", autoexec_name, autoexec_value);
-					run_command(autoexec_value);
+					if(!bypass_wifi_manager && strstr(autoexec_value, "join ")!=NULL ){
+						ESP_LOGW(TAG,"Ignoring wifi join command.");
+					}
+#if RECOVERY_APPLICATION
+					else if(!strstr(autoexec_value, "squeezelite " ) ){
+						ESP_LOGW(TAG,"Ignoring command. ");
+					}
+#endif
+					else {
+						ESP_LOGI(TAG,"Running command %s = %s", autoexec_name, autoexec_value);
+						run_command(autoexec_value);
+					}
 					ESP_LOGD(TAG,"Freeing memory for command %s name", autoexec_name);
 					free(autoexec_value);
 				}
@@ -81,11 +97,7 @@ void process_autoexec(){
 	}
 	else
 	{
-		ESP_LOGD(TAG,"No matching command found for name autoexec. Adding default entries");
-		char autoexec_dft[]="0";
-		char autoexec1_dft[256]="squeezelite -o I2S -b 500:2000 -d all=info -M esp32";
-		store_nvs_value(NVS_TYPE_STR,"autoexec",autoexec_dft);
-		store_nvs_value(NVS_TYPE_STR,"autoexec1",autoexec1_dft);
+		ESP_LOGD(TAG,"No matching command found for name autoexec.");
 	}
 }
 
@@ -150,6 +162,7 @@ void console_start() {
 	esp_console_register_help_command();
 	register_system();
 	register_nvs();
+	register_wifi();
 #if RECOVERY_APPLICATION!=1
 	register_squeezelite();
 #elif RECOVERY_APPLICATION==1
@@ -245,6 +258,7 @@ static void * console_thread() {
 		run_command(line);
 		/* linenoise allocates line buffer on the heap, so need to free it */
 		linenoiseFree(line);
+		taskYIELD();
 	}
 	return NULL;
 }

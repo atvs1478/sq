@@ -185,9 +185,6 @@ struct raop_ctx_s *raop_create(struct in_addr host, char *name,
 	LOG_INFO("starting mDNS with %s", id);
 	ESP_ERROR_CHECK( mdns_service_add(id, "_raop", "_tcp", ctx->port, txt, sizeof(txt) / sizeof(mdns_txt_item_t)) );
 	
-	/*
-	xTaskCreate((TaskFunction_t) rtsp_thread, "RTSP_thread", 8*1024, ctx, ESP_TASK_PRIO_MIN + 1, &ctx->thread);
-	*/
     ctx->xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     ctx->xStack = (StackType_t*) malloc(RTSP_STACK_SIZE);
 	ctx->thread = xTaskCreateStatic( (TaskFunction_t) rtsp_thread, "RTSP_thread", RTSP_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->xStack, ctx->xTaskBuffer);
@@ -221,6 +218,7 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	pthread_join(ctx->thread, NULL);
 #else
 	xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
+	vTaskDelete(ctx->thread);
 	free(ctx->xStack);
 	heap_caps_free(ctx->xTaskBuffer);
 #endif
@@ -369,7 +367,7 @@ static void *rtsp_thread(void *arg) {
 
 #ifndef WIN32
 	xTaskNotify(ctx->joiner, 0, eNoAction);
-	vTaskDelete(NULL);
+	vTaskSuspend(NULL);
 #endif
 
 	return NULL;

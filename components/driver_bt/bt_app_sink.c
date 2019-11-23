@@ -399,16 +399,37 @@ void bt_sink_init(bt_cmd_cb_t cmd_cb, bt_data_cb_t data_cb)
 
     /*
      * Set default parameters for Legacy Pairing
-     * Use fixed pin code
      */
     esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_FIXED;
-    esp_bt_pin_code_t pin_code;
-	pin_code[0] = '1';
-    pin_code[1] = '2';
-    pin_code[2] = '3';
-    pin_code[3] = '4';
-    esp_bt_gap_set_pin(pin_type, 4, pin_code);
 
+    char * pin_code = config_alloc_get_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+    if(strlen(pin_code)>ESP_BT_PIN_CODE_LEN){
+
+    	ESP_LOGW(BT_AV_TAG, "BT Sink pin code [%s] too long. ", pin_code);
+    	pin_code[ESP_BT_PIN_CODE_LEN] = '\0';
+    	ESP_LOGW(BT_AV_TAG, "BT Sink pin truncated code [%s]. ", pin_code);
+    }
+
+    esp_bt_pin_code_t esp_pin_code;
+    bool bError=false;
+    memset(esp_pin_code, 0x00, sizeof(esp_pin_code) );
+    ESP_LOGW(BT_AV_TAG, "BT Sink pin code is: [%s] ", pin_code);
+
+    for(int i=0;i<strlen(pin_code);i++){
+    	if(pin_code[i] < '0' || pin_code[i] > '9' ) {
+    		ESP_LOGE(BT_AV_TAG,"Invalid number found in sequence");
+    		bError=true;
+    	}
+    	esp_pin_code[i]= pin_code[i];
+
+    }
+    if(bError){
+    	esp_pin_code[0]='1';
+    	esp_pin_code[1]='2';
+    	esp_pin_code[2]='3';
+    	esp_pin_code[3]='4';
+    }
+    esp_bt_gap_set_pin(pin_type, strlen(pin_code), esp_pin_code);
 }
 
 void bt_sink_deinit(void)
@@ -466,7 +487,7 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
     switch (event) {
     case BT_APP_EVT_STACK_UP: {
         /* set up device name */
-		bt_name = (char * )get_nvs_value_alloc_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
+		bt_name = (char * )config_alloc_get_default(NVS_TYPE_STR, "bt_name", CONFIG_BT_NAME, 0);
 		esp_bt_dev_set_device_name(bt_name);
 		free(bt_name);
         esp_bt_gap_register_callback(bt_app_gap_cb);
