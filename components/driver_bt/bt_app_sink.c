@@ -156,7 +156,8 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         s_audio_state = a2d->audio_stat.state;
         if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
 			(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
-        } else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state) {
+        } else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state ||
+				   ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND == a2d->audio_stat.state) {
 			(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
 		}	
         break;

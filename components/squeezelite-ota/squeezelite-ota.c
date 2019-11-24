@@ -298,7 +298,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     }
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
-    	//char * local_buff = heap_caps_malloc(ota_config.buffer_size, MALLOC_CAP_INTERNAL);
+    	//char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_INTERNAL);
     	char * local_buff = malloc(ota_config.buffer_size+1);
     	if(local_buff==NULL){
     		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");

@@ -637,6 +637,12 @@ static void *rtp_thread_func(void *arg) {
 				u64_t remote = (((u64_t) ntohl(*(u32_t*)(pktp+8))) << 32) + ntohl(*(u32_t*)(pktp+12));
 				u32_t rtp_now = ntohl(*(u32_t*)(pktp+16));
 				u16_t flags = ntohs(*(u16_t*)(pktp+2));
+				u32_t remote_gap = NTP2MS(remote - ctx->timing.remote);
+				
+				if (remote_gap > 10000) {
+					LOG_WARN("discarding remote timing information %u", remote_gap);
+					break;
+				}
 
 				pthread_mutex_lock(&ctx->ab_mutex);
 
@@ -646,7 +652,7 @@ static void *rtp_thread_func(void *arg) {
 				if (ctx->latency < MIN_LATENCY) ctx->latency = MIN_LATENCY;
 				else if (ctx->latency > MAX_LATENCY) ctx->latency = MAX_LATENCY;
 				ctx->synchro.rtp = rtp_now - ctx->latency;
-				ctx->synchro.time = ctx->timing.local + (u32_t) NTP2MS(remote - ctx->timing.remote);
+				ctx->synchro.time = ctx->timing.local + remote_gap;
 
 				// now we are synced on RTP frames
 				ctx->synchro.status |= RTP_SYNC;
