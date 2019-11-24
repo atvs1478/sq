@@ -36,8 +36,8 @@ extern struct buffer *outputbuf;
 extern log_level loglevel;
 
 // not great to have these here, but they should not be in embedded.h
-bool enable_bt_sink;
-bool enable_airplay;
+bool enable_bt_sink = false;
+bool enable_airplay = false;
 
 #define RAOP_OUTPUT_SIZE (RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
 
@@ -96,7 +96,6 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
  * BT sink command handler
  */
 
-extern u16_t get_adjusted_volume(u16_t volume);
 static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...) 
 {
 	va_list args;
@@ -140,7 +139,7 @@ static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		break;
 	case BT_SINK_VOLUME: {
 		u16_t volume = (u16_t) va_arg(args, u32_t);
-		volume = get_adjusted_volume(volume);
+		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
 		break;
 	}
@@ -260,7 +259,7 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 		case RAOP_VOLUME: {
 			float volume = *((float*) param);
 			LOG_INFO("Volume[0..1] %0.4f", volume);
-			volume *= 65536;
+			volume = 65536 * powf(volume, 3);
 			set_volume((u16_t) volume, (u16_t) volume);
 			break;
 		}

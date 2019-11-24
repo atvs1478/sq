@@ -230,31 +230,6 @@ const char * get_certificate(){
 	return blob;
 }
 
-
-
-
-
-//CONFIG_SDIF_NUM=0
-//CONFIG_SPDIF_BCK_IO=26
-//CONFIG_SPDIF_WS_IO=25
-//CONFIG_SPDIF_DO_IO=15
-//CONFIG_A2DP_CONTROL_DELAY_MS=500
-//CONFIG_A2DP_CONNECT_TIMEOUT_MS=1000
-//CONFIG_WIFI_MANAGER_MAX_RETRY=2
-u16_t get_adjusted_volume(u16_t volume){
-
-	char * str_factor = config_alloc_get_default(NVS_TYPE_STR, "volumefactor", "3", 0);
-	if(str_factor != NULL ){
-
-		float factor = atof(str_factor);
-		free(str_factor);
-		return (u16_t) (65536.0f * powf( (volume/ 128.0f), factor) );
-	}
-	else {
-		ESP_LOGW(TAG,"Error retrieving volume factor.  Returning unmodified volume level. ");
-		return volume;
-	}
-}
 #define DEFAULT_NAME_WITH_MAC(var,defval) char var[strlen(defval)+sizeof(macStr)]; strcpy(var,defval); strcat(var,macStr)
 void register_default_nvs(){
 	uint8_t mac[6];
@@ -289,8 +264,6 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR,"autoexec","1", 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec1",default_command_line);
 	config_set_default(NVS_TYPE_STR,"autoexec1",default_command_line,0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "volumefactor", "3");
-	config_set_default(NVS_TYPE_STR, "volumefactor", "3", 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
 	config_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
