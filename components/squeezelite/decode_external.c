@@ -204,6 +204,7 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 				LOG_DEBUG("obuf:%u, sync_len:%u, devframes:%u, inproc:%u", _buf_used(outputbuf), raop_sync.len, output.device_frames, output.frames_in_process);
 			}	
 			
+			// TODO: better sync logic
 			if (error < -10 && raop_sync.error < -10) {
 				output.skip_frames = (abs(error + raop_sync.error) / 2 * RAOP_SAMPLE_RATE) / 1000;
 				output.state = OUTPUT_SKIP_FRAMES;					
