@@ -29,6 +29,8 @@
 #define LOCK_D   mutex_lock(decode.mutex);
 #define UNLOCK_D mutex_unlock(decode.mutex);
 
+enum { DECODE_BT = 1, DECODE_AIRPLAY };
+
 extern struct outputstate output;
 extern struct decodestate decode;
 extern struct buffer *outputbuf;
@@ -114,14 +116,16 @@ static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		
 	switch(cmd) {
 	case BT_SINK_CONNECTED:
-		output.external = true;
+		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
 		LOG_INFO("BT sink started");
 		break;
 	case BT_SINK_DISCONNECTED:	
-		output.external = false;
-		output.state = OUTPUT_OFF;
-		LOG_INFO("BT sink stopped");
+		if (output.external == DECODE_BT) {
+			output.external = 0;
+			output.state = OUTPUT_OFF;
+			LOG_INFO("BT sink stopped");
+		}	
 		break;
 	case BT_SINK_PLAY:
 		output.state = OUTPUT_RUNNING;
@@ -226,13 +230,13 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 			raop_sync.error = 0;
 			raop_sync.start = true;		
 			raop_sync.enabled = !strcasestr(output.device, "BT");
-			output.external = true;
+			output.external = DECODE_AIRPLAY;
 			output.next_sample_rate = output.current_sample_rate = RAOP_SAMPLE_RATE;
 			output.state = OUTPUT_STOPPED;
 			break;
 		case RAOP_STOP:
 			LOG_INFO("Stop", NULL);
-			output.external = false;
+			output.external = 0;
 			output.state = OUTPUT_OFF;
 			output.frames_played = 0;
 			raop_state = event;

@@ -371,7 +371,7 @@ static void process_strm(u8_t *pkt, int len) {
 			sendSTAT("STMc", 0);
 			sentSTMu = sentSTMo = sentSTMl = false;
 			LOCK_O;
-			output.external = false;
+			output.external = 0;
 			_buf_resize(outputbuf, output.init_size);
 			output.threshold = strm->output_threshold;
 			output.next_replay_gain = unpackN(&strm->replay_gain);
