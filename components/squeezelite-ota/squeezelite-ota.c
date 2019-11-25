@@ -191,8 +191,8 @@ esp_err_t init_config(char * url){
 	ota_config.skip_cert_common_name_check = false;
 	ota_config.url = strdup(url);
 	ota_config.max_redirection_count = 3;
-	//ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_INTERNAL);
-	ota_write_data = malloc(ota_config.buffer_size+1);
+	ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+	//ota_write_data = malloc(ota_config.buffer_size+1);
 	if(ota_write_data== NULL){
 		ESP_LOGE(TAG,"Error allocating the ota buffer");
 		return ESP_ERR_NO_MEM;
@@ -298,8 +298,8 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     }
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
-    	//char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_INTERNAL);
-    	char * local_buff = malloc(ota_config.buffer_size+1);
+    	char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    	//char * local_buff = malloc(ota_config.buffer_size+1);
     	if(local_buff==NULL){
     		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
     		return ESP_ERR_NO_MEM;
