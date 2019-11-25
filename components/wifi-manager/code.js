@@ -346,7 +346,7 @@ $(document).ready(function(){
         var commandLine = commandHeader + '-n ' + $("#player").val();
 
         if (output == 'bt') {
-            commandLine += ' -o "BT -n \'' + $("#btsink").val() + '\'" -R -Z 192000 -r "44100-44100"';
+            commandLine += ' -o "BT -n \'' + $("#btsink").val() + '\'" -R -Z 192000';
         } else if (output == 'spdif') {
             commandLine += ' -o SPDIF -R -Z 192000';
         } else {
