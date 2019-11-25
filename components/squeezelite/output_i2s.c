@@ -570,7 +570,7 @@ static void *output_thread_i2s() {
  * Stats output thread
  */
 static void *output_thread_i2s_stats() {
-	return;
+	//return;
 	while (running) {
 #ifdef TAS57xx		
 		LOG_ERROR("Jack %d Voltage %.2fV", !gpio_get_level(JACK_GPIO), adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
