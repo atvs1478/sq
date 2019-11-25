@@ -391,7 +391,7 @@ void app_main()
 		ESP_LOGW(TAG,"\n\nwifi manager is ENABLED. Starting...\n\n");
 		wifi_manager_start();
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
-		wifi_manager_set_callback(WIFI_EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
+		wifi_manager_set_callback(EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 	}
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
