@@ -704,6 +704,33 @@ esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
 	return result;
 }
 
+esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
+	esp_err_t result = ESP_OK;
+	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
+			ESP_LOGE(TAG, "Unable to lock config after %d ms",LOCK_MAX_WAIT);
+			result = ESP_FAIL;
+	}
+	cJSON * entry = config_set_value_safe(nvs_type, key, value);
+	if(entry == NULL){
+		result = ESP_FAIL;
+	}
+	else{
+		char * entry_str = cJSON_PrintUnformatted(entry);
+		if(entry_str!=NULL){
+			ESP_LOGV(TAG,"config_set_value result: \n%s",entry_str);
+			free(entry_str);
+		}
+		else {
+			ESP_LOGV(TAG,"config_set_value completed");
+		}
+
+	}
+	config_unlock();
+	return result;
+}
+
+
+
 IMPLEMENT_SET_DEFAULT(uint8_t,NVS_TYPE_U8);
 IMPLEMENT_SET_DEFAULT(int8_t,NVS_TYPE_I8);
 IMPLEMENT_SET_DEFAULT(uint16_t,NVS_TYPE_U16);

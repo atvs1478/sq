@@ -38,4 +38,6 @@ void * config_alloc_get(nvs_type_t nvs_type, const char *key) ;
 bool wait_for_commit();
 char * config_alloc_get_json(bool bFormatted);
 esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value);
+nvs_type_t  config_get_item_type(cJSON * entry);
+void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry);
 

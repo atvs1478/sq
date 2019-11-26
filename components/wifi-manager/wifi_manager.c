@@ -37,7 +37,6 @@ Contains the freeRTOS task and all necessary support
 #include <stdbool.h>
 
 #include "dns_server.h"
-#include "http_server.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -62,6 +61,7 @@ Contains the freeRTOS task and all necessary support
 #include "cJSON.h"
 #include "nvs_utilities.h"
 #include "cmd_system.h"
+#include "http_server_handlers.h"
 
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0

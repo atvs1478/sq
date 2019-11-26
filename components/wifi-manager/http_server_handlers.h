@@ -62,6 +62,26 @@ function to process requests, decode URLs, serve files, etc. etc.
 #ifdef __cplusplus
 extern "C" {
 #endif
+esp_err_t root_get_handler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t resource_filehandler(httpd_req_t *req);
+esp_err_t ap_get_handler(httpd_req_t *req);
+esp_err_t config_get_handler(httpd_req_t *req);
+esp_err_t config_post_handler(httpd_req_t *req);
+esp_err_t connect_post_handler(httpd_req_t *req);
+esp_err_t connect_delete_handler(httpd_req_t *req);
+esp_err_t reboot_ota_post_handler(httpd_req_t *req);
+esp_err_t reboot_post_handler(httpd_req_t *req);
+esp_err_t recovery_post_handler(httpd_req_t *req);
+esp_err_t status_post_handler(httpd_req_t *req);
+esp_err_t ap_scan_handler(httpd_req_t *req);
+
+
+
 
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
