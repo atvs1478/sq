@@ -611,89 +611,71 @@ esp_err_t status_post_handler(httpd_req_t *req){
 
 
 
-void http_server_netconn_serve(struct netconn *conn) {
+//void http_server_netconn_serve(struct netconn *conn) {
+//
+//	struct netbuf *inbuf;
+//	char *buf = NULL;
+//	u16_t buflen;
+//	err_t err;
+//	ip_addr_t remote_add;
+//	u16_t port;
+//	ESP_LOGV(TAG,  "Serving page.  Getting device AP address.");
+//	const char new_line[2] = "\n";
+//	char * ap_ip_address= config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
+//	if(ap_ip_address==NULL){
+//		ESP_LOGE(TAG,  "Unable to retrieve default AP IP Address");
+//		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
+//		netconn_close(conn);
+//		return;
+//	}
+//	ESP_LOGV(TAG,  "Getting remote device IP address.");
+//	netconn_getaddr(conn,	&remote_add,	&port,	0);
+//	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
+//	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
+//	err = netconn_recv(conn, &inbuf);
+//	if(err == ERR_OK) {
+//		ESP_LOGV(TAG,  "Getting data buffer.");
+//		netbuf_data(inbuf, (void**)&buf, &buflen);
+//		dump_net_buffer(buf, buflen);
+//		int lenH = 0;
+//		/* extract the first line of the request */
+//		char *save_ptr = buf;
+//		char *line = strtok_r(save_ptr, new_line, &save_ptr);
+//		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
+//		char * host = malloc(lenH+1);
+//		memset(host,0x00,lenH+1);
+//		if(lenH>0){
+//			strlcpy(host,temphost,lenH+1);
+//		}
+//		ESP_LOGD(TAG,  "http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
+//
+//		if(line) {
+//
+//			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
+//			const char * host_name=NULL;
+//			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+//				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
+//			}
+//			else {
+//				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
+//			}
+//
+//			/* determine if Host is from the STA IP address */
+//			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
+//			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
+//			wifi_manager_unlock_sta_ip_string();
+//			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
+//
+//			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
+//				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
+//				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
+//				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
+//				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
+//			}
+//			else {
+//                //static stuff
+//
+//}
 
-	struct netbuf *inbuf;
-	char *buf = NULL;
-	u16_t buflen;
-	err_t err;
-	ip_addr_t remote_add;
-	u16_t port;
-	ESP_LOGV(TAG,  "Serving page.  Getting device AP address.");
-	const char new_line[2] = "\n";
-	char * ap_ip_address= config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
-	if(ap_ip_address==NULL){
-		ESP_LOGE(TAG,  "Unable to retrieve default AP IP Address");
-		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-		netconn_close(conn);
-		return;
-	}
-	ESP_LOGV(TAG,  "Getting remote device IP address.");
-	netconn_getaddr(conn,	&remote_add,	&port,	0);
-	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
-	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
-	err = netconn_recv(conn, &inbuf);
-	if(err == ERR_OK) {
-		ESP_LOGV(TAG,  "Getting data buffer.");
-		netbuf_data(inbuf, (void**)&buf, &buflen);
-		dump_net_buffer(buf, buflen);
-		int lenH = 0;
-		/* extract the first line of the request */
-		char *save_ptr = buf;
-		char *line = strtok_r(save_ptr, new_line, &save_ptr);
-		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
-		char * host = malloc(lenH+1);
-		memset(host,0x00,lenH+1);
-		if(lenH>0){
-			strlcpy(host,temphost,lenH+1);
-		}
-		ESP_LOGD(TAG,  "http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
 
-		if(line) {
-
-			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
-			const char * host_name=NULL;
-			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
-				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
-			}
-			else {
-				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
-			}
-
-			/* determine if Host is from the STA IP address */
-			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
-			wifi_manager_unlock_sta_ip_string();
-			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
-
-			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
-				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
-				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
-				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
-			}
-			else {
-                //static stuff
-
-}
-
-
-void strreplace(char *src, char *str, char *rep)
-{
-    char *p = strstr(src, str);
-    if(p)
-    {
-        int len = strlen(src)+strlen(rep)-strlen(str);
-        char r[len];
-        memset(r, 0, len);
-        if( p >= src ) {
-            strncpy(r, src, p-src);
-            r[p-src]='\0';
-            strncat(r, rep, strlen(rep));
-            strncat(r, p+strlen(str), p+strlen(str)-src+strlen(src));
-            strcpy(src, r);
-            strreplace(p+strlen(rep), str, rep);
-        }
-    }
-}
 
