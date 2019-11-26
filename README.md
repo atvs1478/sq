@@ -147,3 +147,4 @@ See squeezlite command line, but keys options are
 	- LINKALL (mandatory)
 	- NO_FAAD unless you want to us faad, which currently overloads the CPU
 	- TREMOR_ONLY (mandatory)
+
