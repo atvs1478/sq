@@ -57,7 +57,7 @@ void process_autoexec(){
 
 	char * str_flag = config_alloc_get(NVS_TYPE_STR, "autoexec");
 	if(!bypass_wifi_manager){
-		ESP_LOGW(TAG, "Procesing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
+		ESP_LOGW(TAG, "Processing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
 	}
 #if RECOVERY_APPLICATION
 	ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.");
