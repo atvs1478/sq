@@ -343,7 +343,7 @@ $(document).ready(function(){
     });
 
     $("#generate-command").on("click", function() {
-        var commandLine = commandHeader + '-n ' + $("#player").val();
+        var commandLine = commandHeader + '-n "' + $("#player").val() + '"';
 
         if (output == 'bt') {
             commandLine += ' -o "BT -n \'' + $("#btsink").val() + '\'" -R -Z 192000';
