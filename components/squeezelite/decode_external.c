@@ -41,15 +41,16 @@ extern log_level loglevel;
 bool enable_bt_sink = false;
 bool enable_airplay = false;
 
-#define RAOP_OUTPUT_SIZE (RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
+#define RAOP_OUTPUT_SIZE 	(RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
+#define SYNC_NB				5
 
 static raop_event_t	raop_state;
 static bool raop_expect_stop = false;
 static struct {
 	bool enabled, start;
-	s32_t error;
-	u32_t start_time;
-	u32_t playtime, len;
+	s32_t error[SYNC_NB];
+	u32_t idx, len;
+	u32_t start_time, playtime;
 } raop_sync;
 
 /****************************************************************************************
@@ -185,7 +186,7 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 	switch (event) {
 		case RAOP_TIMING: {
 			u32_t ms, now = gettime_ms();
-			s32_t error;
+			s32_t sync_nb, error = 0;
 			
 			if (!raop_sync.enabled || output.state < OUTPUT_RUNNING || output.frames_played_dmp < output.device_frames) break;
 			
@@ -193,31 +194,39 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 			if (raop_sync.start) {
 				// how many ms have we really played
 				ms = now - output.updated + ((u64_t) (output.frames_played_dmp - output.device_frames) * 1000) / RAOP_SAMPLE_RATE;
-				error = ms - (now - raop_sync.start_time); 
-				LOG_DEBUG("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, error);
-				if (abs(error) < 10 && abs(raop_sync.error) < 10) raop_sync.start = false;
+				raop_sync.error[raop_sync.idx] = ms - (now - raop_sync.start_time); 
+				sync_nb = 2;
+				LOG_INFO("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, raop_sync.error[raop_sync.idx]);
 			} else {	
 				// in how many ms will the most recent block play 
 				ms = ((u64_t) ((_buf_used(outputbuf) - raop_sync.len) / BYTES_PER_FRAME + output.device_frames + output.frames_in_process) * 1000) / RAOP_SAMPLE_RATE - (now - output.updated);
-				error = (raop_sync.playtime - now) - ms;
-				LOG_INFO("head local:%u, remote:%u (delta:%d)", ms, raop_sync.playtime - now, error);
+				raop_sync.error[raop_sync.idx] = (raop_sync.playtime - now) - ms;
+				sync_nb = SYNC_NB;
+				LOG_INFO("head local:%u, remote:%u (delta:%d)", ms, raop_sync.playtime - now, raop_sync.error[raop_sync.idx]);
 				LOG_DEBUG("obuf:%u, sync_len:%u, devframes:%u, inproc:%u", _buf_used(outputbuf), raop_sync.len, output.device_frames, output.frames_in_process);
 			}	
 			
-			// TODO: better sync logic
-			if (error < -10 && raop_sync.error < -10) {
-				output.skip_frames = (abs(error + raop_sync.error) / 2 * RAOP_SAMPLE_RATE) / 1000;
+			// calculate the average error
+			for (int i = 0; i < sync_nb; i++) error += raop_sync.error[i];
+			error /= sync_nb;
+			raop_sync.idx = (raop_sync.idx + 1) % sync_nb;
+			
+			// need at least nb_sync measures done to exit quick mode
+			if (raop_sync.start && !raop_sync.idx && abs(error) < 10) raop_sync.start = false;
+			
+			// correct if needed
+			if (error < -10) {
+				output.skip_frames = (abs(error) * RAOP_SAMPLE_RATE) / 1000;
 				output.state = OUTPUT_SKIP_FRAMES;					
-				raop_sync.error = 0;
+				memset(raop_sync.error, 0, sizeof(raop_sync.error));
 				LOG_INFO("skipping %u frames", output.skip_frames);
-			} else if (error > 10 && raop_sync.error > 10) {
-				output.pause_frames = (abs(error + raop_sync.error) / 2 * RAOP_SAMPLE_RATE) / 1000;
+			} else if (error > 10) {
+				output.pause_frames = (abs(error) * RAOP_SAMPLE_RATE) / 1000;
 				output.state = OUTPUT_PAUSE_FRAMES;
-				raop_sync.error = 0;
+				memset(raop_sync.error, 0, sizeof(raop_sync.error));
 				LOG_INFO("pausing for %u frames", output.pause_frames);
 			}
 				
-			raop_sync.error = error;
 			break;
 		}
 		case RAOP_SETUP:
@@ -228,7 +237,8 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 		case RAOP_STREAM:
 			LOG_INFO("Stream", NULL);
 			raop_state = event;
-			raop_sync.error = 0;
+			memset(raop_sync.error, 0, sizeof(raop_sync.error));
+			raop_sync.idx = 0;
 			raop_sync.start = true;		
 			raop_sync.enabled = !strcasestr(output.device, "BT");
 			output.external = DECODE_AIRPLAY;

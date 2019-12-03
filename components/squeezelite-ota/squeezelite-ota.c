@@ -284,7 +284,7 @@ static bool process_again(int status_code)
 }
 static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client, int status_code)
 {
-    esp_err_t err;
+    esp_err_t err=ESP_OK;
     if (status_code == HttpStatus_MovedPermanently || status_code == HttpStatus_Found) {
     	ESP_LOGW(TAG, "Handling HTTP redirection. ");
         err = esp_http_client_set_redirection(http_client);

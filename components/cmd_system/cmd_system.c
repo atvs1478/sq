@@ -102,6 +102,9 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 #if RECOVERY_APPLICATION
 	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
 		ESP_LOGW(TAG,"RECOVERY application is already active");
+		if(!wait_for_commit()){
+			ESP_LOGW(TAG,"Unable to commit configuration. ");
+		}
 		ESP_LOGW(TAG, "Restarting after tx complete");
 		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
 		esp_restart();
@@ -110,6 +113,9 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 #else
 	if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
 		ESP_LOGW(TAG,"SQUEEZELITE application is already active");
+		if(!wait_for_commit()){
+			ESP_LOGW(TAG,"Unable to commit configuration. ");
+		}
 		ESP_LOGW(TAG, "Restarting after tx complete");
 		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
 		esp_restart();

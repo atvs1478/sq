@@ -452,7 +452,7 @@ static void *output_thread_i2s() {
 	while (running) {
 			
 		TIME_MEASUREMENT_START(timer_start);
-		
+#ifdef TAS57xx
 		// handle jack insertion as a polling function (to avoid to have to do de-bouncing)
 		if (gpio_get_level(JACK_GPIO) != jack_status) {
 			jack_status = gpio_get_level(JACK_GPIO);
@@ -461,7 +461,7 @@ static void *output_thread_i2s() {
 				LOG_INFO("Changing jack status %d", jack_status);
 			}	
 		}
-		
+#endif
 		LOCK;
 		
 		// manage led display
@@ -644,20 +644,22 @@ void dac_cmd(dac_cmd_e cmd, ...) {
 /****************************************************************************************
  * Analogue mute
  */
+#ifdef TAS57xx
 static void set_analogue(bool active) {
-#ifdef TAS57xx	
+
 	dac_cmd(DAC_STANDBY);
 	// need to wait a bit for TAS to execute standby before sending backend-down command
 	usleep(50*1000);
 	dac_cmd(active ? DAC_ANALOG_UP : DAC_ANALOG_DOWN);
 	dac_cmd(DAC_ACTIVE);	 
-#endif	
 }
-
+#endif
 /****************************************************************************************
  * TAS57 detection
  */
+#ifdef TAS57xx
 static int tas57_detect(void) {
+
 	u8_t data, addr[] = {0x90, 0x98};
 	int ret;
 	
@@ -681,9 +683,10 @@ static int tas57_detect(void) {
 			return addr[i];
 		}	
 	}	
-	
+
 	return 0;
-}	
+}
+#endif
 
 /****************************************************************************************
  * SPDIF support
