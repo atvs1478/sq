@@ -45,6 +45,43 @@ typedef struct rest_server_context {
 #define ESP_LOGD_LOC(t,str, ...)  ESP_LOGD(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 
+
+void register_common_handlers(httpd_handle_t server){
+	httpd_uri_t res_get = { .uri = "/res/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &res_get);
+
+}
+void register_regular_handlers(httpd_handle_t server){
+	httpd_uri_t root_get = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &root_get);
+
+	httpd_uri_t ap_get = { .uri = "/ap.json", .method = HTTP_GET, .handler = ap_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &ap_get);
+	httpd_uri_t scan_get = { .uri = "/scan.json", .method = HTTP_GET, .handler = ap_scan_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &scan_get);
+	httpd_uri_t config_get = { .uri = "/config.json", .method = HTTP_GET, .handler = config_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &config_get);
+	httpd_uri_t status_get = { .uri = "/status.json", .method = HTTP_GET, .handler = status_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &status_get);
+
+	httpd_uri_t config_post = { .uri = "/config.json", .method = HTTP_POST, .handler = config_post_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &config_post);
+	httpd_uri_t connect_post = { .uri = "/connect.json", .method = HTTP_POST, .handler = connect_post_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &connect_post);
+
+	httpd_uri_t reboot_ota_post = { .uri = "/reboot_ota.json", .method = HTTP_POST, .handler = reboot_ota_post_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &reboot_ota_post);
+
+	httpd_uri_t reboot_post = { .uri = "/reboot.json", .method = HTTP_POST, .handler = reboot_post_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &reboot_post);
+
+	httpd_uri_t recovery_post = { .uri = "/recovery.json", .method = HTTP_POST, .handler = recovery_post_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &recovery_post);
+
+	httpd_uri_t connect_delete = { .uri = "/connect.json", .method = HTTP_DELETE, .handler = connect_delete_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &connect_delete);
+}
+
 esp_err_t http_server_start()
 {
 	ESP_LOGI(REST_TAG, "Initializing HTTP Server");
@@ -58,6 +95,8 @@ esp_err_t http_server_start()
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
+    //todo:  use this to configure session token?
+    // config.open_fn
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     esp_err_t err= httpd_start(&server, &config);
@@ -66,39 +105,11 @@ esp_err_t http_server_start()
     }
     else {
 
-    	httpd_uri_t root_get = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &root_get);
-    	httpd_uri_t res_get = { .uri = "/res/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &res_get);
-
-    	httpd_uri_t ap_get = { .uri = "/ap.json", .method = HTTP_GET, .handler = ap_get_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &ap_get);
-    	httpd_uri_t scan_get = { .uri = "/scan.json", .method = HTTP_GET, .handler = ap_scan_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &scan_get);
-    	httpd_uri_t config_get = { .uri = "/config.json", .method = HTTP_GET, .handler = config_get_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &config_get);
-    	httpd_uri_t status_get = { .uri = "/status.json", .method = HTTP_GET, .handler = status_get_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &status_get);
-
-
-    	httpd_uri_t config_post = { .uri = "/config.json", .method = HTTP_POST, .handler = config_post_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &config_post);
-    	httpd_uri_t connect_post = { .uri = "/connect.json", .method = HTTP_POST, .handler = connect_post_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &connect_post);
-
-    	httpd_uri_t reboot_ota_post = { .uri = "/reboot_ota.json", .method = HTTP_POST, .handler = reboot_ota_post_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &reboot_ota_post);
-
-    	httpd_uri_t reboot_post = { .uri = "/reboot.json", .method = HTTP_POST, .handler = reboot_post_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &reboot_post);
-
-    	httpd_uri_t recovery_post = { .uri = "/recovery.json", .method = HTTP_POST, .handler = recovery_post_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &recovery_post);
-
-    	httpd_uri_t connect_delete = { .uri = "/connect.json", .method = HTTP_DELETE, .handler = connect_delete_handler, .user_ctx = rest_context };
-    	httpd_register_uri_handler(server, &connect_delete);
-
+    	register_common_handlers(server);
+    	register_regular_handlers(server);
     }
+    register_err_handler(server, HTTPD_404_NOT_FOUND,&err_handler);
+
 
     return err;
 }

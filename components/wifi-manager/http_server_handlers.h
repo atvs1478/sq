@@ -79,7 +79,7 @@ esp_err_t reboot_post_handler(httpd_req_t *req);
 esp_err_t recovery_post_handler(httpd_req_t *req);
 esp_err_t status_post_handler(httpd_req_t *req);
 esp_err_t ap_scan_handler(httpd_req_t *req);
-
+esp_err_t err_handler(httpd_req_t *req, httpd_err_code_t error);
 
 
 

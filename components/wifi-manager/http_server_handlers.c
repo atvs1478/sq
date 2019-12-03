@@ -201,7 +201,7 @@ static esp_err_t set_content_type_from_req(httpd_req_t *req)
 
    /* If name has trailing '/', respond with directory contents */
    if (filename[strlen(filename) - 1] == '/') {
-	   httpd_resp_send_err(req, HTTPD_405_METHOD_NOT_ALLOWED, "Browsing files forbidden.");
+	   httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Browsing files forbidden.");
 	   return ESP_FAIL;
    }
    return ESP_OK;
@@ -240,7 +240,7 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 
    /* If name has trailing '/', respond with directory contents */
    if (filename[strlen(filename) - 1] == '/') {
-	   httpd_resp_send_err(req, HTTPD_405_METHOD_NOT_ALLOWED, "Browsing files forbidden.");
+	   httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Browsing files forbidden.");
 	   return ESP_FAIL;
    }
 
@@ -321,7 +321,7 @@ esp_err_t ap_get_handler(httpd_req_t *req){
 		}
 	}
 	else {
-		httpd_resp_send_err(req, HTTPD_503_NOT_FOUND, "AP list unavailable");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "AP list unavailable");
 		ESP_LOGE(TAG,   "GET /ap.json failed to obtain mutex");
 	}
 	return err;
@@ -338,7 +338,7 @@ esp_err_t config_get_handler(httpd_req_t *req){
 		char * json = config_alloc_get_json(false);
 		if(json==NULL){
 			ESP_LOGD(TAG,  "Error retrieving config json string. ");
-			httpd_resp_send_err(req, HTTPD_503_NOT_FOUND, "Error retrieving configuration object");
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error retrieving configuration object");
 			err=ESP_FAIL;
 		}
 		else {
@@ -358,14 +358,14 @@ esp_err_t post_handler_buff_receive(httpd_req_t * req){
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
         /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Content too long");
         return ESP_FAIL;
     }
     while (cur_len < total_len) {
         received = httpd_req_recv(req, buf + cur_len, total_len);
         if (received <= 0) {
             /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Failed to post control value");
             return ESP_FAIL;
         }
         cur_len += received;
@@ -379,7 +379,6 @@ esp_err_t config_post_handler(httpd_req_t *req){
 	char * otaURL=NULL;
     esp_err_t err = post_handler_buff_receive(req);
     if(err!=ESP_OK){
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
         return err;
     }
     if(!is_user_authenticated(httpd_req_t *req)){
@@ -420,7 +419,7 @@ esp_err_t config_post_handler(httpd_req_t *req){
 					else {
 						if(config_set_value(item_type, last_parm_name , last_parm) != ESP_OK){
 							ESP_LOGE(TAG,"Unable to store value for [%s]", prev_item->name);
-							httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to store config value");
+							httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to store config value");
 							err = ESP_FAIL;
 						}
 						else {
@@ -471,7 +470,6 @@ esp_err_t connect_post_handler(httpd_req_t *req){
 	set_content_type_from_req(req);
 	esp_err_t err = post_handler_buff_receive(req);
 	if(err!=ESP_OK){
-		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
 		return err;
 	}
 	char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
@@ -482,7 +480,7 @@ esp_err_t connect_post_handler(httpd_req_t *req){
 	cJSON *root = cJSON_Parse(buf);
 
 	if(root==NULL){
-		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "JSON parsing error.");
 		return ESP_FAIL;
 	}
 
@@ -592,18 +590,126 @@ esp_err_t status_post_handler(httpd_req_t *req){
 			free(buff);
 		}
 		else {
-			httpd_resp_send_err(req, HTTPD_503_NOT_FOUND, "Empty status object");
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Empty status object");
 		}
 	}
 	else {
-		httpd_resp_send_err(req, HTTPD_503_NOT_FOUND, "Error retrieving status object");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Error retrieving status object");
 	}
 
 	return ESP_OK;
 }
 
+esp_err_t err_handler(httpd_req_t *req, httpd_err_code_t error){
+    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    char success[]="";
+    if(!is_user_authenticated(httpd_req_t *req)){
+    	// todo:  redirect to login page
+    	// return ESP_OK;
+    }
+    if(error != HTTPD_404_NOT_FOUND){
+    	return httpd_resp_send_err(req, error, NULL);
+    }
+
+    char * ap_ip_address= config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
+	if(ap_ip_address==NULL){
+		ESP_LOGE(TAG,  "Unable to retrieve default AP IP Address");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to retrieve default AP IP Address");
+		return ESP_FAIL;
+	}
 
 
+	struct httpd_req_aux *ra = req->aux;
+	//UF_HOST
+
+
+    //	ip_addr_t remote_add;
+    //	err_t err;
+
+
+    //	u16_t buflen;
+    //	u16_t port;
+
+
+    //	ESP_LOGV(TAG,  "Getting remote device IP address.");
+    //	netconn_getaddr(conn,	&remote_add,	&port,	0);
+    //	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
+    //	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
+    //	err = netconn_recv(conn, &inbuf);
+    //	if(err == ERR_OK) {
+    //		ESP_LOGV(TAG,  "Getting data buffer.");
+    //		netbuf_data(inbuf, (void**)&buf, &buflen);
+    //		dump_net_buffer(buf, buflen);
+    //		int lenH = 0;
+    //		/* extract the first line of the request */
+    //		char *save_ptr = buf;
+    //		char *line = strtok_r(save_ptr, new_line, &save_ptr);
+    //		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
+    //		char * host = malloc(lenH+1);
+    //		memset(host,0x00,lenH+1);
+    //		if(lenH>0){
+    //			strlcpy(host,temphost,lenH+1);
+    //		}
+    //		ESP_LOGD(TAG,  "http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
+    //
+    //		if(line) {
+    //
+    //			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
+    //			const char * host_name=NULL;
+    //			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+    //				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
+    //			}
+    //			else {
+    //				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
+    //			}
+    //
+    //			/* determine if Host is from the STA IP address */
+    //			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
+    //			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
+    //			wifi_manager_unlock_sta_ip_string();
+    //			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
+    //
+    //			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
+    //				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
+    //				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
+    //				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
+    //				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	set_content_type_from_req(req);
+	httpd_resp_send(req, (const char *)NULL, 0);
+	wifi_manager_reboot(RECOVERY);
+	FREE_AND_NULL(ap_ip_address);
+	return ESP_OK;
+}
 
 
 

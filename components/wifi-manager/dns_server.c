@@ -75,9 +75,6 @@ void CODE_RAM_LOCATION dns_server_stop(){
 
 
 void CODE_RAM_LOCATION dns_server(void *pvParameters) {
-
-
-
     struct sockaddr_in sa, ra;
 
     /* Set redirection DNS hijack to the access point IP */
