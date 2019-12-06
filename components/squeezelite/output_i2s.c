@@ -83,7 +83,7 @@ sure that using rate_delay would fix that
 #define CONFIG_SPDIF_NUM -1
 #endif
 
-typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOG_OFF, DAC_ANALOG_ON, DAC_VOLUME } dac_cmd_e;
+typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOGUE_OFF, DAC_ANALOGUE_ON, DAC_VOLUME } dac_cmd_e;
 
 // must have an integer ratio with FRAME_BLOCK (see spdif comment)
 #define DMA_BUF_LEN		512	
@@ -193,8 +193,8 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 	{ 0x02, 0x00 },	// DAC_ACTIVE
 	{ 0x02, 0x10 },	// DAC_STANDBY
 	{ 0x02, 0x01 },	// DAC_DOWN
-	{ 0x56, 0x10 },	// DAC_ANALOG_OFF
-	{ 0x56, 0x00 },	// DAC_ANALOG_ON
+	{ 0x56, 0x10 },	// DAC_ANALOGUE_OFF
+	{ 0x56, 0x00 },	// DAC_ANALOGUE_ON
 };
 
 static u8_t tas57_addr;
@@ -247,7 +247,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	}
 	
 	// activate analogue output if needed
-	if (!jack_mutes_amp) dac_cmd(DAC_ANALOG_ON);
+	if (!jack_mutes_amp) dac_cmd(DAC_ANALOGUE_ON);
 #endif	
 	
 #ifdef CONFIG_I2S_BITS_PER_CHANNEL
@@ -461,7 +461,7 @@ static void *output_thread_i2s() {
 		if (gpio_get_level(JACK_GPIO) != jack_status) {
 			jack_status = gpio_get_level(JACK_GPIO);
 			if (jack_mutes_amp) {
-				dac_cmd(jack_status ? DAC_ANALOG_ON : DAC_ANALOG_OFF);
+				dac_cmd(jack_status ? DAC_ANALOGUE_ON : DAC_ANALOGUE_OFF);
 				LOG_INFO("Changing jack status %d", jack_status);
 			}	
 		}
@@ -577,7 +577,7 @@ static void *output_thread_i2s_stats() {
 	//return;
 	while (running) {
 #ifdef TAS57xx		
-		LOG_ERROR("Jack %d Voltage %.2fV", !gpio_get_level(JACK_GPIO), adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
+		LOG_INFO("Jack %d Voltage %.2fV", !gpio_get_level(JACK_GPIO), adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
 #endif		
 		LOCK;
 		output_state state = output.state;
