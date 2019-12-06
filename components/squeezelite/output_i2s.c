@@ -83,7 +83,7 @@ sure that using rate_delay would fix that
 #define CONFIG_SPDIF_NUM -1
 #endif
 
-typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOG_UP, DAC_ANALOG_DOWN, DAC_VOLUME } dac_cmd_e;
+typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOG_OFF, DAC_ANALOG_ON, DAC_VOLUME } dac_cmd_e;
 
 // must have an integer ratio with FRAME_BLOCK (see spdif comment)
 #define DMA_BUF_LEN		512	
@@ -130,7 +130,6 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 static void *output_thread_i2s();
 static void *output_thread_i2s_stats();
 static void dac_cmd(dac_cmd_e cmd, ...);
-static void set_analogue(bool mute);
 static int tas57_detect(void);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 
@@ -160,6 +159,9 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 #define VOLUME_GPIO	14
 #define JACK_GPIO	34
 
+#define TAS575x 0x98
+#define TAS578x	0x90
+
 struct tas57xx_cmd_s {
 	u8_t reg;
 	u8_t value;
@@ -172,6 +174,8 @@ static const struct tas57xx_cmd_s tas57xx_init_sequence[] = {
     { 0x02, 0x10 },		// standby
     { 0x0d, 0x10 },		// use SCK for PLL
 	{ 0x25, 0x08 },		// ignore SCK halt 
+	{ 0x08, 0x10 },		// Mute control enable (from TAS5780)
+	{ 0x54, 0x02 },		// Mute output control (from TAS5780)
 	{ 0x02, 0x00 },		// restart
 	{ 0xff, 0xff }		// end of table
 };
@@ -189,8 +193,8 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 	{ 0x02, 0x00 },	// DAC_ACTIVE
 	{ 0x02, 0x10 },	// DAC_STANDBY
 	{ 0x02, 0x01 },	// DAC_DOWN
-	{ 46, 0x01 },	// DAC_ANALOG_UP
-	{ 46, 0x00 },	// DAC_ANALOG_DOWN
+	{ 0x56, 0x10 },	// DAC_ANALOG_OFF
+	{ 0x56, 0x00 },	// DAC_ANALOG_ON
 };
 
 static u8_t tas57_addr;
@@ -243,7 +247,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	}
 	
 	// activate analogue output if needed
-	if (!jack_mutes_amp) set_analogue(true);
+	if (!jack_mutes_amp) dac_cmd(DAC_ANALOG_ON);
 #endif	
 	
 #ifdef CONFIG_I2S_BITS_PER_CHANNEL
@@ -457,7 +461,7 @@ static void *output_thread_i2s() {
 		if (gpio_get_level(JACK_GPIO) != jack_status) {
 			jack_status = gpio_get_level(JACK_GPIO);
 			if (jack_mutes_amp) {
-				set_analogue(jack_status);
+				dac_cmd(jack_status ? DAC_ANALOG_ON : DAC_ANALOG_OFF);
 				LOG_INFO("Changing jack status %d", jack_status);
 			}	
 		}
@@ -642,25 +646,11 @@ void dac_cmd(dac_cmd_e cmd, ...) {
 }
 
 /****************************************************************************************
- * Analogue mute
- */
-#ifdef TAS57xx
-static void set_analogue(bool active) {
-
-	dac_cmd(DAC_STANDBY);
-	// need to wait a bit for TAS to execute standby before sending backend-down command
-	usleep(50*1000);
-	dac_cmd(active ? DAC_ANALOG_UP : DAC_ANALOG_DOWN);
-	dac_cmd(DAC_ACTIVE);	 
-}
-#endif
-/****************************************************************************************
  * TAS57 detection
  */
 #ifdef TAS57xx
 static int tas57_detect(void) {
-
-	u8_t data, addr[] = {0x90, 0x98};
+	u8_t data, addr[] = {TAS578x, TAS575x};
 	int ret;
 	
 	for (int i = 0; i < sizeof(addr); i++) {
@@ -683,7 +673,7 @@ static int tas57_detect(void) {
 			return addr[i];
 		}	
 	}	
-
+	
 	return 0;
 }
 #endif
