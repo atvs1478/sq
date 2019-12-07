@@ -162,6 +162,11 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 #define TAS575x 0x98
 #define TAS578x	0x90
 
+static struct {
+	float sum, avg;
+	u16_t count;
+} battery;
+
 struct tas57xx_cmd_s {
 	u8_t reg;
 	u8_t value;
@@ -245,9 +250,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (ret != ESP_OK) {
 		LOG_ERROR("could not intialize TAS57xx %d", ret);
 	}
-	
-	// activate analogue output if needed
-	if (!jack_mutes_amp) dac_cmd(DAC_ANALOGUE_ON);
 #endif	
 	
 #ifdef CONFIG_I2S_BITS_PER_CHANNEL
@@ -378,7 +380,6 @@ void output_close_i2s(void) {
  */
 bool output_volume_i2s(unsigned left, unsigned right) {
 #ifdef TAS57xx	
-
 	if (!spdif) {
 		LOG_INFO("TAS57xx volume (L:%u R:%u)", left, right);
 		gpio_set_level(VOLUME_GPIO, left || right);
@@ -386,7 +387,6 @@ bool output_volume_i2s(unsigned left, unsigned right) {
 #endif	
  return false;	
 } 
-	
 
 /****************************************************************************************
  * Write frames to the output buffer
@@ -472,8 +472,17 @@ static void *output_thread_i2s() {
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
 			if (output.state == OUTPUT_OFF) led_blink(LED_GREEN, 100, 2500);
-			else if (output.state == OUTPUT_STOPPED) led_blink(LED_GREEN, 200, 1000);
-			else if (output.state == OUTPUT_RUNNING) led_on(LED_GREEN);
+			else if (output.state == OUTPUT_STOPPED) {
+#ifdef TAS57xx				
+				dac_cmd(DAC_ANALOGUE_OFF);
+#endif				
+				led_blink(LED_GREEN, 200, 1000);
+			} else if (output.state == OUTPUT_RUNNING) {
+#ifdef TAS57xx				
+				if (!jack_mutes_amp || (jack_mutes_amp && jack_status)) dac_cmd(DAC_ANALOGUE_ON);
+#endif				
+				led_on(LED_GREEN);
+			}	
 		}
 		state = output.state;
 		
@@ -574,11 +583,17 @@ static void *output_thread_i2s() {
  * Stats output thread
  */
 static void *output_thread_i2s_stats() {
-	//return;
+
 	while (running) {
 #ifdef TAS57xx		
-		LOG_INFO("Jack %d Voltage %.2fV", !gpio_get_level(JACK_GPIO), adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
+		battery.sum += adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1;
+		if (++battery.count == (300 * 1000) / STATS_PERIOD_MS) {
+			battery.avg = battery.sum / battery.count;
+			battery.sum = battery.count = 0;
+			LOG_INFO("Voltage %.2fV", battery.avg);
+		}	
 #endif		
+
 		LOCK;
 		output_state state = output.state;
 		UNLOCK;
