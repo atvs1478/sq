@@ -37,6 +37,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "esp_http_server.h"
 #include "wifi_manager.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -58,10 +59,21 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "lwip/priv/api_msg.h"
 #include "lwip/priv/tcp_priv.h"
 #include "lwip/priv/tcpip_priv.h"
+#include "esp_vfs.h"
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define ESP_LOGE_LOC(t,str, ...)  ESP_LOGE(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define ESP_LOGI_LOC(t,str, ...)  ESP_LOGI(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define ESP_LOGD_LOC(t,str, ...)  ESP_LOGD(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define ESP_LOGW_LOC(t,str, ...)  ESP_LOGW(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define ESP_LOGV_LOC(t,str, ...)  ESP_LOGV(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+
+
 esp_err_t root_get_handler(httpd_req_t *req);
 esp_err_t resource_filehandler(httpd_req_t *req);
 esp_err_t resource_filehandler(httpd_req_t *req);
@@ -77,12 +89,20 @@ esp_err_t connect_delete_handler(httpd_req_t *req);
 esp_err_t reboot_ota_post_handler(httpd_req_t *req);
 esp_err_t reboot_post_handler(httpd_req_t *req);
 esp_err_t recovery_post_handler(httpd_req_t *req);
-esp_err_t status_post_handler(httpd_req_t *req);
+esp_err_t status_get_handler(httpd_req_t *req);
 esp_err_t ap_scan_handler(httpd_req_t *req);
+esp_err_t redirect_ev_handler(httpd_req_t *req);
+esp_err_t redirect_200_ev_handler(httpd_req_t *req);
+
+
 esp_err_t err_handler(httpd_req_t *req, httpd_err_code_t error);
+#define SCRATCH_BUFSIZE (10240)
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
 
-
-
+typedef struct rest_server_context {
+    char base_path[ESP_VFS_PATH_MAX + 1];
+    char scratch[SCRATCH_BUFSIZE];
+} rest_server_context_t;
 /**
  * @brief RTOS task for the HTTP server. Do not start manually.
  * @see void http_server_start()
@@ -93,7 +113,7 @@ void CODE_RAM_LOCATION http_server(void *pvParameters);
 void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn);
 
 /* @brief create the task for the http server */
-void CODE_RAM_LOCATION http_server_start();
+esp_err_t CODE_RAM_LOCATION http_server_start();
 
 /**
  * @brief gets a char* pointer to the first occurence of header_name withing the complete http request request.

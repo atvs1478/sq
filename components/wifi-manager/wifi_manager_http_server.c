@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include  "http_server_handlers.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
@@ -32,19 +32,8 @@
 
 static const char TAG[] = "http_server";
 
-static httpd_handle_t server = NULL;
-#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
-#define SCRATCH_BUFSIZE (10240)
-
-typedef struct rest_server_context {
-    char base_path[ESP_VFS_PATH_MAX + 1];
-    char scratch[SCRATCH_BUFSIZE];
-} rest_server_context_t;
-#define ESP_LOGE_LOC(t,str, ...)  ESP_LOGE(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
-#define ESP_LOGI_LOC(t,str, ...)  ESP_LOGI(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
-#define ESP_LOGD_LOC(t,str, ...)  ESP_LOGD(t, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__)
-
-
+static httpd_handle_t _server = NULL;
+rest_server_context_t *rest_context = NULL;
 
 void register_common_handlers(httpd_handle_t server){
 	httpd_uri_t res_get = { .uri = "/res/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
@@ -80,41 +69,69 @@ void register_regular_handlers(httpd_handle_t server){
 
 	httpd_uri_t connect_delete = { .uri = "/connect.json", .method = HTTP_DELETE, .handler = connect_delete_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &connect_delete);
+
+
+	// from https://github.com/tripflex/wifi-captive-portal/blob/master/src/mgos_wifi_captive_portal.c
+	// https://unix.stackexchange.com/questions/432190/why-isnt-androids-captive-portal-detection-triggering-a-browser-window
+	 // Known HTTP GET requests to check for Captive Portal
+
+	///kindle-wifi/wifiredirect.html Kindle when requested with com.android.captiveportallogin
+	///kindle-wifi/wifistub.html Kindle before requesting with captive portal login window (maybe for detection?)
+
+
+	httpd_uri_t connect_redirect_1 = { .uri = "/mobile/status.php", .method = HTTP_GET, .handler = redirect_200_ev_handler, .user_ctx = rest_context };// Android 8.0 (Samsung s9+)
+	httpd_register_uri_handler(server, &connect_redirect_1);
+	httpd_uri_t connect_redirect_2 = { .uri = "/generate_204", .method = HTTP_GET, .handler = redirect_200_ev_handler, .user_ctx = rest_context };// Android
+	httpd_register_uri_handler(server, &connect_redirect_2);
+	httpd_uri_t connect_redirect_3 = { .uri = "/gen_204", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// Android 9.0
+	httpd_register_uri_handler(server, &connect_redirect_3);
+	httpd_uri_t connect_redirect_4 = { .uri = "/ncsi.txt", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// Windows
+	httpd_register_uri_handler(server, &connect_redirect_4);
+	httpd_uri_t connect_redirect_5 = { .uri = "/hotspot-detect.html", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context }; // iOS 8/9
+	httpd_register_uri_handler(server, &connect_redirect_5);
+	httpd_uri_t connect_redirect_6 = { .uri = "/library/test/success.html", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// iOS 8/9
+	httpd_register_uri_handler(server, &connect_redirect_6);
+	httpd_uri_t connect_redirect_7 = { .uri = "/hotspotdetect.html", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context }; // iOS
+	httpd_register_uri_handler(server, &connect_redirect_7);
+	httpd_uri_t connect_redirect_8 = { .uri = "/success.txt", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context }; // OSX
+	httpd_register_uri_handler(server, &connect_redirect_8);
+
+
+	ESP_LOGD(TAG,"Registering default error handler for 404");
+	httpd_register_err_handler(server, HTTPD_404_NOT_FOUND,&err_handler);
+
 }
 
 esp_err_t http_server_start()
 {
-	ESP_LOGI(REST_TAG, "Initializing HTTP Server");
-    rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
+	ESP_LOGI(TAG, "Initializing HTTP Server");
+    rest_context = calloc(1, sizeof(rest_server_context_t));
     if(rest_context==NULL){
     	ESP_LOGE(TAG,"No memory for http context");
     	return ESP_FAIL;
     }
     strlcpy(rest_context->base_path, "/res/", sizeof(rest_context->base_path));
 
-    httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 20;
+    config.max_open_sockets = 8;
     config.uri_match_fn = httpd_uri_match_wildcard;
-    //todo:  use this to configure session token?
+    //todo:  use the endpoint below to configure session token?
     // config.open_fn
 
-    ESP_LOGI(REST_TAG, "Starting HTTP Server");
-    esp_err_t err= httpd_start(&server, &config);
+    ESP_LOGI(TAG, "Starting HTTP Server");
+    esp_err_t err= httpd_start(&_server, &config);
     if(err != ESP_OK){
     	ESP_LOGE_LOC(TAG,"Start server failed");
     }
     else {
 
-    	register_common_handlers(server);
-    	register_regular_handlers(server);
+    	register_common_handlers(_server);
+    	register_regular_handlers(_server);
     }
-    register_err_handler(server, HTTPD_404_NOT_FOUND,&err_handler);
-
 
     return err;
 }
-
-
 
 
 /* Function to free context */
@@ -124,135 +141,6 @@ void adder_free_func(void *ctx)
     free(ctx);
 }
 
-/* This handler keeps accumulating data that is posted to it into a per
- * socket/session context. And returns the result.
- */
-esp_err_t adder_post_handler(httpd_req_t *req)
-{
-    /* Log total visitors */
-    unsigned *visitors = (unsigned *)req->user_ctx;
-    ESP_LOGI(TAG, "/adder visitor count = %d", ++(*visitors));
-
-    char buf[10];
-    char outbuf[50];
-    int  ret;
-
-    /* Read data received in the request */
-    ret = httpd_req_recv(req, buf, sizeof(buf));
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
-
-    buf[ret] = '\0';
-    int val = atoi(buf);
-    ESP_LOGI(TAG, "/adder handler read %d", val);
-
-    /* Create session's context if not already available */
-    if (! req->sess_ctx) {
-        ESP_LOGI(TAG, "/adder allocating new session");
-        req->sess_ctx = malloc(sizeof(int));
-        req->free_ctx = adder_free_func;
-        *(int *)req->sess_ctx = 0;
-    }
-
-    /* Add the received data to the context */
-    int *adder = (int *)req->sess_ctx;
-    *adder += val;
-
-    /* Respond with the accumulated value */
-    snprintf(outbuf, sizeof(outbuf),"%d", *adder);
-    httpd_resp_send(req, outbuf, strlen(outbuf));
-    return ESP_OK;
-}
-
-/* This handler gets the present value of the accumulator */
-esp_err_t adder_get_handler(httpd_req_t *req)
-{
-    /* Log total visitors */
-    unsigned *visitors = (unsigned *)req->user_ctx;
-    ESP_LOGI(TAG, "/adder visitor count = %d", ++(*visitors));
-
-    char outbuf[50];
-
-    /* Create session's context if not already available */
-    if (! req->sess_ctx) {
-        ESP_LOGI(TAG, "/adder GET allocating new session");
-        req->sess_ctx = malloc(sizeof(int));
-        req->free_ctx = adder_free_func;
-        *(int *)req->sess_ctx = 0;
-    }
-    ESP_LOGI(TAG, "/adder GET handler send %d", *(int *)req->sess_ctx);
-
-    /* Respond with the accumulated value */
-    snprintf(outbuf, sizeof(outbuf),"%d", *((int *)req->sess_ctx));
-    httpd_resp_send(req, outbuf, strlen(outbuf));
-    return ESP_OK;
-}
-
-/* This handler resets the value of the accumulator */
-esp_err_t adder_put_handler(httpd_req_t *req)
-{
-    /* Log total visitors */
-    unsigned *visitors = (unsigned *)req->user_ctx;
-    ESP_LOGI(TAG, "/adder visitor count = %d", ++(*visitors));
-
-    char buf[10];
-    char outbuf[50];
-    int  ret;
-
-    /* Read data received in the request */
-    ret = httpd_req_recv(req, buf, sizeof(buf));
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
-
-    buf[ret] = '\0';
-    int val = atoi(buf);
-    ESP_LOGI(TAG, "/adder PUT handler read %d", val);
-
-    /* Create session's context if not already available */
-    if (! req->sess_ctx) {
-        ESP_LOGI(TAG, "/adder PUT allocating new session");
-        req->sess_ctx = malloc(sizeof(int));
-        req->free_ctx = adder_free_func;
-    }
-    *(int *)req->sess_ctx = val;
-
-    /* Respond with the reset value */
-    snprintf(outbuf, sizeof(outbuf),"%d", *((int *)req->sess_ctx));
-    httpd_resp_send(req, outbuf, strlen(outbuf));
-    return ESP_OK;
-}
-
-/* Maintain a variable which stores the number of times
- * the "/adder" URI has been visited */
-static unsigned visitors = 0;
-
-
-httpd_handle_t start_webserver(void)
-{
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // Start the httpd server
-    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
-
-    if (httpd_start(&server, &config) == ESP_OK) {
-        // Set URI handlers
-        ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &adder_get);
-        httpd_register_uri_handler(server, &adder_put);
-        httpd_register_uri_handler(server, &adder_post);
-        return server;
-    }
-
-    ESP_LOGI(TAG, "Error starting server!");
-    return NULL;
-}
 
 void stop_webserver(httpd_handle_t server)
 {
@@ -264,7 +152,7 @@ void stop_webserver(httpd_handle_t server)
 
 
 
-
+#if 0
 
 if(strstr(line, "GET / ")) {
 	netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1, NETCONN_NOCOPY);
@@ -481,3 +369,4 @@ netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 free(host);
 
 }
+#endif

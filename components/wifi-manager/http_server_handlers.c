@@ -45,30 +45,39 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "config.h"
+#include "sys/param.h"
+#include "esp_vfs.h"
+#include "lwip/ip_addr.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 #define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
-
+const char str_na[]="N/A";
+#define STR_OR_NA(s) s?s:str_na
 /* @brief tag used for ESP serial console messages */
 static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
-static TaskHandle_t task_http_server = NULL;
-static StaticTask_t task_http_buffer;
-#if RECOVERY_APPLICATION
-static StackType_t task_http_stack[HTTP_STACK_SIZE];
-#else
-static StackType_t EXT_RAM_ATTR task_http_stack[HTTP_STACK_SIZE];
-#endif
+
 SemaphoreHandle_t http_server_config_mutex = NULL;
 
 #define AUTH_TOKEN_SIZE 50
 typedef struct session_context {
     char * auth_token;
     bool authenticated;
+    char * sess_ip_address;
+    u16_t port;
 } session_context_t;
 
 
+union sockaddr_aligned {
+	struct sockaddr     sa;
+    struct sockaddr_storage st;
+    struct sockaddr_in  sin;
+    struct sockaddr_in6 sin6;
+} aligned_sockaddr_t;
 
+static const char redirect_payload1[]="<html><head><title>Redirecting to Captive Portal</title><meta http-equiv='refresh' content='0; url=";
+static const char redirect_payload2[]="'></head><body><p>Please wait, refreshing.  If page does not refresh, click <a href='";
+static const char redirect_payload3[]="'>here</a> to login.</p></body></html>";
 
 /**
  * @brief embedded binary data.
@@ -103,40 +112,117 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 //const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
 //const static char http_redirect_hdr_end[] = "/\n\n";
 
+char * alloc_get_http_header(httpd_req_t * req, const char * key){
+    char*  buf = NULL;
+    size_t buf_len;
+
+    /* Get header value string length and allocate memory for length + 1,
+     * extra byte for null termination */
+    buf_len = httpd_req_get_hdr_value_len(req, key) + 1;
+    if (buf_len > 1) {
+        buf = malloc(buf_len);
+        /* Copy null terminated value string into buffer */
+        if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK) {
+            ESP_LOGD_LOC(TAG, "Found header => %s: %s",key, buf);
+        }
+    }
+    return buf;
+}
+
+
+char * http_alloc_get_socket_address(httpd_req_t *req, u8_t local, in_port_t * portl) {
+
+	socklen_t len;
+	union sockaddr_aligned addr;
+	len = sizeof(addr);
+	ip_addr_t * ip_addr=NULL;
+	char * ipstr = malloc(INET6_ADDRSTRLEN);
+	memset(ipstr,0x0,INET6_ADDRSTRLEN);
+
+	typedef int (*getaddrname_fn_t)(int s, struct sockaddr *name, socklen_t *namelen);
+	getaddrname_fn_t get_addr = NULL;
+
+	int s = httpd_req_to_sockfd(req);
+	if(s == -1) {
+		return strdup("httpd_req_to_sockfd error");
+	}
+	ESP_LOGV_LOC(TAG,"httpd socket descriptor: %u", s);
+
+	get_addr = local?&lwip_getsockname:&lwip_getpeername;
+	if(get_addr(s, (struct sockaddr *)&addr, &len) <0){
+		ESP_LOGE_LOC(TAG,"Failed to retrieve socket address");
+		sprintf(ipstr,"N/A (0.0.0.%u)",local);
+	}
+	else {
+		if (addr.sin.sin_family!= AF_INET) {
+			ip_addr = (ip_addr_t *)&(addr.sin6.sin6_addr);
+			inet_ntop(addr.sa.sa_family, ip_addr, ipstr, INET6_ADDRSTRLEN);
+			ESP_LOGV_LOC(TAG,"Processing an IPV6 address : %s", ipstr);
+			*portl =  addr.sin6.sin6_port;
+			unmap_ipv4_mapped_ipv6(ip_2_ip4(ip_addr), ip_2_ip6(ip_addr));
+		}
+		else {
+			ip_addr = (ip_addr_t *)&(addr.sin.sin_addr);
+			inet_ntop(addr.sa.sa_family, ip_addr, ipstr, INET6_ADDRSTRLEN);
+			ESP_LOGV_LOC(TAG,"Processing an IPV6 address : %s", ipstr);
+			*portl =  addr.sin.sin_port;
+		}
+		inet_ntop(AF_INET, ip_addr, ipstr, INET6_ADDRSTRLEN);
+		ESP_LOGV_LOC(TAG,"Retrieved ip address:port = %s:%u",ipstr, *portl);
+	}
+	return ipstr;
+}
+
 
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
-    if(ctx){
-    	if(ctx->auth_token) free(auth_token);
-    	free(ctx);
+	session_context_t * context = (session_context_t *)ctx;
+    if(context){
+    	FREE_AND_NULL(context->auth_token);
+    	FREE_AND_NULL(context->sess_ip_address);
+    	free(context);
     }
 }
 
-bool is_user_authenticated(httpd_req_t *req){
-	    if (! req->sess_ctx) {
-	        req->sess_ctx = malloc(sizeof(session_context_t));
-	        memset(req->sess_ctx,0x00,sizeof(session_context_t));
-	        req->free_ctx = free_ctx_func;
-	    }
-	    session_context_t *ctx_data = (session_context_t*)req->sess_ctx;
-	    if(ctx_data->authenticated){
-	    	ESP_LOGD(TAG,"User is authenticated.");
-	    	return true;
-	    }
+session_context_t* get_session_context(httpd_req_t *req){
+	if (! req->sess_ctx) {
+		req->sess_ctx = malloc(sizeof(session_context_t));
+		memset(req->sess_ctx,0x00,sizeof(session_context_t));
+		req->free_ctx = free_ctx_func;
+		// get the remote IP address only once per session
+	}
+	session_context_t *ctx_data = (session_context_t*)req->sess_ctx;
+	ctx_data->sess_ip_address = http_alloc_get_socket_address(req, 0, &ctx_data->port);
+	ESP_LOGI_LOC(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
+	return (session_context_t *)req->sess_ctx;
+}
 
-	    // todo:  ask for user to authenticate
-	    return false;
+bool is_user_authenticated(httpd_req_t *req){
+	session_context_t *ctx_data = get_session_context(req);
+	if(ctx_data->authenticated){
+		ESP_LOGD_LOC(TAG,"User is authenticated.");
+		return true;
+	}
+
+	ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
+				heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+				heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+				heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+				heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+
+	// todo:  ask for user to authenticate
+	return false;
 }
 
 
 
 /* Copies the full path into destination buffer and returns
- * pointer to path (skipping the preceding base path) */
-static const char* get_path_from_uri(char *dest, const char *base_path, const char *uri, size_t destsize)
+ * pointer to requested file name */
+static const char* get_path_from_uri(char *dest, const char *uri, size_t destsize)
 {
-    const size_t base_pathlen = strlen(base_path);
     size_t pathlen = strlen(uri);
+    memset(dest,0x0,destsize);
 
     const char *quest = strchr(uri, '?');
     if (quest) {
@@ -147,17 +233,29 @@ static const char* get_path_from_uri(char *dest, const char *base_path, const ch
         pathlen = MIN(pathlen, hash - uri);
     }
 
-    if (base_pathlen + pathlen + 1 > destsize) {
+    if ( pathlen + 1 > destsize) {
         /* Full path string won't fit into destination buffer */
         return NULL;
     }
 
-    /* Construct full path (base + path) */
-    strcpy(dest, base_path);
-    strlcpy(dest + base_pathlen, uri, pathlen + 1);
+    strlcpy(dest , uri, pathlen + 1);
+
+    // strip trailing blanks
+    char * sr = dest+pathlen;
+    while(*sr== ' ') *sr-- = '\0';
+
+    char * last_fs = strchr(dest,'/');
+    if(!last_fs) ESP_LOGD_LOC(TAG,"no / found in %s", dest);
+    char * p=last_fs;
+    while(p && *(++p)!='\0'){
+    	if(*p == '/') {
+    		last_fs=p;
+    	}
+    }
+
 
     /* Return pointer to path, skipping the base */
-    return dest + base_pathlen;
+    return last_fs? ++last_fs: dest;
 }
 
 #define IS_FILE_EXT(filename, ext) \
@@ -169,7 +267,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
     if (IS_FILE_EXT(filename, ".pdf")) {
         return httpd_resp_set_type(req, "application/pdf");
     } else if (IS_FILE_EXT(filename, ".html")) {
-        return httpd_resp_set_type(req, "text/html");
+        return httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
     } else if (IS_FILE_EXT(filename, ".jpeg")) {
         return httpd_resp_set_type(req, "image/jpeg");
     } else if (IS_FILE_EXT(filename, ".ico")) {
@@ -181,7 +279,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
     } else if (IS_FILE_EXT(filename, ".js")) {
         return httpd_resp_set_type(req, "text/javascript");
     } else if (IS_FILE_EXT(filename, ".json")) {
-        return httpd_resp_set_type(req, "application/json");
+        return httpd_resp_set_type(req, HTTPD_TYPE_JSON);
     }
     /* This is a limited set only */
     /* For any other type always set as plain text */
@@ -190,17 +288,16 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
 static esp_err_t set_content_type_from_req(httpd_req_t *req)
 {
 	char filepath[FILE_PATH_MAX];
-	const char *filename = get_path_from_uri(filepath, "/" ,
-										req->uri, sizeof(filepath));
+	const char *filename = get_path_from_uri(filepath, req->uri, sizeof(filepath));
    if (!filename) {
-	   ESP_LOGE(TAG, "Filename is too long");
+	   ESP_LOGE_LOC(TAG, "Filename is too long");
 	   /* Respond with 500 Internal Server Error */
 	   httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Filename too long");
 	   return ESP_FAIL;
    }
 
    /* If name has trailing '/', respond with directory contents */
-   if (filename[strlen(filename) - 1] == '/') {
+   if (filename[strlen(filename) - 1] == '/' && strlen(filename)>1) {
 	   httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Browsing files forbidden.");
 	   return ESP_FAIL;
    }
@@ -209,11 +306,11 @@ static esp_err_t set_content_type_from_req(httpd_req_t *req)
 
 
 esp_err_t root_get_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Accept-Encoding", "identity");
 
-    if(!is_user_authenticated(httpd_req_t *req)){
+    if(!is_user_authenticated(req)){
     	// todo:  send password entry page and return
     }
     const size_t file_size = (index_html_end - index_html_start);
@@ -226,13 +323,12 @@ esp_err_t root_get_handler(httpd_req_t *req){
 
 esp_err_t resource_filehandler(httpd_req_t *req){
     char filepath[FILE_PATH_MAX];
-   ESP_LOGI(TAG, "serving [%s]", req->uri);
+   ESP_LOGI_LOC(TAG, "serving [%s]", req->uri);
 
-   const char *filename = get_path_from_uri(filepath, "/res/" ,
-											req->uri, sizeof(filepath));
+   const char *filename = get_path_from_uri(filepath, req->uri, sizeof(filepath));
 
    if (!filename) {
-	   ESP_LOGE(TAG, "Filename is too long");
+	   ESP_LOGE_LOC(TAG, "Filename is too long");
 	   /* Respond with 500 Internal Server Error */
 	   httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Filename too long");
 	   return ESP_FAIL;
@@ -244,92 +340,92 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 	   return ESP_FAIL;
    }
 
-   if(strstr(line, "GET /code.js ")) {
+   if(strstr(filename, "code.js")) {
 	    const size_t file_size = (code_js_end - code_js_start);
 	    set_content_type_from_file(req, filename);
 	    httpd_resp_send(req, (const char *)code_js_start, file_size);
 	}
-	else if(strstr(line, "GET /style.css ")) {
+	else if(strstr(filename, "style.css")) {
 		set_content_type_from_file(req, filename);
 	    const size_t file_size = (style_css_end - style_css_start);
 	    httpd_resp_send(req, (const char *)style_css_start, file_size);
-	} else if(strstr(line, "GET /jquery.js ")) {
+	} else if(strstr(filename, "jquery.js")) {
 		set_content_type_from_file(req, filename);
 		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (jquery_gz_end - jquery_gz_start);
 	    httpd_resp_send(req, (const char *)jquery_gz_start, file_size);
-	}else if(strstr(line, "GET /popper.js")) {
+	}else if(strstr(filename, "popper.js")) {
 		set_content_type_from_file(req, filename);
 		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (popper_gz_end - popper_gz_start);
 	    httpd_resp_send(req, (const char *)popper_gz_start, file_size);
 	}
-	else if(strstr(line, "GET /bootstrap.js ")) {
+	else if(strstr(filename, "bootstrap.js")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_js_gz_end - bootstrap_js_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_js_gz_start, file_size);
 		}
-	else if(strstr(line, "GET /bootstrap.css")) {
+	else if(strstr(filename, "bootstrap.css")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_css_gz_end - bootstrap_css_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_css_gz_start, file_size);
 		}
 	else {
-	   ESP_LOGE(TAG, "Unknown resource: %s", filepath);
+	   ESP_LOGE_LOC(TAG, "Unknown resource [%s] from path [%s] ", filename,filepath);
 	   /* Respond with 404 Not Found */
 	   httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File does not exist");
 	   return ESP_FAIL;
    }
-   ESP_LOGI(TAG, "Resource sending complete");
+   ESP_LOGI_LOC(TAG, "Resource sending complete");
    return ESP_OK;
 
 }
 esp_err_t ap_scan_handler(httpd_req_t *req){
     const char empty[] = "{}";
-	ESP_LOGI(TAG, "serving [%s]", req->uri);
-    if(!is_user_authenticated(httpd_req_t *req)){
+	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
 	wifi_manager_scan_async();
 	esp_err_t err = set_content_type_from_req(req);
 	if(err == ESP_OK){
-		httpd_resp_send(req, (const char *)empty, strlen(empty));
+		httpd_resp_send(req, (const char *)empty, HTTPD_RESP_USE_STRLEN);
 	}
 	return err;
 }
 esp_err_t ap_get_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
-    if(!is_user_authenticated(httpd_req_t *req)){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
     /* if we can get the mutex, write the last version of the AP list */
 	esp_err_t err = set_content_type_from_req(req);
-	if(err == ESP_OK wifi_manager_lock_json_buffer(( TickType_t ) 10)){
+	if( err == ESP_OK && wifi_manager_lock_json_buffer(( TickType_t ) 10)){
 		char *buff = wifi_manager_alloc_get_ap_list_json();
 		wifi_manager_unlock_json_buffer();
 		if(buff!=NULL){
-			httpd_resp_send(req, (const char *)buff, strlen(buff));
+			httpd_resp_send(req, (const char *)buff, HTTPD_RESP_USE_STRLEN);
 			free(buff);
 		}
 		else {
-			ESP_LOGD(TAG,  "Error retrieving ap list json string. ");
+			ESP_LOGD_LOC(TAG,  "Error retrieving ap list json string. ");
 			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to retrieve AP list");
 		}
 	}
 	else {
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "AP list unavailable");
-		ESP_LOGE(TAG,   "GET /ap.json failed to obtain mutex");
+		ESP_LOGE_LOC(TAG,   "GET /ap.json failed to obtain mutex");
 	}
 	return err;
 }
 
 esp_err_t config_get_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
-    if(!is_user_authenticated(httpd_req_t *req)){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -337,13 +433,13 @@ esp_err_t config_get_handler(httpd_req_t *req){
 	if(err == ESP_OK){
 		char * json = config_alloc_get_json(false);
 		if(json==NULL){
-			ESP_LOGD(TAG,  "Error retrieving config json string. ");
+			ESP_LOGD_LOC(TAG,  "Error retrieving config json string. ");
 			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error retrieving configuration object");
 			err=ESP_FAIL;
 		}
 		else {
-			ESP_LOGD(TAG,  "config json : %s",json );
-			httpd_resp_send(req, (const char *)json, strlen(json));
+			ESP_LOGD_LOC(TAG,  "config json : %s",json );
+			httpd_resp_send(req, (const char *)json, HTTPD_RESP_USE_STRLEN);
 			free(json);
 		}
 	}
@@ -358,84 +454,122 @@ esp_err_t post_handler_buff_receive(httpd_req_t * req){
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
         /* Respond with 500 Internal Server Error */
+    	ESP_LOGE_LOC(TAG,"Received content was too long. ");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Content too long");
-        return ESP_FAIL;
+        err = ESP_FAIL;
     }
-    while (cur_len < total_len) {
+    while (err == ESP_OK && cur_len < total_len) {
         received = httpd_req_recv(req, buf + cur_len, total_len);
         if (received <= 0) {
             /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Failed to post control value");
-            return ESP_FAIL;
+        	ESP_LOGE_LOC(TAG,"Not all data was received. ");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Not all data was received");
+            err = ESP_FAIL;
         }
-        cur_len += received;
+        else {
+        	cur_len += received;
+        }
     }
 
-    buf[total_len] = '\0';
+    if(err == ESP_OK) {
+    	buf[total_len] = '\0';
+    }
+    return err;
 }
+
 esp_err_t config_post_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
 	bool bOTA=false;
 	char * otaURL=NULL;
     esp_err_t err = post_handler_buff_receive(req);
     if(err!=ESP_OK){
         return err;
     }
-    if(!is_user_authenticated(httpd_req_t *req)){
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
     cJSON *root = cJSON_Parse(buf);
-	cJSON *item=root->next;
+    if(root == NULL){
+    	ESP_LOGE_LOC(TAG, "Parsing config json failed. Received content was: %s",buf);
+    	httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Unable to parse content.");
+    	return ESP_FAIL;
+    }
+
+    char * root_str = cJSON_Print(root);
+	if(root_str!=NULL){
+		ESP_LOGE(TAG, "Processing config item: \n%s", root_str);
+		free(root_str);
+	}
+
+    cJSON *item=cJSON_GetObjectItemCaseSensitive(root, "config");
+    if(!item){
+    	ESP_LOGE_LOC(TAG, "Parsing config json failed. Received content was: %s",buf);
+    	httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Unable to parse content.");
+    	err = ESP_FAIL;
+    }
+    else{
+    	// navigate to the first child of the config structure
+    	if(item->child) item=item->child;
+    }
+
 	while (item && err == ESP_OK)
 	{
 		cJSON *prev_item = item;
 		item=item->next;
-		if(prev_item->name==NULL) {
-			ESP_LOGE(TAG,"Config value does not have a name");
+		char * entry_str = cJSON_Print(prev_item);
+		if(entry_str!=NULL){
+			ESP_LOGD_LOC(TAG, "Processing config item: \n%s", entry_str);
+			free(entry_str);
+		}
+
+		if(prev_item->string==NULL) {
+			ESP_LOGD_LOC(TAG,"Config value does not have a name");
 			httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Value does not have a name.");
 			err = ESP_FAIL;
 		}
 		if(err == ESP_OK){
-			ESP_LOGI(TAG,"Found config value name [%s]", prev_item->name);
+			ESP_LOGI_LOC(TAG,"Found config value name [%s]", prev_item->string);
 			nvs_type_t item_type=  config_get_item_type(prev_item);
 			if(item_type!=0){
 				void * val = config_safe_alloc_get_entry_value(item_type, prev_item);
 				if(val!=NULL){
-					if(strcmp(prev_item->name, "fwurl")==0) {
+					if(strcmp(prev_item->string, "fwurl")==0) {
 						if(item_type!=NVS_TYPE_STR){
-							ESP_LOGE(TAG,"Firmware url should be type %d. Found type %d instead.",NVS_TYPE_STR,item_type );
+							ESP_LOGE_LOC(TAG,"Firmware url should be type %d. Found type %d instead.",NVS_TYPE_STR,item_type );
 							httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Wrong type for firmware URL.");
 							err = ESP_FAIL;
 						}
 						else {
 							// we're getting a request to do an OTA from that URL
-							ESP_LOGW(TAG,   "Found OTA request!");
+							ESP_LOGW_LOC(TAG,   "Found OTA request!");
 							otaURL=strdup(val);
 							bOTA=true;
 						}
 					}
 					else {
-						if(config_set_value(item_type, last_parm_name , last_parm) != ESP_OK){
-							ESP_LOGE(TAG,"Unable to store value for [%s]", prev_item->name);
+						if(config_set_value(item_type, prev_item->string , val) != ESP_OK){
+							ESP_LOGE_LOC(TAG,"Unable to store value for [%s]", prev_item->string);
 							httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to store config value");
 							err = ESP_FAIL;
 						}
 						else {
-							ESP_LOGI(TAG,"Successfully set value for [%s]",prev_item->name);
+							ESP_LOGI_LOC(TAG,"Successfully set value for [%s]",prev_item->string);
 						}
 					}
 					free(val);
 				}
 				else {
-					ESP_LOGE(TAG,"Value not found for [%s]", prev_item->name);
-					httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Missing value for entry.");
+					char messageBuffer[101]={};
+					ESP_LOGE_LOC(TAG,"Value not found for [%s]", prev_item->string);
+					snprintf(messageBuffer,sizeof(messageBuffer),"Malformed config json.  Missing value for entry %s.",prev_item->string);
+					httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, messageBuffer);
 					err = ESP_FAIL;
 				}
 			}
 			else {
-				ESP_LOGE(TAG,"Unable to determine the type of config value [%s]", prev_item->name);
+				ESP_LOGE_LOC(TAG,"Unable to determine the type of config value [%s]", prev_item->string);
 				httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed config json.  Missing value for entry.");
 				err = ESP_FAIL;
 			}
@@ -445,15 +579,15 @@ esp_err_t config_post_handler(httpd_req_t *req){
 
 	if(err==ESP_OK){
 		set_content_type_from_req(req);
-		httpd_resp_sendstr(req, "{ok}");
+		httpd_resp_sendstr(req, "{ \"result\" : \"OK\" }");
 	}
     cJSON_Delete(root);
 	if(bOTA) {
 
 #if RECOVERY_APPLICATION
-		ESP_LOGW(TAG,   "Starting process OTA for url %s",otaURL);
+		ESP_LOGW_LOC(TAG,   "Starting process OTA for url %s",otaURL);
 #else
-		ESP_LOGW(TAG,   "Restarting system to process OTA for url %s",otaURL);
+		ESP_LOGW_LOC(TAG,   "Restarting system to process OTA for url %s",otaURL);
 #endif
 		wifi_manager_reboot_ota(otaURL);
 		free(otaURL);
@@ -462,18 +596,18 @@ esp_err_t config_post_handler(httpd_req_t *req){
 
 }
 esp_err_t connect_post_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     char success[]="{}";
     char * ssid=NULL;
     char * password=NULL;
-    char * host_name;
+    char * host_name=NULL;
 	set_content_type_from_req(req);
 	esp_err_t err = post_handler_buff_receive(req);
 	if(err!=ESP_OK){
 		return err;
 	}
 	char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
-    if(!is_user_authenticated(httpd_req_t *req)){
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -486,32 +620,32 @@ esp_err_t connect_post_handler(httpd_req_t *req){
 
 	cJSON * ssid_object = cJSON_GetObjectItem(root, "ssid");
 	if(ssid_object !=NULL){
-		ssid = (char *)config_safe_alloc_get_entry_value(ssid_object);
+		ssid = strdup(ssid_object->valuestring);
 	}
 	cJSON * password_object = cJSON_GetObjectItem(root, "pwd");
 	if(password_object !=NULL){
-		password = (char *)config_safe_alloc_get_entry_value(password_object);
+		password = strdup(password_object->valuestring);
 	}
 	cJSON * host_name_object = cJSON_GetObjectItem(root, "host_name");
 	if(host_name_object !=NULL){
-		host_name = (char *)config_safe_alloc_get_entry_value(host_name_object);
+		host_name = strdup(host_name_object->valuestring);
 	}
 	cJSON_Delete(root);
 
 	if(host_name!=NULL){
 		if(config_set_value(NVS_TYPE_STR, "host_name", host_name) != ESP_OK){
-			ESP_LOGW(TAG,  "Unable to save host name configuration");
+			ESP_LOGW_LOC(TAG,  "Unable to save host name configuration");
 		}
 	}
 
 	if(ssid !=NULL && strlen(ssid) <= MAX_SSID_SIZE && strlen(password) <= MAX_PASSWORD_SIZE  ){
 		wifi_config_t* config = wifi_manager_get_wifi_sta_config();
 		memset(config, 0x00, sizeof(wifi_config_t));
-		strlcpy(config->sta.ssid, ssid, sizeof(config->sta.ssid)+1);
+		strlcpy((char *)config->sta.ssid, ssid, sizeof(config->sta.ssid)+1);
 		if(password){
-			strlcpy(config->sta.password, password, sizeof(config->sta.password)+1);
+			strlcpy((char *)config->sta.password, password, sizeof(config->sta.password)+1);
 		}
-		ESP_LOGD(TAG,   "http_server_netconn_serve: wifi_manager_connect_async() call, with ssid: %s, password: %s", config->sta.ssid, config->sta.password);
+		ESP_LOGD_LOC(TAG,   "http_server_netconn_serve: wifi_manager_connect_async() call, with ssid: %s, password: %s", config->sta.ssid, config->sta.password);
 		wifi_manager_connect_async();
 		httpd_resp_send(req, (const char *)success, strlen(success));
 	}
@@ -526,8 +660,8 @@ esp_err_t connect_post_handler(httpd_req_t *req){
 }
 esp_err_t connect_delete_handler(httpd_req_t *req){
 	char success[]="{}";
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
-    if(!is_user_authenticated(httpd_req_t *req)){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -539,8 +673,8 @@ esp_err_t connect_delete_handler(httpd_req_t *req){
 }
 esp_err_t reboot_ota_post_handler(httpd_req_t *req){
 	char success[]="{}";
-	ESP_LOGI(TAG, "serving [%s]", req->uri);
-    if(!is_user_authenticated(httpd_req_t *req)){
+	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -550,9 +684,9 @@ esp_err_t reboot_ota_post_handler(httpd_req_t *req){
     return ESP_OK;
 }
 esp_err_t reboot_post_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     char success[]="{}";
-    if(!is_user_authenticated(httpd_req_t *req)){
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -562,9 +696,9 @@ esp_err_t reboot_post_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 esp_err_t recovery_post_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     char success[]="{}";
-    if(!is_user_authenticated(httpd_req_t *req)){
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -573,10 +707,260 @@ esp_err_t recovery_post_handler(httpd_req_t *req){
 	wifi_manager_reboot(RECOVERY);
 	return ESP_OK;
 }
-esp_err_t status_post_handler(httpd_req_t *req){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
-    char success[]="{}";
-    if(!is_user_authenticated(httpd_req_t *req)){
+
+bool is_captive_portal_host_name(http_req_t *req){
+	const char * host_name=NULL;
+	const char * ap_host_name=NULL;
+
+	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
+	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
+	}
+	else {
+		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
+	}
+
+   ESP_LOGD_LOC(TAG,  "Getting host name from request");
+	char *req_host = alloc_get_http_header(req, "Host");
+
+
+
+
+
+	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
+		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
+		// Access point is up and running. Get the current IP address
+		tcpip_adapter_ip_info_t ip_info;
+		esp_err_t ap_ip_err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+		if(ap_ip_err != ESP_OK){
+			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(ap_ip_err));
+		}
+		else {
+			ESP_LOGD_LOC(TAG,  "getting host name for TCPIP_ADAPTER_IF_AP");
+			if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_AP, &ap_host_name )) !=ESP_OK) {
+				ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
+				err=err==ESP_OK?hn_err:err;
+			}
+			else {
+				ESP_LOGD_LOC(TAG,  "Soft AP Host name is %s",ap_host_name);
+			}
+
+			ap_ip_address =  malloc(IP4ADDR_STRLEN_MAX);
+			memset(ap_ip_address, 0x00, IP4ADDR_STRLEN_MAX);
+			if(ap_ip_address){
+				ESP_LOGD_LOC(TAG,  "Converting soft ip address to string");
+				ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
+				ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
+			}
+		}
+
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if((request_contains_hostname 		= (host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = system host name %s", req_host);
+    }
+    else if((request_contains_hostname 		= (ap_host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,ap_host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = AP system host name %s", req_host);
+    }
+
+    FREE_AND_NULL(req_host);
+
+
+}
+esp_err_t redirect_200_ev_handler(httpd_req_t *req){
+	esp_err_t err=ESP_OK;
+	const char location_prefix[] = "http://";
+	char * ap_ip_address=NULL;
+	char * remote_ip=NULL;
+	const char * host_name=NULL;
+	in_port_t port=0;
+
+	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
+	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
+	}
+	else {
+		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
+	}
+
+    ESP_LOGD_LOC(TAG,  "Getting remote socket address");
+    remote_ip = http_alloc_get_socket_address(req,0, &port);
+
+	size_t buf_size = strlen(redirect_payload1) +strlen(redirect_payload2) + strlen(redirect_payload3) +2*(strlen(location_prefix)+strlen(ap_ip_address))+1;
+	char * redirect=malloc(buf_size);
+	snprintf(redirect, buf_size,"%s%s%s%s%s%s%s",redirect_payload1, location_prefix, ap_ip_address,redirect_payload2, location_prefix, ap_ip_address,redirect_payload3);
+	ESP_LOGI_LOC(TAG,  "Redirecting host [%s] to %s",remote_ip, redirect);
+	httpd_resp_set_type(req, "text/plain");
+	httpd_resp_set_hdr(req,"Cache-Control","no-cache");
+	httpd_resp_set_status(req, "200 OK");
+	httpd_resp_send(req, redirect, HTTPD_RESP_USE_STRLEN);
+	FREE_AND_NULL(redirect);
+	FREE_AND_NULL(ap_ip_address);
+	FREE_AND_NULL(remote_ip);
+	return ESP_OK;
+}
+esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
+	esp_err_t err=ESP_OK;
+
+	const char location_prefix[] = "http://";
+	const char * host_name=NULL;
+	const char * ap_host_name=NULL;
+	char * user_agent=NULL;
+	char * remote_ip=NULL;
+	char * sta_ip_address=NULL;
+	char * ap_ip_address=NULL;
+	char * socket_local_address=NULL;
+	char * redirect  = NULL;
+	bool request_contains_hostname = false;
+	bool request_contains_ap_ip_address 	= false;
+	bool request_is_sta_ip_address 	= false;
+	bool connected_to_ap_ip_interface 	= false;
+	bool connected_to_sta_ip_interface = false;
+	bool useragentiscaptivenetwork = false;
+
+	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
+		sta_ip_address = strdup(wifi_manager_get_sta_ip_string());
+		wifi_manager_unlock_sta_ip_string();
+	}
+	else {
+    	ESP_LOGE(TAG,"Unable to obtain local IP address from WiFi Manager.");
+    	httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , NULL);
+	}
+
+    in_port_t port=0;
+    ESP_LOGD_LOC(TAG,  "Getting remote socket address");
+    remote_ip = http_alloc_get_socket_address(req,0, &port);
+
+    ESP_LOGD_LOC(TAG,  "Getting host name from request");
+    char *req_host = alloc_get_http_header(req, "Host");
+
+    user_agent = alloc_get_http_header(req,"User-Agent");
+    if((useragentiscaptivenetwork = strcasestr(user_agent,"CaptiveNetworkSupport"))==true){
+    	ESP_LOGD_LOC(TAG,"Found user agent that supports captive networks! [%s]",user_agent);
+    }
+
+	esp_err_t hn_err = ESP_OK;
+	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
+	if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
+		err=err==ESP_OK?hn_err:err;
+	}
+	else {
+		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
+	}
+
+
+	in_port_t loc_port=0;
+	ESP_LOGD_LOC(TAG,  "Getting local socket address");
+	socket_local_address= http_alloc_get_socket_address(req,1, &loc_port);
+
+	ESP_LOGD_LOC(TAG,  "checking if soft AP is enabled");
+	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
+		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
+		// Access point is up and running. Get the current IP address
+		tcpip_adapter_ip_info_t ip_info;
+		esp_err_t ap_ip_err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+		if(ap_ip_err != ESP_OK){
+			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(ap_ip_err));
+		}
+		else {
+			ESP_LOGD_LOC(TAG,  "getting host name for TCPIP_ADAPTER_IF_AP");
+			if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_AP, &ap_host_name )) !=ESP_OK) {
+				ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
+				err=err==ESP_OK?hn_err:err;
+			}
+			else {
+				ESP_LOGD_LOC(TAG,  "Soft AP Host name is %s",ap_host_name);
+			}
+
+			ap_ip_address =  malloc(IP4ADDR_STRLEN_MAX);
+			memset(ap_ip_address, 0x00, IP4ADDR_STRLEN_MAX);
+			if(ap_ip_address){
+				ESP_LOGD_LOC(TAG,  "Converting soft ip address to string");
+				ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
+				ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
+			}
+		}
+
+	}
+
+    ESP_LOGD_LOC(TAG,  "Peer IP: %s [port %u], System AP IP address: %s, System host: %s. Requested Host: [%s], uri [%s]",STR_OR_NA(remote_ip), port, STR_OR_NA(ap_ip_address), STR_OR_NA(host_name), STR_OR_NA(req_host), req->uri);
+    /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
+	/* determine if Host is from the STA IP address */
+
+    if((request_contains_hostname 		= (host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = system host name %s", req_host);
+    }
+    else if((request_contains_hostname 		= (ap_host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,ap_host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = AP system host name %s", req_host);
+    }
+    if((request_contains_ap_ip_address 	= (ap_ip_address!=NULL) && (req_host!=NULL) && strcasestr(req_host,ap_ip_address))== true){
+    	ESP_LOGD_LOC(TAG,"http request host is access point ip address %s", req_host);
+    }
+    if((connected_to_ap_ip_interface 	= (ap_ip_address!=NULL) && (socket_local_address!=NULL) && strcasestr(socket_local_address,ap_ip_address))==true){
+    	ESP_LOGD_LOC(TAG,"http request is connected to access point interface IP %s", ap_ip_address);
+    }
+    if((request_is_sta_ip_address 	= (sta_ip_address!=NULL) && (req_host!=NULL) && strcasestr(req_host,sta_ip_address))==true){
+    	ESP_LOGD_LOC(TAG,"http request host is WiFi client ip address %s", req_host);
+    }
+    if((connected_to_sta_ip_interface = (sta_ip_address!=NULL) && (socket_local_address!=NULL) && strcasestr(sta_ip_address,socket_local_address))==true){
+    	ESP_LOGD_LOC(TAG,"http request is connected to WiFi client ip address %s", sta_ip_address);
+    }
+
+   if((error == 0) || (error == HTTPD_404_NOT_FOUND && connected_to_ap_ip_interface && !(request_contains_ap_ip_address || request_contains_hostname ))) {
+
+		// known polling url's, send redirect 302
+		size_t buf_size = strlen(location_prefix) + strlen(ap_ip_address)+1;
+		redirect = malloc(buf_size);
+		snprintf(redirect, buf_size,"%s%s",location_prefix, ap_ip_address);
+		ESP_LOGI_LOC(TAG,  "Redirecting host [%s] to %s",remote_ip, redirect);
+		httpd_resp_set_type(req, "text/plain");
+		httpd_resp_set_status(req, "302 Found");
+		httpd_resp_set_hdr(req,"Location",redirect);
+		httpd_resp_send(req, "", HTTPD_RESP_USE_STRLEN);
+
+	}
+	else {
+		ESP_LOGD_LOC(TAG,"URL not found, and not processing captive portal so throw regular 404 error");
+		httpd_resp_send_err(req, error, NULL);
+	}
+
+	FREE_AND_NULL(socket_local_address);
+	FREE_AND_NULL(redirect);
+	FREE_AND_NULL(req_host);
+	FREE_AND_NULL(user_agent);
+
+    FREE_AND_NULL(sta_ip_address);
+	FREE_AND_NULL(ap_ip_address);
+	FREE_AND_NULL(remote_ip);
+	return err;
+
+}
+esp_err_t redirect_ev_handler(httpd_req_t *req){
+	return redirect_processor(req,0);
+}
+esp_err_t status_get_handler(httpd_req_t *req){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
@@ -600,188 +984,21 @@ esp_err_t status_post_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+
 esp_err_t err_handler(httpd_req_t *req, httpd_err_code_t error){
-    ESP_LOGI(TAG, "serving [%s]", req->uri);
-    char success[]="";
-    if(!is_user_authenticated(httpd_req_t *req)){
-    	// todo:  redirect to login page
-    	// return ESP_OK;
-    }
+	esp_err_t err = ESP_OK;
+
     if(error != HTTPD_404_NOT_FOUND){
-    	return httpd_resp_send_err(req, error, NULL);
+    	err = httpd_resp_send_err(req, error, NULL);
+    }
+    else {
+    	err = redirect_processor(req,error);
     }
 
-    char * ap_ip_address= config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
-	if(ap_ip_address==NULL){
-		ESP_LOGE(TAG,  "Unable to retrieve default AP IP Address");
-		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to retrieve default AP IP Address");
-		return ESP_FAIL;
-	}
 
-
-	struct httpd_req_aux *ra = req->aux;
-	//UF_HOST
-
-
-    //	ip_addr_t remote_add;
-    //	err_t err;
-
-
-    //	u16_t buflen;
-    //	u16_t port;
-
-
-    //	ESP_LOGV(TAG,  "Getting remote device IP address.");
-    //	netconn_getaddr(conn,	&remote_add,	&port,	0);
-    //	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
-    //	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
-    //	err = netconn_recv(conn, &inbuf);
-    //	if(err == ERR_OK) {
-    //		ESP_LOGV(TAG,  "Getting data buffer.");
-    //		netbuf_data(inbuf, (void**)&buf, &buflen);
-    //		dump_net_buffer(buf, buflen);
-    //		int lenH = 0;
-    //		/* extract the first line of the request */
-    //		char *save_ptr = buf;
-    //		char *line = strtok_r(save_ptr, new_line, &save_ptr);
-    //		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
-    //		char * host = malloc(lenH+1);
-    //		memset(host,0x00,lenH+1);
-    //		if(lenH>0){
-    //			strlcpy(host,temphost,lenH+1);
-    //		}
-    //		ESP_LOGD(TAG,  "http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
-    //
-    //		if(line) {
-    //
-    //			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
-    //			const char * host_name=NULL;
-    //			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
-    //				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
-    //			}
-    //			else {
-    //				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
-    //			}
-    //
-    //			/* determine if Host is from the STA IP address */
-    //			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-    //			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
-    //			wifi_manager_unlock_sta_ip_string();
-    //			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
-    //
-    //			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
-    //				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
-    //				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-    //				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
-    //				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	set_content_type_from_req(req);
-	httpd_resp_send(req, (const char *)NULL, 0);
-	wifi_manager_reboot(RECOVERY);
-	FREE_AND_NULL(ap_ip_address);
-	return ESP_OK;
+	return err;
 }
 
-
-
-
-
-
-
-//void http_server_netconn_serve(struct netconn *conn) {
-//
-//	struct netbuf *inbuf;
-//	char *buf = NULL;
-//	u16_t buflen;
-//	err_t err;
-//	ip_addr_t remote_add;
-//	u16_t port;
-//	ESP_LOGV(TAG,  "Serving page.  Getting device AP address.");
-//	const char new_line[2] = "\n";
-//	char * ap_ip_address= config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
-//	if(ap_ip_address==NULL){
-//		ESP_LOGE(TAG,  "Unable to retrieve default AP IP Address");
-//		netconn_write(conn, http_503_hdr, sizeof(http_503_hdr) - 1, NETCONN_NOCOPY);
-//		netconn_close(conn);
-//		return;
-//	}
-//	ESP_LOGV(TAG,  "Getting remote device IP address.");
-//	netconn_getaddr(conn,	&remote_add,	&port,	0);
-//	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
-//	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
-//	err = netconn_recv(conn, &inbuf);
-//	if(err == ERR_OK) {
-//		ESP_LOGV(TAG,  "Getting data buffer.");
-//		netbuf_data(inbuf, (void**)&buf, &buflen);
-//		dump_net_buffer(buf, buflen);
-//		int lenH = 0;
-//		/* extract the first line of the request */
-//		char *save_ptr = buf;
-//		char *line = strtok_r(save_ptr, new_line, &save_ptr);
-//		char *temphost = http_server_get_header(save_ptr, "Host: ", &lenH);
-//		char * host = malloc(lenH+1);
-//		memset(host,0x00,lenH+1);
-//		if(lenH>0){
-//			strlcpy(host,temphost,lenH+1);
-//		}
-//		ESP_LOGD(TAG,  "http_server_netconn_serve Host: [%s], host: [%s], Processing line [%s]",remote_address,host,line);
-//
-//		if(line) {
-//
-//			/* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
-//			const char * host_name=NULL;
-//			if((err=tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
-//				ESP_LOGE(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
-//			}
-//			else {
-//				ESP_LOGI(TAG,"System host name %s, http requested host: %s.",host_name, host);
-//			}
-//
-//			/* determine if Host is from the STA IP address */
-//			wifi_manager_lock_sta_ip_string(portMAX_DELAY);
-//			bool access_from_sta_ip = lenH > 0?strcasestr(host, wifi_manager_get_sta_ip_string()):false;
-//			wifi_manager_unlock_sta_ip_string();
-//			bool access_from_host_name = (host_name!=NULL) && strcasestr(host,host_name);
-//
-//			if(lenH > 0 && !strcasestr(host, ap_ip_address) && !(access_from_sta_ip || access_from_host_name)) {
-//				ESP_LOGI(TAG,  "Redirecting host [%s] to AP IP Address : %s",remote_address, ap_ip_address);
-//				netconn_write(conn, http_redirect_hdr_start, sizeof(http_redirect_hdr_start) - 1, NETCONN_NOCOPY);
-//				netconn_write(conn, ap_ip_address, strlen(ap_ip_address), NETCONN_NOCOPY);
-//				netconn_write(conn, http_redirect_hdr_end, sizeof(http_redirect_hdr_end) - 1, NETCONN_NOCOPY);
-//			}
-//			else {
-//                //static stuff
-//
-//}
 
 
 

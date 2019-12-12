@@ -3,6 +3,7 @@
 #include <string.h>
 #include "esp_system.h"
 #include "nvs_utilities.h"
+#include "cJSON.h"
 
 #ifdef __cplusplus
 extern "C" {

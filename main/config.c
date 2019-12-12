@@ -70,30 +70,30 @@ void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 		void * pval = config_alloc_get(nt, key);\
 		if(pval!=NULL){ *value = *(t * )pval; free(pval); return ESP_OK; }\
 		return ESP_FAIL;}
-#ifdef RECOVERY_APPLICATION
+#ifndef RECOVERY_APPLICATION
 static void * malloc_fn(size_t sz){
-
 	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
 	if(ptr==NULL){
 		ESP_LOGE(TAG,"malloc_fn:  unable to allocate memory!");
 	}
 	return ptr;
 }
-static void * free_fn(void * ptr){
-	if(ptr!=NULL){
-		free(ptr);
-	}
-	else {
-		ESP_LOGW(TAG,"free_fn: Cannot free null pointer!");
-	}
-	return NULL;
-}
+//static void * free_fn(void * ptr){
+//	if(ptr!=NULL){
+//		free(ptr);
+//	}
+//	else {
+//		ESP_LOGW(TAG,"free_fn: Cannot free null pointer!");
+//	}
+//	return NULL;
+//}
 #endif
 void init_cJSON(){
+
+#ifndef RECOVERY_APPLICATION
 	static cJSON_Hooks hooks;
 	// initialize cJSON hooks it uses SPIRAM memory
 	// as opposed to IRAM
-#ifndef RECOVERY_APPLICATION
 	// In squeezelite mode, allocate memory from PSRAM.  Otherwise allocate from internal RAM
 	// as recovery will lock flash access when erasing FLASH or writing to OTA partition.
 	hooks.malloc_fn=&malloc_fn;
@@ -320,7 +320,7 @@ void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry){
 	}
 
 	nvs_type_t type = config_get_entry_type(entry);
-	if(nvs_type != type){
+	if (nvs_type != type){
 		// requested value type different than the stored type
 		char * entry_str = cJSON_PrintUnformatted(entry);
 		if(entry_str!=NULL){
@@ -679,31 +679,6 @@ char * config_alloc_get_json(bool bFormatted){
 	config_unlock();
 	return json_buffer;
 }
-esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
-	esp_err_t result = ESP_OK;
-	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
-			ESP_LOGE(TAG, "Unable to lock config after %d ms",LOCK_MAX_WAIT);
-			result = ESP_FAIL;
-	}
-	cJSON * entry = config_set_value_safe(nvs_type, key, value);
-	if(entry == NULL){
-		result = ESP_FAIL;
-	}
-	else{
-		char * entry_str = cJSON_PrintUnformatted(entry);
-		if(entry_str!=NULL){
-			ESP_LOGV(TAG,"config_set_value result: \n%s",entry_str);
-			free(entry_str);
-		}
-		else {
-			ESP_LOGV(TAG,"config_set_value completed");
-		}
-
-	}
-	config_unlock();
-	return result;
-}
-
 esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
 	esp_err_t result = ESP_OK;
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){

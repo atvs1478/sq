@@ -10,6 +10,19 @@ if (!String.prototype.format) {
         });
     };
 }
+var nvs_type_t = {
+    NVS_TYPE_U8    : 0x01,  /*!< Type uint8_t */
+    NVS_TYPE_I8    : 0x11,  /*!< Type int8_t */
+    NVS_TYPE_U16   : 0x02,  /*!< Type uint16_t */
+    NVS_TYPE_I16   : 0x12,  /*!< Type int16_t */
+    NVS_TYPE_U32   : 0x04,  /*!< Type uint32_t */
+    NVS_TYPE_I32   : 0x14,  /*!< Type int32_t */
+    NVS_TYPE_U64   : 0x08,  /*!< Type uint64_t */
+    NVS_TYPE_I64   : 0x18,  /*!< Type int64_t */
+    NVS_TYPE_STR   : 0x21,  /*!< Type string */
+    NVS_TYPE_BLOB  : 0x42,  /*!< Type blob */
+    NVS_TYPE_ANY   : 0xff   /*!< Must be last */
+} ;
 
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
@@ -189,16 +202,25 @@ $(document).ready(function(){
     $("input#autoexec-cb").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
-        data['autoexec'] = autoexec;
+        data['config'] = {};
+        data['config'] = {
+            autoexec : {
+                value : autoexec,
+                type : 33
+            }
+        }
+
+
         showMessage('please wait for the ESP32 to reboot', 'WARNING');
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-autoexec": autoexec },
+//            headers: { "X-Custom-autoexec": autoexec },
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data:  JSON.stringify(data),
+
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -232,14 +254,20 @@ $(document).ready(function(){
     $("input#save-autoexec1").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec1 = $("#autoexec1").val();
-        data['autoexec1'] = autoexec1;
+        data['config'] = {};
+        data['config'] = {
+            autoexec1 : {
+                value : autoexec1,
+                type : 33
+            }
+        }
 
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-autoexec1": autoexec1 },
+//            headers: { "X-Custom-autoexec1": autoexec1 },
             contentType: 'application/json; charset=utf-8',
             data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
@@ -254,15 +282,19 @@ $(document).ready(function(){
 
     $("input#save-gpio").on("click", function() {
         var data = { 'timestamp': Date.now() };
+        var config = {};
+
         var headers = {};
         $("input.gpio").each(function() {
             var id = $(this)[0].id;
             var pin = $(this).val();
             if (pin != '') {
-                headers["X-Custom-"+id] = pin;
-                data[id] = pin;
+                config[id] = {};
+                config[id].value = pin;
+                config[id].type = nvs_type_t.NVS_TYPE_STR;
             }
         });
+        data['config'] = config;
         $.ajax({
             url: '/config.json',
             dataType: 'text',
@@ -284,23 +316,40 @@ $(document).ready(function(){
     $("#save-nvs").on("click", function() {
         var headers = {};
         var data = { 'timestamp': Date.now() };
+        var config = {};
         $("input.nvs").each(function() {
             var key = $(this)[0].id;
             var val = $(this).val();
+            var nvs_type = parseInt($(this)[0].attributes.nvs_type.nodeValue,10);
             if (key != '') {
-                headers["X-Custom-"+key] = val;
-                data[key] = {};
-                data[key].value = val;
-                data[key].type = 33;
+                config[key] = {};
+                if(nvs_type == nvs_type_t.NVS_TYPE_U8    
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I8    
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U16   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I16   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U32   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I32   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U64   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I64) {
+						config[key].value = parseInt(val);	
+				}   
+				else { 
+					config[key].value = val; 
+				} 
+                
+                
+                config[key].type = nvs_type;
             }
         });
         var key = $("#nvs-new-key").val();
         var val = $("#nvs-new-value").val();
         if (key != '') {
-            headers["X-Custom-"+key] = val;
-            data[key] = {};
-            data[key].value = val;
+//            headers["X-Custom-"	+key] = val;
+            config[key] = {};
+            config[key].value = val;
+            config[key].type = 33;
         }
+        data['config'] = config;
         $.ajax({
             url: '/config.json',
             dataType: 'text',
@@ -308,7 +357,7 @@ $(document).ready(function(){
             cache: false,
             headers: headers,
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data : JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -324,15 +373,21 @@ $(document).ready(function(){
         if (blockFlashButton) return;
         blockFlashButton = true;
         var url = $("#fwurl").val();
-        data['fwurl'] = url;
+        data['config'] = {
+            fwurl : {
+            value : url,
+            type : 33
+
+            }
+        };
+
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-fwurl": url },
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data:  JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -509,9 +564,13 @@ function performConnect(conntype){
         dataType: 'text',
         method: 'POST',
         cache: false,
-        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
+//        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
         contentType: 'application/json; charset=utf-8',
-        data: { 'timestamp': Date.now()},
+        data: JSON.stringify({ 'timestamp': Date.now(),
+        	'ssid' : selectedSSID, 
+        	'pwd' : pwd,
+        	'host_name' : dhcpname
+        	}), 
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);
             console.log(thrownError);
@@ -737,7 +796,7 @@ function getConfig() {
                     "<tr>"+
                         "<td>"+key+"</td>"+
                         "<td class='value'>"+
-                            "<input type='text' class='form-control nvs' id='"+key+"'>"+
+                            "<input type='text' class='form-control nvs' id='"+key+"'  nvs_type="+data[key].type+" >"+
                         "</td>"+
                     "</tr>"
                 );
@@ -750,7 +809,7 @@ function getConfig() {
                     "<input type='text' class='form-control' id='nvs-new-key' placeholder='new key'>"+
                 "</td>"+
                 "<td>"+
-                    "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value'>"+
+                    "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value' nvs_type=33 >"+ // todo: provide a way to choose field type 
                 "</td>"+
             "</tr>"
         );

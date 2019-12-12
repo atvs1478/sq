@@ -63,6 +63,7 @@ Contains the freeRTOS task and all necessary support
 #include "cmd_system.h"
 #include "http_server_handlers.h"
 
+
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0
 #endif
@@ -509,7 +510,7 @@ char * get_mac_string(uint8_t mac[6]){
 
 	char * macStr=malloc(LOCAL_MAC_SIZE);
 	memset(macStr, 0x00, LOCAL_MAC_SIZE);
-	snprintf(macStr, LOCAL_MAC_SIZE-1,MACSTR, MAC2STR(mac));
+	snprintf(macStr, LOCAL_MAC_SIZE,MACSTR, MAC2STR(mac));
 	return macStr;
 
 }
@@ -1093,7 +1094,7 @@ void wifi_manager( void * pvParameters ){
 	BaseType_t xStatus;
 	EventBits_t uxBits;
 	uint8_t	retries = 0;
-	esp_err_t err=ESP_OK;
+
 	/* start http server */
 	http_server_start();
 
