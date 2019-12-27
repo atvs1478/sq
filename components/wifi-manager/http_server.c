@@ -77,16 +77,16 @@ extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t battery-0_svg_start[] asm("_binary_battery-0_svg_start");
-extern const uint8_t battery-0_svg_end[] asm("_binary_battery-0_svg_end");
-extern const uint8_t battery-1_svg_start[] asm("_binary_battery-1_svg_start");
-extern const uint8_t battery-1_svg_end[] asm("_binary_battery-1_svg_end");
-extern const uint8_t battery-2_svg_start[] asm("_binary_battery-2_svg_start");
-extern const uint8_t battery-2_svg_end[] asm("_binary_battery-2_svg_end");
-extern const uint8_t battery-3_svg_start[] asm("_binary_battery-3_svg_start");
-extern const uint8_t battery-3_svg_end[] asm("_binary_battery-3_svg_end");
-extern const uint8_t battery-4_svg_start[] asm("_binary_battery-4_svg_start");
-extern const uint8_t battery-4_svg_end[] asm("_binary_battery-4_svg_end");
+extern const uint8_t battery0_svg_start[] asm("_binary_battery0_svg_start");
+extern const uint8_t battery0_svg_end[] asm("_binary_battery0_svg_end");
+extern const uint8_t battery1_svg_start[] asm("_binary_battery1_svg_start");
+extern const uint8_t battery1_svg_end[] asm("_binary_battery1_svg_end");
+extern const uint8_t battery2_svg_start[] asm("_binary_battery2_svg_start");
+extern const uint8_t battery2_svg_end[] asm("_binary_battery2_svg_end");
+extern const uint8_t battery3_svg_start[] asm("_binary_battery3_svg_start");
+extern const uint8_t battery3_svg_end[] asm("_binary_battery3_svg_end");
+extern const uint8_t battery4_svg_start[] asm("_binary_battery4_svg_start");
+extern const uint8_t battery4_svg_end[] asm("_binary_battery4_svg_end");
 
 
 /* const http headers stored in ROM */
@@ -404,25 +404,25 @@ void http_server_netconn_serve(struct netconn *conn) {
 				else if(strstr(line, "GET /bootstrap.css ")) {
 					http_server_send_resource_file(conn,bootstrap_css_gz_start, bootstrap_css_gz_end, "text/css", "gzip" );
 				}
-				else if(strstr(line, "GET /battery-0.svg ")) {
+				else if(strstr(line, "GET /battery0.svg ")) {
 					netconn_write(conn, http_svg_hdr, sizeof(http_svg_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, battery-0_svg_start, battery-0_svg_end - battery-0_svg_start, NETCONN_NOCOPY);
+					netconn_write(conn, battery0_svg_start, battery0_svg_end - battery0_svg_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /battery-1.svg ")) {
+				else if(strstr(line, "GET /battery1.svg ")) {
 					netconn_write(conn, http_svg_hdr, sizeof(http_svg_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, battery-1_svg_start, battery-1_svg_end - battery-1_svg_start, NETCONN_NOCOPY);
+					netconn_write(conn, battery1_svg_start, battery1_svg_end - battery1_svg_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /battery-2.svg ")) {
+				else if(strstr(line, "GET /battery2.svg ")) {
 					netconn_write(conn, http_svg_hdr, sizeof(http_svg_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, battery-2_svg_start, battery-2_svg_end - battery-2_svg_start, NETCONN_NOCOPY);
+					netconn_write(conn, battery2_svg_start, battery2_svg_end - battery2_svg_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /battery-3.svg ")) {
+				else if(strstr(line, "GET /battery3.svg ")) {
 					netconn_write(conn, http_svg_hdr, sizeof(http_svg_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, battery-3_svg_start, battery-3_svg_end - battery-3_svg_start, NETCONN_NOCOPY);
+					netconn_write(conn, battery3_svg_start, battery3_svg_end - battery3_svg_start, NETCONN_NOCOPY);
 				}
-				else if(strstr(line, "GET /battery-4.svg ")) {
+				else if(strstr(line, "GET /battery4.svg ")) {
 					netconn_write(conn, http_svg_hdr, sizeof(http_svg_hdr) - 1, NETCONN_NOCOPY);
-					netconn_write(conn, battery-4_svg_start, battery-4_svg_end - battery-4_svg_start, NETCONN_NOCOPY);
+					netconn_write(conn, battery4_svg_start, battery4_svg_end - battery4_svg_start, NETCONN_NOCOPY);
 				}
 
                 //dynamic stuff

@@ -721,7 +721,7 @@ function checkStatus(){
                 } else {
                     i = 4;
                 }
-                $("#battery").html('<img src="battery-'+i+'.svg" />');
+                $("#battery").html('<img src="battery'+i+'.svg" />');
             }
         }
         blockAjax = false;
