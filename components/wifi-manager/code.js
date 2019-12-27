@@ -706,6 +706,24 @@ function checkStatus(){
                 lastMsg = msg;
             }
         }
+        if (data.hasOwnProperty('Voltage')) {
+            var voltage = data['Voltage'];
+            var i;
+            if (voltage > 0) {
+                if (inRange(voltage, 5.8, 6.2) || inRange(voltage, 8.8, 9.2)) {
+                    i = 0;
+                } else if (inRange(voltage, 6.2, 6.8) || inRange(voltage, 9.2, 10.0)) {
+                    i = 1;
+                } else if (inRange(voltage, 6.8, 7.1) || inRange(voltage, 10.0, 10.5)) {
+                    i = 2;
+                } else if (inRange(voltage, 7.1, 7.5) || inRange(voltage, 10.5, 11.0)) {
+                    i = 3;
+                } else {
+                    i = 4;
+                }
+                $("#battery").html('<img src="battery-'+i+'.svg" />');
+            }
+        }
         blockAjax = false;
     })
     .fail(function(xhr, ajaxOptions, thrownError) {
@@ -777,4 +795,8 @@ function showMessage(message, severity) {
             $("#content").fadeTo("slow", 1.0);
         });
     });
+}
+
+function inRange(x, min, max) {
+    return ((x-min)*(x-max) <= 0);
 }

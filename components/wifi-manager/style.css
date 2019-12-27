@@ -308,6 +308,19 @@ span#flash-status {
     font-size: 120%;
 }
 
+#battery {
+    padding-top: 7px;
+    float: right;
+}
+
+ul#navbar {
+    border-bottom: 0px;
+}
+
+#content {
+    border-top: 1px solid black;
+}
+
 .footer {
   position: fixed;
   left: 0;
