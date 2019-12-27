@@ -6,7 +6,8 @@
 # lib(subdirectory_name).a in the build directory. This behaviour is entirely configurable,
 # please read the SDK documents if you need to do this.
 #
-COMPONENT_EMBED_FILES := style.css code.js index.html bootstrap.min.css.gz jquery.min.js.gz popper.min.js.gz bootstrap.min.js.gz
+COMPONENT_EMBED_FILES := style.css code.js index.html bootstrap.min.css.gz jquery.min.js.gz popper.min.js.gz bootstrap.min.js.gz battery-0.svg battery-1.svg battery-2.svg battery-3.svg battery-4.svg
+
 #CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG 
 CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_INFO \
 	-I$(COMPONENT_PATH)/../tools				
