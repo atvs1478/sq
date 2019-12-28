@@ -708,20 +708,20 @@ function checkStatus(){
         }
         if (data.hasOwnProperty('Voltage')) {
             var voltage = data['Voltage'];
-            var i;
+            var layer;
             if (voltage > 0) {
                 if (inRange(voltage, 5.8, 6.2) || inRange(voltage, 8.8, 9.2)) {
-                    i = 0;
+                    layer = bat0;
                 } else if (inRange(voltage, 6.2, 6.8) || inRange(voltage, 9.2, 10.0)) {
-                    i = 1;
+                    layer = bat1;
                 } else if (inRange(voltage, 6.8, 7.1) || inRange(voltage, 10.0, 10.5)) {
-                    i = 2;
+                    layer = bat2;
                 } else if (inRange(voltage, 7.1, 7.5) || inRange(voltage, 10.5, 11.0)) {
-                    i = 3;
+                    layer = bat3;
                 } else {
-                    i = 4;
+                    layer = bat4;
                 }
-                $("#battery").html('<img src="battery'+i+'.svg" />');
+                layer.setAttribute("display","inline");
             }
         }
         blockAjax = false;
