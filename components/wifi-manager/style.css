@@ -308,9 +308,13 @@ span#flash-status {
     font-size: 120%;
 }
 
-#battery {
+#info {
     padding-top: 7px;
     float: right;
+}
+
+svg#battery {
+    fill: #ddd;
 }
 
 ul#navbar {
