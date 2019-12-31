@@ -746,6 +746,15 @@ function getConfig() {
                     }
                 } else if (key == 'autoexec1') {
                     $("textarea#autoexec1").val(data[key].value);
+                    var re = / -o "?(\S+)\b/g;
+                    var m = re.exec(data[key].value);
+                    if (m[1] =='I2S') {
+                        o_i2s.setAttribute("display","inline");
+                    } else if (m[1] =='SPDIF') {
+                        o_spdif.setAttribute("display","inline");
+                    } else if (m[1] =='BT') {
+                        o_bt.setAttribute("display","inline");
+                    }
                 } else if (key == 'host_name') {
                     $("input#dhcp-name1").val(data[key].value);
                     $("input#dhcp-name2").val(data[key].value);

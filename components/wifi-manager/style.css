@@ -317,6 +317,11 @@ svg#battery {
     fill: #ddd;
 }
 
+svg#output {
+    fill: #ddd;
+    padding-right: 4px;
+}
+
 ul#navbar {
     border-bottom: 0px;
 }
