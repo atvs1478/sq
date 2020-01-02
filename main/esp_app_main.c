@@ -46,6 +46,7 @@
 #include "squeezelite-ota.h"
 #include <math.h>
 #include "config.h"
+#include "audio_controls.h"
 
 extern bool enable_bt_sink;
 extern bool enable_airplay;
@@ -375,10 +376,12 @@ void app_main()
 	}
 
 	ESP_LOGD(TAG,"Configuring Green led");
-
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	ESP_LOGD(TAG,"Configuring Red led");
 	led_config(LED_RED, LED_RED_GPIO, 0);
+
+	ESP_LOGD(TAG,"Initializing audio control buttons");
+	audio_controls_init();
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
