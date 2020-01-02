@@ -23,20 +23,13 @@
 #define BUTTON_HIGH		1
 
 typedef enum { BUTTON_PRESSED, BUTTON_RELEASED } button_event_e; 
-typedef enum { BUTTON_NORMAL, BUTTON_LONG, BUTTON_SHIFTED } button_press_e; 
-typedef void (*button_handler)(button_event_e event, button_press_e mode);
+typedef enum { BUTTON_NORMAL, BUTTON_SHIFTED } button_press_e; 
+typedef void (*button_handler)(button_event_e event, button_press_e mode, bool long_press);
 
 /* 
-a button might have variable functions
-	- "long", <long_handler>, <duration_in_ms>
-	- "shift", <shift_handler>, <shifter_gpio>
-
-button_create(2, BUTTON_LOW, true, handler, NULL);
-button_create(5, BUTTON_HIGH, true, handler, "long", long_handler, 2000, NULL);
-button_create(6, BUTTON_LOW, true, handler, "shift", shift_handler, 5, NULL);
-button_create(6, BUTTON_HIGH, true, handler, "long", long_handler, 2000, "shift", shift_handler, 5);
-
+set long_press to 0 for no long-press
+set shifter_gpio to -1 for no shift
 NOTE: shifter buttons *must* be created before shiftee
 */
 
-void button_create(int gpio, int type, bool pull, button_handler handler, ...);
+void button_create(int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio);

@@ -41,7 +41,7 @@ static int n_buttons = 0;
 
 static struct button_s {
 	int gpio, index;
-	button_handler handler, long_handler, shift_handler;
+	button_handler handler;
 	struct button_s *shifter;
 	int	long_press;
 	bool long_timer, shifted, shifting;
@@ -63,7 +63,7 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 
 	if (xTimerGetPeriod(button->timer) > DEBOUNCE / portTICK_RATE_MS) xTimerChangePeriodFromISR(button->timer, DEBOUNCE / portTICK_RATE_MS, &woken); // does that restart the timer? 
 	else xTimerResetFromISR(button->timer, &woken);
-	// ESP_EARLY_LOGD(TAG, "INT gpio %u level %u", button->gpio, button->level);
+	// ESP_EARLY_LOGI(TAG, "INT gpio %u level %u", button->gpio, button->level);
 }
 
 /****************************************************************************************
@@ -71,7 +71,7 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
  */
 static void buttons_timer( TimerHandle_t xTimer ) {
 	struct button_s *button = (struct button_s*) pvTimerGetTimerID (xTimer);
-	
+
 	button->level = gpio_get_level(button->gpio);
 
 	if (button->long_press && !button->long_timer && button->level == button->type) {
@@ -97,7 +97,7 @@ static void buttons_task(void* arg) {
     while (1) {
 		struct button_s button;
 		button_event_e event;
-		bool shifted = false;
+		button_press_e press = BUTTON_NORMAL;
 
         if (!xQueueReceive(button_evt_queue, &button, portMAX_DELAY)) continue;
 
@@ -108,7 +108,7 @@ static void buttons_task(void* arg) {
 		// find if shifting is activated
 		if (button.shifter && button.shifter->type == button.shifter->level) {
 			button.shifter->shifting = true;
-			shifted = true;
+			press = BUTTON_SHIFTED;
 		} 
 	
 		/* 
@@ -119,32 +119,19 @@ static void buttons_task(void* arg) {
 		if (button.long_timer) {
 			if (event == BUTTON_RELEASED) {
 				// early release of a long-press button, send press/release
-				if (shifted) {
-					(*button.shift_handler)(BUTTON_PRESSED, BUTTON_SHIFTED);
-					(*button.shift_handler)(BUTTON_RELEASED, BUTTON_SHIFTED);
-				} else if (!button.shifting) {
-					(*button.handler)(BUTTON_PRESSED, BUTTON_NORMAL);
-					(*button.handler)(BUTTON_RELEASED, BUTTON_NORMAL);
-				}	
+				if (!button.shifting) {
+					(*button.handler)(BUTTON_PRESSED, press, false);		
+					(*button.handler)(BUTTON_RELEASED, press, false);		
+				}
 				// button is a copy, so need to go to real context
 				buttons[button.index].shifting = false;
 			} else if (!button.shifting) {
-				/* 
-				normal long press and not shifting so don't discard but there
-				is no long-press when shifted
-				*/
-				if (shifted) (*button.shift_handler)(BUTTON_PRESSED, BUTTON_SHIFTED);
-				else (*button.long_handler)(BUTTON_PRESSED, BUTTON_LONG);
+				// normal long press and not shifting so don't discard
+				(*button.handler)(BUTTON_PRESSED, press, true);
 			}  
-		} else if (shifted) {
-			// we are shifted
-			(*button.shift_handler)(event, BUTTON_SHIFTED);
 		} else {
 			// normal press/release of a button or release of a long-press button
-			if (!button.shifting) {
-				if (button.long_press) (*button.long_handler)(event, BUTTON_LONG);
-				else (*button.handler)(event, BUTTON_NORMAL);
-			}
+			if (!button.shifting) (*button.handler)(event, press, button.long_press);
 			// button is a copy, so need to go to real context
 			buttons[button.index].shifting = false;
 		}
@@ -161,13 +148,11 @@ void dummy_handler(button_event_e event, button_press_e press) {
 /****************************************************************************************
  * Create buttons 
  */
-void button_create(int gpio, int type, bool pull, button_handler handler, ...) { 
-	char *param;
-	va_list args;
+void button_create(int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio) { 
 	
 	if (n_buttons >= MAX_BUTTONS) return;
 
-	ESP_LOGI(TAG, "creating button using GPIO %u, type %u, pull-up/down %u", gpio, type, pull);
+	ESP_LOGI(TAG, "creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
 
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));
@@ -181,40 +166,22 @@ void button_create(int gpio, int type, bool pull, button_handler handler, ...) {
 	// set mandatory parameters
  	buttons[n_buttons].gpio = gpio;
 	buttons[n_buttons].handler = handler;
+	buttons[n_buttons].long_press = long_press;
 	buttons[n_buttons].level = -1;
 	buttons[n_buttons].type = type;
 	buttons[n_buttons].timer = xTimerCreate("buttonTimer", DEBOUNCE / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
 	// little trick to find ourselves from queued copy
 	buttons[n_buttons].index = n_buttons;
 
-	va_start(args, handler);
-	
-	// set optional parameters
-	while ((param = va_arg(args, char*)) != NULL) {
-		if (!strcasecmp(param, "long")) {
-			buttons[n_buttons].long_handler = (button_handler) va_arg(args, void*);
-			buttons[n_buttons].long_press = va_arg(args, int);
-			ESP_LOGI(TAG, "adding long press %u (ms)", buttons[n_buttons].long_press);
-		} else if (!strcasecmp(param, "shift")) {
-			buttons[n_buttons].shift_handler = (button_handler) va_arg(args, void*);
-			int shifter_gpio = va_arg(args, int);
-			for (int i = 0; i < n_buttons; i++) {
-				if (buttons[i].gpio == shifter_gpio) {
-					buttons[n_buttons].shifter = buttons + i;
-					// a shifter must have a long-press handler
-					if (!buttons[i].long_press) {
-						buttons[i].long_press = 60*60*1000;
-						buttons[i].long_handler = dummy_handler;
-					} 
-					break;
-				}
-			}	
-			ESP_LOGI(TAG, "adding shifter %u", buttons[n_buttons].shifter->gpio);
+	for (int i = 0; i < n_buttons; i++) {
+		if (buttons[i].gpio == shifter_gpio) {
+			buttons[n_buttons].shifter = buttons + i;
+			// a shifter must have a long-press handler
+			if (!buttons[i].long_press) buttons[i].long_press = -1;
+			break;
 		}
-	}
+	}	
 
-	va_end(args);
-	
 	gpio_set_direction(gpio, GPIO_MODE_INPUT);
 
 	// we need any edge detection

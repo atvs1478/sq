@@ -40,31 +40,31 @@ typedef struct {
 static audio_control_t default_control, current_control;
 
 /****************************************************************************************
- * Volume DOWN command
+ * DOWN button
  */
-static void volume_down(button_event_e event, button_press_e press) {
-	ESP_LOGI(TAG, "volume down %u", event);
-	//if (event == BUTTON_PRESSED) (*current_control.volume_down)();
-}
-
-static void volume_down_special(button_event_e event, button_press_e press) {
-	if (press == BUTTON_LONG) ESP_LOGI(TAG, "volume down long %u", event);
-	else ESP_LOGI(TAG, "volume down shifted %u", event);
+static void down(button_event_e event, button_press_e press, bool long_press) {
+	if (press == BUTTON_NORMAL) {
+		if (!long_press) ESP_LOGI(TAG, "volume DOWN %u", event);
+		else ESP_LOGI(TAG, "volume DOWN long %u", event);
+	} else {
+		if (!long_press) ESP_LOGI(TAG, "volume DOWN shifted %u", event);
+		else ESP_LOGI(TAG, "volume DOWN long shifted %u", event);
+	}
 	//if (event == BUTTON_PRESSED) (*current_control.volume_down)();
 }
 
 /****************************************************************************************
- * Volume UP commands
+ * UP button
  */
-static void volume_up(button_event_e event, button_press_e press) {
-	ESP_LOGI(TAG, "volume up %u", event);
+static void up(button_event_e event, button_press_e press, bool long_press) {
+	if (press == BUTTON_NORMAL) {
+		if (!long_press) ESP_LOGI(TAG, "volume UP %u", event);
+		else ESP_LOGI(TAG, "volume UP long %u", event);
+	} else {
+		if (!long_press) ESP_LOGI(TAG, "volume UP shifted %u", event);
+		else ESP_LOGI(TAG, "volume UP long shifted %u", event);
+	}
 	//if (event == BUTTON_PRESSED) (*current_control.volume_up)();
-}
-
-static void volume_up_long(button_event_e event, button_press_e press) {
-	if (press == BUTTON_LONG) ESP_LOGI(TAG, "volume up long %u", event);
-	else ESP_LOGI(TAG, "volume up shifted %u", event);
-	//if (event == BUTTON_PRESSED) (*current_control.volume_down)();
 }
 
 /****************************************************************************************
@@ -72,12 +72,12 @@ static void volume_up_long(button_event_e event, button_press_e press) {
  */
 void audio_controls_init(void) {
 	/*
-	button_create(18, BUTTON_LOW, true, volume_up, NULL);
-	button_create(19, BUTTON_LOW, true, volume_down, "long", volume_down_long, 3000, NULL);
-	button_create(21, BUTTON_LOW, true, volume_up, NULL);
+	button_create(18, BUTTON_LOW, true, up, 0, -1);
+	button_create(19, BUTTON_LOW, true, down, 0, -1);
+	button_create(21, BUTTON_LOW, true, play, 0, -1);
 	*/
-	button_create(4, BUTTON_LOW, true, volume_up, NULL);
-	button_create(5, BUTTON_LOW, true, volume_down, "long", volume_down_special, 3000, "shift", volume_down_special, 4, NULL);
+	button_create(4, BUTTON_LOW, true, up, 2000, -1);
+	button_create(5, BUTTON_LOW, true, down, 3000, 4);
 }
 
 /****************************************************************************************
