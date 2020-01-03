@@ -25,7 +25,7 @@
 #include "nvs_utilities.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "audio_controls.h"
 #include "sys/lock.h"
 
 // AVRCP used transaction label
@@ -60,6 +60,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param);
 static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param);
 /* avrc TG event handler */
 static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param);
+static void volume_set_by_local_host(uint8_t volume);
 
 static esp_a2d_audio_state_t s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
 static const char *s_a2d_conn_state_str[] = {"Disconnected", "Connecting", "Connected", "Disconnecting"};
@@ -68,6 +69,29 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
 static _lock_t s_volume_lock;
 static uint8_t s_volume = 0;
 static bool s_volume_notify;
+
+static void bt_volume_up(void) {
+	volume_set_by_local_host(s_volume + 3);
+	ESP_LOGI(BT_AV_TAG, "BT volume up %u", s_volume);
+}
+
+static void bt_volume_down(void) {
+	volume_set_by_local_host(s_volume - 3);
+	ESP_LOGI(BT_AV_TAG, "BT volume down %u", s_volume);
+}
+
+static void bt_toggle(void) {
+	//btc_a2dp_control_media_ctrl(ESP_A2D_MEDIA_CTL_STOP);
+	//ESP_LOGI(BT_AV_TAG, "PLAY/PAUSE");
+}
+
+static actrls_t controls = {
+	bt_volume_up, bt_volume_down,	// volume up, volume down
+	bt_toggle, NULL,	// toggle, play
+	NULL, NULL,	// pause, stop
+	NULL, NULL,		// rew, fwd
+	NULL, NULL,		// prev, next
+};
 
 /* callback for A2DP sink */
 void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
@@ -144,9 +168,11 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_DISCONNECTED);
+			actrls_unset();
         } else if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_CONNECTED){
             esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED);
+			actrls_set(controls);
         }
         break;
     }
@@ -518,4 +544,7 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
         break;
     }
 }
+
+
+
 
