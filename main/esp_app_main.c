@@ -76,8 +76,18 @@ static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
+static const actrls_config_t board_1[] = {
+	//								normal 							long						shifted						long shifted											
+	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
+	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_FWD, ACTRLS_PLAY} },
+};
 
-
+static const actrls_config_t board_2[] = {
+	//								normal 							long						shifted						long shifted											
+	{ 21, BUTTON_LOW, true, 1000, -1, 	{ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_STOP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
+	{ 18, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, 	{ACTRLS_REW, ACTRLS_PLAY} },
+	{ 19, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_FWD, ACTRLS_PLAY} },
+};
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -381,7 +391,7 @@ void app_main()
 	led_config(LED_RED, LED_RED_GPIO, 0);
 
 	ESP_LOGD(TAG,"Initializing audio control buttons");
-	audio_controls_init();
+	actrls_init(sizeof(board_1) / sizeof(actrls_config_t), (actrls_config_t*) board_1);
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");

@@ -43,6 +43,8 @@ static log_level loglevel;
 
 static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
+static u16_t slimproto_hport = 9000;
+static u16_t slimproto_cport = 9090;
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -768,16 +770,17 @@ void wake_controller(void) {
 in_addr_t discover_server(char *default_server) {
 	struct sockaddr_in d;
 	struct sockaddr_in s;
-	char *buf;
+	char buf[32], port_d[] = "JSON", clip_d[] = "CLIP";
 	struct pollfd pollinfo;
 	unsigned port;
+	u8_t len;
 
 	int disc_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	socklen_t enable = 1;
 	setsockopt(disc_sock, SOL_SOCKET, SO_BROADCAST, (const void *)&enable, sizeof(enable));
 
-	buf = "e";
+	len = sprintf(buf,"e%s%c%s", port_d, '\0', clip_d) + 1;
 
 	memset(&d, 0, sizeof(d));
 	d.sin_family = AF_INET;
@@ -792,15 +795,26 @@ in_addr_t discover_server(char *default_server) {
 		LOG_INFO("sending discovery");
 		memset(&s, 0, sizeof(s));
 
-		if (sendto(disc_sock, buf, 1, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
+		if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
 			LOG_INFO("error sending disovery");
 		}
 
 		if (poll(&pollinfo, 1, 5000) == 1) {
-			char readbuf[10];
+			char readbuf[32], *p;
 			socklen_t slen = sizeof(s);
-			recvfrom(disc_sock, readbuf, 10, 0, (struct sockaddr *)&s, &slen);
+			memset(readbuf, 0, 32);
+			recvfrom(disc_sock, readbuf, 32 - 1, 0, (struct sockaddr *)&s, &slen);
 			LOG_INFO("got response from: %s:%d", inet_ntoa(s.sin_addr), ntohs(s.sin_port));
+
+			 if ((p = strstr(readbuf, port_d)) != NULL) {
+				p += strlen(port_d);
+				slimproto_hport = atoi(p + 1);
+			}
+
+			 if ((p = strstr(readbuf, clip_d)) != NULL) {
+				p += strlen(clip_d);
+				slimproto_cport = atoi(p + 1);
+			}
 		}
 
 		if (default_server) {
@@ -950,6 +964,10 @@ void slimproto(log_level level, char *server, u8_t mac[6], const char *name, con
 			}
 
 			sendHELO(reconnect, fixed_cap, var_cap, mac);
+
+#if EMBEDDED
+			if (server_notify) (*server_notify)(slimproto_ip, slimproto_hport, slimproto_cport);
+#endif
 
 			slimproto_run();
 

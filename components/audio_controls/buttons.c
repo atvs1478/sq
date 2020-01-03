@@ -40,6 +40,7 @@ static int n_buttons = 0;
 #define DEBOUNCE		50
 
 static struct button_s {
+	void *id;
 	int gpio, index;
 	button_handler handler;
 	struct button_s *shifter;
@@ -73,6 +74,7 @@ static void buttons_timer( TimerHandle_t xTimer ) {
 	struct button_s *button = (struct button_s*) pvTimerGetTimerID (xTimer);
 
 	button->level = gpio_get_level(button->gpio);
+	if (button->shifter && button->shifter->type == button->shifter->level) button->shifter->shifting = true;
 
 	if (button->long_press && !button->long_timer && button->level == button->type) {
 		// detect a long press, so hold event generation
@@ -97,7 +99,7 @@ static void buttons_task(void* arg) {
     while (1) {
 		struct button_s button;
 		button_event_e event;
-		button_press_e press = BUTTON_NORMAL;
+		button_press_e press;
 
         if (!xQueueReceive(button_evt_queue, &button, portMAX_DELAY)) continue;
 
@@ -106,10 +108,8 @@ static void buttons_task(void* arg) {
 		ESP_LOGD(TAG, "received event:%u from gpio:%u level:%u (timer %u shifting %u)", event, button.gpio, button.level, button.long_timer, button.shifting);
 
 		// find if shifting is activated
-		if (button.shifter && button.shifter->type == button.shifter->level) {
-			button.shifter->shifting = true;
-			press = BUTTON_SHIFTED;
-		} 
+		if (button.shifter && button.shifter->type == button.shifter->level) press = BUTTON_SHIFTED;
+		else press = BUTTON_NORMAL;
 	
 		/* 
 		long_timer will be set either because we truly have a long press 
@@ -120,18 +120,18 @@ static void buttons_task(void* arg) {
 			if (event == BUTTON_RELEASED) {
 				// early release of a long-press button, send press/release
 				if (!button.shifting) {
-					(*button.handler)(BUTTON_PRESSED, press, false);		
-					(*button.handler)(BUTTON_RELEASED, press, false);		
+					(*button.handler)(button.id, BUTTON_PRESSED, press, false);		
+					(*button.handler)(button.id, BUTTON_RELEASED, press, false);		
 				}
 				// button is a copy, so need to go to real context
 				buttons[button.index].shifting = false;
 			} else if (!button.shifting) {
 				// normal long press and not shifting so don't discard
-				(*button.handler)(BUTTON_PRESSED, press, true);
+				(*button.handler)(button.id, BUTTON_PRESSED, press, true);
 			}  
 		} else {
 			// normal press/release of a button or release of a long-press button
-			if (!button.shifting) (*button.handler)(event, press, button.long_press);
+			if (!button.shifting) (*button.handler)(button.id, event, press, button.long_press);
 			// button is a copy, so need to go to real context
 			buttons[button.index].shifting = false;
 		}
@@ -141,14 +141,14 @@ static void buttons_task(void* arg) {
 /****************************************************************************************
  * dummy button handler
  */	
-void dummy_handler(button_event_e event, button_press_e press) {
+void dummy_handler(void *id, button_event_e event, button_press_e press) {
 	ESP_LOGW(TAG, "should not be here");
 }
 
 /****************************************************************************************
  * Create buttons 
  */
-void button_create(int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio) { 
+void button_create(void *id, int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio) { 
 	
 	if (n_buttons >= MAX_BUTTONS) return;
 
@@ -157,13 +157,14 @@ void button_create(int gpio, int type, bool pull, button_handler handler, int lo
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));
 		gpio_install_isr_service(0);
-		xTaskCreate(buttons_task, "buttons_task", 2048, NULL, ESP_TASK_PRIO_MIN + 1, NULL);
+		xTaskCreate(buttons_task, "buttons_task", 8192, NULL, ESP_TASK_PRIO_MIN + 1, NULL);
 	}
 	
-	// just in case this structure is allocated later
+	// just in case this structure is allocated in a future release
 	memset(buttons + n_buttons, 0, sizeof(struct button_s));
 
 	// set mandatory parameters
+	buttons[n_buttons].id = id;
  	buttons[n_buttons].gpio = gpio;
 	buttons[n_buttons].handler = handler;
 	buttons[n_buttons].long_press = long_press;

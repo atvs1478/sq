@@ -20,6 +20,7 @@
  */
  
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include "esp_system.h"
 #include "esp_log.h"
@@ -28,75 +29,87 @@
 
 static const char * TAG = "audio_controls";
 
-typedef struct {
-	void (*volume_up)(void);
-	void (*volume_down)(void);
-	void (*play_toggle)(void);
-	void (*play)(void);
-	void (*pause)(void);
-	void (*stop)(void);
-} audio_control_t;
+static actrls_t default_controls, current_controls;
 
-static audio_control_t default_control, current_control;
+static void control_handler(void *id, button_event_e event, button_press_e press, bool long_press) {
+	actrls_config_t *key = (actrls_config_t*) id;
+	actrls_action_e action;
 
-/****************************************************************************************
- * DOWN button
- */
-static void down(button_event_e event, button_press_e press, bool long_press) {
-	if (press == BUTTON_NORMAL) {
-		if (!long_press) ESP_LOGI(TAG, "volume DOWN %u", event);
-		else ESP_LOGI(TAG, "volume DOWN long %u", event);
-	} else {
-		if (!long_press) ESP_LOGI(TAG, "volume DOWN shifted %u", event);
-		else ESP_LOGI(TAG, "volume DOWN long shifted %u", event);
+	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u", key->gpio, press, long_press, event);
+	
+	switch(press) {
+	case BUTTON_NORMAL:
+		if (long_press) action = key->longpress[event == BUTTON_PRESSED ? 0 : 1];
+		else action = key->normal[event == BUTTON_PRESSED ? 0 : 1];
+		break;
+	case BUTTON_SHIFTED:
+		if (long_press) action = key->longshifted[event == BUTTON_PRESSED ? 0 : 1];
+		else action = key->shifted[event == BUTTON_PRESSED ? 0 : 1];
+		break;
+	default:
+		action = ACTRLS_NONE;
+		break;
 	}
-	//if (event == BUTTON_PRESSED) (*current_control.volume_down)();
-}
 
-/****************************************************************************************
- * UP button
- */
-static void up(button_event_e event, button_press_e press, bool long_press) {
-	if (press == BUTTON_NORMAL) {
-		if (!long_press) ESP_LOGI(TAG, "volume UP %u", event);
-		else ESP_LOGI(TAG, "volume UP long %u", event);
-	} else {
-		if (!long_press) ESP_LOGI(TAG, "volume UP shifted %u", event);
-		else ESP_LOGI(TAG, "volume UP long shifted %u", event);
+	if (action != ACTRLS_NONE) {
+		ESP_LOGD(TAG, " calling action %u", action);
+		if (current_controls[action]) (*current_controls[action])();
 	}
-	//if (event == BUTTON_PRESSED) (*current_control.volume_up)();
+}
+
+/*
+void up(void *id, button_event_e event, button_press_e press, bool longpress) {
+	if (press == BUTTON_NORMAL) {
+		if (longpress) ESP_LOGI(TAG, "up long %u", event);
+		else ESP_LOGI(TAG, "up %u", event);
+	} else if (press == BUTTON_SHIFTED) {
+		if (longpress) ESP_LOGI(TAG, "up shifted long %u", event);
+		else ESP_LOGI(TAG, "up shifted %u", event);
+	} else {
+		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
+	}
+}
+
+void down(void *id, button_event_e event, button_press_e press, bool longpress) {
+	if (press == BUTTON_NORMAL) {
+		if (longpress) ESP_LOGI(TAG, "down long %u", event);
+		else ESP_LOGI(TAG, "down %u", event);
+	} else if (press == BUTTON_SHIFTED) {
+		if (longpress) ESP_LOGI(TAG, "down shifted long %u", event);
+		else ESP_LOGI(TAG, "down shifted %u", event);
+	} else {
+		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
+	}
+}
+*/
+
+/****************************************************************************************
+ * 
+ */
+void actrls_init(int n, actrls_config_t *config) {
+	for (int i = 0; i < n; i++) {
+		button_create(config + i, config[i].gpio, config[i].type, config[i].pull, control_handler, config[i].long_press, config[i].shifter_gpio);
+	}
 }
 
 /****************************************************************************************
  * 
  */
-void audio_controls_init(void) {
-	/*
-	button_create(18, BUTTON_LOW, true, up, 0, -1);
-	button_create(19, BUTTON_LOW, true, down, 0, -1);
-	button_create(21, BUTTON_LOW, true, play, 0, -1);
-	*/
-	button_create(4, BUTTON_LOW, true, up, 2000, -1);
-	button_create(5, BUTTON_LOW, true, down, 3000, 4);
+void actrls_set_default(actrls_t controls) {
+	memcpy(default_controls, controls, sizeof(actrls_t));
+	memcpy(current_controls, default_controls, sizeof(actrls_t));
 }
 
 /****************************************************************************************
  * 
  */
-void default_audio_control(audio_control_t *control) {
-	default_control = current_control = *control;
+void actrls_set(actrls_t controls) {
+	memcpy(current_controls, controls, sizeof(actrls_t));
 }
 
 /****************************************************************************************
  * 
  */
-void register_audio_control(audio_control_t *control) {
-	current_control = *control;
-}
-
-/****************************************************************************************
- * 
- */
-void deregister_audio_control(void) {
-	current_control = default_control;	
+void actrls_unset(void) {
+	memcpy(current_controls, default_controls, sizeof(actrls_t));
 }

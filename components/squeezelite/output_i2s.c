@@ -583,6 +583,7 @@ static void *output_thread_i2s() {
  * Stats output thread
  */
 static void *output_thread_i2s_stats() {
+	int memory_count = 0;
 
 	while (running) {
 #ifdef TAS57xx		
@@ -617,11 +618,14 @@ static void *output_thread_i2s_stats() {
 			LOG_INFO("              ----------+----------+-----------+-----------+");
 			RESET_ALL_MIN_MAX;
 		}
-		LOG_INFO("Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
-					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+		if (loglevel == lDEBUG || !memory_count--) {
+			LOG_INFO("Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
+						heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+						heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+						heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+			memory_count = (60*1000) / STATS_PERIOD_MS;
+		}
 		usleep(STATS_PERIOD_MS *1000);
 	}
 	return NULL;

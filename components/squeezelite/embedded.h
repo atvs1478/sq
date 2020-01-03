@@ -45,5 +45,6 @@ int			pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr,
 			
 void 		register_external(void);
 void 		deregister_external(void);
+void 		(*server_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 				   
 #endif // EMBEDDED_H
