@@ -79,7 +79,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 static const actrls_config_t board_1[] = {
 	//								normal 							long						shifted						long shifted											
 	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_FWD, ACTRLS_PLAY} },
+	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE} },
 };
 
 static const actrls_config_t board_2[] = {

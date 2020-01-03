@@ -108,6 +108,7 @@ static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 	if (decode.state != DECODE_STOPPED) {
 		LOG_WARN("Cannot use BT sink while LMS is controlling player");
 		UNLOCK_D;
+		bt_sink_cmd(BT_SINK_DISCONNECTED);
 		return;
 	} 	
 	

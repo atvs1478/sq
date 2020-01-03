@@ -69,29 +69,75 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
 static _lock_t s_volume_lock;
 static uint8_t s_volume = 0;
 static bool s_volume_notify;
+static esp_avrc_playback_stat_t s_play_status = ESP_AVRC_PLAYBACK_STOPPED;
+static uint8_t s_remote_bda[6];
+static int tl;
 
 static void bt_volume_up(void) {
-	volume_set_by_local_host(s_volume + 3);
+	// volume UP/DOWN buttons are not supported by iPhone/Android
+	volume_set_by_local_host(s_volume < 127-3 ? s_volume + 3 : 127);
+	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 	ESP_LOGI(BT_AV_TAG, "BT volume up %u", s_volume);
 }
 
 static void bt_volume_down(void) {
-	volume_set_by_local_host(s_volume - 3);
-	ESP_LOGI(BT_AV_TAG, "BT volume down %u", s_volume);
+	// volume UP/DOWN buttons are not supported by iPhone/Android
+	volume_set_by_local_host(s_volume > 3 ? s_volume - 3 : 0);
+	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
+	ESP_LOGD(BT_AV_TAG, "BT volume down %u", s_volume);
 }
 
 static void bt_toggle(void) {
-	//btc_a2dp_control_media_ctrl(ESP_A2D_MEDIA_CTL_STOP);
-	//ESP_LOGI(BT_AV_TAG, "PLAY/PAUSE");
+	if (s_play_status != ESP_AVRC_PLAYBACK_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	else esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	//s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
+	ESP_LOGD(BT_AV_TAG, "BT play/pause toggle %u", s_volume);
+}
+
+static void bt_play(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	ESP_LOGD(BT_AV_TAG, "BT play");
+}
+
+static void bt_pause(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PAUSE, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	ESP_LOGD(BT_AV_TAG, "BT pause");
+}
+
+static void bt_stop(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	ESP_LOGD(BT_AV_TAG, "BT stop");
+}
+
+static void bt_prev(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_BACKWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	ESP_LOGD(BT_AV_TAG, "BT previous");
+}
+
+static void bt_next(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_FORWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	ESP_LOGD(BT_AV_TAG, "BT next");
 }
 
 static actrls_t controls = {
 	bt_volume_up, bt_volume_down,	// volume up, volume down
-	bt_toggle, NULL,	// toggle, play
-	NULL, NULL,	// pause, stop
-	NULL, NULL,		// rew, fwd
-	NULL, NULL,		// prev, next
+	bt_toggle, bt_play,	// toggle, play
+	bt_pause, bt_stop,	// pause, stop
+	NULL, NULL,			// rew, fwd
+	bt_prev, bt_next,	// prev, next
 };
+
+void bt_sink_cmd(bt_sink_cmd_t event, ...) {
+	switch(event) {
+	case BT_SINK_DISCONNECTED:
+		esp_a2d_sink_disconnect(s_remote_bda);
+		actrls_unset();
+		break;
+	default:
+		ESP_LOGW(BT_AV_TAG, "unhandled command %u", event);
+		break;
+	}
+}
 
 /* callback for A2DP sink */
 void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
@@ -170,6 +216,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 			(*bt_app_a2d_cmd_cb)(BT_SINK_DISCONNECTED);
 			actrls_unset();
         } else if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_CONNECTED){
+			memcpy(s_remote_bda, bda, 6);
             esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED);
 			actrls_set(controls);
@@ -182,7 +229,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         s_audio_state = a2d->audio_stat.state;
         if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
 			(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
-        } else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state ||
+		} else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state ||
 				   ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND == a2d->audio_stat.state) {
 			(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
 		}	
@@ -256,6 +303,7 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
         break;
     case ESP_AVRC_RN_PLAY_STATUS_CHANGE:
         ESP_LOGI(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
+		s_play_status = event_parameter->playback;
         bt_av_playback_changed();
         break;
     case ESP_AVRC_RN_PLAY_POS_CHANGED:
