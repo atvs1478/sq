@@ -72,7 +72,7 @@ Contains the freeRTOS task and all necessary support
 #endif
 #ifdef CONFIG_SQUEEZEAMP
 #define JACK_GPIO	34
-#define JACK_LEVEL !gpio_get_level(JACK_GPIO)?"1":"0";
+#define JACK_LEVEL !gpio_get_level(JACK_GPIO)?"1":"0"
 #else
 #define JACK_LEVEL "N/A"
 #endif
