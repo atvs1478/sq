@@ -85,9 +85,17 @@ static const actrls_config_t board_1[] = {
 static const actrls_config_t board_2[] = {
 	//								normal 							long						shifted						long shifted											
 	{ 21, BUTTON_LOW, true, 1000, -1, 	{ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_STOP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 18, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, 	{ACTRLS_REW, ACTRLS_PLAY} },
-	{ 19, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_FWD, ACTRLS_PLAY} },
+	{ 18, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, 	{ACTRLS_FWD, ACTRLS_PLAY} },
+	{ 19, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_REW, ACTRLS_PLAY} },
 };
+
+static const struct {
+	int n;
+	const actrls_config_t *config;
+} board_configs[] = {
+	{ 2, board_1 },
+	{ 3, board_2 },
+};	
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -390,8 +398,10 @@ void app_main()
 	ESP_LOGD(TAG,"Configuring Red led");
 	led_config(LED_RED, LED_RED_GPIO, 0);
 
-	ESP_LOGD(TAG,"Initializing audio control buttons");
-	actrls_init(sizeof(board_1) / sizeof(actrls_config_t), (actrls_config_t*) board_1);
+	char *board_index = config_alloc_get_default(NVS_TYPE_STR, "board_index", "0", 0);
+	ESP_LOGD(TAG,"Initializing audio control buttons index %u", atoi(board_index));
+	actrls_init(board_configs[atoi(board_index)].n, (actrls_config_t*) board_configs[atoi(board_index)].config);
+	free(board_index);
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
