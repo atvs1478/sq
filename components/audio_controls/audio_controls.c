@@ -86,7 +86,7 @@ void down(void *id, button_event_e event, button_press_e press, bool longpress) 
 /****************************************************************************************
  * 
  */
-void actrls_init(int n, actrls_config_t *config) {
+void actrls_init(int n, const actrls_config_t *config) {
 	for (int i = 0; i < n; i++) {
 		button_create(config + i, config[i].gpio, config[i].type, config[i].pull, control_handler, config[i].long_press, config[i].shifter_gpio);
 	}
@@ -95,7 +95,7 @@ void actrls_init(int n, actrls_config_t *config) {
 /****************************************************************************************
  * 
  */
-void actrls_set_default(actrls_t controls) {
+void actrls_set_default(const actrls_t controls) {
 	memcpy(default_controls, controls, sizeof(actrls_t));
 	memcpy(current_controls, default_controls, sizeof(actrls_t));
 }
@@ -103,7 +103,7 @@ void actrls_set_default(actrls_t controls) {
 /****************************************************************************************
  * 
  */
-void actrls_set(actrls_t controls) {
+void actrls_set(const actrls_t controls) {
 	memcpy(current_controls, controls, sizeof(actrls_t));
 }
 

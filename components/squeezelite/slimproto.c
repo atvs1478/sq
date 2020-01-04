@@ -330,6 +330,12 @@ static void process_strm(u8_t *pkt, int len) {
 			LOCK_O;
 			output.state = jiffies ? OUTPUT_START_AT : OUTPUT_RUNNING;
 			output.start_at = jiffies;
+#if EMBEDDED
+			if (output.external) {
+				decode_resume(output.external);
+				output.external = 0;
+			}
+#endif
 			UNLOCK_O;
 
 			LOG_DEBUG("unpause at: %u now: %u", jiffies, gettime_ms());
@@ -373,8 +379,10 @@ static void process_strm(u8_t *pkt, int len) {
 			sendSTAT("STMc", 0);
 			sentSTMu = sentSTMo = sentSTMl = false;
 			LOCK_O;
+#if EMBEDDED
+			if (output.external) decode_resume(output.external);
 			output.external = 0;
-			_buf_resize(outputbuf, output.init_size);
+#endif
 			output.threshold = strm->output_threshold;
 			output.next_replay_gain = unpackN(&strm->replay_gain);
 			output.fade_mode = strm->transition_type - '0';

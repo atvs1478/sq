@@ -49,7 +49,7 @@ enum {
 };
 char * bt_name = NULL;
 
-static void (*bt_app_a2d_cmd_cb)(bt_sink_cmd_t cmd, ...);
+static bool (*bt_app_a2d_cmd_cb)(bt_sink_cmd_t cmd, ...);
 static void (*bt_app_a2d_data_cb)(const uint8_t *data, uint32_t len);
 
 /* handler for bluetooth stack enabled events */
@@ -84,42 +84,35 @@ static void bt_volume_down(void) {
 	// volume UP/DOWN buttons are not supported by iPhone/Android
 	volume_set_by_local_host(s_volume > 3 ? s_volume - 3 : 0);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
-	ESP_LOGD(BT_AV_TAG, "BT volume down %u", s_volume);
 }
 
 static void bt_toggle(void) {
 	if (s_play_status != ESP_AVRC_PLAYBACK_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	else esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	//s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
-	ESP_LOGD(BT_AV_TAG, "BT play/pause toggle %u", s_volume);
 }
 
 static void bt_play(void) {
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	ESP_LOGD(BT_AV_TAG, "BT play");
 }
 
 static void bt_pause(void) {
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PAUSE, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	ESP_LOGD(BT_AV_TAG, "BT pause");
 }
 
 static void bt_stop(void) {
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	ESP_LOGD(BT_AV_TAG, "BT stop");
 }
 
 static void bt_prev(void) {
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_BACKWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	ESP_LOGD(BT_AV_TAG, "BT previous");
 }
 
 static void bt_next(void) {
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_FORWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	ESP_LOGD(BT_AV_TAG, "BT next");
 }
 
-static actrls_t controls = {
+const static actrls_t controls = {
 	bt_volume_up, bt_volume_down,	// volume up, volume down
 	bt_toggle, bt_play,	// toggle, play
 	bt_pause, bt_stop,	// pause, stop
@@ -127,16 +120,18 @@ static actrls_t controls = {
 	bt_prev, bt_next,	// prev, next
 };
 
-void bt_sink_cmd(bt_sink_cmd_t event, ...) {
-	switch(event) {
-	case BT_SINK_DISCONNECTED:
-		esp_a2d_sink_disconnect(s_remote_bda);
-		actrls_unset();
-		break;
-	default:
-		ESP_LOGW(BT_AV_TAG, "unhandled command %u", event);
-		break;
-	}
+/* taking/giving audio system's control */
+void bt_master(bool on) {
+	if (on) actrls_set(controls);
+	else actrls_unset();
+}
+
+/* disconnection */
+void bt_disconnect(void) {
+	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	esp_a2d_sink_disconnect(s_remote_bda);
+	actrls_unset();
+	ESP_LOGI(BT_AV_TAG, "forced disconnection");
 }
 
 /* callback for A2DP sink */
@@ -218,8 +213,10 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         } else if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_CONNECTED){
 			memcpy(s_remote_bda, bda, 6);
             esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
-			(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED);
-			actrls_set(controls);
+			if (!(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED)){
+				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+				esp_a2d_sink_disconnect(s_remote_bda);
+			}
         }
         break;
     }

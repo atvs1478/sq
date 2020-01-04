@@ -761,6 +761,7 @@ int main(int argc, char **argv) {
 	stream_init(log_stream, stream_buf_size);
 
 #if EMBEDDED
+	embedded_init();
 	output_init_embedded(log_output, output_device, output_buf_size, output_params, rates, rate_delay, idle);
 #else
 	if (!strcmp(output_device, "-")) {

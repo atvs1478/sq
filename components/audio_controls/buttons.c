@@ -36,10 +36,11 @@ static const char * TAG = "audio_controls";
 
 static int n_buttons = 0;
 
-#define MAX_BUTTONS		16
-#define DEBOUNCE		50
+#define BUTTON_STACK_SIZE	4096
+#define MAX_BUTTONS			16
+#define DEBOUNCE			50
 
-static struct button_s {
+static EXT_RAM_ATTR struct button_s {
 	void *id;
 	int gpio, index;
 	button_handler handler;
@@ -95,7 +96,7 @@ static void buttons_timer( TimerHandle_t xTimer ) {
  */
 static void buttons_task(void* arg) {
 	ESP_LOGI(TAG, "starting button tasks");
-
+	
     while (1) {
 		struct button_s button;
 		button_event_e event;
@@ -149,7 +150,9 @@ void dummy_handler(void *id, button_event_e event, button_press_e press) {
  * Create buttons 
  */
 void button_create(void *id, int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio) { 
-	
+	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+	static EXT_RAM_ATTR StackType_t xStack[BUTTON_STACK_SIZE] __attribute__ ((aligned (4)));
+
 	if (n_buttons >= MAX_BUTTONS) return;
 
 	ESP_LOGI(TAG, "creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
@@ -157,7 +160,7 @@ void button_create(void *id, int gpio, int type, bool pull, button_handler handl
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));
 		gpio_install_isr_service(0);
-		xTaskCreate(buttons_task, "buttons_task", 8192, NULL, ESP_TASK_PRIO_MIN + 1, NULL);
+		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	}
 	
 	// just in case this structure is allocated in a future release

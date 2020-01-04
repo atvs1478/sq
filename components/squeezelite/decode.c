@@ -65,7 +65,7 @@ static void *decode_thread() {
 		toend = (stream.state <= DISCONNECT);
 		UNLOCK_S;
 		LOCK_O;
-		space = _buf_space(outputbuf);
+		space = !output.external ? _buf_space(outputbuf) : 0;
 		UNLOCK_O;
 
 		LOCK_D;
@@ -117,10 +117,6 @@ static void *decode_thread() {
 		}
 	}
 	
-#if EMBEDDED	
-	deregister_external();
-#endif	
-
 	return 0;
 }
 
@@ -246,6 +242,9 @@ void decode_close(void) {
 	pthread_join(thread, NULL);
 #endif
 	mutex_destroy(decode.mutex);
+#if EMBEDDED	
+	deregister_external();
+#endif	
 }
 
 void decode_flush(void) {

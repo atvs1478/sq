@@ -69,7 +69,7 @@ static void lms_next(void) {
 	cli_send_cmd("button fwd");
 }
 
-static actrls_t controls = {
+const static actrls_t controls = {
 	lms_volume_up, lms_volume_down,	// volume up, volume down
 	lms_toggle, lms_play,	// toggle, play
 	lms_pause, lms_stop,	// pause, stop
@@ -102,7 +102,7 @@ static void cli_send_cmd(char *cmd) {
 		LOG_WARN("cannot send CLI %s", packet);
 	}
 
-	close(sock);
+	closesocket(sock);
 }
 
 /****************************************************************************************

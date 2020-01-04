@@ -139,7 +139,7 @@ typedef struct rtp_s {
 #else
 	TaskHandle_t thread, joiner;
 	StaticTask_t *xTaskBuffer;
-    StackType_t *xStack;
+    StackType_t xStack[RTP_STACK_SIZE] __attribute__ ((aligned (4)));
 #endif
 
 	struct alac_codec_s *alac_codec;
@@ -275,11 +275,11 @@ rtp_resp_t rtp_init(struct in_addr host, int latency, char *aeskey, char *aesiv,
 #else
 		// xTaskCreate((TaskFunction_t) rtp_thread_func, "RTP_thread", RTP_TASK_SIZE, ctx,  CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1 , &ctx->thread);
 		ctx->xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-		ctx->xStack = (StackType_t*) malloc(RTP_STACK_SIZE);
 		ctx->thread = xTaskCreateStatic( (TaskFunction_t) rtp_thread_func, "RTP_thread", RTP_STACK_SIZE, ctx, 
 										 CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1, ctx->xStack, ctx->xTaskBuffer );
 #endif
 	} else {
+		LOG_ERROR("[%p]: cannot start RTP", ctx);
 		rtp_end(ctx);
 		ctx = NULL;
 	}
@@ -304,9 +304,8 @@ void rtp_end(rtp_t *ctx)
 #ifdef WIN32
 		pthread_join(ctx->thread, NULL);
 #else
-		xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
+		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 		vTaskDelete(ctx->thread);
-		free(ctx->xStack);
 		heap_caps_free(ctx->xTaskBuffer);
 #endif
 	}
@@ -715,7 +714,7 @@ static void *rtp_thread_func(void *arg) {
 	LOG_INFO("[%p]: terminating", ctx);
 
 #ifndef WIN32
-	xTaskNotify(ctx->joiner, 0, eNoAction);
+	xTaskNotifyGive(ctx->joiner);
 	vTaskSuspend(NULL);
 #endif
 

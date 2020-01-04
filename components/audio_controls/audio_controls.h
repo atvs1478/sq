@@ -36,7 +36,7 @@ typedef struct {
 	actrls_action_e normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
 } actrls_config_t;
 
-void actrls_init(int n, actrls_config_t *config);
-void actrls_set_default(actrls_t controls);
-void actrls_set(actrls_t controls);
+void actrls_init(int n, const actrls_config_t *config);
+void actrls_set_default(const actrls_t controls);
+void actrls_set(const actrls_t controls);
 void actrls_unset(void);

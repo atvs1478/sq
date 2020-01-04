@@ -57,8 +57,6 @@ void output_init_embedded(log_level level, char *device, unsigned output_buf_siz
 	output.start_frames = FRAME_BLOCK;
 	output.rate_delay = rate_delay;
 	
-	cli_controls_init();
-	
 	if (strcasestr(device, "BT ")) {
 		LOG_INFO("init Bluetooth");
 		close_cb = &output_close_bt;
