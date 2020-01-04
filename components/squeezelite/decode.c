@@ -65,7 +65,7 @@ static void *decode_thread() {
 		toend = (stream.state <= DISCONNECT);
 		UNLOCK_S;
 		LOCK_O;
-		space = !output.external ? _buf_space(outputbuf) : 0;
+		space = _buf_space(outputbuf);
 		UNLOCK_O;
 
 		LOCK_D;

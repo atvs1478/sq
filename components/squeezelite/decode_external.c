@@ -121,6 +121,7 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		output.state = OUTPUT_STOPPED;
 		output.frames_played = 0;
 		_buf_flush(outputbuf);
+		if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
 		bt_master(true);
 		LOG_INFO("BT sink started");
 		break;
@@ -239,6 +240,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			output.frames_played = 0;
 			output.external = DECODE_RAOP;
 			output.state = OUTPUT_STOPPED;
+			if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
 			raop_master(true);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;
@@ -333,5 +335,4 @@ void decode_resume(int external) {
 		raop_state = RAOP_STOP;
 		break;
 	}
-	_buf_resize(outputbuf, output.init_size);
 }
