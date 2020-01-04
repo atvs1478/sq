@@ -70,7 +70,7 @@ Contains the freeRTOS task and all necessary support
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
-#ifdef TAS57xx
+#ifdef CONFIG_SQUEEZEAMP
 #define JACK_GPIO	34
 #define JACK_LEVEL !gpio_get_level(JACK_GPIO)?"1":"0";
 #else
