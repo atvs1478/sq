@@ -30,28 +30,28 @@
 unsigned char printable(unsigned char c) {
    switch (c) {
 	  case 11:		/* block */
-		 return '#';
-	 break;;
+		return '#';
+		break;;
 	  case 16:		/* rightarrow */
-		 return '>';
-	 break;;
+		return '>';
+		break;;
 	  case 22:		/* circle */
-		 return '@';
-	 break;;
+		return '@';
+		break;;
 	  case 145:		/* note */
-	 return ' ';
-	 break;;
+		return ' ';
+		break;;
 	  case 152:		/* bell */
-		 return 'o';
-	 break;;
+		return 'o';
+		break;
 	  default:
-		 return c;
+		return c;
 	  }
 }
 
 // Replace unprintable symbols in line
 void makeprintable(unsigned char * line) {
-	for (int n=0; n < LINELEN; n++) line[n] = printable(line[n]);
+	for (int n = 0; n < LINELEN; n++) line[n] = printable(line[n]);
 }
 
 // Show the display
@@ -67,6 +67,7 @@ void show_display_buffer(char *ddram) {
 	/* Convert special LCD chars */
 	makeprintable((unsigned char *)line1);
 	makeprintable((unsigned char *)line2);
+
 	ESP_LOGI(TAG, "\n\t%.40s\n\t%.40s", line1, line2);
 }
 
@@ -96,7 +97,8 @@ void vfd_data( unsigned short *data, int bytes_read) {
 	display_data = &(data[6]); /* display data starts at byte 12 */
 
 	memset(ddram, ' ', LINELEN * 2);
-	for (n=0; n<(bytes_read/2); n++) {
+
+	for (n = 0; n < (bytes_read/2); n++) {
 		unsigned short d; /* data element */
 		unsigned char t, c;
 
@@ -114,7 +116,7 @@ void vfd_data( unsigned short *data, int bytes_read) {
 				switch (c) {
 					case 0x06: /* display clear */
 						memset(ddram, ' ', LINELEN * 2);
-			break;
+						break;
 					case 0x02: /* cursor home */
 						addr = 0;
 						break;
@@ -124,5 +126,6 @@ void vfd_data( unsigned short *data, int bytes_read) {
 				}
 		}
 	}
+
 	show_display_buffer(ddram);
 }
