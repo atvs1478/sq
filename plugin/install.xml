@@ -1,0 +1,13 @@
+<?xml version='1.0' standalone='yes'?>
+<extensions>
+  <defaultState>enabled</defaultState>
+  <email>philippe_44@outlook.com</email>
+  <targetApplication>
+    <minVersion>7.9</minVersion>
+    <maxVersion>*.*</maxVersion>
+    <id>SlimServer</id>
+  </targetApplication>
+  <module>Plugins::SqueezeESP32::Plugin</module>
+    <version>0.1</version>
+  <creator>Philippe</creator>
+</extensions>
