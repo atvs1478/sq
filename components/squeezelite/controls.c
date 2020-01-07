@@ -69,12 +69,35 @@ static void lms_next(void) {
 	cli_send_cmd("button fwd");
 }
 
+static void lms_up(void) {
+	cli_send_cmd("button arrow_up");
+}
+
+static void lms_down(void) {
+	cli_send_cmd("button arrow_down");
+}
+
+static void lms_left(void) {
+	cli_send_cmd("button arrow_left");
+}
+
+static void lms_right(void) {
+	cli_send_cmd("button arrow_right");
+}
+
+static void lms_push(void) {
+	cli_send_cmd("button knob_push");
+}
+
 const actrls_t LMS_controls = {
 	lms_volume_up, lms_volume_down,	// volume up, volume down
 	lms_toggle, lms_play,	// toggle, play
 	lms_pause, lms_stop,	// pause, stop
 	lms_rew, lms_fwd,		// rew, fwd
 	lms_prev, lms_next,		// prev, next
+	lms_push, 
+	lms_up, lms_down,
+	lms_left, lms_right, 
 };
 
 /****************************************************************************************

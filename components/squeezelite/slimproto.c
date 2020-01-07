@@ -45,6 +45,7 @@ static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
 static u16_t slimproto_hport = 9000;
 static u16_t slimproto_cport = 9090;
+static u8_t	player_id = 100; // squeezeesp32
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -136,7 +137,7 @@ static void sendHELO(bool reconnect, const char *fixed_cap, const char *var_cap,
 	memset(&pkt, 0, sizeof(pkt));
 	memcpy(&pkt.opcode, "HELO", 4);
 	pkt.length = htonl(sizeof(struct HELO_packet) - 8 + strlen(base_cap) + strlen(fixed_cap) + strlen(var_cap));
-	pkt.deviceid = 12; // squeezeplay
+	pkt.deviceid = player_id;
 	pkt.revision = 0;
 	packn(&pkt.wlan_channellist, reconnect ? 0x4000 : 0x0000);
 	packN(&pkt.bytes_received_H, (u64_t)status.stream_bytes >> 32);
@@ -444,6 +445,16 @@ static void process_audg(u8_t *pkt, int len) {
 	set_volume(audg->adjust ? audg->gainL : FIXED_ONE, audg->adjust ? audg->gainR : FIXED_ONE);
 }
 
+static void process_dsco(u8_t *pkt, int len) {
+	LOG_INFO("got DSCO, switching from id %u to 12", (int) player_id);
+	player_id = 12;
+}
+
+static void process_vfdc(u8_t *pkt, int len) {
+	LOG_DEBUG("VFDC %u", len);
+	vfd_data( pkt + 4, len - 4);
+}
+
 static void process_setd(u8_t *pkt, int len) {
 	struct setd_packet *setd = (struct setd_packet *)pkt;
 
@@ -519,6 +530,8 @@ static struct handler handlers[] = {
 	{ "audg", process_audg },
 	{ "setd", process_setd },
 	{ "serv", process_serv },
+	{ "dsco", process_dsco },
+	{ "vfdc", process_vfdc },
 	{ "",     NULL  },
 };
 

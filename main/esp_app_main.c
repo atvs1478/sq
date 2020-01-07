@@ -81,7 +81,7 @@ extern void services_init(void);
 static const actrls_config_t board_1[] = {
 	//								normal 							long						shifted						long shifted											
 	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE} },
+	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {BCTRLS_DOWN, ACTRLS_NONE} },
 };
 
 static const actrls_config_t board_2[] = {

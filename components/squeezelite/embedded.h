@@ -25,7 +25,7 @@
 #define OUTPUT_THREAD_STACK_SIZE  6 * 1024
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
-//#define BASE_CAP "Model=squeezelite,AccuratePlayPoints=0,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION	
+#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 
 typedef int16_t   s16_t;
@@ -47,6 +47,7 @@ void		embedded_init(void);
 void 		register_external(void);
 void 		deregister_external(void);
 void 		decode_resume(int external);
+void 		vfd_data(u8_t *data, int len);
 
 void 		(*server_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 				   

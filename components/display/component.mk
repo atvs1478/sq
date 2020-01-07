@@ -6,9 +6,5 @@
 # lib(subdirectory_name).a in the build directory. This behaviour is entirely configurable,
 # please read the SDK documents if you need to do this.
 #
-#CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG
-CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_INFO -DMODEL_NAME=SqueezeESP32
-COMPONENT_ADD_INCLUDEDIRS += $(COMPONENT_PATH)/../tools
-COMPONENT_EXTRA_INCLUDES += $(PROJECT_PATH)/components/tools/
-LDFLAGS += -s
-COMPONENT_EMBED_TXTFILES :=  ${PROJECT_PATH}/server_certs/github.pem
+
+COMPONENT_ADD_INCLUDEDIRS := .
