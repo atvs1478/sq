@@ -1093,7 +1093,7 @@ void wifi_manager( void * pvParameters ){
 	BaseType_t xStatus;
 	EventBits_t uxBits;
 	uint8_t	retries = 0;
-	esp_err_t err=ESP_OK;
+
 	/* start http server */
 	http_server_start();
 

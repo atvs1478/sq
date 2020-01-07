@@ -32,7 +32,7 @@
 #include "driver/gpio.h"
 #include "buttons.h"
 
-static const char * TAG = "audio_controls";
+static const char * TAG = "buttons";
 
 static int n_buttons = 0;
 

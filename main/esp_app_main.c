@@ -76,6 +76,8 @@ static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
+extern void services_init(void);
+
 static const actrls_config_t board_1[] = {
 	//								normal 							long						shifted						long shifted											
 	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
@@ -393,15 +395,19 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
+	services_init();
+
 	ESP_LOGD(TAG,"Configuring Green led");
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	ESP_LOGD(TAG,"Configuring Red led");
 	led_config(LED_RED, LED_RED_GPIO, 0);
 
-	char *board_index = config_alloc_get_default(NVS_TYPE_STR, "board_index", "0", 0);
-	ESP_LOGD(TAG,"Initializing audio control buttons index %u", atoi(board_index));
-	actrls_init(board_configs[atoi(board_index)].n, (actrls_config_t*) board_configs[atoi(board_index)].config);
-	free(board_index);
+	char *board_index = config_alloc_get_default(NVS_TYPE_STR, "board_index", NULL, 0);
+	if (board_index) {
+		ESP_LOGD(TAG,"Initializing audio control buttons index %u", atoi(board_index));
+		actrls_init(board_configs[atoi(board_index)].n, (actrls_config_t*) board_configs[atoi(board_index)].config);
+		free(board_index);
+	}
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");

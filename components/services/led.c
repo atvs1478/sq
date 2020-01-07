@@ -33,6 +33,10 @@ static struct led_s {
 	TimerHandle_t timer;
 } leds[MAX_LED];
 
+void led_svc_init(void) {
+	ESP_LOGI(TAG, "Initializing led");
+}
+
 static void vCallbackFunction( TimerHandle_t xTimer ) {
 	struct led_s *led = (struct led_s*) pvTimerGetTimerID (xTimer);
 	

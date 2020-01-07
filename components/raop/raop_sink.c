@@ -111,7 +111,7 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
     ESP_ERROR_CHECK( mdns_init() );
     ESP_ERROR_CHECK( mdns_hostname_set(hostname) );
         
-    char * sink_name_buffer= (char *)config_alloc_get(NVS_TYPE_STR,"AirPlay_name");
+    char * sink_name_buffer= (char *)config_alloc_get(NVS_TYPE_STR,"airplay_name");
     if(sink_name_buffer != NULL){
     	memset(sink_name, 0x00, sizeof(sink_name));
     	strncpy(sink_name,sink_name_buffer,sizeof(sink_name)-1 );

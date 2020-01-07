@@ -69,7 +69,7 @@ static void lms_next(void) {
 	cli_send_cmd("button fwd");
 }
 
-const static actrls_t controls = {
+const actrls_t LMS_controls = {
 	lms_volume_up, lms_volume_down,	// volume up, volume down
 	lms_toggle, lms_play,	// toggle, play
 	lms_pause, lms_stop,	// pause, stop
@@ -121,7 +121,7 @@ static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
  */
 void cli_controls_init(void) {
 	get_mac(mac);
-	actrls_set_default(controls);
+	actrls_set_default(LMS_controls);
 	chained_notify = server_notify;
 	server_notify = notify;
 }

@@ -162,11 +162,6 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 #define TAS575x 0x98
 #define TAS578x	0x90
 
-static struct {
-	float sum, avg;
-	u16_t count;
-} battery;
-
 struct tas57xx_cmd_s {
 	u8_t reg;
 	u8_t value;
@@ -583,18 +578,7 @@ static void *output_thread_i2s() {
  * Stats output thread
  */
 static void *output_thread_i2s_stats() {
-	int memory_count = 0;
-
 	while (running) {
-#ifdef TAS57xx		
-		battery.sum += adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1;
-		if (++battery.count == (300 * 1000) / STATS_PERIOD_MS) {
-			battery.avg = battery.sum / battery.count;
-			battery.sum = battery.count = 0;
-			LOG_INFO("Voltage %.2fV", battery.avg);
-		}	
-#endif		
-
 		LOCK;
 		output_state state = output.state;
 		UNLOCK;
@@ -617,14 +601,6 @@ static void *output_thread_i2s_stats() {
 			LOG_INFO(LINE_MIN_MAX_DURATION_FORMAT,LINE_MIN_MAX_DURATION("i2s tfr(us)",i2s_time));
 			LOG_INFO("              ----------+----------+-----------+-----------+");
 			RESET_ALL_MIN_MAX;
-		}
-		if (loglevel == lDEBUG || !memory_count--) {
-			LOG_INFO("Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
-						heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-						heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-						heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-						heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
-			memory_count = (60*1000) / STATS_PERIOD_MS;
 		}
 		usleep(STATS_PERIOD_MS *1000);
 	}
