@@ -452,7 +452,7 @@ static void process_dsco(u8_t *pkt, int len) {
 
 static void process_vfdc(u8_t *pkt, int len) {
 	LOG_DEBUG("VFDC %u", len);
-	vfd_data( pkt + 4, len - 4);
+	vfd_data( pkt, len - 4);
 }
 
 static void process_setd(u8_t *pkt, int len) {

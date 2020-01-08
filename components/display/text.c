@@ -23,7 +23,7 @@
 
 #include "esp_log.h"
 
-#define LINELEN 60
+#define LINELEN 40
 #define TAG "display"
 
 //Change special LCD chars to something more printable on screen
@@ -94,7 +94,8 @@ void vfd_data( unsigned short *data, int bytes_read) {
 	int addr = 0; /* counter */
 
 	if (bytes_read % 2) bytes_read--; /* even number of bytes */
-	display_data = &(data[6]); /* display data starts at byte 12 */
+	// if we use Noritake VFD codes, display data starts at 12
+	display_data = &(data[5]); /* display data starts at byte 10 */
 
 	memset(ddram, ' ', LINELEN * 2);
 
