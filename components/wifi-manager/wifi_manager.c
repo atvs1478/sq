@@ -62,6 +62,7 @@ Contains the freeRTOS task and all necessary support
 #include "cJSON.h"
 #include "nvs_utilities.h"
 #include "cmd_system.h"
+#include "monitor.h"
 
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0
@@ -70,12 +71,7 @@ Contains the freeRTOS task and all necessary support
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
-#ifdef CONFIG_SQUEEZEAMP
-#define JACK_GPIO	34
-#define JACK_LEVEL !gpio_get_level(JACK_GPIO)?"1":"0"
-#else
-#define JACK_LEVEL "N/A"
-#endif
+
 #define STR_OR_BLANK(p) p==NULL?"":p
 #define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
 /* objects used to manipulate the main queue of events */
@@ -455,7 +451,7 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddNumberToObject(root,"recovery",	RECOVERY_APPLICATION	);
 	cJSON_AddItemToObject(root, "ota_dsc", cJSON_CreateString(ota_get_status()));
 	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
-	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(JACK_LEVEL));
+	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));
 	cJSON_AddNumberToObject(root,"Voltage",	adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
 	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);

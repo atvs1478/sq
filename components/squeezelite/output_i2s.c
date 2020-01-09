@@ -49,6 +49,7 @@ sure that using rate_delay would fix that
 #include <signal.h>
 #include "time.h"
 #include "led.h"
+#include "monitor.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
@@ -121,7 +122,6 @@ static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
 static size_t dma_buf_frames;
-static int jack_status = -1;		// 0 = inserted
 
 DECLARE_ALL_MIN_MAX;
 
@@ -132,6 +132,7 @@ static void *output_thread_i2s_stats();
 static void dac_cmd(dac_cmd_e cmd, ...);
 static int tas57_detect(void);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
+static void (*jack_handler_chain)(bool inserted);
 
 #ifdef CONFIG_SQUEEZEAMP
 
@@ -202,6 +203,19 @@ static u8_t tas57_addr;
 #endif
 
 /****************************************************************************************
+ * jack insertion handler
+ */
+static void jack_handler(bool inserted) {
+	// jack detection bounces a bit but that seems fine
+	if (jack_mutes_amp) {
+		LOG_INFO("switching amplifier %s", inserted ? "ON" : "OFF");
+		if (inserted) dac_cmd(DAC_ANALOGUE_OFF);
+		else dac_cmd(DAC_ANALOGUE_ON);
+	}
+	if (jack_handler_chain) (jack_handler_chain)(inserted);
+}
+
+/****************************************************************************************
  * Initialize the DAC output
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
@@ -209,9 +223,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	
 #ifdef TAS57xx
 	LOG_INFO("Initializing TAS57xx ");
-	gpio_pad_select_gpio(JACK_GPIO);
-	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
-			
+				
 	adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_7, ADC_ATTEN_DB_0);
     			
@@ -335,6 +347,12 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	
 	dac_cmd(DAC_STANDBY);
 
+	jack_handler_chain = jack_handler_svc;
+	jack_handler_svc = jack_handler;
+	
+	if (jack_mutes_amp && jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_OFF);
+	else dac_cmd(DAC_ANALOGUE_ON);
+	
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
     cfg.thread_name= "output_i2s";
@@ -451,19 +469,10 @@ static void *output_thread_i2s() {
 	while (running) {
 			
 		TIME_MEASUREMENT_START(timer_start);
-#ifdef TAS57xx
-		// handle jack insertion as a polling function (to avoid to have to do de-bouncing)
-		if (gpio_get_level(JACK_GPIO) != jack_status) {
-			jack_status = gpio_get_level(JACK_GPIO);
-			if (jack_mutes_amp) {
-				dac_cmd(jack_status ? DAC_ANALOGUE_ON : DAC_ANALOGUE_OFF);
-				LOG_INFO("Changing jack status %d", jack_status);
-			}	
-		}
-#endif
+
 		LOCK;
 		
-		// manage led display
+		// manage led display & analogue
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
 			if (output.state == OUTPUT_OFF) led_blink(LED_GREEN, 100, 2500);
@@ -474,7 +483,7 @@ static void *output_thread_i2s() {
 				led_blink(LED_GREEN, 200, 1000);
 			} else if (output.state == OUTPUT_RUNNING) {
 #ifdef TAS57xx				
-				if (!jack_mutes_amp || (jack_mutes_amp && jack_status)) dac_cmd(DAC_ANALOGUE_ON);
+				if (!jack_mutes_amp || !jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_ON);
 #endif				
 				led_on(LED_GREEN);
 			}	

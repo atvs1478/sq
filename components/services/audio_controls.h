@@ -32,6 +32,7 @@ typedef struct {
 	int gpio;
 	int type;
 	bool pull;
+	int	debounce;
 	int long_press;
 	int shifter_gpio;
 	actrls_action_e normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased

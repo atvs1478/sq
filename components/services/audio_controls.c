@@ -88,7 +88,7 @@ void down(void *id, button_event_e event, button_press_e press, bool longpress) 
  */
 void actrls_init(int n, const actrls_config_t *config) {
 	for (int i = 0; i < n; i++) {
-		button_create((void*) (config + i), config[i].gpio, config[i].type, config[i].pull, control_handler, config[i].long_press, config[i].shifter_gpio);
+		button_create((void*) (config + i), config[i].gpio, config[i].type, config[i].pull, config[i].debounce, control_handler, config[i].long_press, config[i].shifter_gpio);
 	}
 }
 

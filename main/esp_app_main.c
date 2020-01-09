@@ -65,13 +65,6 @@ static const char TAG[] = "esp_app_main";
 #define DEFAULT_HOST_NAME "squeezelite"
 char * fwurl = NULL;
 
-#ifdef CONFIG_SQUEEZEAMP
-#define LED_GREEN_GPIO 	12
-#define LED_RED_GPIO	13
-#else
-#define LED_GREEN_GPIO 	-1
-#define LED_RED_GPIO	-1
-#endif
 static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
@@ -80,15 +73,15 @@ extern void services_init(void);
 
 static const actrls_config_t board_1[] = {
 	//								normal 							long						shifted						long shifted											
-	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {BCTRLS_DOWN, ACTRLS_NONE} },
+	{ 4, BUTTON_LOW, true, 0, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
+	{ 5, BUTTON_LOW, true, 0, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {BCTRLS_DOWN, ACTRLS_NONE} },
 };
 
 static const actrls_config_t board_2[] = {
 	//								normal 							long						shifted						long shifted											
-	{ 21, BUTTON_LOW, true, 1000, -1, 	{ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_STOP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 18, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, 	{ACTRLS_FWD, ACTRLS_PLAY} },
-	{ 19, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_REW, ACTRLS_PLAY} },
+	{ 21, BUTTON_LOW, true, 0, 1000, -1, 	{ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_STOP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
+	{ 18, BUTTON_LOW, true, 0, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, 	{ACTRLS_FWD, ACTRLS_PLAY} },
+	{ 19, BUTTON_LOW, true, 0, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_REW, ACTRLS_PLAY} },
 };
 
 static const struct {
@@ -372,6 +365,9 @@ void app_main()
 	ESP_LOGI(TAG,"Setting up config subsystem.");
 	config_init();
 
+	ESP_LOGD(TAG,"Configuring services");
+	services_init();
+
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
 
@@ -383,7 +379,6 @@ void app_main()
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
 
-
 	ESP_LOGD(TAG,"Getting value for WM bypass, nvs 'bypass_wm'");
 	char * bypass_wm = config_alloc_get_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 	if(bypass_wm==NULL)
@@ -394,13 +389,6 @@ void app_main()
 	else {
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
-
-	services_init();
-
-	ESP_LOGD(TAG,"Configuring Green led");
-	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
-	ESP_LOGD(TAG,"Configuring Red led");
-	led_config(LED_RED, LED_RED_GPIO, 0);
 
 	char *board_index = config_alloc_get_default(NVS_TYPE_STR, "board_index", NULL, 0);
 	if (board_index) {

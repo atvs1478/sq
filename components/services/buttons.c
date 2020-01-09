@@ -43,6 +43,7 @@ static int n_buttons = 0;
 static EXT_RAM_ATTR struct button_s {
 	void *id;
 	int gpio, index;
+	int debounce;
 	button_handler handler;
 	struct button_s *shifter;
 	int	long_press;
@@ -63,7 +64,7 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 	struct button_s *button = (struct button_s*) arg;
 	BaseType_t woken = pdFALSE;
 
-	if (xTimerGetPeriod(button->timer) > DEBOUNCE / portTICK_RATE_MS) xTimerChangePeriodFromISR(button->timer, DEBOUNCE / portTICK_RATE_MS, &woken); // does that restart the timer? 
+	if (xTimerGetPeriod(button->timer) > button->debounce / portTICK_RATE_MS) xTimerChangePeriodFromISR(button->timer, button->debounce / portTICK_RATE_MS, &woken); // does that restart the timer? 
 	else xTimerResetFromISR(button->timer, &woken);
 	// ESP_EARLY_LOGI(TAG, "INT gpio %u level %u", button->gpio, button->level);
 }
@@ -149,7 +150,7 @@ void dummy_handler(void *id, button_event_e event, button_press_e press) {
 /****************************************************************************************
  * Create buttons 
  */
-void button_create(void *id, int gpio, int type, bool pull, button_handler handler, int long_press, int shifter_gpio) { 
+void button_create(void *id, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio) { 
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[BUTTON_STACK_SIZE] __attribute__ ((aligned (4)));
 
@@ -159,7 +160,6 @@ void button_create(void *id, int gpio, int type, bool pull, button_handler handl
 
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));
-		gpio_install_isr_service(0);
 		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	}
 	
@@ -169,11 +169,12 @@ void button_create(void *id, int gpio, int type, bool pull, button_handler handl
 	// set mandatory parameters
 	buttons[n_buttons].id = id;
  	buttons[n_buttons].gpio = gpio;
+ 	buttons[n_buttons].debounce = debounce ? debounce: DEBOUNCE;
 	buttons[n_buttons].handler = handler;
 	buttons[n_buttons].long_press = long_press;
 	buttons[n_buttons].level = -1;
 	buttons[n_buttons].type = type;
-	buttons[n_buttons].timer = xTimerCreate("buttonTimer", DEBOUNCE / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
+	buttons[n_buttons].timer = xTimerCreate("buttonTimer", buttons[n_buttons].debounce / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
 	// little trick to find ourselves from queued copy
 	buttons[n_buttons].index = n_buttons;
 
