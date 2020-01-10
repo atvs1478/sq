@@ -32,14 +32,18 @@ static struct {
 /****************************************************************************************
  * 
  */
+#ifdef CONFIG_SQUEEZEAMP
 static void battery_callback(TimerHandle_t xTimer) {
+
 	battery.sum += adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1;
 	if (++battery.count == 30) {
 		battery.avg = battery.sum / battery.count;
 		battery.sum = battery.count = 0;
 		ESP_LOGI(TAG, "Voltage %.2fV", battery.avg);
 	}	
+
 }
+#endif
 
 /****************************************************************************************
  * 

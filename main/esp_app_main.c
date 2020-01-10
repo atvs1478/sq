@@ -48,6 +48,11 @@
 #include "config.h"
 #include "audio_controls.h"
 
+// todo:  this should be moved to the build scripts definitions
+static const char * actrls_brd1 = "[{\"gpio\":4,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":5,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":4,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"}}]";
+static const char * actrls_brd2 ="[{\"gpio\":21,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_STOP\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":18,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_FWD\",\"released\":\"ACTRLS_PLAY\"}},{\"gpio\":19,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_REW\",\"released\":\"ACTRLS_PLAY\"}}]";
+
+
 extern bool enable_bt_sink;
 extern bool enable_airplay;
 extern bool jack_mutes_amp;
@@ -78,26 +83,6 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
 extern void services_init(void);
 
-static const actrls_config_t board_1[] = {
-	//								normal 							long						shifted						long shifted											
-	{ 4, BUTTON_LOW, true, 1000, -1, {ACTRLS_VOLUP, ACTRLS_NONE}, 	{ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 5, BUTTON_LOW, true, 1000, 4,  {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, {ACTRLS_TOGGLE, ACTRLS_NONE}, {BCTRLS_DOWN, ACTRLS_NONE} },
-};
-
-static const actrls_config_t board_2[] = {
-	//								normal 							long						shifted						long shifted											
-	{ 21, BUTTON_LOW, true, 1000, -1, 	{ACTRLS_TOGGLE, ACTRLS_NONE}, {ACTRLS_STOP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE} },
-	{ 18, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLUP, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_NEXT, ACTRLS_NONE}, 	{ACTRLS_FWD, ACTRLS_PLAY} },
-	{ 19, BUTTON_LOW, true, 1000, 21, {ACTRLS_VOLDOWN, ACTRLS_NONE}, {ACTRLS_NONE, ACTRLS_NONE}, {ACTRLS_PREV, ACTRLS_NONE}, {ACTRLS_REW, ACTRLS_PLAY} },
-};
-
-static const struct {
-	int n;
-	const actrls_config_t *config;
-} board_configs[] = {
-	{ 2, board_1 },
-	{ 3, board_2 },
-};	
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -308,8 +293,14 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
+	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd1",actrls_brd1);
+	config_set_default(NVS_TYPE_STR, "actrls_brd1", actrls_brd1, 0);
 
+	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd2", actrls_brd1);
+	config_set_default(NVS_TYPE_STR, "actrls_brd2", actrls_brd2, 0);
+
+	ESP_LOGD(TAG,"Registering Defalt Audio control board type %s, value ","actrls_brd");
+	config_set_default(NVS_TYPE_STR, "actrls_brd", "", 0);
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
@@ -402,11 +393,20 @@ void app_main()
 	ESP_LOGD(TAG,"Configuring Red led");
 	led_config(LED_RED, LED_RED_GPIO, 0);
 
-	char *board_index = config_alloc_get_default(NVS_TYPE_STR, "board_index", NULL, 0);
-	if (board_index) {
-		ESP_LOGD(TAG,"Initializing audio control buttons index %u", atoi(board_index));
-		actrls_init(board_configs[atoi(board_index)].n, (actrls_config_t*) board_configs[atoi(board_index)].config);
-		free(board_index);
+	char *actrls_brd = config_alloc_get_default(NVS_TYPE_STR, "actrls_brd", NULL, 0);
+	if (actrls_brd) {
+		if(actrls_brd[0] !='\0'){
+			ESP_LOGD(TAG,"Initializing audio control buttons board type %s", actrls_brd);
+			char *actrls_brd_json = config_alloc_get_default(NVS_TYPE_STR, actrls_brd, NULL, 0);
+			if(actrls_brd_json){
+				actrls_init_json(actrls_brd_json);
+				free(actrls_brd_json);
+			}
+			else {
+				ESP_LOGE(TAG,"Audio controls board type %s could not be found",actrls_brd);
+			}
+		}
+		free(actrls_brd);
 	}
 
 	/* start the wifi manager */
