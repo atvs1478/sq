@@ -60,7 +60,8 @@ Contains the freeRTOS task and all necessary support
 #include "driver/gpio.h"
 #include "driver/adc.h"
 #include "cJSON.h"
-#include "nvs_utilities.h"
+#include "config.h"
+#include "trace.h"
 #include "cmd_system.h"
 #include "monitor.h"
 

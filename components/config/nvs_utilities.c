@@ -10,11 +10,11 @@
 #include "driver/uart.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
-#include "cmd_decl.h"
 #include "esp_vfs_fat.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "nvs_utilities.h"
+#include "config.h"
 
 const char current_namespace[] = "config";
 const char settings_partition[] = "settings";

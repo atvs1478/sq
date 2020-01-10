@@ -22,9 +22,10 @@
 #include "esp_a2dp_api.h"
 #include "esp_avrc_api.h"
 #include "nvs.h"
-#include "nvs_utilities.h"
+#include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "trace.h"
 #include "audio_controls.h"
 #include "sys/lock.h"
 

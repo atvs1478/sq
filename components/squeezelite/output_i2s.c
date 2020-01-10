@@ -50,6 +50,7 @@ sure that using rate_delay would fix that
 #include "time.h"
 #include "led.h"
 #include "monitor.h"
+#include "config.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
@@ -111,9 +112,9 @@ extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
 
-bool jack_mutes_amp = false;
-
 static log_level loglevel;
+
+static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
 static int bytes_per_frame;
@@ -158,7 +159,6 @@ static void (*jack_handler_chain)(bool inserted);
 
 #define I2C_PORT	0
 #define VOLUME_GPIO	14
-#define JACK_GPIO	34
 
 #define TAS575x 0x98
 #define TAS578x	0x90
@@ -220,6 +220,11 @@ static void jack_handler(bool inserted) {
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;
+	char *p;
+
+	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
+	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
+	free(p);
 	
 #ifdef TAS57xx
 	LOG_INFO("Initializing TAS57xx ");

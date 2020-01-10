@@ -18,7 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+
+#include "config.h" 
 #include "squeezelite.h"
 #include "bt_app_sink.h"
 #include "raop_sink.h"
@@ -37,9 +38,9 @@ extern struct buffer *outputbuf;
 // this is the only system-wide loglevel variable
 extern log_level loglevel;
 
-// not great to have these here, but they should not be in embedded.h
-bool enable_bt_sink = false;
-bool enable_airplay = false;
+
+static bool enable_bt_sink;
+static bool enable_airplay;
 
 #define RAOP_OUTPUT_SIZE 	(RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
 #define SYNC_NB				5
@@ -300,6 +301,18 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
  * We provide the generic codec register option
  */
 void register_external(void) {
+	char *p;
+
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_bt_sink")) != NULL) {
+		enable_bt_sink = strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0;
+		free(p);
+	}
+
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_airplay")) != NULL) {
+		enable_airplay = strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0;
+		free(p);
+	}
+
 	if (!strcasestr(output.device, "BT ") ) {
 		if(enable_bt_sink){
 			bt_sink_init(bt_sink_cmd_handler, sink_data_handler);
@@ -308,6 +321,7 @@ void register_external(void) {
 	} else {
 		LOG_WARN("Cannot be a BT sink and source");
 	}	
+
 	if (enable_airplay){
 		raop_sink_init(raop_sink_cmd_handler, raop_sink_data_handler);
 		LOG_INFO("Initializing AirPlay sink");

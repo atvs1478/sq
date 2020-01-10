@@ -7,8 +7,5 @@
 # please read the SDK documents if you need to do this.
 #
 
-CFLAGS += 	-I$(COMPONENT_PATH)/../tools	\
-			-I$(COMPONENT_PATH)/../config
 COMPONENT_ADD_INCLUDEDIRS := .
-COMPONENT_ADD_INCLUDEDIRS += $(COMPONENT_PATH)/../tools			
-COMPONENT_EXTRA_INCLUDES += $(PROJECT_PATH)/main/
+

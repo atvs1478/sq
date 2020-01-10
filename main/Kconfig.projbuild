@@ -187,4 +187,17 @@ menu "Squeezelite-ESP32"
 				AirPlay service listening port
 	endmenu	
 
+	menu "Display Screen"
+		config DISPLAY_CONFIG
+			string "Screen configuraton"
+			default ""
+			help
+				Set parameters of display screen, leave empty for no screen
+				I2C,width=<size>,height=<size>,sda=<gpio>,scl=<gpio>
+				SPI,width=<size>,height=<size>,data=<gpio>,clock=<gpio>,select=<gpio>
+		config DISPLAY_I2C_SPEED
+			int "I2C bus speed"
+				default 250000
+	endmenu	
+
 endmenu

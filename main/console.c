@@ -27,7 +27,7 @@
 #include "wifi_manager.h"
 
 #include "cmd_squeezelite.h"
-#include "nvs_utilities.h"
+#include "config.h"
 pthread_t thread_console;
 static void * console_thread();
 void console_start();

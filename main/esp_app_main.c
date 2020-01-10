@@ -48,9 +48,6 @@
 #include "config.h"
 #include "audio_controls.h"
 
-extern bool enable_bt_sink;
-extern bool enable_airplay;
-extern bool jack_mutes_amp;
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -253,7 +250,6 @@ void register_default_nvs(){
 	esp_read_mac((uint8_t *)&mac, ESP_MAC_WIFI_STA);
 	snprintf(macStr, LOCAL_MAC_SIZE-1,"-%x%x%x", mac[3], mac[4], mac[5]);
 
-
 	DEFAULT_NAME_WITH_MAC(default_bt_name,CONFIG_BT_NAME);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", default_bt_name);
 	config_set_default(NVS_TYPE_STR, "bt_name", default_bt_name, 0);
@@ -303,7 +299,6 @@ void register_default_nvs(){
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
 
-
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ota_erase_blk", number_buffer);
@@ -318,35 +313,14 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "ota_prio", number_buffer, 0);
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
-	char * flag = config_alloc_get_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
-	if(flag !=NULL){
-		enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_bt_sink'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
+	
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
-	flag = config_alloc_get_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
-	if(flag !=NULL){
-		enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_airplay'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 
-
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "jack_mutes_amp", "n");
-	flag = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
-
-	if(flag !=NULL){
-		jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'jack_mutes_amp'");
-	}
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", STR(CONFIG_DISPLAY_CONFIG));
+	config_set_default(NVS_TYPE_STR, "display_config", STR(CONFIG_DISPLAY_CONFIG), 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
