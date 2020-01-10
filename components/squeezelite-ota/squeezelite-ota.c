@@ -23,7 +23,7 @@
 #include "esp_err.h"
 #include "tcpip_adapter.h"
 #include "squeezelite-ota.h"
-#include "nvs_utilities.h"
+#include "config.h"
 #include <time.h>
 #include <sys/time.h>
 #include <stdarg.h>

@@ -49,13 +49,9 @@
 #include "audio_controls.h"
 
 // todo:  this should be moved to the build scripts definitions
-static const char * actrls_brd1 = "[{\"gpio\":4,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":5,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":4,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"}}]";
-static const char * actrls_brd2 ="[{\"gpio\":21,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_STOP\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":18,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_FWD\",\"released\":\"ACTRLS_PLAY\"}},{\"gpio\":19,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_REW\",\"released\":\"ACTRLS_PLAY\"}}]";
+static const char * actrls_brd1 = "[{\"gpio\":4,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":5,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":4,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"BCTRLS_DOWN\",\"released\":\"ACTRLS_NONE\"}}]";
+static const char * actrls_brd2 ="[{\"gpio\":21,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_STOP\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":18,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_FWD\",\"released\":\"ACTRLS_PLAY\"}},{\"gpio\":19,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_REW\",\"released\":\"ACTRLS_PLAY\"}}]";
 
-
-extern bool enable_bt_sink;
-extern bool enable_airplay;
-extern bool jack_mutes_amp;
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -70,19 +66,11 @@ static const char TAG[] = "esp_app_main";
 #define DEFAULT_HOST_NAME "squeezelite"
 char * fwurl = NULL;
 
-#ifdef CONFIG_SQUEEZEAMP
-#define LED_GREEN_GPIO 	12
-#define LED_RED_GPIO	13
-#else
-#define LED_GREEN_GPIO 	-1
-#define LED_RED_GPIO	-1
-#endif
 static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
 extern void services_init(void);
-
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -245,7 +233,6 @@ void register_default_nvs(){
 	esp_read_mac((uint8_t *)&mac, ESP_MAC_WIFI_STA);
 	snprintf(macStr, LOCAL_MAC_SIZE-1,"-%x%x%x", mac[3], mac[4], mac[5]);
 
-
 	DEFAULT_NAME_WITH_MAC(default_bt_name,CONFIG_BT_NAME);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", default_bt_name);
 	config_set_default(NVS_TYPE_STR, "bt_name", default_bt_name, 0);
@@ -316,35 +303,14 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "ota_prio", number_buffer, 0);
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
-	char * flag = config_alloc_get_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
-	if(flag !=NULL){
-		enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_bt_sink'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
+	
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
-	flag = config_alloc_get_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
-	if(flag !=NULL){
-		enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_airplay'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 
-
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "jack_mutes_amp", "n");
-	flag = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
-
-	if(flag !=NULL){
-		jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'jack_mutes_amp'");
-	}
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", STR(CONFIG_DISPLAY_CONFIG));
+	config_set_default(NVS_TYPE_STR, "display_config", STR(CONFIG_DISPLAY_CONFIG), 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
@@ -363,6 +329,9 @@ void app_main()
 	ESP_LOGI(TAG,"Setting up config subsystem.");
 	config_init();
 
+	ESP_LOGD(TAG,"Configuring services");
+	services_init();
+
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
 
@@ -373,7 +342,6 @@ void app_main()
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
-
 
 	ESP_LOGD(TAG,"Getting value for WM bypass, nvs 'bypass_wm'");
 	char * bypass_wm = config_alloc_get_default(NVS_TYPE_STR, "bypass_wm", "0", 0);

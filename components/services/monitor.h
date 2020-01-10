@@ -20,3 +20,6 @@
  
 #pragma once
 
+extern void (*jack_handler_svc)(bool inserted);
+extern bool jack_inserted_svc(void);
+

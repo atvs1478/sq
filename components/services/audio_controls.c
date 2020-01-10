@@ -94,7 +94,7 @@ void down(void *id, button_event_e event, button_press_e press, bool longpress) 
  */
 esp_err_t actrls_init(int n, const actrls_config_t *config) {
 	for (int i = 0; i < n; i++) {
-		button_create((void*) (config + i), config[i].gpio, config[i].type, config[i].pull, control_handler, config[i].long_press, config[i].shifter_gpio);
+		button_create((void*) (config + i), config[i].gpio, config[i].type, config[i].pull, config[i].debounce, control_handler, config[i].long_press, config[i].shifter_gpio);
 	}
 	return ESP_OK;
 }
@@ -175,7 +175,7 @@ esp_err_t actrls_parse_config_map(const cJSON * member, actrls_config_t *cur_con
 
 	if (err == ESP_OK) {
 		button_create((void*) cur_config, cur_config->gpio,
-				cur_config->type, cur_config->pull,
+				cur_config->type, cur_config->pull,cur_config->debounce,
 				control_handler, cur_config->long_press,
 				cur_config->shifter_gpio);
 	}

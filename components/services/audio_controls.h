@@ -38,6 +38,7 @@ typedef struct {
 	int gpio;
 	int type;
 	bool pull;
+	int	debounce;
 	int long_press;
 	int shifter_gpio;
 	actrls_action_e normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
@@ -54,6 +55,7 @@ typedef struct {
 static const actrls_config_map_t actrls_config_map[] =
 		{
 			{"gpio", offsetof(actrls_config_t,gpio), ACTRLS_MAP_INT},
+			{"debounce", offsetof(actrls_config_t,debounce), ACTRLS_MAP_INT},
 			{"type", offsetof(actrls_config_t,type),ACTRLS_MAP_TYPE},
 			{"pull", offsetof(actrls_config_t,pull),ACTRLS_MAP_BOOL},
 			{"long_press", offsetof(actrls_config_t,long_press),ACTRLS_MAP_INT},

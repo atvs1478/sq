@@ -15,12 +15,17 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "monitor.h"
+#include "driver/gpio.h"
+#include "buttons.h"
 
+#define JACK_GPIO	34
 #define MONITOR_TIMER	(10*1000)
 
 static const char TAG[] = "monitor";
 
 static TimerHandle_t monitor_timer;
+void (*jack_handler_svc)(bool inserted);
+bool jack_inserted_svc(void);
 
 /****************************************************************************************
  * 
@@ -36,8 +41,35 @@ static void monitor_callback(TimerHandle_t xTimer) {
 /****************************************************************************************
  * 
  */
+static void jack_handler_default(void *id, button_event_e event, button_press_e mode, bool long_press) {
+	ESP_LOGD(TAG, "Jack %s", event == BUTTON_PRESSED ? "inserted" : "removed");
+	if (jack_handler_svc) (*jack_handler_svc)(event == BUTTON_PRESSED);
+}
+
+/****************************************************************************************
+ * 
+ */
+bool jack_inserted_svc (void) {
+#ifdef JACK_GPIO
+	return !gpio_get_level(JACK_GPIO);
+#else
+	return false;
+#endif
+}
+
+/****************************************************************************************
+ * 
+ */
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
+
+#ifdef JACK_GPIO
+	gpio_pad_select_gpio(JACK_GPIO);
+	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
+
+	// re-use button management for jack handler, it's a GPIO after all
+	button_create(NULL, JACK_GPIO, BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
+#endif
 
 	monitor_timer = xTimerCreate("monitor", MONITOR_TIMER / portTICK_RATE_MS, pdTRUE, NULL, monitor_callback);
 	xTimerStart(monitor_timer, portMAX_DELAY);

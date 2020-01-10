@@ -1,8 +1,6 @@
 #pragma once
 #include "esp_err.h"
 #include "nvs.h"
-#include "trace.h"
-#include "config.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

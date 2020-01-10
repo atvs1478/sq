@@ -1,0 +1,2 @@
+WELCOME_TO_SQUEEZEESP32
+	EN	Welcome to SqueezeESP32

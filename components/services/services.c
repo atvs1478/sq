@@ -7,6 +7,8 @@
 */
 
 #include <stdio.h>
+#include "esp_log.h"
+#include "driver/gpio.h"
 #include "battery.h"
 #include "led.h"
 #include "monitor.h"
@@ -17,11 +19,24 @@ extern void led_svc_init(void);
 
 static const char TAG[] = "services";
 
+#ifdef CONFIG_SQUEEZEAMP
+#define LED_GREEN_GPIO 	12
+#define LED_RED_GPIO	13
+#endif
+
 /****************************************************************************************
  * 
  */
 void services_init(void) {
+	gpio_install_isr_service(0);
+
+	ESP_LOGD(TAG,"Configuring LEDs");
+	led_svc_init();
+#ifdef CONFIG_SQUEEZEAMP
+	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
+	led_config(LED_RED, LED_RED_GPIO, 0);
+#endif
+
 	battery_svc_init();
 	monitor_svc_init();
-	led_svc_init();
 }

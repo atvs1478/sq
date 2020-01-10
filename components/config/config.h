@@ -1,8 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <string.h>
-#include "esp_system.h"
-#include "nvs_utilities.h"
+#include "nvs.h"
 
 #ifdef __cplusplus
 extern "C" {

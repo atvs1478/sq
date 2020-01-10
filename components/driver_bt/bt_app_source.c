@@ -15,7 +15,7 @@
 #include "esp_wifi.h"
 #include "freertos/timers.h"
 #include "argtable3/argtable3.h"
-#include "nvs_utilities.h"
+#include "config.h"
 #include "bt_app_core.h"
 #include "trace.h"
 
