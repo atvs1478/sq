@@ -281,10 +281,10 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
 	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd1",actrls_brd1);
-	config_set_default(NVS_TYPE_STR, "actrls_brd1", actrls_brd1, 0);
+	config_set_default(NVS_TYPE_STR, "actrls_brd1",(void *) actrls_brd1, 0);
 
 	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd2", actrls_brd1);
-	config_set_default(NVS_TYPE_STR, "actrls_brd2", actrls_brd2, 0);
+	config_set_default(NVS_TYPE_STR, "actrls_brd2",(void *) actrls_brd2, 0);
 
 	ESP_LOGD(TAG,"Registering Defalt Audio control board type %s, value ","actrls_brd");
 	config_set_default(NVS_TYPE_STR, "actrls_brd", "", 0);
@@ -354,12 +354,6 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
-	services_init();
-
-	ESP_LOGD(TAG,"Configuring Green led");
-	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
-	ESP_LOGD(TAG,"Configuring Red led");
-	led_config(LED_RED, LED_RED_GPIO, 0);
 
 	char *actrls_brd = config_alloc_get_default(NVS_TYPE_STR, "actrls_brd", NULL, 0);
 	if (actrls_brd) {
