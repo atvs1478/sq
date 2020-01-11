@@ -225,7 +225,7 @@ static bool SSD1306_Init( struct SSD1306_Device* DeviceHandle, int Width, int He
     SSD1306_SetInverted( DeviceHandle, false );
     SSD1306_SetDisplayClocks( DeviceHandle, 0, 8 );
     EnableChargePumpRegulator( DeviceHandle );
-    SSD1306_SetDisplayAddressMode( DeviceHandle, AddressMode_Horizontal );
+    SSD1306_SetDisplayAddressMode( DeviceHandle, AddressMode_Vertical );
     SSD1306_SetColumnAddress( DeviceHandle, 0, DeviceHandle->Width - 1 );
     SSD1306_SetPageAddress( DeviceHandle, 0, ( DeviceHandle->Height / 8 ) - 1 );
     SSD1306_EnableDisplayRAM( DeviceHandle );

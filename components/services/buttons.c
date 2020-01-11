@@ -156,7 +156,7 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 
 	if (n_buttons >= MAX_BUTTONS) return;
 
-	ESP_LOGI(TAG, "creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
+	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
 
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));

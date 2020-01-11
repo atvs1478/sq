@@ -21,13 +21,11 @@
 
 static const char TAG[] = "battery";
 
-#ifdef CONFIG_SQUEEZEAMP
 static struct {
 	float sum, avg;
 	int count;
 	TimerHandle_t timer;
 } battery;
-#endif
 
 /****************************************************************************************
  * 

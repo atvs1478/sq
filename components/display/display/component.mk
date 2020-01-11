@@ -6,7 +6,8 @@
 # lib(subdirectory_name).a in the build directory. This behaviour is entirely configurable,
 # please read the SDK documents if you need to do this.
 #
-COMPONENT_SRCDIRS := . tarablessd1306
+CFLAGS += 	-I$(COMPONENT_PATH)/../squeezelite
+COMPONENT_SRCDIRS := . tarablessd1306 tarablessd1306/fonts tarablessd1306/ifaces
 COMPONENT_ADD_INCLUDEDIRS := .
 COMPONENT_ADD_INCLUDEDIRS += ./tarablessd1306
 

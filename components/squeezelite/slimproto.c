@@ -45,7 +45,7 @@ static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
 static u16_t slimproto_hport = 9000;
 static u16_t slimproto_cport = 9090;
-static u8_t	player_id = 100; // squeezeesp32
+static u8_t	player_id = PLAYER_ID;
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -450,11 +450,6 @@ static void process_dsco(u8_t *pkt, int len) {
 	player_id = 12;
 }
 
-static void process_vfdc(u8_t *pkt, int len) {
-	LOG_DEBUG("VFDC %u", len);
-	vfd_data( pkt, len - 4);
-}
-
 static void process_setd(u8_t *pkt, int len) {
 	struct setd_packet *setd = (struct setd_packet *)pkt;
 
@@ -531,7 +526,6 @@ static struct handler handlers[] = {
 	{ "setd", process_setd },
 	{ "serv", process_serv },
 	{ "dsco", process_dsco },
-	{ "vfdc", process_vfdc },
 	{ "",     NULL  },
 };
 
@@ -542,7 +536,7 @@ static void process(u8_t *pack, int len) {
 	if (h->handler) {
 		LOG_DEBUG("%s", h->opcode);
 		h->handler(pack, len);
-	} else {
+	} else if (!slimp_handler || !(*slimp_handler)(pack, len)) {
 		pack[4] = '\0';
 		LOG_WARN("unhandled %s", (char *)pack);
 	}
