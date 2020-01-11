@@ -724,6 +724,12 @@ function checkStatus(){
                 layer.setAttribute("display","inline");
             }
         }
+        if (data.hasOwnProperty('Jack')) {
+            var jack = data['Jack'];
+            if (jack == '1') {
+                o_jack.setAttribute("display","inline");
+            }
+        }
         blockAjax = false;
     })
     .fail(function(xhr, ajaxOptions, thrownError) {

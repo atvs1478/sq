@@ -322,6 +322,11 @@ svg#output {
     padding-right: 4px;
 }
 
+svg#jack {
+    fill: #ddd;
+    padding-right: 4px;
+}
+
 ul#navbar {
     border-bottom: 0px;
 }
