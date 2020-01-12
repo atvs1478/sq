@@ -330,11 +330,14 @@ void app_main()
 	ESP_LOGI(TAG,"Setting up config subsystem.");
 	config_init();
 
+	ESP_LOGI(TAG,"Registering default values");
+	register_default_nvs();
+
 	ESP_LOGD(TAG,"Configuring services");
 	services_init();
 
-	ESP_LOGI(TAG,"Registering default values");
-	register_default_nvs();
+	ESP_LOGD(TAG,"Initializing display");	
+	display_init();
 
 #if !RECOVERY_APPLICATION
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");
