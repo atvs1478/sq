@@ -187,6 +187,7 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 		}
 	}	
 
+	gpio_pad_select_gpio(gpio);
 	gpio_set_direction(gpio, GPIO_MODE_INPUT);
 
 	// we need any edge detection

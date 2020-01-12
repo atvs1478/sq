@@ -208,7 +208,7 @@ static u8_t tas57_addr;
 static void jack_handler(bool inserted) {
 	// jack detection bounces a bit but that seems fine
 	if (jack_mutes_amp) {
-		LOG_INFO("switching amplifier %s", inserted ? "ON" : "OFF");
+		LOG_INFO("switching amplifier %s", inserted ? "OFF" : "ON");
 		if (inserted) dac_cmd(DAC_ANALOGUE_OFF);
 		else dac_cmd(DAC_ANALOGUE_ON);
 	}

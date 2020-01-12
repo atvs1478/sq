@@ -23,3 +23,6 @@
 extern void (*jack_handler_svc)(bool inserted);
 extern bool jack_inserted_svc(void);
 
+extern void (*spkfault_handler_svc)(bool inserted);
+extern bool spkfault_svc(void);
+

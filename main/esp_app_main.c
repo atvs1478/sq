@@ -287,7 +287,7 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd2", actrls_brd1);
 	config_set_default(NVS_TYPE_STR, "actrls_brd2",(void *) actrls_brd2, 0);
 
-	ESP_LOGD(TAG,"Registering Defalt Audio control board type %s, value ","actrls_brd");
+	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_brd");
 	config_set_default(NVS_TYPE_STR, "actrls_brd", "", 0);
 
 	char number_buffer[101] = {};
@@ -323,7 +323,7 @@ void app_main()
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-
+	
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
 
@@ -358,7 +358,6 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
-
 	char *actrls_brd = config_alloc_get_default(NVS_TYPE_STR, "actrls_brd", NULL, 0);
 	if (actrls_brd) {
 		if(actrls_brd[0] !='\0'){
@@ -373,6 +372,8 @@ void app_main()
 			}
 		}
 		free(actrls_brd);
+	} else {
+		ESP_LOGD(TAG,"No audio control buttons");
 	}
 
 	/* start the wifi manager */
