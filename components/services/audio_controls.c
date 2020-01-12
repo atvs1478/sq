@@ -27,12 +27,37 @@
 #include "cJSON.h"
 #include "buttons.h"
 #include "audio_controls.h"
+
+typedef enum {
+	ACTRLS_MAP_INT, ACTRLS_MAP_BOOL, ACTRLS_MAP_ACTION,ACTRLS_MAP_TYPE,ACTRLS_MAP_END
+} actrls_action_map_element_type_e;
+
+typedef struct {
+	char * member;
+	uint32_t offset;
+	actrls_action_map_element_type_e type;
+} actrls_config_map_t;
+
+static const actrls_config_map_t actrls_config_map[] =
+		{
+			{"gpio", offsetof(actrls_config_t,gpio), ACTRLS_MAP_INT},
+			{"debounce", offsetof(actrls_config_t,debounce), ACTRLS_MAP_INT},
+			{"type", offsetof(actrls_config_t,type),ACTRLS_MAP_TYPE},
+			{"pull", offsetof(actrls_config_t,pull),ACTRLS_MAP_BOOL},
+			{"long_press", offsetof(actrls_config_t,long_press),ACTRLS_MAP_INT},
+			{"shifter_gpio", offsetof(actrls_config_t,shifter_gpio),ACTRLS_MAP_INT},
+			{"normal", offsetof(actrls_config_t,normal), ACTRLS_MAP_ACTION},
+			{"shifted", offsetof(actrls_config_t,shifted), ACTRLS_MAP_ACTION},
+			{"longpress", offsetof(actrls_config_t,longpress), ACTRLS_MAP_ACTION},
+			{"longshifted", offsetof(actrls_config_t,longshifted), ACTRLS_MAP_ACTION},
+			{"", 0,ACTRLS_MAP_END}
+		};
+
 // BEWARE: the actions below need to stay aligned with the corresponding enum to properly support json parsing
 static const char * actrls_action_s[ ] = { "ACTRLS_VOLUP","ACTRLS_VOLDOWN","ACTRLS_TOGGLE","ACTRLS_PLAY",
 									"ACTRLS_PAUSE","ACTRLS_STOP","ACTRLS_REW","ACTRLS_FWD","ACTRLS_PREV","ACTRLS_NEXT",
 									"BCTRLS_PUSH", "BCTRLS_UP","BCTRLS_DOWN","BCTRLS_LEFT","BCTRLS_RIGHT", ""} ;
-
-
+									
 static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
 static actrls_t default_controls, current_controls;
@@ -41,8 +66,6 @@ static void control_handler(void *id, button_event_e event, button_press_e press
 	actrls_config_t *key = (actrls_config_t*) id;
 	actrls_action_e action;
 
-	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u", key->gpio, press, long_press, event);
-	
 	switch(press) {
 	case BUTTON_NORMAL:
 		if (long_press) action = key->longpress[event == BUTTON_PRESSED ? 0 : 1];
@@ -56,6 +79,8 @@ static void control_handler(void *id, button_event_e event, button_press_e press
 		action = ACTRLS_NONE;
 		break;
 	}
+	
+	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action);
 
 	if (action != ACTRLS_NONE) {
 		ESP_LOGD(TAG, " calling action %u", action);
@@ -100,7 +125,6 @@ esp_err_t actrls_init(int n, const actrls_config_t *config) {
 }
 
 actrls_action_e actrls_parse_action_json(const char * name){
-
 	for(int i=0;actrls_action_s[i][0]!='\0' && i<ACTRLS_MAX;i++){
 		if(!strcmp(actrls_action_s[i], name)){
 			return (actrls_action_e) i;
@@ -135,9 +159,9 @@ esp_err_t actrls_parse_config_map(const cJSON * member, actrls_config_t *cur_con
 	void *value = (config_pointer + map->offset);
 	switch (map->type) {
 	case ACTRLS_MAP_TYPE:
-		if (member->child != NULL) {
+		if (member->type == cJSON_String) {
 			*(int*) value =
-					!strcmp(member->child->string,
+					!strcmp(member->valuestring,
 							"BUTTON_LOW") ?
 							BUTTON_LOW : BUTTON_HIGH;
 		} else {
@@ -157,27 +181,19 @@ esp_err_t actrls_parse_config_map(const cJSON * member, actrls_config_t *cur_con
 		if (button_action != NULL) {
 			((actrls_action_e*) value)[0] =
 					actrls_parse_action_json(
-							button_action->string);
+							button_action->valuestring);
 		}
 		button_action = cJSON_GetObjectItemCaseSensitive(
 				member, "released");
 		if (button_action != NULL) {
 			((actrls_action_e*) value)[1] =
 					actrls_parse_action_json(
-							button_action->string);
+							button_action->valuestring);
 		}
 		break;
 
 	default:
 		break;
-	}
-
-
-	if (err == ESP_OK) {
-		button_create((void*) cur_config, cur_config->gpio,
-				cur_config->type, cur_config->pull,cur_config->debounce,
-				control_handler, cur_config->long_press,
-				cur_config->shifter_gpio);
 	}
 
 	return err;
@@ -218,6 +234,12 @@ esp_err_t actrls_init_json(const char *config) {
 				{
 					actrls_parse_config_map(member, cur_config);
 					err = err == ESP_OK ? loc_err : err;
+				}
+				if (loc_err == ESP_OK) {
+					button_create((void*) cur_config, cur_config->gpio,
+					cur_config->type, cur_config->pull,cur_config->debounce,
+					control_handler, cur_config->long_press,
+					cur_config->shifter_gpio);
 				}
 				cur_config++;
 			}

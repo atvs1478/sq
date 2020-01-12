@@ -20,20 +20,17 @@
 
 #include "buttons.h"
 
-// BEWARE: this is the index of the array of action below
+// BEWARE: this is the index of the array of action below (change actrls_action_s as well!)
 typedef enum { 	ACTRLS_NONE = -1, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
 				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,
 				ACTRLS_MAX 
 		} actrls_action_e;
-typedef enum {
-	ACTRLS_MAP_INT, ACTRLS_MAP_BOOL, ACTRLS_MAP_ACTION,ACTRLS_MAP_TYPE,ACTRLS_MAP_END
-} actrls_action_map_element_type_e;
-
-
 
 typedef void (*actrls_handler)(void);
 typedef actrls_handler actrls_t[ACTRLS_MAX - ACTRLS_NONE - 1];
+
+// BEWARE any change to struct below must be mapped to actrls_config_map
 typedef struct {
 	int gpio;
 	int type;
@@ -43,29 +40,6 @@ typedef struct {
 	int shifter_gpio;
 	actrls_action_e normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
 } actrls_config_t;
-
-
-
-typedef struct {
-	char * member;
-	uint32_t offset;
-	actrls_action_map_element_type_e type;
-} actrls_config_map_t;
-
-static const actrls_config_map_t actrls_config_map[] =
-		{
-			{"gpio", offsetof(actrls_config_t,gpio), ACTRLS_MAP_INT},
-			{"debounce", offsetof(actrls_config_t,debounce), ACTRLS_MAP_INT},
-			{"type", offsetof(actrls_config_t,type),ACTRLS_MAP_TYPE},
-			{"pull", offsetof(actrls_config_t,pull),ACTRLS_MAP_BOOL},
-			{"long_press", offsetof(actrls_config_t,long_press),ACTRLS_MAP_INT},
-			{"shifter_gpio", offsetof(actrls_config_t,shifter_gpio),ACTRLS_MAP_INT},
-			{"normal", offsetof(actrls_config_t,normal), ACTRLS_MAP_ACTION},
-			{"longpress", offsetof(actrls_config_t,longpress), ACTRLS_MAP_ACTION},
-			{"longshifted", offsetof(actrls_config_t,longshifted), ACTRLS_MAP_ACTION},
-			{"", 0,ACTRLS_MAP_END}
-		};
-
 
 esp_err_t actrls_init(int n, const actrls_config_t *config);
 esp_err_t actrls_init_json(const char * config);
