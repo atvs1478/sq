@@ -310,7 +310,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 
 	struct netbuf *inbuf;
 	char *buf = NULL;
-	u16_t buflen;
+	u16_t buflen = 0;
 	err_t err;
 	ip_addr_t remote_add;
 	u16_t port;
@@ -327,11 +327,28 @@ void http_server_netconn_serve(struct netconn *conn) {
 	netconn_getaddr(conn,	&remote_add,	&port,	0);
 	char * remote_address = strdup(ip4addr_ntoa(ip_2_ip4(&remote_add)));
 	ESP_LOGD(TAG,  "Local Access Point IP address is: %s. Remote device IP address is %s. Receiving request buffer", ap_ip_address, remote_address);
-	err = netconn_recv(conn, &inbuf);
-	if(err == ERR_OK) {
+
+	u16_t bufsize = 0;
+	netconn_set_recvtimeout(conn, 50);
+	while (netconn_recv(conn, &inbuf) == ERR_OK) {
+		do {
+			u8_t *rcvbuf;
+			u16_t rcvlen;
+			netbuf_data(inbuf, (void**)&rcvbuf, &rcvlen);
+			dump_net_buffer(rcvbuf, rcvlen);
+			if (buflen + rcvlen > bufsize) {
+				bufsize += 2048;
+				buf = realloc(buf, bufsize);
+			}
+			memcpy(buf + buflen, rcvbuf, rcvlen);
+			buflen += rcvlen;
+			ESP_LOGI(TAG, "received netbuf of %hu", rcvlen);
+		} while (netbuf_next(inbuf) != -1);
+		netbuf_delete(inbuf);
+	}
+
+	if(buflen) {
 		ESP_LOGV(TAG,  "Getting data buffer.");
-		netbuf_data(inbuf, (void**)&buf, &buflen);
-		dump_net_buffer(buf, buflen);
 		int lenH = 0;
 		/* extract the first line of the request */
 		char *save_ptr = buf;
@@ -583,13 +600,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 			netconn_write(conn, http_404_hdr, sizeof(http_404_hdr) - 1, NETCONN_NOCOPY);
 		}
 		free(host);
-
+		free(buf);
 	}
 
 	free(ap_ip_address);
 	free(remote_address);
 	netconn_close(conn);
-	netbuf_delete(inbuf);
 	/* free the buffer */
 
 }
