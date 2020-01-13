@@ -21,7 +21,7 @@
 
 #ifdef CONFIG_SQUEEZEAMP
 #define JACK_GPIO		34
-#define SPKFAULT_GPIO	2
+#define SPKFAULT_GPIO	2			// this requires a pull-up, so can't be >34
 #endif
 
 #define MONITOR_TIMER	(10*1000)
@@ -104,8 +104,8 @@ void monitor_svc_init(void) {
 
 #ifdef SPKFAULT_GPIO
 	gpio_pad_select_gpio(SPKFAULT_GPIO);
-	ESP_LOGI(TAG, "DIR %d", gpio_set_direction(SPKFAULT_GPIO, GPIO_MODE_INPUT));
-	ESP_LOGI(TAG, "PULLUP %d", gpio_set_pull_mode(SPKFAULT_GPIO, GPIO_PULLUP_ONLY));
+	gpio_set_direction(SPKFAULT_GPIO, GPIO_MODE_INPUT);
+	gpio_set_pull_mode(SPKFAULT_GPIO, GPIO_PULLUP_ONLY); 
 	
 	// re-use button management for speaker fault handler, it's a GPIO after all
 	button_create(NULL, SPKFAULT_GPIO, BUTTON_LOW, true, 0, spkfault_handler_default, 0, -1);

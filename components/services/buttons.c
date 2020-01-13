@@ -42,10 +42,11 @@ static int n_buttons = 0;
 
 static EXT_RAM_ATTR struct button_s {
 	void *id;
-	int gpio, index;
+	int gpio;
 	int debounce;
 	button_handler handler;
-	struct button_s *shifter;
+	struct button_s *self, *shifter;
+	int shifter_gpio;	// this one is just for post-creation						
 	int	long_press;
 	bool long_timer, shifted, shifting;
 	int type, level;	
@@ -126,7 +127,7 @@ static void buttons_task(void* arg) {
 					(*button.handler)(button.id, BUTTON_RELEASED, press, false);		
 				}
 				// button is a copy, so need to go to real context
-				buttons[button.index].shifting = false;
+				button.self->shifting = false;
 			} else if (!button.shifting) {
 				// normal long press and not shifting so don't discard
 				(*button.handler)(button.id, BUTTON_PRESSED, press, true);
@@ -135,7 +136,7 @@ static void buttons_task(void* arg) {
 			// normal press/release of a button or release of a long-press button
 			if (!button.shifting) (*button.handler)(button.id, event, press, button.long_press);
 			// button is a copy, so need to go to real context
-			buttons[button.index].shifting = false;
+			button.self->shifting = false;
 		}
     }
 }	
@@ -173,19 +174,24 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 	buttons[n_buttons].handler = handler;
 	buttons[n_buttons].long_press = long_press;
 	buttons[n_buttons].level = -1;
+	buttons[n_buttons].shifter_gpio = shifter_gpio;
 	buttons[n_buttons].type = type;
 	buttons[n_buttons].timer = xTimerCreate("buttonTimer", buttons[n_buttons].debounce / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
-	// little trick to find ourselves from queued copy
-	buttons[n_buttons].index = n_buttons;
+	buttons[n_buttons].self = buttons + n_buttons;
 
 	for (int i = 0; i < n_buttons; i++) {
+		// first try to find our shifter
 		if (buttons[i].gpio == shifter_gpio) {
 			buttons[n_buttons].shifter = buttons + i;
 			// a shifter must have a long-press handler
 			if (!buttons[i].long_press) buttons[i].long_press = -1;
-			break;
 		}
-	}	
+		// then try to see if we are a non-assigned shifter
+		if (buttons[i].shifter_gpio == gpio) {
+			buttons[i].shifter = buttons + n_buttons;
+			ESP_LOGI(TAG, "post-assigned shifter gpio %u", buttons[i].gpio);			
+		}	
+	}
 
 	gpio_pad_select_gpio(gpio);
 	gpio_set_direction(gpio, GPIO_MODE_INPUT);
@@ -195,8 +201,12 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 
 	// do we need pullup or pulldown
 	if (pull) {
-		if (type == BUTTON_LOW) gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
-		else gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+		if (GPIO_IS_VALID_OUTPUT_GPIO(gpio)) {
+			if (type == BUTTON_LOW) gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+			else gpio_set_pull_mode(gpio, GPIO_PULLDOWN_ONLY);
+		} else {	
+			ESP_LOGW(TAG, "cannot set pull up/down for gpio %u", gpio);
+		}
 	}
  
 	gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
