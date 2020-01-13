@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -28,35 +28,41 @@
 #include "buttons.h"
 #include "audio_controls.h"
 
-typedef enum {
-	ACTRLS_MAP_INT, ACTRLS_MAP_BOOL, ACTRLS_MAP_ACTION,ACTRLS_MAP_TYPE,ACTRLS_MAP_END
-} actrls_action_map_element_type_e;
 
+typedef esp_err_t (actrls_config_map_handler) (const cJSON * member, actrls_config_t *cur_config,uint32_t offset);
 typedef struct {
 	char * member;
 	uint32_t offset;
-	actrls_action_map_element_type_e type;
+	actrls_config_map_handler * handler;
 } actrls_config_map_t;
+
+esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config);
+esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config);
+esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
 
 static const actrls_config_map_t actrls_config_map[] =
 		{
-			{"gpio", offsetof(actrls_config_t,gpio), ACTRLS_MAP_INT},
-			{"debounce", offsetof(actrls_config_t,debounce), ACTRLS_MAP_INT},
-			{"type", offsetof(actrls_config_t,type),ACTRLS_MAP_TYPE},
-			{"pull", offsetof(actrls_config_t,pull),ACTRLS_MAP_BOOL},
-			{"long_press", offsetof(actrls_config_t,long_press),ACTRLS_MAP_INT},
-			{"shifter_gpio", offsetof(actrls_config_t,shifter_gpio),ACTRLS_MAP_INT},
-			{"normal", offsetof(actrls_config_t,normal), ACTRLS_MAP_ACTION},
-			{"shifted", offsetof(actrls_config_t,shifted), ACTRLS_MAP_ACTION},
-			{"longpress", offsetof(actrls_config_t,longpress), ACTRLS_MAP_ACTION},
-			{"longshifted", offsetof(actrls_config_t,longshifted), ACTRLS_MAP_ACTION},
-			{"", 0,ACTRLS_MAP_END}
+			{"gpio", offsetof(actrls_config_t,gpio), actrls_process_int},
+			{"debounce", offsetof(actrls_config_t,debounce), actrls_process_int},
+			{"type", offsetof(actrls_config_t,type), actrls_process_type},
+			{"pull", offsetof(actrls_config_t,pull), actrls_process_bool},
+			{"long_press", offsetof(actrls_config_t,long_press),actrls_process_int},
+			{"shifter_gpio", offsetof(actrls_config_t,shifter_gpio), actrls_process_int},
+			{"normal", offsetof(actrls_config_t,normal), actrls_process_action},
+			{"shifted", offsetof(actrls_config_t,shifted), actrls_process_action},
+			{"longpress", offsetof(actrls_config_t,longpress), actrls_process_action},
+			{"longshifted", offsetof(actrls_config_t,longshifted), actrls_process_action},
+			{"", 0, NULL}
 		};
 
 // BEWARE: the actions below need to stay aligned with the corresponding enum to properly support json parsing
-static const char * actrls_action_s[ ] = { "ACTRLS_VOLUP","ACTRLS_VOLDOWN","ACTRLS_TOGGLE","ACTRLS_PLAY",
-									"ACTRLS_PAUSE","ACTRLS_STOP","ACTRLS_REW","ACTRLS_FWD","ACTRLS_PREV","ACTRLS_NEXT",
-									"BCTRLS_PUSH", "BCTRLS_UP","BCTRLS_DOWN","BCTRLS_LEFT","BCTRLS_RIGHT", ""} ;
+#define EP(x) [x] = #x  /* ENUM PRINT */
+static const char * actrls_action_s[ ] = { EP(ACTRLS_VOLUP),EP(ACTRLS_VOLDOWN),EP(ACTRLS_TOGGLE),EP(ACTRLS_PLAY),
+									EP(ACTRLS_PAUSE),EP(ACTRLS_STOP),EP(ACTRLS_REW),EP(ACTRLS_FWD),EP(ACTRLS_PREV),EP(ACTRLS_NEXT),
+									EP(BCTRLS_PUSH), EP(BCTRLS_UP),EP(BCTRLS_DOWN),EP(BCTRLS_LEFT),EP(BCTRLS_RIGHT), ""} ;
 									
 static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
@@ -125,131 +131,186 @@ esp_err_t actrls_init(int n, const actrls_config_t *config) {
 }
 
 actrls_action_e actrls_parse_action_json(const char * name){
-	for(int i=0;actrls_action_s[i][0]!='\0' && i<ACTRLS_MAX;i++){
+
+	for(int i=0;i<ACTRLS_MAX && actrls_action_s[i][0]!='\0' ;i++){
 		if(!strcmp(actrls_action_s[i], name)){
 			return (actrls_action_e) i;
 		}
 	}
 	return ACTRLS_NONE;
 }
-esp_err_t actrls_parse_config_map(const cJSON * member, actrls_config_t *cur_config){
-	const actrls_config_map_t * map=NULL;
-	esp_err_t err=ESP_OK;
-	char *config_pointer = (char*) cur_config;
-	cJSON *button_action;
 
-	char * string = cJSON_Print(member);
-	ESP_LOGD(TAG, "Processing structure member json : %s", string);
-	free(string);
+esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config,uint32_t offset){
+	esp_err_t err = ESP_OK;
+	ESP_LOGD(TAG,"Processing int member");
+	int *value = (int*)((char*) cur_config + offset);
+	*value = member->valueint;
+	return err;
+}
+esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+	esp_err_t err = ESP_OK;
+	ESP_LOGD(TAG,"Processing type member");
+	int *value = (int *)((char*) cur_config + offset);
+	if (member->type == cJSON_String) {
+		*value =
+				!strcmp(member->valuestring,
+						"BUTTON_LOW") ?
+						BUTTON_LOW : BUTTON_HIGH;
+	} else {
+		ESP_LOGE(TAG,
+				"Button type value expected string value of BUTTON_LOW or BUTTON_HIGH, none found");
+		err=ESP_FAIL;
+	}
+	return err;
+}
 
-	for(int i = 0;!map && actrls_config_map[i].type!=ACTRLS_MAP_END ;i++){
-		if(!strcmp(member->string, actrls_config_map[i].member)){
-			map = &actrls_config_map[i];
+esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+	esp_err_t err = ESP_OK;
+	if(!member) {
+		ESP_LOGE(TAG,"Null json member pointer!");
+		err = ESP_FAIL;
+	}
+	else {
+		ESP_LOGD(TAG,"Processing bool member ");
+		if(cJSON_IsBool(member)){
+			bool*value = (bool*)((char*) cur_config + offset);
+			*value = cJSON_IsTrue(member);
+		}
+		else {
+			ESP_LOGE(TAG,"Member %s is not a boolean", member->string?member->string:"unknown");
+			err = ESP_FAIL;
 		}
 	}
 
-	if(!map){
-		ESP_LOGE(TAG,"Unknown structure member [%s]", member->string?member->string:"");
-		return ESP_FAIL;
+	return err;
+}
+esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+	esp_err_t err = ESP_OK;
+	cJSON * button_action= cJSON_GetObjectItemCaseSensitive(member, "pressed");
+	actrls_action_e*value = (actrls_action_e*)((char *)cur_config + offset);
+	if (button_action != NULL) {
+		value[0] = actrls_parse_action_json( button_action->valuestring);
 	}
-
-	ESP_LOGD(TAG,
-			"Found map type %d at structure offset %u",
-			map->type, map->offset);
-	void *value = (config_pointer + map->offset);
-	switch (map->type) {
-	case ACTRLS_MAP_TYPE:
-		if (member->type == cJSON_String) {
-			*(int*) value =
-					!strcmp(member->valuestring,
-							"BUTTON_LOW") ?
-							BUTTON_LOW : BUTTON_HIGH;
-		} else {
-			ESP_LOGE(TAG,
-					"Button type value expected string value of BUTTON_LOW or BUTTON_HIGH, none found");
-		}
-		break;
-	case ACTRLS_MAP_INT:
-		*(int*) value = member->valueint;
-		break;
-	case ACTRLS_MAP_BOOL:
-		*(bool*) value = cJSON_IsTrue(member);
-		break;
-	case ACTRLS_MAP_ACTION:
-		button_action= cJSON_GetObjectItemCaseSensitive(
-				member, "pressed");
-		if (button_action != NULL) {
-			((actrls_action_e*) value)[0] =
-					actrls_parse_action_json(
-							button_action->valuestring);
-		}
-		button_action = cJSON_GetObjectItemCaseSensitive(
-				member, "released");
-		if (button_action != NULL) {
-			((actrls_action_e*) value)[1] =
-					actrls_parse_action_json(
-							button_action->valuestring);
-		}
-		break;
-
-	default:
-		break;
+	else{
+		ESP_LOGW(TAG,"Action pressed not found in json structure");
+		err = ESP_FAIL;
+	}
+	button_action = cJSON_GetObjectItemCaseSensitive(member, "released");
+	if (button_action != NULL) {
+		value[1] = actrls_parse_action_json( button_action->valuestring);
+	}
+	else{
+		ESP_LOGW(TAG,"Action released not found in json structure");
+		err = ESP_FAIL;
 	}
 
 	return err;
 }
 
 
+esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config) {
+	esp_err_t err = ESP_FAIL;
+	const actrls_config_map_t * h=actrls_config_map;
+
+	char * str = cJSON_Print(member);
+	while (h->handler && strcmp(member->string, h->member)) { h++; }
+
+	if (h->handler) {
+		ESP_LOGD(TAG,"found handler for member %s, json value %s", h->member,str?str:"");
+		err = h->handler(member, cur_config, h->offset);
+	} else {
+		ESP_LOGE(TAG, "Unknown json structure member : %s", str?str:"");
+	}
+
+	if(str) free(str);
+	return err;
+}
+
+esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config) {
+	esp_err_t err= ESP_FAIL;
+	const cJSON *member;
+
+	cJSON_ArrayForEach(member, button)
+	{
+		ESP_LOGD(TAG,"Processing member %s. ", member->string);
+		esp_err_t loc_err = actrls_process_member(member, cur_config);
+		err = (err == ESP_OK) ? loc_err : err;
+	}
+	return err;
+
+}
+
+actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons){
+	int member_count = 0;
+	const cJSON *button;
+	actrls_config_t * json_config=NULL;
+	ESP_LOGD(TAG,"Counting the number of buttons definition");
+	cJSON_ArrayForEach(button, buttons)	{
+		member_count++;
+	}
+	ESP_LOGD(TAG, "config contains %u button definitions",
+			member_count);
+	if (member_count != 0) {
+		json_config = malloc(sizeof(actrls_config_t) * member_count);
+		if(json_config){
+			memset(json_config, 0x00, sizeof(actrls_config_t) * member_count);
+		}
+		else {
+			ESP_LOGE(TAG,"Unable to allocate memory to hold configuration for %u buttons ",member_count);
+		}
+
+	}
+	else {
+		ESP_LOGE(TAG,"No button found in configuration structure");
+	}
+
+	return json_config;
+}
+
 /****************************************************************************************
  * 
  */
 esp_err_t actrls_init_json(const char *config) {
 	esp_err_t err = ESP_OK;
-
 	actrls_config_t *cur_config;
-
+	const cJSON *button;
+	ESP_LOGD(TAG,"Parsing JSON structure ");
 	cJSON *buttons = cJSON_Parse(config);
-	if (buttons != NULL) {
+	if (buttons == NULL) {
+		ESP_LOGE(TAG,"JSON Parsing failed for %s", config);
+		err = ESP_FAIL;
+	}
+	else {
+		ESP_LOGD(TAG,"Json parsing completed");
 		if (cJSON_IsArray(buttons)) {
-			int member_count = 0;
-			const cJSON *button;
-			const cJSON *member;
-			cJSON_ArrayForEach(button, buttons)
-			{
-				member_count++;
-			}
-			ESP_LOGD(TAG, "config contains %u button definitions",
-					member_count);
-			if (member_count == 0) {
+			ESP_LOGD(TAG,"configuration is an array as expected");
+			cur_config = json_config = actrls_init_alloc_structure(buttons);
+			if(!cur_config) {
+				ESP_LOGE(TAG,"Config buffer was empty. ");
+				cJSON_Delete(buttons);
 				return ESP_FAIL;
 			}
-			json_config = malloc(sizeof(actrls_config_t) * member_count);
-			memset(json_config, 0x00, sizeof(actrls_config_t) * member_count);
-			cur_config = json_config;
-
-			cJSON_ArrayForEach(button, buttons)
-			{
-				esp_err_t loc_err = ESP_OK;
-				cJSON_ArrayForEach(member, button)
-				{
-					actrls_parse_config_map(member, cur_config);
-					err = err == ESP_OK ? loc_err : err;
+			ESP_LOGD(TAG,"Processing button definitions. ");
+			cJSON_ArrayForEach(button, buttons){
+				char * str = cJSON_Print(button);
+				ESP_LOGD(TAG,"Processing %s. ", str?str:"");
+				if(str){
+					free(str);
 				}
+				esp_err_t loc_err = actrls_process_button(button, cur_config);
+				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
-					button_create((void*) cur_config, cur_config->gpio,
-					cur_config->type, cur_config->pull,cur_config->debounce,
-					control_handler, cur_config->long_press,
-					cur_config->shifter_gpio);
+					button_create((void*) cur_config, cur_config->gpio,cur_config->type, cur_config->pull,cur_config->debounce,
+									control_handler, cur_config->long_press, cur_config->shifter_gpio);
 				}
 				cur_config++;
 			}
 		}
-
+		else {
+			ESP_LOGE(TAG,"Invalid configuration; array is expected and none received in %s ", config);
+		}
 		cJSON_Delete(buttons);
-	} else {
-		err = ESP_FAIL;
 	}
-
 	return err;
 }
 

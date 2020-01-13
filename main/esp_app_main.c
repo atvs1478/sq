@@ -358,12 +358,15 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
+	ESP_LOGD(TAG,"Getting audio control mapping ");
 	char *actrls_brd = config_alloc_get_default(NVS_TYPE_STR, "actrls_brd", NULL, 0);
 	if (actrls_brd) {
 		if(actrls_brd[0] !='\0'){
-			ESP_LOGD(TAG,"Initializing audio control buttons board type %s", actrls_brd);
+			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_brd);
 			char *actrls_brd_json = config_alloc_get_default(NVS_TYPE_STR, actrls_brd, NULL, 0);
+
 			if(actrls_brd_json){
+				ESP_LOGD(TAG,"with config JSON as follow: %s", actrls_brd_json );
 				actrls_init_json(actrls_brd_json);
 				free(actrls_brd_json);
 			}
