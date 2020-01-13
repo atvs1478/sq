@@ -5,6 +5,9 @@ use strict;
 use base qw(Slim::Display::Text);
 
 # we don't want the special Noritake codes
-sub vfdmodel { 'squeezeslave' }
+sub vfdmodel {
+	return 'squeezeslave'';
+}
+
 
 1;
