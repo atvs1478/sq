@@ -1,2 +1,9 @@
 WELCOME_TO_SQUEEZEESP32
 	EN	Welcome to SqueezeESP32
+	
+PLUGIN_SQUEEZEESP32
+	SqueezeESP32
+	
+PLUGIN_SQUEEZEESP32_DESC
+	Adds a new player id (100) to enable display with SqueezeESP32
+	
