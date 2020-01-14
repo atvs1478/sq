@@ -12,6 +12,9 @@
 #include "driver/i2c.h"
 #include "esp_console.h"
 #include "esp_log.h"
+#include "string.h"
+#include "stdio.h"
+#include "config.h"
 
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
@@ -70,6 +73,147 @@ static struct {
     struct arg_end *end;
 } i2cconfig_args;
 
+static struct {
+	struct arg_lit *clear;
+	struct arg_int *address;
+	struct arg_int *sda;
+	struct arg_int *scl;
+	struct arg_int *width;
+	struct arg_int *height;
+	struct arg_str *name;
+	struct arg_str *driver;
+	struct arg_end *end;
+} i2cdisp_args;
+
+static struct {
+	struct arg_end *end;
+} i2cdisp_show_args;
+static int do_i2c_show_display(int argc, char **argv){
+	char * config_string = (char * )config_alloc_get(NVS_TYPE_STR, "display_config") ;
+	if(config_string){
+		ESP_LOGI(TAG,"Display configuration string is : \n"
+					"display_config = \"%s\"",config_string);
+		free(config_string);
+	}
+	else {
+		ESP_LOGW(TAG,"No display configuration found in nvs config display_config");
+	}
+	return 0;
+}
+
+static int do_i2c_set_display(int argc, char **argv)
+{
+	int sda = 0, scl=0, width=0, height=0, address=120;
+	char * name = strdup("I2S");
+	char * driver= strdup("SSD136");
+	char config_string[200]={};
+    int nerrors = arg_parse(argc, argv, (void **)&i2cdisp_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, i2cdisp_args.end, argv[0]);
+        return 0;
+    }
+
+
+    /* Check "--clear" option */
+    if (i2cdisp_args.clear->count) {
+    	ESP_LOGW(TAG,"Clearing display config");
+    	config_set_value(NVS_TYPE_STR, "display_config", "");
+    }
+    /* Check "--address" option */
+    if (i2cdisp_args.address->count) {
+    	address=i2cdisp_args.address->ival[0];
+    }
+    /* Check "--sda" option */
+    if (i2cdisp_args.sda->count) {
+    	sda=i2cdisp_args.sda->ival[0];
+    }
+    else {
+    	ESP_LOGE(TAG,"Missing parameter: --sda");
+    	nerrors ++;
+    }
+	/* Check "--scl" option */
+	if (i2cdisp_args.scl->count) {
+		scl=i2cdisp_args.scl->ival[0];
+	}
+    else {
+    	ESP_LOGE(TAG,"Missing parameter: --scl");
+    	nerrors ++;
+    }
+
+	/* Check "--width" option */
+	if (i2cdisp_args.width->count) {
+		width=i2cdisp_args.width->ival[0];
+	}
+    else {
+    	ESP_LOGE(TAG,"Missing parameter: --width");
+    	nerrors ++;
+    }
+
+	/* Check "--height" option */
+	if (i2cdisp_args.height->count) {
+		height=i2cdisp_args.height->ival[0];
+	}
+    else {
+    	ESP_LOGE(TAG,"Missing parameter: --height");
+    	nerrors ++;
+    }
+	/* Check "--name" option */
+	if (i2cdisp_args.name->count) {
+		free(name);
+		name=strdup(i2cdisp_args.name->sval[0]);
+	}
+
+	/* Check "--name" option */
+	if (i2cdisp_args.driver->count) {
+		free(driver);
+		driver=strdup(i2cdisp_args.driver->sval[0]);
+	}
+	snprintf(config_string, sizeof(config_string),"%s:scl=%i,sda=%i,width=%i,height=%i,address=%i,driver=%s",name,scl,sda,width,height,address,driver );
+	free(name);
+	free(driver);
+
+	if(nerrors!=0){
+		return 0;
+	}
+
+	ESP_LOGI(TAG,"Updating display configuration string configuration to :\n"
+			"display_config = \"%s\"",config_string );
+
+
+	return config_set_value(NVS_TYPE_STR, "display_config", config_string)!=ESP_OK;
+}
+
+static void register_i2c_set_display(){
+	i2cdisp_args.address = arg_int0(NULL, "address", "<n>", "Set the I2C bus port number (decimal format, default 120)");
+	i2cdisp_args.sda = arg_int0("d", "sda", "<gpio>", "Set the gpio for I2C SDA");
+	i2cdisp_args.scl = arg_int0("c", "scl", "<gpio>", "Set the gpio for I2C SCL");
+	i2cdisp_args.width = arg_int0("w", "width", "<n>", "Set the display width");
+	i2cdisp_args.height = arg_int0("h", "height", "<n>", "Set the display height");
+	i2cdisp_args.name = arg_str0("n", "name", "<string>", "Set the display type. Default is I2S");
+	i2cdisp_args.driver = arg_str0("d", "driver", "<string>", "Set the display driver name");
+	i2cdisp_args.clear = arg_litn(NULL, "clear", 0, 1, "clear configuration");
+	i2cdisp_args.end = arg_end(2);
+	i2cdisp_show_args.end = arg_end(1);
+	const esp_console_cmd_t i2c_set_display= {
+	 		.command = "set_i2c_display",
+			.help="Sets the i2c display options for the board",
+			.hint = NULL,
+			.func = &do_i2c_set_display,
+			.argtable = &i2cdisp_args
+	};
+	const esp_console_cmd_t i2c_show_display= {
+			.command = "show_i2c_display",
+			.help="Sets the i2c display options for the board",
+			.hint = NULL,
+			.func = &do_i2c_show_display,
+			.argtable = &i2cdisp_show_args
+	};
+	ESP_ERROR_CHECK(esp_console_cmd_register(&i2c_set_display));
+	ESP_ERROR_CHECK(esp_console_cmd_register(&i2c_show_display));
+}
+
+
+
 static int do_i2cconfig_cmd(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **)&i2cconfig_args);
@@ -111,6 +255,16 @@ static void register_i2cconfig(void)
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cconfig_cmd));
 }
+
+
+
+
+
+
+
+
+
+
 
 static int do_i2cdetect_cmd(int argc, char **argv)
 {
@@ -407,4 +561,5 @@ void register_i2ctools(void)
     register_i2cget();
     register_i2cset();
     register_i2cdump();
+    register_i2c_set_display();
 }

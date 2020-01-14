@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -209,7 +209,7 @@ esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_conf
 
 
 esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config) {
-	esp_err_t err = ESP_FAIL;
+	esp_err_t err = ESP_OK;
 	const actrls_config_map_t * h=actrls_config_map;
 
 	char * str = cJSON_Print(member);
@@ -219,6 +219,7 @@ esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_confi
 		ESP_LOGD(TAG,"found handler for member %s, json value %s", h->member,str?str:"");
 		err = h->handler(member, cur_config, h->offset);
 	} else {
+		err = ESP_FAIL;
 		ESP_LOGE(TAG, "Unknown json structure member : %s", str?str:"");
 	}
 
@@ -227,7 +228,7 @@ esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_confi
 }
 
 esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config) {
-	esp_err_t err= ESP_FAIL;
+	esp_err_t err= ESP_OK;
 	const cJSON *member;
 
 	cJSON_ArrayForEach(member, button)
@@ -300,9 +301,15 @@ esp_err_t actrls_init_json(const char *config) {
 				esp_err_t loc_err = actrls_process_button(button, cur_config);
 				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
+
+					ESP_LOGI(TAG, "Calling button_create");
 					button_create((void*) cur_config, cur_config->gpio,cur_config->type, cur_config->pull,cur_config->debounce,
 									control_handler, cur_config->long_press, cur_config->shifter_gpio);
 				}
+				else{
+					ESP_LOGE(TAG,"Error parsing button structure.  Button will not be registered.");
+				}
+
 				cur_config++;
 			}
 		}

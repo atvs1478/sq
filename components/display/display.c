@@ -39,17 +39,23 @@ static bool display_handler(u8_t *data, int len);
 void display_init(void) {
 	char *item = config_alloc_get(NVS_TYPE_STR, "display_config");
 
-	if (item && *item) { 
-		handle = &SSD1306_handle;
-		if (handle->init(item)) {
-			slimp_handler_chain = slimp_handler;
-			slimp_handler = display_handler;
-			ESP_LOGI(TAG, "Display initialization successful");
-		} else {
-			ESP_LOGI(TAG, "Display initialization failed");
+	if (item && *item) {
+		char * drivername=strstr(item,"driver");
+		if( !drivername  || (drivername && (strstr(drivername,"SSD1306") || strstr(drivername,"ssd1306")))){
+			handle = &SSD1306_handle;
+			if (handle->init(item)) {
+				slimp_handler_chain = slimp_handler;
+				slimp_handler = display_handler;
+				ESP_LOGI(TAG, "Display initialization successful");
+			} else {
+				ESP_LOGE(TAG, "Display initialization failed");
+			}
+		}else {
+			ESP_LOGE(TAG,"Unknown display driver name in display config: %s",item);
+
 		}
 	} else {
-		ESP_LOGI(TAG, "no display");
+		ESP_LOGW(TAG, "no display");
 	}
 
 	if (item) free(item);

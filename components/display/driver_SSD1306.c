@@ -76,26 +76,41 @@ static bool display_init(char *config) {
 
 	if (strstr(config, "I2C")) {
 		int scl = -1, sda = -1;
-		int width = -1, height = -1;
+		int width = -1, height = -1, address=I2C_ADDRESS;
 		char *p;
-
+		ESP_LOGI(TAG, "Initializing I2C display with config: %s",config);
 		// no time for smart parsing - this is for tinkerers
 		if ((p = strcasestr(config, "scl")) != NULL) scl = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "sda")) != NULL) sda = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
 
 		if (sda != -1 && scl != -1 && width != -1 && height != -1) {
-			SSD1306_I2CMasterInitDefault( I2C_PORT, sda, scl );
-			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, I2C_ADDRESS, -1);
-			SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
-			ESP_LOGI(TAG, "Initialized I2C display %dx%d (sda:%d, scl:%d)", width, height, sda, scl);
-			res = true;
+			res = SSD1306_I2CMasterInitDefault( I2C_PORT, sda, scl );
+			if(!res){
+				ESP_LOGE(TAG,"I2C Master Init failed");
+			}
+		}
+		if(res){
+			res = SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, address, -1);
+			if(!res){
+				ESP_LOGE(TAG,"Attach Display default failed");
+			}
+		}
+		if(res){
+			res = SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
+			if(!res){
+				ESP_LOGE(TAG,"Set Font failed");
+			}
+		}
+		if(res){
+			ESP_LOGI(TAG, "Initialized I2C display %dx%d (sda:%d, scl:%d, address:%02x)", width, height, sda, scl, address);
 		} else {
-			ESP_LOGI(TAG, "Cannot initialized I2C display %s [%dx%d sda:%d, scl:%d]", config, width, height, sda, scl);
+			ESP_LOGE(TAG, "Cannot initialized I2C display %s [%dx%d sda:%d, scl:%d, address:%02x]", config, width, height, sda, scl, address);
 		}
 	} else {
-		// other types
+		ESP_LOGE(TAG, "Non-I2C display not supported. Display config %s", config);
 	}
 
 	return res;
