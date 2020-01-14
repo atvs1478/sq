@@ -71,7 +71,7 @@ extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
 extern void services_init(void);
-extern void	display_init(void);
+extern void	display_init(char *welcome);
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -337,7 +337,7 @@ void app_main()
 	services_init();
 
 	ESP_LOGD(TAG,"Initializing display");	
-	display_init();
+	display_init("SqueezeESP32");
 
 #if !RECOVERY_APPLICATION
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");

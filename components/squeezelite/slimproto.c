@@ -134,6 +134,8 @@ static void sendHELO(bool reconnect, const char *fixed_cap, const char *var_cap,
 	base_cap = BASE_CAP;
 #endif	
 
+	if (!reconnect) player_id = PLAYER_ID;
+
 	memset(&pkt, 0, sizeof(pkt));
 	memcpy(&pkt.opcode, "HELO", 4);
 	pkt.length = htonl(sizeof(struct HELO_packet) - 8 + strlen(base_cap) + strlen(fixed_cap) + strlen(var_cap));

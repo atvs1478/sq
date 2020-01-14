@@ -30,18 +30,20 @@
 
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static struct display_handle_s *handle;
+static void (*chained_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 
+static void server_attach(in_addr_t ip, u16_t hport, u16_t cport);
 static bool display_handler(u8_t *data, int len);
 
 /****************************************************************************************
  * 
  */
-void display_init(void) {
+void display_init(char *welcome) {
 	char *item = config_alloc_get(NVS_TYPE_STR, "display_config");
 
 	if (item && *item) { 
 		handle = &SSD1306_handle;
-		if (handle->init(item)) {
+		if (handle->init(item, welcome)) {
 			slimp_handler_chain = slimp_handler;
 			slimp_handler = display_handler;
 			ESP_LOGI(TAG, "Display initialization successful");
@@ -51,8 +53,21 @@ void display_init(void) {
 	} else {
 		ESP_LOGI(TAG, "no display");
 	}
+	
+	chained_notify = server_notify;
+	server_notify = server_attach;
 
 	if (item) free(item);
+}
+
+/****************************************************************************************
+ * 
+ */
+static void server_attach(in_addr_t ip, u16_t hport, u16_t cport) {
+	char msg[32];
+	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
+	handle->print_message(msg);
+	if (chained_notify) (*chained_notify)(ip, hport, cport);
 }
 
 /****************************************************************************************

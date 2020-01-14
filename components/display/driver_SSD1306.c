@@ -35,11 +35,13 @@
 #define TAG 		"display"
 
 static void 	vfdc_handler( u8_t *_data, int bytes_read);
-void 			grfe_handler( u8_t *data, int len);
-static bool 	display_init(char *config);
+static void 	grfe_handler( u8_t *data, int len);
+static bool 	display_init(char *config, char *welcome);
+static void 	print_message(char *msg);
 
 struct display_handle_s SSD1306_handle = {
 	display_init,
+	print_message, 
 	vfdc_handler,
 	grfe_handler,
 	NULL, NULL,
@@ -71,7 +73,7 @@ static const unsigned char BitReverseTable256[] =
 /****************************************************************************************
  * 
  */
-static bool display_init(char *config) {
+static bool display_init(char *config, char *welcome) {
 	bool res = false;
 
 	if (strstr(config, "I2C")) {
@@ -89,6 +91,7 @@ static bool display_init(char *config) {
 			SSD1306_I2CMasterInitDefault( I2C_PORT, sda, scl );
 			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, I2C_ADDRESS, -1);
 			SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
+			print_message(welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d (sda:%d, scl:%d)", width, height, sda, scl);
 			res = true;
 		} else {
@@ -99,6 +102,17 @@ static bool display_init(char *config) {
 	}
 
 	return res;
+}
+
+/****************************************************************************************
+ * 
+ */
+static void print_message(char *msg) {
+	if (!msg) return;
+	SSD1306_Clear( &I2CDisplay, SSD_COLOR_BLACK );
+	SSD1306_SetDisplayAddressMode( &I2CDisplay, AddressMode_Horizontal );
+	SSD1306_FontDrawAnchoredString( &I2CDisplay, TextAnchor_Center, msg, SSD_COLOR_WHITE );
+	SSD1306_Update( &I2CDisplay );
 }
 
 /****************************************************************************************
