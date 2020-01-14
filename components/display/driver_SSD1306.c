@@ -32,7 +32,7 @@
 #define I2C_PORT 	1
 #define I2C_ADDRESS	0x3C
 #define LINELEN		40
-#define TAG 		"display"
+static const char *TAG = "display";
 
 static void 	vfdc_handler( u8_t *_data, int bytes_read);
 static void 	grfe_handler( u8_t *data, int len);

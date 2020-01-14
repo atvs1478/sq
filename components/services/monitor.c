@@ -26,7 +26,7 @@
 
 #define MONITOR_TIMER	(10*1000)
 
-static const char TAG[] = "monitor";
+static const char *TAG = "monitor";
 
 static TimerHandle_t monitor_timer;
 

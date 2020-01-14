@@ -26,7 +26,7 @@
 #include "embedded.h"
 #include "display.h"
 
-#define TAG 		"display"
+static const char *TAG = "display";
 
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static struct display_handle_s *handle;
