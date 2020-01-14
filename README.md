@@ -1,7 +1,7 @@
 # Squeezelite-esp32
 ## Supported Hardware 
 ### SqueezeAMP
-Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md). Add the repository [here]() to LMS if you want to have a display
+Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md). Add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml to LMS if you want to have a display
 
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
