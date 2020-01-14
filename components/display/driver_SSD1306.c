@@ -109,10 +109,12 @@ static bool display_init(char *config, char *welcome) {
  */
 static void print_message(char *msg) {
 	if (!msg) return;
+	SSD1306_AddressMode Mode = AddressMode;
 	SSD1306_Clear( &I2CDisplay, SSD_COLOR_BLACK );
 	SSD1306_SetDisplayAddressMode( &I2CDisplay, AddressMode_Horizontal );
 	SSD1306_FontDrawAnchoredString( &I2CDisplay, TextAnchor_Center, msg, SSD_COLOR_WHITE );
 	SSD1306_Update( &I2CDisplay );
+	SSD1306_SetDisplayAddressMode( &I2CDisplay, Mode );
 }
 
 /****************************************************************************************
