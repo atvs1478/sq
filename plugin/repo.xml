@@ -7,7 +7,7 @@
       <sha>066d97b8ca3fa53cbfaa7caf06f47fdc066344fe</sha>
       <email>philippe_44@outlook.com</email>
       <desc lang="EN">SqueezeESP32 additional player id (100)</desc>
-      <url>https://github.com/sle118/squeezelite-esp32/raw/master/plugin/SqueezeESP32/SqueezeESP32.zip</url>
+      <url>http://github.com/sle118/squeezelite-esp32/raw/master/plugin/SqueezeESP32/SqueezeESP32.zip</url>
       <title lang="EN">SqueezeESP32</title>
     </plugin>
   </plugins>
