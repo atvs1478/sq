@@ -69,10 +69,8 @@ void services_init(void) {
 
 	ESP_LOGD(TAG,"Configuring LEDs");
 	led_svc_init();
-#ifdef CONFIG_SQUEEZEAMP
 	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
 	led_config(LED_RED, LED_RED_GPIO, 0);
-#endif
 
 	battery_svc_init();
 	monitor_svc_init();

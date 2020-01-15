@@ -28,7 +28,7 @@ extern int i2c_system_port;
 #define SPKFAULT_GPIO	2			// this requires a pull-up, so can't be >34
 #define LED_GREEN_GPIO 	12
 #define LED_RED_GPIO	13
+#else 
+#define LED_GREEN_GPIO	CONFIG_LED_GREEN_GPIO
+#define LED_RED_GPIO	CONFIG_LED_RED_GPIO
 #endif
-
-
-

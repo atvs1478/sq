@@ -192,12 +192,31 @@ menu "Squeezelite-ESP32"
 			string "Screen configuraton"
 			default ""
 			help
-				Set parameters of display screen, leave empty for no screen
-				I2C,width=<size>,height=<size>,sda=<gpio>,scl=<gpio>
-				SPI,width=<size>,height=<size>,data=<gpio>,clock=<gpio>,select=<gpio>
+				Set parameters for display screen, leave empty for no screen
+				I2C,width=<size>,height=<size>
+				SPI,width=<size>,height=<size>,select=<gpio>
 		config DISPLAY_I2C_SPEED
 			int "I2C bus speed"
 				default 250000
 	endmenu	
-
+	
+	menu "Various I/O"
+		config I2C_CONFIG
+			string "I2C system configuration"
+			default ""
+			help
+				Set parameters of shared I2C interface
+				sda=<gpio>,scl=<gpio>,speed=<num>,port=<0|1>
+		config LED_GREEN_GPIO
+			int "Green led GPIO"
+			default -1
+			help
+				Set to -1 for no LED
+		config LED_RED_GPIO				
+			int "Red led GPIO"
+			default -1
+			help
+				Set to -1 for no LED
+	endmenu	
+	
 endmenu
