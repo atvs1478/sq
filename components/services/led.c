@@ -21,7 +21,7 @@
 #define MAX_LED	8
 #define BLOCKTIME	10	// up to portMAX_DELAY
 
-static const char TAG[] = "led";
+static const char *TAG = "led";
 
 static struct led_s {
 	gpio_num_t gpio;

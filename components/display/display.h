@@ -19,7 +19,8 @@
 #pragma once
 
 struct display_handle_s {
-	bool (*init)(char *config);
+	bool (*init)(char *config, char* welcome);
+	void (*print_message)(char *msg);
 	void (*vfdc_handler)(u8_t *data, int len);
 	void (*grfe_handler)(u8_t *data, int len);
 	void (*grfb_handler)(u8_t *data, int len);

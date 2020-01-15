@@ -20,7 +20,7 @@ sub initPlugin {
 	my $class = shift;
 
 	$class->SUPER::initPlugin(@_);
-	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeeze2esp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
+	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
 	$log->info("Added class 100 for SqueezeESP32");
 }
 

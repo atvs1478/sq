@@ -19,7 +19,7 @@
 
 #define BATTERY_TIMER	(10*1000)
 
-static const char TAG[] = "battery";
+static const char *TAG = "battery";
 
 static struct {
 	float sum, avg;

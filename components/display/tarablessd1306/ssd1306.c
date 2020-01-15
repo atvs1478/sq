@@ -200,7 +200,8 @@ static bool SSD1306_Init( struct SSD1306_Device* DeviceHandle, int Width, int He
     DeviceHandle->Height = Height;
     DeviceHandle->FramebufferSize = ( DeviceHandle->Width * Height ) / 8;
 
-    DeviceHandle->Framebuffer = heap_caps_calloc( 1, DeviceHandle->FramebufferSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT );
+    // DeviceHandle->Framebuffer = heap_caps_calloc( 1, DeviceHandle->FramebufferSize, MALLOC_CAP_INTERNAL );
+	DeviceHandle->Framebuffer = calloc( 1, DeviceHandle->FramebufferSize );
 
     NullCheck( DeviceHandle->Framebuffer, return false );
 
