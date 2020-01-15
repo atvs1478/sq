@@ -70,7 +70,7 @@ void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 		void * pval = config_alloc_get(nt, key);\
 		if(pval!=NULL){ *value = *(t * )pval; free(pval); return ESP_OK; }\
 		return ESP_FAIL;}
-#ifdef RECOVERY_APPLICATION
+#if RECOVERY_APPLICATION==0
 static void * malloc_fn(size_t sz){
 
 	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
@@ -81,7 +81,7 @@ static void * malloc_fn(size_t sz){
 }
 static void * free_fn(void * ptr){
 	if(ptr!=NULL){
-		free(ptr);
+		heap_caps_free(ptr);
 	}
 	else {
 		ESP_LOGW(TAG,"free_fn: Cannot free null pointer!");
@@ -92,7 +92,7 @@ static void * free_fn(void * ptr){
 void init_cJSON(){
 	// initialize cJSON hooks it uses SPIRAM memory
 	// as opposed to IRAM
-#ifndef RECOVERY_APPLICATION
+#if RECOVERY_APPLICATION==0
 	static cJSON_Hooks hooks;
 	// In squeezelite mode, allocate memory from PSRAM.  Otherwise allocate from internal RAM
 	// as recovery will lock flash access when erasing FLASH or writing to OTA partition.
@@ -229,6 +229,8 @@ cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value
 		}
 		else {
 			ESP_LOGD(TAG, "Config not changed. ");
+			cJSON_Delete(entry);
+			entry = existing;
 		}
 	}
 	else {
@@ -698,7 +700,6 @@ esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
 		else {
 			ESP_LOGV(TAG,"config_set_value completed");
 		}
-
 	}
 	config_unlock();
 	return result;

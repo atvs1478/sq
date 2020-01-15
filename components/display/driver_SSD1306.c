@@ -23,13 +23,13 @@
 #include <arpa/inet.h>
 #include "esp_log.h"
 #include "display.h"
+#include "globdefs.h"
 
 #include "ssd1306.h"
 #include "ssd1306_draw.h"
 #include "ssd1306_font.h"
 #include "ssd1306_default_if.h"
 
-#define I2C_PORT 	1
 #define I2C_ADDRESS	0x3C
 #define LINELEN		40
 static const char *TAG = "display";
@@ -77,40 +77,26 @@ static bool display_init(char *config, char *welcome) {
 	bool res = false;
 
 	if (strstr(config, "I2C")) {
-		int scl = -1, sda = -1;
 		int width = -1, height = -1, address=I2C_ADDRESS;
 		char *p;
 		ESP_LOGI(TAG, "Initializing I2C display with config: %s",config);
 		// no time for smart parsing - this is for tinkerers
-		if ((p = strcasestr(config, "scl")) != NULL) scl = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "sda")) != NULL) sda = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
 
-		if (sda != -1 && scl != -1 && width != -1 && height != -1) {
-			res = SSD1306_I2CMasterInitDefault( I2C_PORT, sda, scl );
-			if(!res){
-				ESP_LOGE(TAG,"I2C Master Init failed");
-			}
-		}
-		if(res){
-			res = SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, address, -1);
-			if(!res){
-				ESP_LOGE(TAG,"Attach Display default failed");
-			}
-		}
-		if(res){
-			res = SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
-			if(!res){
-				ESP_LOGE(TAG,"Set Font failed");
-			}
-		}
-		if(res){
+		
+		if (width != -1 && height != -1) {
+			SSD1306_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
+			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, address, -1 );
+			SSD1306_SetHFlip( &I2CDisplay, strcasestr(config, "HFlip") ? true : false);
+			SSD1306_SetVFlip( &I2CDisplay, strcasestr(config, "VFlip") ? true : false);
+			SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
 			print_message(welcome);
-			ESP_LOGI(TAG, "Initialized I2C display %dx%d (sda:%d, scl:%d, address:%02x)", width, height, sda, scl, address);
+			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
+			res = true;
 		} else {
-			ESP_LOGE(TAG, "Cannot initialized I2C display %s [%dx%d sda:%d, scl:%d, address:%02x]", config, width, height, sda, scl, address);
+			ESP_LOGI(TAG, "Cannot initialized I2C display %s [%dx%d]", config, width, height);
 		}
 	} else {
 		ESP_LOGE(TAG, "Non-I2C display not supported. Display config %s", config);
