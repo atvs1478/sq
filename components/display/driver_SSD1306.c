@@ -47,7 +47,7 @@ struct display_handle_s SSD1306_handle = {
 	NULL, NULL,
 };
 
-static struct SSD1306_Device I2CDisplay;
+static struct SSD1306_Device Display;
 static SSD1306_AddressMode AddressMode = AddressMode_Invalid;
 
 static const unsigned char BitReverseTable256[] = 
@@ -86,10 +86,10 @@ static bool display_init(char *config, char *welcome) {
 		
 		if (width != -1 && height != -1) {
 			SSD1306_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
-			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, I2C_ADDRESS, -1 );
-			SSD1306_SetHFlip( &I2CDisplay, strcasestr(config, "HFlip") ? true : false);
-			SSD1306_SetVFlip( &I2CDisplay, strcasestr(config, "VFlip") ? true : false);
-			SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
+			SSD1306_I2CMasterAttachDisplayDefault( &Display, width, height, I2C_ADDRESS, -1 );
+			SSD1306_SetHFlip( &Display, strcasestr(config, "HFlip") ? true : false);
+			SSD1306_SetVFlip( &Display, strcasestr(config, "VFlip") ? true : false);
+			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 			print_message(welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
@@ -109,11 +109,11 @@ static bool display_init(char *config, char *welcome) {
 static void print_message(char *msg) {
 	if (!msg) return;
 	SSD1306_AddressMode Mode = AddressMode;
-	SSD1306_Clear( &I2CDisplay, SSD_COLOR_BLACK );
-	SSD1306_SetDisplayAddressMode( &I2CDisplay, AddressMode_Horizontal );
-	SSD1306_FontDrawAnchoredString( &I2CDisplay, TextAnchor_Center, msg, SSD_COLOR_WHITE );
-	SSD1306_Update( &I2CDisplay );
-	SSD1306_SetDisplayAddressMode( &I2CDisplay, Mode );
+	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
+	SSD1306_SetDisplayAddressMode( &Display, AddressMode_Horizontal );
+	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_Center, msg, SSD_COLOR_WHITE );
+	SSD1306_Update( &Display );
+	SSD1306_SetDisplayAddressMode( &Display, Mode );
 }
 
 /****************************************************************************************
@@ -178,17 +178,17 @@ static void show_display_buffer(char *ddram) {
 
 	ESP_LOGI(TAG, "\n\t%.40s\n\t%.40s", line1, line2);
 
-	SSD1306_Clear( &I2CDisplay, SSD_COLOR_BLACK );
-	SSD1306_FontDrawAnchoredString( &I2CDisplay, TextAnchor_NorthWest, line1, SSD_COLOR_WHITE );
-	SSD1306_FontDrawAnchoredString( &I2CDisplay, TextAnchor_SouthWest, line2, SSD_COLOR_WHITE );
+	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
+	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_NorthWest, line1, SSD_COLOR_WHITE );
+	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_SouthWest, line2, SSD_COLOR_WHITE );
 
 	// check addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
-		SSD1306_SetDisplayAddressMode( &I2CDisplay, AddressMode );
+		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
 
-	SSD1306_Update( &I2CDisplay );
+	SSD1306_Update( &Display );
 }
 
 /****************************************************************************************
@@ -245,16 +245,47 @@ void grfe_handler( u8_t *data, int len) {
 	data += 8;
 	len -= 8;
 
+#ifndef FULL_REFRESH
+	// force addressing mode by lines
+	if (AddressMode != AddressMode_Horizontal) {
+		AddressMode = AddressMode_Horizontal;
+		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+	}	
+		
+	// try to minmize I2C traffic which is very slow
+	int rows = Display.Height / 8;
+	for (int r = 0; r < rows; r++) {
+		uint8_t first = 0, last;	
+		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
+		
+		// row/col swap, frame buffr comparison and bit-reversing
+		for (int c = 0; c < Display.Width; c++) {
+			if (*iptr != *optr) {
+				if (first) last = c;
+				else first = c;
+			}	
+			*optr++ = BitReverseTable256[*iptr];
+			iptr += rows;
+		}
+		
+		// now update the display by "byte rows"
+		if (first--) {
+			SSD1306_SetColumnAddress( &Display, first, last );
+			SSD1306_SetPageAddress( &Display, r, r);
+			SSD1306_WriteRawData( &Display, Display.Framebuffer + r*Display.Width + first, last - first + 1);
+		}
+	}	
+#else
 	// to be verified, but this is as fast as using a pointer on data
 	for (int i = len - 1; i >= 0; i--) data[i] = BitReverseTable256[data[i]];
-
-	// check addressing mode by columns
+	
+	// force addressing mode by columns
 	if (AddressMode != AddressMode_Vertical) {
 		AddressMode = AddressMode_Vertical;
-		SSD1306_SetDisplayAddressMode( &I2CDisplay, AddressMode );
+		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
-	
-	SSD1306_WriteRawData( &I2CDisplay, data,  len);
+	SSD1306_WriteRawData( &Display, data,  len);
+ #endif	
 }
 
 
