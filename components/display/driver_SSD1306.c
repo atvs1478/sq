@@ -23,13 +23,13 @@
 #include <arpa/inet.h>
 #include "esp_log.h"
 #include "display.h"
+#include "globdefs.h"
 
 #include "ssd1306.h"
 #include "ssd1306_draw.h"
 #include "ssd1306_font.h"
 #include "ssd1306_default_if.h"
 
-#define I2C_PORT 	1
 #define I2C_ADDRESS	0x3C
 #define LINELEN		40
 static const char *TAG = "display";
@@ -77,25 +77,24 @@ static bool display_init(char *config, char *welcome) {
 	bool res = false;
 
 	if (strstr(config, "I2C")) {
-		int scl = -1, sda = -1;
 		int width = -1, height = -1;
 		char *p;
 
 		// no time for smart parsing - this is for tinkerers
-		if ((p = strcasestr(config, "scl")) != NULL) scl = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "sda")) != NULL) sda = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
-
-		if (sda != -1 && scl != -1 && width != -1 && height != -1) {
-			SSD1306_I2CMasterInitDefault( I2C_PORT, sda, scl );
-			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, I2C_ADDRESS, -1);
+		
+		if (width != -1 && height != -1) {
+			SSD1306_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
+			SSD1306_I2CMasterAttachDisplayDefault( &I2CDisplay, width, height, I2C_ADDRESS, -1 );
+			SSD1306_SetHFlip( &I2CDisplay, strcasestr(config, "HFlip") ? true : false);
+			SSD1306_SetVFlip( &I2CDisplay, strcasestr(config, "VFlip") ? true : false);
 			SSD1306_SetFont( &I2CDisplay, &Font_droid_sans_fallback_15x17 );
 			print_message(welcome);
-			ESP_LOGI(TAG, "Initialized I2C display %dx%d (sda:%d, scl:%d)", width, height, sda, scl);
+			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
 		} else {
-			ESP_LOGI(TAG, "Cannot initialized I2C display %s [%dx%d sda:%d, scl:%d]", config, width, height, sda, scl);
+			ESP_LOGI(TAG, "Cannot initialized I2C display %s [%dx%d]", config, width, height);
 		}
 	} else {
 		// other types

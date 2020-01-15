@@ -32,21 +32,21 @@ static bool I2CDefaultReset( struct SSD1306_Device* Display );
  * Returns true on successful init of the i2c bus.
  */
 bool SSD1306_I2CMasterInitDefault( int PortNumber, int SDA, int SCL ) {
-    i2c_config_t Config;
-
-    memset( &Config, 0, sizeof( i2c_config_t ) );
-
-    Config.mode = I2C_MODE_MASTER;
-    Config.sda_io_num = SDA;
-    Config.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    Config.scl_io_num = SCL;
-    Config.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    Config.master.clk_speed = I2CDisplaySpeed;
-
 	I2CPortNumber = PortNumber;
+	
+	if (SDA != -1 && SCL != -1) {
+		i2c_config_t Config = { 0 };
 
-    ESP_ERROR_CHECK_NONFATAL( i2c_param_config( I2CPortNumber, &Config ), return false );
-    ESP_ERROR_CHECK_NONFATAL( i2c_driver_install( I2CPortNumber, Config.mode, 0, 0, 0 ), return false );
+        Config.mode = I2C_MODE_MASTER;
+		Config.sda_io_num = SDA;
+		Config.sda_pullup_en = GPIO_PULLUP_ENABLE;
+		Config.scl_io_num = SCL;
+		Config.scl_pullup_en = GPIO_PULLUP_ENABLE;
+		Config.master.clk_speed = I2CDisplaySpeed;
+
+		ESP_ERROR_CHECK_NONFATAL( i2c_param_config( I2CPortNumber, &Config ), return false );
+		ESP_ERROR_CHECK_NONFATAL( i2c_driver_install( I2CPortNumber, Config.mode, 0, 0, 0 ), return false );
+	}	
 
     return true;
 }

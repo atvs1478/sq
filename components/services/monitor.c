@@ -18,11 +18,7 @@
 #include "driver/gpio.h"
 #include "buttons.h"
 #include "led.h"
-
-#ifdef CONFIG_SQUEEZEAMP
-#define JACK_GPIO		34
-#define SPKFAULT_GPIO	2			// this requires a pull-up, so can't be >34
-#endif
+#include "globdefs.h"
 
 #define MONITOR_TIMER	(10*1000)
 

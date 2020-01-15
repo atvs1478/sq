@@ -312,6 +312,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", STR(CONFIG_DISPLAY_CONFIG));
 	config_set_default(NVS_TYPE_STR, "display_config", STR(CONFIG_DISPLAY_CONFIG), 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "i2c_config");
+	config_set_default(NVS_TYPE_STR, "i2c_config", "", 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
