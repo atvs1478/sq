@@ -362,6 +362,7 @@ td.value {
 
 iframe#dummyframe {
     float: right;
+    border: none;
 }
 
 div#message {
