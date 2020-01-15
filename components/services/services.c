@@ -40,6 +40,7 @@ void services_init(void) {
 		if ((p = strcasestr(nvs_item, "sda")) != NULL) sda = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "speed")) != NULL) i2c_speed = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "port")) != NULL) i2c_system_port = atoi(strchr(p, '=') + 1);
+		free(nvs_item);
 	}
 	
 #ifdef CONFIG_SQUEEZEAMP

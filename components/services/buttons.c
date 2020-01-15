@@ -41,7 +41,7 @@ static int n_buttons = 0;
 #define DEBOUNCE			50
 
 static EXT_RAM_ATTR struct button_s {
-	void *id;
+	void *client;
 	int gpio;
 	int debounce;
 	button_handler handler;
@@ -123,18 +123,18 @@ static void buttons_task(void* arg) {
 			if (event == BUTTON_RELEASED) {
 				// early release of a long-press button, send press/release
 				if (!button.shifting) {
-					(*button.handler)(button.id, BUTTON_PRESSED, press, false);		
-					(*button.handler)(button.id, BUTTON_RELEASED, press, false);		
+					(*button.handler)(button.client, BUTTON_PRESSED, press, false);		
+					(*button.handler)(button.client, BUTTON_RELEASED, press, false);		
 				}
 				// button is a copy, so need to go to real context
 				button.self->shifting = false;
 			} else if (!button.shifting) {
 				// normal long press and not shifting so don't discard
-				(*button.handler)(button.id, BUTTON_PRESSED, press, true);
+				(*button.handler)(button.client, BUTTON_PRESSED, press, true);
 			}  
 		} else {
 			// normal press/release of a button or release of a long-press button
-			if (!button.shifting) (*button.handler)(button.id, event, press, button.long_press);
+			if (!button.shifting) (*button.handler)(button.client, event, press, button.long_press);
 			// button is a copy, so need to go to real context
 			button.self->shifting = false;
 		}
@@ -151,7 +151,7 @@ void dummy_handler(void *id, button_event_e event, button_press_e press) {
 /****************************************************************************************
  * Create buttons 
  */
-void button_create(void *id, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio) { 
+void button_create(void *client, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio) { 
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[BUTTON_STACK_SIZE] __attribute__ ((aligned (4)));
 
@@ -168,7 +168,7 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 	memset(buttons + n_buttons, 0, sizeof(struct button_s));
 
 	// set mandatory parameters
-	buttons[n_buttons].id = id;
+	buttons[n_buttons].client = client;
  	buttons[n_buttons].gpio = gpio;
  	buttons[n_buttons].debounce = debounce ? debounce: DEBOUNCE;
 	buttons[n_buttons].handler = handler;
@@ -214,3 +214,53 @@ void button_create(void *id, int gpio, int type, bool pull, int debounce, button
 
 	n_buttons++;
 }	
+
+/****************************************************************************************
+ * Get stored id
+ */
+ void button_get_client(int gpio) {
+	 for (int i = 0; i < n_buttons; i++) {
+		 if (buttons[i].gpio == gpio) return buttons[i].client;
+	 }
+	 return NULL;
+ }
+
+/****************************************************************************************
+ * Update buttons 
+ */
+void *button_remap(void *client, int gpio, button_handler handler, int long_press, int shifter_gpio) { 
+	int i;
+	struct button_s *button = NULL;
+	void *prev_client;
+	
+	ESP_LOGI(TAG, "remapping GPIO %u, long press %u shifter %u", gpio, long_press, shifter_gpio);
+
+	// find button
+	for (i = 0; i < n_buttons; i++) {
+		if (buttons[i].gpio == gpio) {
+			button = buttons + i;
+			break;
+		}	
+	}	
+	
+	// huh
+	if (!button) return NULL;	
+	
+	prev_client = button->client;
+	button->client = client;
+ 	button->handler = handler;
+	button->long_press = long_press;
+	button->shifter_gpio = shifter_gpio;
+
+	// find our shifter	(if any)	
+	for (i = 0; shifter_gpio != -1 && i < n_buttons; i++) {
+		if (buttons[i].gpio == shifter_gpio) {
+			button->shifter = buttons + i;
+			// a shifter must have a long-press handler
+			if (!buttons[i].long_press) buttons[i].long_press = -1;
+			break;
+		}
+	}
+	
+	return prev_client;
+}
