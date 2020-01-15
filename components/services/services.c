@@ -28,7 +28,7 @@ static const char *TAG = "services";
  * 
  */
 void services_init(void) {
-	int scl = -1, sda = -1, i2c_speed = 250000;
+	int scl = -1, sda = -1, i2c_speed = 400000;
 	char *nvs_item, *p;
 	
 	gpio_install_isr_service(0);
