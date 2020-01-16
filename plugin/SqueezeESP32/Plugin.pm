@@ -8,7 +8,9 @@ use Slim::Utils::Log;
 
 my $prefs = preferences('plugin.squeezeesp32');
 
-$prefs->init();
+$prefs->init({ 
+	width => 128, 
+});
 
 my $log = Slim::Utils::Log->addLogCategory({
 	'category'     => 'plugin.squeezeesp32',
@@ -18,6 +20,11 @@ my $log = Slim::Utils::Log->addLogCategory({
 
 sub initPlugin {
 	my $class = shift;
+	
+	if ( main::WEBUI ) {
+		require Plugins::SqueezeESP32::Settings;
+		Plugins::SqueezeESP32::Settings->new;
+	}
 
 	$class->SUPER::initPlugin(@_);
 	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
