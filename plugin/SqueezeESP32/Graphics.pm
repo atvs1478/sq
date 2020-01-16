@@ -45,6 +45,12 @@ sub nmodes {
 	return $#modes;
 }
 
+# I don't think LMS renderer handles properly screens other than 32 pixels. It
+# seems that all we get is a 32 pixel-tall data with anything else padded to 0
+# i.e. if we try 64 pixels height, bytes 0..3 and 4..7 will contains the same 
+# pattern than the 32 pixels version, where one would have expected bytes 4..7
+# to be empty
+
 =comment
 sub bytesPerColumn {
 	return 4;
