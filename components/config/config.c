@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_system.h"
-#include "ctype.h"
 #include "esp_log.h"
 #include "esp_console.h"
 #include "esp_vfs_dev.h"
@@ -90,10 +89,10 @@ static void * free_fn(void * ptr){
 }
 #endif
 void init_cJSON(){
+	static cJSON_Hooks hooks;
 	// initialize cJSON hooks it uses SPIRAM memory
 	// as opposed to IRAM
 #if RECOVERY_APPLICATION==0
-	static cJSON_Hooks hooks;
 	// In squeezelite mode, allocate memory from PSRAM.  Otherwise allocate from internal RAM
 	// as recovery will lock flash access when erasing FLASH or writing to OTA partition.
 	hooks.malloc_fn=&malloc_fn;
@@ -705,39 +704,6 @@ esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
 	return result;
 }
 
-#define IS_ALPHA(c) isalpha((int)c)
-#define TO_UPPER(c) toupper((int)c)
-
-
-
-
-char * strstri (const char * str1, const char * str2){
-	char *cp = (char *) str1;
-	char *s1, *s2;
-
-	if ( *str2=='\0' )
-		return((char *)str1);
-
-	while (*cp){
-			s1 = cp;
-			s2 = (char *) str2;
-			while ( *s1!='\0' && *s2!='\0' && (IS_ALPHA(*s1) && IS_ALPHA(*s2))?!(TO_UPPER(*s1) - TO_UPPER(*s2)):!(*s1-*s2)){
-				ESP_LOGW(TAG,"Matched [%c] = [%c] ", IS_ALPHA(*s1)?TO_UPPER(*s1):*s1,IS_ALPHA(*s2)?TO_UPPER(*s2):*s2);
-				++s1, ++s2;
-			}
-
-
-			if (*s2=='\0'){
-				ESP_LOGW(TAG,"String %s found!", str2);
-				return(cp);
-			}
-
-			++cp;
-			ESP_LOGW(TAG,"%s not found. s2 is [%c]. Moving forward to %s", str2, *s2, cp);
-	}
-	ESP_LOGW(TAG,"String %s not found", str2);
-	return(NULL);
-}
 IMPLEMENT_SET_DEFAULT(uint8_t,NVS_TYPE_U8);
 IMPLEMENT_SET_DEFAULT(int8_t,NVS_TYPE_I8);
 IMPLEMENT_SET_DEFAULT(uint16_t,NVS_TYPE_U16);
@@ -751,4 +717,3 @@ IMPLEMENT_GET_NUM(uint16_t,NVS_TYPE_U16);
 IMPLEMENT_GET_NUM(int16_t,NVS_TYPE_I16);
 IMPLEMENT_GET_NUM(uint32_t,NVS_TYPE_U32);
 IMPLEMENT_GET_NUM(int32_t,NVS_TYPE_I32);
-

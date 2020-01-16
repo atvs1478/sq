@@ -209,7 +209,7 @@ static bool SSD1306_Init( struct SSD1306_Device* DeviceHandle, int Width, int He
     SSD1306_HWReset( DeviceHandle );
     
     /* Init sequence according to SSD1306.pdf */
-    SSD1306_SetMuxRatio( DeviceHandle, 0x3F );
+    SSD1306_SetMuxRatio( DeviceHandle, Height - 1 );
     SSD1306_SetDisplayOffset( DeviceHandle, 0x00 );
     SSD1306_SetDisplayStartLine( DeviceHandle, 0 );
     SSD1306_SetHFlip( DeviceHandle, false );

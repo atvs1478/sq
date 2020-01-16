@@ -89,7 +89,7 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action);
 
 	if (action > ACTRLS_MAX) {
-		// need to do the remap here
+		// need to do the remap here using button_remap
 		ESP_LOGD(TAG, "remapping buttons");
 	} else if (action != ACTRLS_NONE) {
 		ESP_LOGD(TAG, "calling action %u", action);
@@ -304,8 +304,6 @@ esp_err_t actrls_init_json(const char *config) {
 				esp_err_t loc_err = actrls_process_button(button, cur_config);
 				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
-
-					ESP_LOGI(TAG, "Calling button_create");
 					button_create((void*) cur_config, cur_config->gpio,cur_config->type, cur_config->pull,cur_config->debounce,
 									control_handler, cur_config->long_press, cur_config->shifter_gpio);
 				}

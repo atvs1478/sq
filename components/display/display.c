@@ -64,7 +64,7 @@ void display_init(char *welcome) {
 
 	if (item && *item) {
 		char * drivername=strstr(item,"driver");
-		if( !drivername  || (drivername && (strstr(drivername,"SSD1306") || strstr(drivername,"ssd1306")))){
+		if (!drivername  || (drivername && strcasestr(drivername,"SSD1306"))) {
 			handle = &SSD1306_handle;
 			if (handle->init(item, welcome)) {
 				slimp_handler_chain = slimp_handler;
@@ -73,7 +73,7 @@ void display_init(char *welcome) {
 			} else {
 				ESP_LOGE(TAG, "Display initialization failed");
 			}
-		}else {
+		} else {
 			ESP_LOGE(TAG,"Unknown display driver name in display config: %s",item);
 		}
 	} else {
