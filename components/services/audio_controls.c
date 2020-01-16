@@ -304,8 +304,6 @@ esp_err_t actrls_init_json(const char *config) {
 				esp_err_t loc_err = actrls_process_button(button, cur_config);
 				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
-
-					ESP_LOGI(TAG, "Calling button_create");
 					button_create((void*) cur_config, cur_config->gpio,cur_config->type, cur_config->pull,cur_config->debounce,
 									control_handler, cur_config->long_press, cur_config->shifter_gpio);
 				}
