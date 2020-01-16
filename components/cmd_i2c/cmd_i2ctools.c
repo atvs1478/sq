@@ -80,6 +80,9 @@ static struct {
 
 static struct {
 	struct arg_lit *clear;
+	struct arg_lit *hflip;
+	struct arg_lit *vflip;
+	struct arg_lit *rotate;
 	struct arg_int *address;
 	struct arg_int *width;
 	struct arg_int *height;
@@ -364,8 +367,8 @@ static int do_i2c_show_display(int argc, char **argv){
 static int do_i2c_set_display(int argc, char **argv)
 {
 	int width=0, height=0, address=60;
-	char * name = strdup("I2C");
-	char * driver= strdup("SSD136");
+	char * name = NULL;
+	char * driver= NULL;
 	char config_string[200]={};
     int nerrors = arg_parse(argc, argv, (void **)&i2cdisp_args);
     if (nerrors != 0) {
@@ -373,13 +376,15 @@ static int do_i2c_set_display(int argc, char **argv)
         return 0;
     }
 
-
 	/* Check "--clear" option */
 	if (i2cdisp_args.clear->count) {
 		ESP_LOGW(TAG,"Clearing display config");
 		config_set_value(NVS_TYPE_STR, "display_config", "");
 		return 0;
 	}
+
+
+
 
 	/* Check "--address" option */
 	if (i2cdisp_args.address->count) {
@@ -405,16 +410,21 @@ static int do_i2c_set_display(int argc, char **argv)
 	}
 	/* Check "--name" option */
 	if (i2cdisp_args.name->count) {
-		free(name);
 		name=strdup(i2cdisp_args.name->sval[0]);
 	}
 
 	/* Check "--driver" option */
 	if (i2cdisp_args.driver->count) {
-		free(driver);
 		driver=strdup(i2cdisp_args.driver->sval[0]);
 	}
-	snprintf(config_string, sizeof(config_string),"%s:width=%i,height=%i,address=%i,driver=%s",name,width,height,address,driver );
+
+	if(!name) name = strdup("I2C");
+	if(!driver) driver = strdup("SSD136");
+
+	bool rotate = i2cdisp_args.rotate->count>0;
+
+	snprintf(config_string, sizeof(config_string),"%s:width=%i,height=%i,address=%i,driver=%s%s%s",
+				name,width,height,address,driver,rotate || i2cdisp_args.hflip->count?",HFlip":"",rotate || i2cdisp_args.vflip->count?",VFlip":"" );
 	free(name);
 	free(driver);
 
@@ -758,17 +768,19 @@ static int do_i2cdetect_cmd(int argc, char **argv)
 		printf("\r\n------------------------------------------------------------------------------------\r\n");
     }
 
-    //i2c_driver_delete(i2c_port);
     return 0;
 }
 static void register_i2c_set_display(){
-	i2cdisp_args.address = arg_int0(NULL, "address", "<n>", "Set the I2C bus port number (decimal format, default 60)");
+	i2cdisp_args.address = arg_int0("a", "address", "<n>", "Set the device address, default 60");
 	i2cdisp_args.width = arg_int0("w", "width", "<n>", "Set the display width");
 	i2cdisp_args.height = arg_int0("h", "height", "<n>", "Set the display height");
-	i2cdisp_args.name = arg_str0("n", "name", "<string>", "Set the display type. Default is I2C");
-	i2cdisp_args.driver = arg_str0("d", "driver", "<string>", "Set the display driver name");
-	i2cdisp_args.clear = arg_litn("c", "clear", 0, 1, "clear configuration and return");
-	i2cdisp_args.end = arg_end(2);
+	i2cdisp_args.name = arg_str0("t", "type", "<I2C|SPI>", "Set the display type. default I2C");
+	i2cdisp_args.driver = arg_str0("d", "driver", "<string>", "Set the display driver name. Default SSD1306");
+	i2cdisp_args.clear = arg_litn(NULL, "clear", 0, 1, "clear configuration and return");
+	i2cdisp_args.hflip = arg_litn(NULL, "hf", 0, 1, "Flip picture horizontally");
+	i2cdisp_args.vflip = arg_litn(NULL, "vf", 0, 1, "Flip picture vertically");
+	i2cdisp_args.rotate = arg_litn("r", "rotate", 0, 1, "Rotate the picture 180 deg");
+	i2cdisp_args.end = arg_end(8);
 	const esp_console_cmd_t i2c_set_display= {
 	 		.command = "setdisplay",
 			.help="Sets the display options for the board",
@@ -776,9 +788,10 @@ static void register_i2c_set_display(){
 			.func = &do_i2c_set_display,
 			.argtable = &i2cdisp_args
 	};
+
 	const esp_console_cmd_t i2c_show_display= {
-			.command = "i2cgetdisplay",
-			.help="Shows display options and i2c global configuration",
+			.command = "getdisplay",
+			.help="Shows display options and global i2c configuration",
 			.hint = NULL,
 			.func = &do_i2c_show_display,
 			.argtable = NULL
