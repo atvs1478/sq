@@ -45,7 +45,7 @@ void display_init(char *welcome) {
 		char * drivername=strstr(item,"driver");
 		if( !drivername  || (drivername && (strstr(drivername,"SSD1306") || strstr(drivername,"ssd1306")))){
 			handle = &SSD1306_handle;
-			if (handle->init(item)) {
+			if (handle->init(item, welcome)) {
 				slimp_handler_chain = slimp_handler;
 				slimp_handler = display_handler;
 				ESP_LOGI(TAG, "Display initialization successful");
