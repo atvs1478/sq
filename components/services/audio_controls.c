@@ -89,7 +89,7 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action);
 
 	if (action > ACTRLS_MAX) {
-		// need to do the remap here
+		// need to do the remap here using button_remap
 		ESP_LOGD(TAG, "remapping buttons");
 	} else if (action != ACTRLS_NONE) {
 		ESP_LOGD(TAG, "calling action %u", action);

@@ -246,7 +246,7 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
 void grfe_handler( u8_t *data, int len) {
 	data += 8;
 	len -= 8;
-
+	
 #ifndef FULL_REFRESH
 	// force addressing mode by lines
 	if (AddressMode != AddressMode_Horizontal) {
@@ -255,7 +255,7 @@ void grfe_handler( u8_t *data, int len) {
 	}	
 		
 	// try to minmize I2C traffic which is very slow
-	int rows = Display.Height / 8;
+	int rows = (Display.Height > 32) ? 4 : Display.Height / 8;
 	for (int r = 0; r < rows; r++) {
 		uint8_t first = 0, last;	
 		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
@@ -281,12 +281,15 @@ void grfe_handler( u8_t *data, int len) {
 	// to be verified, but this is as fast as using a pointer on data
 	for (int i = len - 1; i >= 0; i--) data[i] = BitReverseTable256[data[i]];
 	
+	if (Display.Height > 32) SSD1306_SetPageAddress( &Display, 0, 32/8-1);
+	
 	// force addressing mode by columns
 	if (AddressMode != AddressMode_Vertical) {
 		AddressMode = AddressMode_Vertical;
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
-	SSD1306_WriteRawData( &Display, data,  len);
+	
+	SSD1306_WriteRawData(&Display, data, len);
  #endif	
 }
 
