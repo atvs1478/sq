@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+ 
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -68,18 +68,18 @@ static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
 static actrls_t default_controls, current_controls;
 
-static void control_handler(void *id, button_event_e event, button_press_e press, bool long_press) {
-	actrls_config_t *key = (actrls_config_t*) id;
+static void control_handler(void *client, button_event_e event, button_press_e press, bool long_press) {
+	actrls_config_t *key = (actrls_config_t*) client;
 	actrls_action_e action;
 
 	switch(press) {
 	case BUTTON_NORMAL:
-		if (long_press) action = key->longpress[event == BUTTON_PRESSED ? 0 : 1];
-		else action = key->normal[event == BUTTON_PRESSED ? 0 : 1];
+		if (long_press) action = key->longpress[event == BUTTON_PRESSED ? 0 : 1].action;
+		else action = key->normal[event == BUTTON_PRESSED ? 0 : 1].action;
 		break;
 	case BUTTON_SHIFTED:
-		if (long_press) action = key->longshifted[event == BUTTON_PRESSED ? 0 : 1];
-		else action = key->shifted[event == BUTTON_PRESSED ? 0 : 1];
+		if (long_press) action = key->longshifted[event == BUTTON_PRESSED ? 0 : 1].action;
+		else action = key->shifted[event == BUTTON_PRESSED ? 0 : 1].action;
 		break;
 	default:
 		action = ACTRLS_NONE;
@@ -88,8 +88,11 @@ static void control_handler(void *id, button_event_e event, button_press_e press
 	
 	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action);
 
-	if (action != ACTRLS_NONE) {
-		ESP_LOGD(TAG, " calling action %u", action);
+	if (action > ACTRLS_MAX) {
+		// need to do the remap here
+		ESP_LOGD(TAG, "remapping buttons");
+	} else if (action != ACTRLS_NONE) {
+		ESP_LOGD(TAG, "calling action %u", action);
 		if (current_controls[action]) (*current_controls[action])();
 	}
 }

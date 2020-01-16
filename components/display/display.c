@@ -35,6 +35,27 @@ static void (*chained_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 static void server_attach(in_addr_t ip, u16_t hport, u16_t cport);
 static bool display_handler(u8_t *data, int len);
 
+/* scrolling undocumented information
+	grfs	
+		B: screen number
+		B:1 = left, 2 = right,
+		Q: scroll pause once done (ms)
+		Q: scroll speed (ms)
+		W: # of pixels to scroll each time
+		W: 0 = continue scrolling after pause, 1 = scroll to scrollend and then stop, 2 = scroll to scrollend and then end animation (causing new update)
+		W: width of total scroll area in pixels
+			
+	grfd
+		W: screen number
+		W: width of scrollable area	in pixels
+		
+ANIC flags
+ANIM_TRANSITION   0x01 # A transition animation has finished
+ANIM_SCROLL_ONCE  0x02 # A scrollonce has finished
+ANIM_SCREEN_1     0x04 # For scrollonce only, screen 1 was scrolling
+ANIM_SCREEN_2     0x08 # For scrollonce only, screen 2 was scrolling
+*/
+
 /****************************************************************************************
  * 
  */

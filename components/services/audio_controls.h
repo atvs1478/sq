@@ -31,14 +31,17 @@ typedef void (*actrls_handler)(void);
 typedef actrls_handler actrls_t[ACTRLS_MAX - ACTRLS_NONE - 1];
 
 // BEWARE any change to struct below must be mapped to actrls_config_map
-typedef struct {
+typedef struct actrl_config_s {
 	int gpio;
 	int type;
 	bool pull;
 	int	debounce;
 	int long_press;
 	int shifter_gpio;
-	actrls_action_e normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
+	union {
+		actrls_action_e action;
+		struct actrl_config_s *config;	
+	} normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
 } actrls_config_t;
 
 esp_err_t actrls_init(int n, const actrls_config_t *config);

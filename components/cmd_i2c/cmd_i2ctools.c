@@ -62,6 +62,7 @@ static esp_err_t i2c_master_driver_install(){
 	if((err=i2c_driver_install(i2c_port, I2C_MODE_MASTER, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0))!=ESP_OK){
 		ESP_LOGW(TAG,"i2c driver was already installed.  Deleting it.");
 		i2c_driver_delete(i2c_port);
+		ESP_LOGW(TAG,"Installing i2c driver on port %u",i2c_port);
 		if((err=i2c_driver_install(i2c_port, I2C_MODE_MASTER, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0))!=ESP_OK){
 			ESP_LOGE(TAG,"Driver install failed. %s", esp_err_to_name(err));
 		}
