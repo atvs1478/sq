@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+ #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -26,6 +26,7 @@
 #include "esp_log.h"
 #include "cJSON.h"
 #include "buttons.h"
+#include "config.h"
 #include "audio_controls.h"
 
 
@@ -35,6 +36,8 @@ typedef struct {
 	uint32_t offset;
 	actrls_config_map_handler * handler;
 } actrls_config_map_t;
+
+
 
 static esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config);
 static esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config);
@@ -66,34 +69,56 @@ static const char * actrls_action_s[ ] = { EP(ACTRLS_VOLUP),EP(ACTRLS_VOLDOWN),E
 									
 static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
+cJSON * control_profiles = NULL;
 static actrls_t default_controls, current_controls;
 
 static void control_handler(void *client, button_event_e event, button_press_e press, bool long_press) {
 	actrls_config_t *key = (actrls_config_t*) client;
-	actrls_action_e action;
+	actrls_action_detail_t  action_detail;
 
 	switch(press) {
 	case BUTTON_NORMAL:
-		if (long_press) action = key->longpress[event == BUTTON_PRESSED ? 0 : 1].action;
-		else action = key->normal[event == BUTTON_PRESSED ? 0 : 1].action;
+		if (long_press) action_detail = key->longpress[event == BUTTON_PRESSED ? 0 : 1];
+		else action_detail = key->normal[event == BUTTON_PRESSED ? 0 : 1];
 		break;
 	case BUTTON_SHIFTED:
-		if (long_press) action = key->longshifted[event == BUTTON_PRESSED ? 0 : 1].action;
-		else action = key->shifted[event == BUTTON_PRESSED ? 0 : 1].action;
+		if (long_press) action_detail = key->longshifted[event == BUTTON_PRESSED ? 0 : 1];
+		else action_detail = key->shifted[event == BUTTON_PRESSED ? 0 : 1];
 		break;
 	default:
-		action = ACTRLS_NONE;
+		action_detail.action = ACTRLS_NONE;
 		break;
 	}
 	
-	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action);
+	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event,action_detail.action);
 
-	if (action > ACTRLS_MAX) {
-		// need to do the remap here using button_remap
-		ESP_LOGD(TAG, "remapping buttons");
-	} else if (action != ACTRLS_NONE) {
-		ESP_LOGD(TAG, "calling action %u", action);
-		if (current_controls[action]) (*current_controls[action])();
+	if (action_detail.action == ACTRLS_REMAP) {
+		// remap requested
+		ESP_LOGD(TAG, "remapping buttons to profile %s",action_detail.name);
+		cJSON * profile_obj = cJSON_GetObjectItem(control_profiles,action_detail.name);
+		if(profile_obj){
+			actrls_config_t * profile  = (actrls_config_t *) cJSON_GetStringValue(profile_obj);
+			if(profile){
+				actrls_config_t *cur_config =profile;
+				ESP_LOGD(TAG,"Remapping all the buttons that are found in the new profile");
+				while(cur_config){
+					ESP_LOGD(TAG,"Remapping button with gpio %u", cur_config->gpio);
+					button_remap((void*) cur_config, cur_config->gpio, control_handler, cur_config->long_press, cur_config->shifter_gpio);
+					cur_config++;
+				}
+			}
+			else {
+				ESP_LOGE(TAG,"Profile %s exists, but is empty. Cannot remap buttons",action_detail.name);
+			}
+
+		}
+		else {
+			ESP_LOGE(TAG,"Invalid profile name %s. Cannot remap buttons",action_detail.name);
+		}
+
+	} else if (action_detail.action != ACTRLS_NONE) {
+		ESP_LOGD(TAG, "calling action %u", action_detail.action);
+		if (current_controls[action_detail.action]) (*current_controls[action_detail.action])();
 	}
 }
 
@@ -137,13 +162,30 @@ esp_err_t actrls_init(int n, const actrls_config_t *config) {
  * 
  */
 static actrls_action_e actrls_parse_action_json(const char * name){
-
+	actrls_action_e action = ACTRLS_NONE;
+	if(!strcmp("ACTRLS_NONE",name)) return ACTRLS_NONE;
 	for(int i=0;i<ACTRLS_MAX && actrls_action_s[i][0]!='\0' ;i++){
 		if(!strcmp(actrls_action_s[i], name)){
 			return (actrls_action_e) i;
 		}
 	}
-	return ACTRLS_NONE;
+	// Action name wasn't recognized.
+	// Check if this is a profile name that has a match in nvs
+	ESP_LOGD(TAG,"unknown action %s, trying to find matching profile ", name);
+	cJSON * existing = cJSON_GetObjectItem(control_profiles, name);
+
+	if(!existing){
+			ESP_LOGD(TAG,"Loading new audio control profile with name: %s", name);
+			if(actrls_init_json(name)==ESP_OK){
+				action = ACTRLS_REMAP;
+			}
+
+	}
+	else{
+		ESP_LOGD(TAG,"Existing profile %s was referenced", name);
+	}
+
+	return action;
 }
 
 /****************************************************************************************
@@ -207,9 +249,12 @@ static esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur
 static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
 	esp_err_t err = ESP_OK;
 	cJSON * button_action= cJSON_GetObjectItemCaseSensitive(member, "pressed");
-	actrls_action_e*value = (actrls_action_e*)((char *)cur_config + offset);
+	actrls_action_detail_t*value = (actrls_action_detail_t*)((char *)cur_config + offset);
 	if (button_action != NULL) {
-		value[0] = actrls_parse_action_json( button_action->valuestring);
+		value[0].action = actrls_parse_action_json( button_action->valuestring);
+		if(value[0].action == ACTRLS_REMAP){
+			value[0].name = strdup(button_action->valuestring);
+		}
 	}
 	else{
 		ESP_LOGW(TAG,"Action pressed not found in json structure");
@@ -217,7 +262,10 @@ static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *c
 	}
 	button_action = cJSON_GetObjectItemCaseSensitive(member, "released");
 	if (button_action != NULL) {
-		value[1] = actrls_parse_action_json( button_action->valuestring);
+		value[1].action = actrls_parse_action_json( button_action->valuestring);
+		if(value[1].action == ACTRLS_REMAP){
+			value[1].name = strdup(button_action->valuestring);
+		}
 	}
 	else{
 		ESP_LOGW(TAG,"Action released not found in json structure");
@@ -269,20 +317,28 @@ static esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cu
 /****************************************************************************************
  * 
  */
-static actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons){
+static actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons, const char * name){
 	int member_count = 0;
 	const cJSON *button;
 	actrls_config_t * json_config=NULL;
+
+	// Check if the main profiles array was created
+	if(!control_profiles){
+		control_profiles = cJSON_CreateObject();
+	}
+
+
 	ESP_LOGD(TAG,"Counting the number of buttons definition");
 	cJSON_ArrayForEach(button, buttons)	{
 		member_count++;
 	}
+
 	ESP_LOGD(TAG, "config contains %u button definitions",
 			member_count);
 	if (member_count != 0) {
-		json_config = malloc(sizeof(actrls_config_t) * member_count);
+		json_config = malloc(sizeof(actrls_config_t) * member_count+1);
 		if(json_config){
-			memset(json_config, 0x00, sizeof(actrls_config_t) * member_count);
+			memset(json_config, 0x00, sizeof(actrls_config_t) * member_count+1);
 		}
 		else {
 			ESP_LOGE(TAG,"Unable to allocate memory to hold configuration for %u buttons ",member_count);
@@ -293,17 +349,31 @@ static actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons){
 		ESP_LOGE(TAG,"No button found in configuration structure");
 	}
 
+	// we're cheating here; we're going to store the control profile
+	// pointer as a string reference;  this will prevent cJSON
+	// from trying to free the structure if we ever want to free the object
+	cJSON * new_profile = cJSON_CreateStringReference((const char *)json_config);
+	cJSON_AddItemToObject(control_profiles, name, new_profile);
+
+
 	return json_config;
 }
+
 
 /****************************************************************************************
  * 
  */
-esp_err_t actrls_init_json(const char *config) {
+esp_err_t actrls_init_json(const char *profile_name) {
 	esp_err_t err = ESP_OK;
-	actrls_config_t *cur_config;
+	actrls_config_t *cur_config = NULL;
+	actrls_config_t *config_root = NULL;
 	const cJSON *button;
-	ESP_LOGD(TAG,"Parsing JSON structure ");
+
+
+	char *config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
+	if(!config) return ESP_FAIL;
+
+	ESP_LOGD(TAG,"Parsing JSON structure %s", config);
 	cJSON *buttons = cJSON_Parse(config);
 	if (buttons == NULL) {
 		ESP_LOGE(TAG,"JSON Parsing failed for %s", config);
@@ -313,7 +383,7 @@ esp_err_t actrls_init_json(const char *config) {
 		ESP_LOGD(TAG,"Json parsing completed");
 		if (cJSON_IsArray(buttons)) {
 			ESP_LOGD(TAG,"configuration is an array as expected");
-			cur_config = json_config = actrls_init_alloc_structure(buttons);
+			cur_config =config_root= actrls_init_alloc_structure(buttons, profile_name);
 			if(!cur_config) {
 				ESP_LOGE(TAG,"Config buffer was empty. ");
 				cJSON_Delete(buttons);
@@ -344,6 +414,10 @@ esp_err_t actrls_init_json(const char *config) {
 		}
 		cJSON_Delete(buttons);
 	}
+	// Now update the global json_config object.  If we are recursively processing menu structures,
+	// the last init that completes will assigh the first json config object found, which will match
+	// the default config from nvs.
+	json_config = config_root;
 	return err;
 }
 

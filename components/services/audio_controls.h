@@ -23,7 +23,7 @@
 // BEWARE: this is the index of the array of action below (change actrls_action_s as well!)
 typedef enum { 	ACTRLS_NONE = -1, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
-				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,
+				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,ACTRLS_REMAP,
 				ACTRLS_MAX 
 		} actrls_action_e;
 
@@ -31,6 +31,10 @@ typedef void (*actrls_handler)(void);
 typedef actrls_handler actrls_t[ACTRLS_MAX - ACTRLS_NONE - 1];
 
 // BEWARE any change to struct below must be mapped to actrls_config_map
+typedef struct {
+	actrls_action_e action;
+	const char * name;
+} actrls_action_detail_t;
 typedef struct actrl_config_s {
 	int gpio;
 	int type;
@@ -38,14 +42,11 @@ typedef struct actrl_config_s {
 	int	debounce;
 	int long_press;
 	int shifter_gpio;
-	union {
-		actrls_action_e action;
-		struct actrl_config_s *config;	
-	} normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
+	actrls_action_detail_t normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
 } actrls_config_t;
 
 esp_err_t actrls_init(int n, const actrls_config_t *config);
-esp_err_t actrls_init_json(const char * config);
+esp_err_t actrls_init_json(const char *profile_name);
 void actrls_set_default(const actrls_t controls);
 void actrls_set(const actrls_t controls);
 void actrls_unset(void);

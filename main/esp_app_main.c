@@ -367,16 +367,7 @@ void app_main()
 	if (actrls_brd) {
 		if(actrls_brd[0] !='\0'){
 			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_brd);
-			char *actrls_brd_json = config_alloc_get_default(NVS_TYPE_STR, actrls_brd, NULL, 0);
-
-			if(actrls_brd_json){
-				ESP_LOGD(TAG,"with config JSON as follow: %s", actrls_brd_json );
-				actrls_init_json(actrls_brd_json);
-				free(actrls_brd_json);
-			}
-			else {
-				ESP_LOGE(TAG,"Audio controls board type %s could not be found",actrls_brd);
-			}
+			actrls_init_json(actrls_brd);
 		}
 		free(actrls_brd);
 	} else {
