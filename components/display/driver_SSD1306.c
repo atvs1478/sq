@@ -254,7 +254,7 @@ void grfe_handler( u8_t *data, int len) {
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}	
 		
-	// try to minmize I2C traffic which is very slow
+	// try to minimize I2C traffic which is very slow
 	int rows = (Display.Height > 32) ? 4 : Display.Height / 8;
 	for (int r = 0; r < rows; r++) {
 		uint8_t first = 0, last;	
@@ -264,7 +264,7 @@ void grfe_handler( u8_t *data, int len) {
 		for (int c = 0; c < Display.Width; c++) {
 			if (*iptr != *optr) {
 				if (first) last = c;
-				else first = c;
+				else first = c + 1;
 			}	
 			*optr++ = BitReverseTable256[*iptr];
 			iptr += rows;

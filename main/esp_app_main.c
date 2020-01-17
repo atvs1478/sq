@@ -47,7 +47,6 @@
 #include <math.h>
 #include "config.h"
 #include "audio_controls.h"
-#include "services.h"
 
 // todo:  this should be moved to the build scripts definitions
 static const char * actrls_brd1 = "[{\"gpio\":4,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":5,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":4,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"BCTRLS_DOWN\",\"released\":\"ACTRLS_NONE\"}}]";
@@ -71,6 +70,9 @@ static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
+// as an exception _init function don't need include
+extern void services_init(void);
+extern void	display_init(char *welcome);
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
