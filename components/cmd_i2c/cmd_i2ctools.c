@@ -551,10 +551,8 @@ static int do_i2cdump_cmd(int argc, char **argv)
         ESP_LOGE(TAG, "Wrong read size. Only support 1,2,4");
         return 1;
     }
-    i2c_master_driver_initialize();
-	if(i2c_master_driver_install()!=ESP_OK){
-		 return 1;
-	}
+    esp_err_t ret = i2c_initialize_driver_from_config();
+	if(ret!=ESP_OK) return 0;
 
     uint8_t data_addr;
     uint8_t data[4];
@@ -850,7 +848,7 @@ static void register_i2cdump(void)
 {
     i2cdump_args.chip_address = arg_int1("c", "chip", "<chip_addr>", "Specify the address of the chip on that bus");
     i2cdump_args.size = arg_int0("s", "size", "<size>", "Specify the size of each read");
-    i2cdump_args.end = arg_end(1);
+    i2cdump_args.end = arg_end(3);
     const esp_console_cmd_t i2cdump_cmd = {
         .command = "i2cdump",
         .help = "Examine registers visible through the I2C bus",
