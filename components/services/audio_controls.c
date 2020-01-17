@@ -36,12 +36,12 @@ typedef struct {
 	actrls_config_map_handler * handler;
 } actrls_config_map_t;
 
-esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config);
-esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config);
-esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
-esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
-esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
-esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+static esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config);
+static esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config);
+static esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+static esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+static esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
 
 static const actrls_config_map_t actrls_config_map[] =
 		{
@@ -133,7 +133,10 @@ esp_err_t actrls_init(int n, const actrls_config_t *config) {
 	return ESP_OK;
 }
 
-actrls_action_e actrls_parse_action_json(const char * name){
+/****************************************************************************************
+ * 
+ */
+static actrls_action_e actrls_parse_action_json(const char * name){
 
 	for(int i=0;i<ACTRLS_MAX && actrls_action_s[i][0]!='\0' ;i++){
 		if(!strcmp(actrls_action_s[i], name)){
@@ -143,14 +146,21 @@ actrls_action_e actrls_parse_action_json(const char * name){
 	return ACTRLS_NONE;
 }
 
-esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config,uint32_t offset){
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_config,uint32_t offset){
 	esp_err_t err = ESP_OK;
 	ESP_LOGD(TAG,"Processing int member");
 	int *value = (int*)((char*) cur_config + offset);
 	*value = member->valueint;
 	return err;
 }
-esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
 	esp_err_t err = ESP_OK;
 	ESP_LOGD(TAG,"Processing type member");
 	int *value = (int *)((char*) cur_config + offset);
@@ -167,7 +177,10 @@ esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config
 	return err;
 }
 
-esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
 	esp_err_t err = ESP_OK;
 	if(!member) {
 		ESP_LOGE(TAG,"Null json member pointer!");
@@ -187,7 +200,11 @@ esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config
 
 	return err;
 }
-esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
+
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset){
 	esp_err_t err = ESP_OK;
 	cJSON * button_action= cJSON_GetObjectItemCaseSensitive(member, "pressed");
 	actrls_action_e*value = (actrls_action_e*)((char *)cur_config + offset);
@@ -210,8 +227,10 @@ esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_conf
 	return err;
 }
 
-
-esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config) {
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_config) {
 	esp_err_t err = ESP_OK;
 	const actrls_config_map_t * h=actrls_config_map;
 
@@ -230,7 +249,10 @@ esp_err_t actrls_process_member(const cJSON * member, actrls_config_t *cur_confi
 	return err;
 }
 
-esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config) {
+/****************************************************************************************
+ * 
+ */
+static esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_config) {
 	esp_err_t err= ESP_OK;
 	const cJSON *member;
 
@@ -244,7 +266,10 @@ esp_err_t actrls_process_button(const cJSON * button, actrls_config_t *cur_confi
 
 }
 
-actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons){
+/****************************************************************************************
+ * 
+ */
+static actrls_config_t * actrls_init_alloc_structure(const cJSON *buttons){
 	int member_count = 0;
 	const cJSON *button;
 	actrls_config_t * json_config=NULL;

@@ -16,7 +16,7 @@
 #include "string.h"
 #include "stdio.h"
 #include "config.h"
-#include "services.h"
+#include "accessors.h"
 
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
@@ -236,7 +236,7 @@ static const i2c_db_t i2c_db[] = {
 };
 void i2c_load_configuration(){
 	ESP_LOGD(TAG,"Loading configuration from nvs");
-	const i2c_config_t * conf =  services_get_i2c_config((int *)&i2c_port);
+	const i2c_config_t * conf =  config_i2c_get((int *)&i2c_port);
 	i2c_gpio_scl = conf->scl_io_num;
 	i2c_gpio_sda = conf->sda_io_num;
 	i2c_frequency = conf->master.clk_speed;
@@ -523,7 +523,7 @@ static int do_i2cconfig_cmd(int argc, char **argv)
 				.scl_pullup_en = GPIO_PULLUP_ENABLE,
 				.master.clk_speed = i2c_frequency
 			};
-			services_store_i2c_config(&config, i2c_port);
+			config_i2c_set(&config, i2c_port);
 	}
 
     return res;
