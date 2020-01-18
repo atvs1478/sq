@@ -58,7 +58,7 @@ sub nmodes {
 # to be empty
 
 sub brightnessMap {
-	return (65535, 1, 2, 3, 4);
+	return (65535, 10, 50, 100, 200);
 }
 
 =comment
