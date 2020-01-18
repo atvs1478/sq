@@ -47,15 +47,15 @@ Buttons adre described using a JSON string with the following syntax
 ```
 
 Where (all parameters are optionals except gpio) 
- "type": (BUTTON_LOW) logic level when the button is pressed 
- "pull": (false) activate internal pull up/down
- "long_press": (0) duration (in ms) of keypress to detect long press, 0 to disable it
- "debounce": (0) debouncing duration in ms (0 = internal default of 50 ms)
- "shifter_gpio": (-1) gpio number of another button that can be pressed together to create a "shift". Set to -1 to disable shifter
- "normal": ({"pressed":"ACTRLS_NONE","released":"ACTRLS_NONE"}) action to take when a button is pressed/released (see below)
- "longpress": action to take when a button is long-pressed/released (see above/below)
- "shifted": action to take when a button is pressed/released and shifted (see above/below)
- "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
+ -"type": (BUTTON_LOW) logic level when the button is pressed 
+ -"pull": (false) activate internal pull up/down
+ -"long_press": (0) duration (in ms) of keypress to detect long press, 0 to disable it
+ -"debounce": (0) debouncing duration in ms (0 = internal default of 50 ms)
+ -"shifter_gpio": (-1) gpio number of another button that can be pressed together to create a "shift". Set to -1 to disable shifter
+ -"normal": ({"pressed":"ACTRLS_NONE","released":"ACTRLS_NONE"}) action to take when a button is pressed/released (see below)
+ -"longpress": action to take when a button is long-pressed/released (see above/below)
+ -"shifted": action to take when a button is pressed/released and shifted (see above/below)
+ -"longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
 
 Where <action> is either the name of another configuration to load or one amongst 
 				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
