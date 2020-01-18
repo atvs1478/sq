@@ -82,6 +82,30 @@ Defines two buttons
 - first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
 - second on GPIO 5, acive low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
 
+Below is a difficult but functional 2-buttons interface for your decoding pleasure
+```
+(buttons)
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
+ "normal":{"pressed":"ACTRLS_VOLDOWN"},
+ "longpress":{"pressed":"buttons_remap"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"long_press":1000,"shifter_gpio":4,
+ "normal":{"pressed":"ACTRLS_VOLUP"}, 
+ "shifted":{"pressed":"ACTRLS_TOGGLE"}, 
+ "longpress":{"pressed":"ACTRLS_NEXT"}}
+]
+
+(buttons_remap)
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
+ "normal":{"pressed":"BCTRLS_DOWN"},
+ "longpress":{"pressed":"buttons"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"long_press":1000,"shifter_gpio":4,
+ "normal":{"pressed":"BCTRLS_UP"},
+ "shifted":{"pressed":"BCTRLS_PUSH"},
+ "longpress":{"pressed":"ACTRLS_PLAY"},
+ "longshifted":{"pressed":"BCTRLS_LEFT"}}
+]
+```
+
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  
