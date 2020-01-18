@@ -46,7 +46,7 @@ static void lms_pause(void) {
 }
 
 static void lms_play(void) {
-	cli_send_cmd("pause 0");
+	cli_send_cmd("button play.single");
 }
 
 static void lms_stop(void) {
