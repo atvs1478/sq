@@ -81,7 +81,7 @@ const static actrls_t controls = {
  * Airplay taking/giving audio system's control 
  */
 void raop_master(bool on) {
-	if (on) actrls_set(controls);
+	if (on) actrls_set(controls, NULL);
 	else actrls_unset();
 }
 

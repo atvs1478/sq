@@ -145,7 +145,7 @@ static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
 void cli_controls_init(void) {
 	LOG_INFO("initializing CLI controls");
 	get_mac(mac);
-	actrls_set_default(LMS_controls);
+	actrls_set_default(LMS_controls, NULL);
 	chained_notify = server_notify;
 	server_notify = notify;
 }

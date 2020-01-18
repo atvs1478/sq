@@ -78,6 +78,7 @@ static void * malloc_fn(size_t sz){
 	}
 	return ptr;
 }
+/*
 static void * free_fn(void * ptr){
 	if(ptr!=NULL){
 		heap_caps_free(ptr);
@@ -87,6 +88,7 @@ static void * free_fn(void * ptr){
 	}
 	return NULL;
 }
+*/
 #endif
 void init_cJSON(){
 	static cJSON_Hooks hooks;

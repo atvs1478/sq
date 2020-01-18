@@ -48,10 +48,6 @@
 #include "config.h"
 #include "audio_controls.h"
 
-// todo:  this should be moved to the build scripts definitions
-static const char * actrls_brd1 = "[{\"gpio\":4,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":5,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":4,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"BCTRLS_DOWN\",\"released\":\"ACTRLS_NONE\"}}]";
-static const char * actrls_brd2 ="[{\"gpio\":21,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":-1,\"normal\":{\"pressed\":\"ACTRLS_TOGGLE\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_STOP\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"}},{\"gpio\":18,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLUP\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_NEXT\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_FWD\",\"released\":\"ACTRLS_PLAY\"}},{\"gpio\":19,\"type\":\"BUTTON_LOW\",\"pull\":true,\"long_press\":1000, \"debounce\":0,\"shifter_gpio\":21,\"normal\":{\"pressed\":\"ACTRLS_VOLDOWN\",\"released\":\"ACTRLS_NONE\"},\"longpress\":{\"pressed\":\"ACTRLS_NONE\",\"released\":\"ACTRLS_NONE\"},\"shifted\":{\"pressed\":\"ACTRLS_PREV\",\"released\":\"ACTRLS_NONE\"},\"longshifted\":{\"pressed\":\"ACTRLS_REW\",\"released\":\"ACTRLS_PLAY\"}}]";
-
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -282,14 +278,8 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
-	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd1",actrls_brd1);
-	config_set_default(NVS_TYPE_STR, "actrls_brd1",(void *) actrls_brd1, 0);
-
-	ESP_LOGD(TAG,"Registering Audio control board type %s, value %s","actrls_brd2", actrls_brd1);
-	config_set_default(NVS_TYPE_STR, "actrls_brd2",(void *) actrls_brd2, 0);
-
-	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_brd");
-	config_set_default(NVS_TYPE_STR, "actrls_brd", "", 0);
+	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
+	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
@@ -363,13 +353,13 @@ void app_main()
 	}
 
 	ESP_LOGD(TAG,"Getting audio control mapping ");
-	char *actrls_brd = config_alloc_get_default(NVS_TYPE_STR, "actrls_brd", NULL, 0);
-	if (actrls_brd) {
-		if(actrls_brd[0] !='\0'){
-			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_brd);
-			actrls_init_json(actrls_brd);
+	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
+	if (actrls_config) {
+		if(actrls_config[0] !='\0'){
+			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);
+			actrls_init_json(actrls_config, true);
 		}
-		free(actrls_brd);
+		free(actrls_config);
 	} else {
 		ESP_LOGD(TAG,"No audio control buttons");
 	}

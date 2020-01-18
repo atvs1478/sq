@@ -123,7 +123,7 @@ const static actrls_t controls = {
 
 /* taking/giving audio system's control */
 void bt_master(bool on) {
-	if (on) actrls_set(controls);
+	if (on) actrls_set(controls, NULL);
 	else actrls_unset();
 }
 

@@ -23,12 +23,13 @@
 // BEWARE: this is the index of the array of action below (change actrls_action_s as well!)
 typedef enum { 	ACTRLS_NONE = -1, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
-				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,ACTRLS_REMAP,
+				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT, ACTRLS_REMAP,
 				ACTRLS_MAX 
 		} actrls_action_e;
 
 typedef void (*actrls_handler)(void);
 typedef actrls_handler actrls_t[ACTRLS_MAX - ACTRLS_NONE - 1];
+typedef bool actrls_hook_t(int gpio, actrls_action_e action, button_event_e event, button_press_e press, bool long_press);
 
 // BEWARE any change to struct below must be mapped to actrls_config_map
 typedef struct {
@@ -46,7 +47,13 @@ typedef struct actrl_config_s {
 } actrls_config_t;
 
 esp_err_t actrls_init(int n, const actrls_config_t *config);
-esp_err_t actrls_init_json(const char *profile_name);
-void actrls_set_default(const actrls_t controls);
-void actrls_set(const actrls_t controls);
+esp_err_t actrls_init_json(const char *profile_name, bool create);
+
+/* 
+Set hook function to non-null to be set your own direct managemet function, 
+which should return true if it managed the control request, false if the
+normal handling should be done
+*/
+void actrls_set_default(const actrls_t controls, actrls_hook_t *hook);
+void actrls_set(const actrls_t controls, actrls_hook_t *hook);
 void actrls_unset(void);
