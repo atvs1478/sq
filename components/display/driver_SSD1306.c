@@ -36,6 +36,7 @@ static const char *TAG = "display";
 
 static void 	vfdc_handler( u8_t *_data, int bytes_read);
 static void 	grfe_handler( u8_t *data, int len);
+static void 	grfb_handler( u8_t *data, int len);
 static bool 	display_init(char *config, char *welcome);
 static void 	print_message(char *msg);
 
@@ -44,6 +45,7 @@ struct display_handle_s SSD1306_handle = {
 	print_message, 
 	vfdc_handler,
 	grfe_handler,
+	grfb_handler,
 	NULL, NULL,
 };
 
@@ -243,7 +245,7 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
 /****************************************************************************************
  * Process graphic display data
  */
-void grfe_handler( u8_t *data, int len) {
+static void grfe_handler( u8_t *data, int len) {
 	data += 8;
 	len -= 8;
 	
@@ -292,5 +294,21 @@ void grfe_handler( u8_t *data, int len) {
 	SSD1306_WriteRawData(&Display, data, len);
  #endif	
 }
+
+/****************************************************************************************
+ * Process graphic display data
+ */
+static void grfb_handler(u8_t *data, int len) {
+	s16_t brightness = htons(*(uint16_t*) (data + 4));
+	
+	ESP_LOGI(TAG, "brightness %hx", brightness);
+	if (brightness < 0) {
+		SSD1306_DisplayOff( &Display ); 
+	} else {
+		SSD1306_DisplayOn( &Display ); 
+		SSD1306_SetContrast( &Display, brightness * 256 / 4  - 1);
+	}
+}
+
 
 

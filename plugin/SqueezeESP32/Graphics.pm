@@ -57,6 +57,10 @@ sub nmodes {
 # pattern than the 32 pixels version, where one would have expected bytes 4..7
 # to be empty
 
+sub brightnessMap {
+	return (65535, 1, 2, 3, 4);
+}
+
 =comment
 sub bytesPerColumn {
 	return 4;

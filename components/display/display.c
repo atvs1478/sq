@@ -106,6 +106,8 @@ static bool display_handler(u8_t *data, int len){
 		handle->vfdc_handler(data, len);
 	} else if (!strncmp((char*) data, "grfe", 4)) {
 		handle->grfe_handler(data, len);
+	} else if (!strncmp((char*) data, "grfb", 4)) {
+		handle->grfb_handler(data, len);
 	} else {
 		res = false;
 	}
