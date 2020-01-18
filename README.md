@@ -80,7 +80,7 @@ While the config named "buttons_remap"
 ``` 
 Defines two buttons
 - first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
-- second on GPIO 5, acive low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
+- second on GPIO 5, active low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
 
 Below is a difficult but functional 2-buttons interface for your decoding pleasure
 
