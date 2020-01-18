@@ -24,6 +24,64 @@ XMT - 3.3V
 
 Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 
+## Configuration
+To access NVS, in the webUI, go to credits and select "shows nvs editor"
+### Buttons
+Buttons adre described using a JSON string with the following syntax
+```
+[
+{"gpio":<num>,		
+ "type":"BUTTON_LOW | BUTTON_HIGH",	
+ "pull":[true|false],
+ "long_press":<ms>, 
+ "debounce":<ms>,
+ "shifter_gpio":<-1|num>,
+ "normal": {"pressed":"<action>","released":"<action>"},
+ "longpress": { <same> },
+ "shifted": { <same> },
+ "longshifted": { <same> },
+ },
+ { ... },
+ { ... },
+] 
+```
+
+Where (all parameters are optionals except gpio) 
+ "type": (BUTTON_LOW) logic level when the button is pressed 
+ "pull": (false) activate internal pull up/down
+ "long_press": (0) duration (in ms) of keypress to detect long press, 0 to disable it
+ "debounce": (0) debouncing duration in ms (0 = internal default of 50 ms)
+ "shifter_gpio": (-1) gpio number of another button that can be pressed together to create a "shift". Set to -1 to disable shifter
+ "normal": ({"pressed":"ACTRLS_NONE","released":"ACTRLS_NONE"}) action to take when a button is pressed/released (see below)
+ "longpress": action to take when a button is long-pressed/released (see above/below)
+ "shifted": action to take when a button is pressed/released and shifted (see above/below)
+ "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
+
+Where <action> is either the name of another configuration to load or one amongst 
+				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
+				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
+				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
+				
+One you've created such a string use it to fill a new NVS parameter with any name below 16(?) characters. You can have as many of these parameters as you can. Then set the parameter "actrls_config" with the name of your default config
+
+For example a config named "buttons" :
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,"normal":{"pressed":"ACTRLS_VOLDOWN"},"longpress":{"pressed":"buttons_remap"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_TOGGLE"}}]
+``` 
+Defines two buttons
+- first on GPIO 4, active low. When pressed, it triggers a volume down command. When pressed more than 1000ms, it changes the button configuration for the one named "buttons_remap"
+- second on GPIO 5, acive low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
+
+While the config named "buttons_remap"
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,"normal":{"pressed":"BCTRLS_DOWN"},"longpress":{"pressed":"buttons"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"BCTRLS_UP"}}]
+``` 
+Defines two buttons
+- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
+- second on GPIO 5, acive low. When pressed it triggers a navigation down command. That button, in that configuration, has no shift option
+
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  
