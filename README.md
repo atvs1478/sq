@@ -25,7 +25,7 @@ XMT - 3.3V
 Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 
 ## Configuration
-To access NVS, in the webUI, go to credits and select "shows nvs editor"
+To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters 
 ### Buttons
 Buttons adre described using a JSON string with the following syntax
 ```
@@ -62,7 +62,7 @@ Where <action> is either the name of another configuration to load or one amongs
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
 				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
 				
-One you've created such a string use it to fill a new NVS parameter with any name below 16(?) characters. You can have as many of these parameters as you can. Then set the parameter "actrls_config" with the name of your default config
+One you've created such a string, use it to fill a new NVS parameter with any name below 16(?) characters. You can have as many of these configs as you can. Then set the config parameter "actrls_config" with the name of your default config
 
 For example a config named "buttons" :
 ```
