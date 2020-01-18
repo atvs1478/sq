@@ -27,7 +27,7 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 ## Configuration
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters 
 ### Buttons
-Buttons adre described using a JSON string with the following syntax
+Buttons are described using a JSON string with the following syntax
 ```
 [
 {"gpio":<num>,		
