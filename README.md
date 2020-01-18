@@ -83,8 +83,9 @@ Defines two buttons
 - second on GPIO 5, acive low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
 
 Below is a difficult but functional 2-buttons interface for your decoding pleasure
+
+*buttons*
 ```
-(buttons)
 [{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
  "normal":{"pressed":"ACTRLS_VOLDOWN"},
  "longpress":{"pressed":"buttons_remap"}},
@@ -93,8 +94,9 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "shifted":{"pressed":"ACTRLS_TOGGLE"}, 
  "longpress":{"pressed":"ACTRLS_NEXT"}}
 ]
-
-(buttons_remap)
+```
+*buttons_remap*
+```
 [{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
  "normal":{"pressed":"BCTRLS_DOWN"},
  "longpress":{"pressed":"buttons"}},
