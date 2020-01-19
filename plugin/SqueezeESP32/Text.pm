@@ -6,8 +6,7 @@ use base qw(Slim::Display::Text);
 
 # we don't want the special Noritake codes
 sub vfdmodel {
-	return 'squeezeslave'';
+	return 'squeezeslave';
 }
-
 
 1;

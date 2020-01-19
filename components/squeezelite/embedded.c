@@ -49,8 +49,10 @@ uint32_t _gettime_ms_(void) {
 	return (uint32_t) (esp_timer_get_time() / 1000);
 }
 
-extern void cli_controls_init(void);
+extern void sb_controls_init(void);
+extern void sb_display_init(void);
 
 void embedded_init(void) {
-	cli_controls_init();
+	sb_controls_init();
+	sb_display_init();
 }

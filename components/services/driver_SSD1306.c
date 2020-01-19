@@ -31,24 +31,21 @@
 #include "ssd1306_default_if.h"
 
 #define I2C_ADDRESS	0x3C
-#define LINELEN		40
+
 static const char *TAG = "display";
 
-static void 	vfdc_handler( u8_t *_data, int bytes_read);
-static void 	grfe_handler( u8_t *data, int len);
-static void 	grfb_handler( u8_t *data, int len);
-static bool 	display_init(char *config, char *welcome);
-static void 	print_message(char *msg);
+// handlers
+static bool init(char *config, char *welcome);
+static void text(enum display_pos_e pos, int attribute, char *text);
+static void v_draw(u8_t *data);
+static void brightness(u8_t level);
+static void on(bool state);
+static void update(void);
 
-struct display_handle_s SSD1306_handle = {
-	display_init,
-	print_message, 
-	vfdc_handler,
-	grfe_handler,
-	grfb_handler,
-	NULL, NULL,
-};
+// display structure for others to use
+struct display_s SSD1306_display = { init, on, brightness, text, update, v_draw, NULL };
 
+// SSD1306 specific function
 static struct SSD1306_Device Display;
 static SSD1306_AddressMode AddressMode = AddressMode_Invalid;
 
@@ -75,11 +72,11 @@ static const unsigned char BitReverseTable256[] =
 /****************************************************************************************
  * 
  */
-static bool display_init(char *config, char *welcome) {
+static bool init(char *config, char *welcome) {
 	bool res = false;
 
 	if (strstr(config, "I2C")) {
-		int width = -1, height = -1, address=I2C_ADDRESS;
+		int width = -1, height = -1, address = I2C_ADDRESS;
 		char *p;
 		ESP_LOGI(TAG, "Initializing I2C display with config: %s",config);
 		// no time for smart parsing - this is for tinkerers
@@ -87,14 +84,13 @@ static bool display_init(char *config, char *welcome) {
 		if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
 
-		
 		if (width != -1 && height != -1) {
 			SSD1306_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
 			SSD1306_I2CMasterAttachDisplayDefault( &Display, width, height, address, -1 );
 			SSD1306_SetHFlip( &Display, strcasestr(config, "HFlip") ? true : false);
 			SSD1306_SetVFlip( &Display, strcasestr(config, "VFlip") ? true : false);
 			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
-			print_message(welcome);
+			text(DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
 		} else {
@@ -110,165 +106,62 @@ static bool display_init(char *config, char *welcome) {
 /****************************************************************************************
  * 
  */
-static void print_message(char *msg) {
-	if (!msg) return;
-	SSD1306_AddressMode Mode = AddressMode;
-	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
-	SSD1306_SetDisplayAddressMode( &Display, AddressMode_Horizontal );
-	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_Center, msg, SSD_COLOR_WHITE );
-	SSD1306_Update( &Display );
-	SSD1306_SetDisplayAddressMode( &Display, Mode );
-}
+static void text(enum display_pos_e pos, int attribute, char *text) {
+	TextAnchor Anchor = TextAnchor_Center;	
+	
+	if (attribute & DISPLAY_CLEAR) SSD1306_Clear( &Display, SSD_COLOR_BLACK );
+	
+	if (!text) return;
+	
+	switch(pos) {
+	case DISPLAY_TOP_LEFT: 
+		Anchor = TextAnchor_NorthWest; 
+		break;
+	case DISPLAY_MIDDLE_LEFT:
+		break;
+	case DISPLAY_BOTTOM_LEFT:
+		Anchor = TextAnchor_SouthWest;
+		break;
+	case DISPLAY_CENTER:
+		Anchor = TextAnchor_Center;
+		break;
+	}	
+	
+	ESP_LOGD(TAG, "SSDD1306 displaying %s at %u with attribute %u", text, Anchor, attribute);
 
-/****************************************************************************************
- * Change special LCD chars to something more printable on screen 
- */
-static void makeprintable(unsigned char * line) {
-	for (int n = 0; n < LINELEN; n++) {
-		switch (line[n]) {
-		case 11:		/* block */
-			line[n] = '#';
-			break;;
-		case 16:		/* rightarrow */
-			line[n] = '>';
-			break;;
-		case 22:		/* circle */
-			line[n] = '@';
-			break;;
-		case 145:		/* note */
-			line[n] = ' ';
-			break;;
-		case 152:		/* bell */
-			line[n] = 'o';
-			break;
-		default:
-			break;
-		}
-	}
-}
-
-/****************************************************************************************
- * Check if char is printable, or a valid symbol
- */
-static bool charisok(unsigned char c) {
-   switch (c) {
-	  case 11:		/* block */
-	  case 16:		/* rightarrow */
-	  case 22:		/* circle */
-	  case 145:		/* note */
-	  case 152:		/* bell */
-		 return true;
-	 break;;
-	  default:
-		 return isprint(c);
-   }
-}
-
-/****************************************************************************************
- * Show the display (text mode)
- */
-static void show_display_buffer(char *ddram) {
-	char line1[LINELEN+1];
-	char *line2;
-
-	memset(line1, 0, LINELEN+1);
-	strncpy(line1, ddram, LINELEN);
-	line2 = &(ddram[LINELEN]);
-	line2[LINELEN] = '\0';
-
-	/* Convert special LCD chars */
-	makeprintable((unsigned char *)line1);
-	makeprintable((unsigned char *)line2);
-
-	ESP_LOGI(TAG, "\n\t%.40s\n\t%.40s", line1, line2);
-
-	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
-	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_NorthWest, line1, SSD_COLOR_WHITE );
-	SSD1306_FontDrawAnchoredString( &Display, TextAnchor_SouthWest, line2, SSD_COLOR_WHITE );
-
-	// check addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
-	}
-
-	SSD1306_Update( &Display );
-}
-
-/****************************************************************************************
- * Process display data
- */
-static void vfdc_handler( u8_t *_data, int bytes_read) {
-	unsigned short *data = (unsigned short*) _data, *display_data;
-	char ddram[(LINELEN + 1) * 2];
-	int n, addr = 0; /* counter */
-
-	bytes_read -= 4;
-	if (bytes_read % 2) bytes_read--; /* even number of bytes */
-	// if we use Noritake VFD codes, display data starts at 12
-	display_data = &(data[5]); /* display data starts at byte 10 */
-
-	memset(ddram, ' ', LINELEN * 2);
-
-	for (n = 0; n < (bytes_read/2); n++) {
-		unsigned short d; /* data element */
-		unsigned char t, c;
-
-		d = ntohs(display_data[n]);
-		t = (d & 0x00ff00) >> 8; /* type of display data */
-		c = (d & 0x0000ff); /* character/command */
-		switch (t) {
-			case 0x03: /* character */
-				if (!charisok(c)) c = ' ';
-				if (addr <= LINELEN * 2) {
-					ddram[addr++] = c;
-		}
-				break;
-			case 0x02: /* command */
-				switch (c) {
-					case 0x06: /* display clear */
-						memset(ddram, ' ', LINELEN * 2);
-						break;
-					case 0x02: /* cursor home */
-						addr = 0;
-						break;
-					case 0xc0: /* cursor home2 */
-						addr = LINELEN;
-						break;
-				}
-		}
-	}
-
-	show_display_buffer(ddram);
+	}	
+	SSD1306_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
+	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
 }
 
 /****************************************************************************************
  * Process graphic display data
  */
-static void grfe_handler( u8_t *data, int len) {
-	data += 8;
-	len -= 8;
-	
+static void v_draw( u8_t *data) {
 #ifndef FULL_REFRESH
-	// force addressing mode by lines
+	// force addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
-	}	
-		
+	}
+	
 	// try to minimize I2C traffic which is very slow
 	int rows = (Display.Height > 32) ? 4 : Display.Height / 8;
 	for (int r = 0; r < rows; r++) {
 		uint8_t first = 0, last;	
 		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
 		
-		// row/col swap, frame buffr comparison and bit-reversing
+		// row/col swap, frame buffer comparison and bit-reversing
 		for (int c = 0; c < Display.Width; c++) {
+			*iptr = BitReverseTable256[*iptr];
 			if (*iptr != *optr) {
-				if (first) last = c;
-				else first = c + 1;
+				if (!first) first = c + 1;
+				last = c ;
 			}	
-			*optr++ = BitReverseTable256[*iptr];
+			*optr++ = *iptr;
 			iptr += rows;
 		}
 		
@@ -280,9 +173,12 @@ static void grfe_handler( u8_t *data, int len) {
 		}
 	}	
 #else
+	int len = (Display.Width * Display.Height) / 8;
+
 	// to be verified, but this is as fast as using a pointer on data
 	for (int i = len - 1; i >= 0; i--) data[i] = BitReverseTable256[data[i]];
 	
+	// 64 pixels display are not handled by LMS (bitmap is 32 pixels)
 	if (Display.Height > 32) SSD1306_SetPageAddress( &Display, 0, 32/8-1);
 	
 	// force addressing mode by columns
@@ -296,18 +192,26 @@ static void grfe_handler( u8_t *data, int len) {
 }
 
 /****************************************************************************************
- * Process graphic display data
+ * Brightness
  */
-static void grfb_handler(u8_t *data, int len) {
-	s16_t brightness = htons(*(uint16_t*) (data + 4));
-	
-	ESP_LOGI(TAG, "brightness %hx", brightness);
-	if (brightness < 0) {
-		SSD1306_DisplayOff( &Display ); 
-	} else {
-		SSD1306_DisplayOn( &Display ); 
-		SSD1306_SetContrast( &Display, brightness * 256 / 4  - 1);
-	}
+static void brightness(u8_t level) {
+	SSD1306_DisplayOn( &Display ); 
+	SSD1306_SetContrast( &Display, (uint8_t) level);
+}
+
+/****************************************************************************************
+ * Display On/Off
+ */
+static void on(bool state) {
+	if (state) SSD1306_DisplayOn( &Display ); 
+	else SSD1306_DisplayOff( &Display ); 
+}
+
+/****************************************************************************************
+ * Update 
+ */
+static void update(void) {
+	SSD1306_Update( &Display );
 }
 
 

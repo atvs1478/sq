@@ -18,16 +18,16 @@
 
 #pragma once
 
-struct display_handle_s {
-	bool (*init)(char *config, char* welcome);
-	void (*print_message)(char *msg);
-	void (*vfdc_handler)(u8_t *data, int len);
-	void (*grfe_handler)(u8_t *data, int len);
-	void (*grfb_handler)(u8_t *data, int len);
-	void (*visu_handler)(u8_t *data, int len);
-}; 
+#define DISPLAY_CLEAR 	0x01
+#define DISPLAY_UPDATE	0x02
 
-extern struct display_handle_s SSD1306_handle;
+enum display_pos_e { DISPLAY_TOP_LEFT, DISPLAY_MIDDLE_LEFT, DISPLAY_BOTTOM_LEFT, DISPLAY_CENTER };
 
-
-
+extern struct display_s {
+	bool (*init)(char *config, char *welcome);
+	void (*on)(bool state);
+	void (*brightness)(u8_t level);
+	void (*text)(enum display_pos_e pos, int attribute, char *msg);
+	void (*update)(void);
+	void (*v_draw)(u8_t *data);
+} *display;

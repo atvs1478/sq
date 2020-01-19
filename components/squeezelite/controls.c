@@ -142,7 +142,7 @@ static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
 /****************************************************************************************
  * Initialize controls - shall be called once from output_init_embedded
  */
-void cli_controls_init(void) {
+void sb_controls_init(void) {
 	LOG_INFO("initializing CLI controls");
 	get_mac(mac);
 	actrls_set_default(LMS_controls, NULL);

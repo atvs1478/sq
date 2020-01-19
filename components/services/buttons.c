@@ -218,7 +218,7 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
 /****************************************************************************************
  * Get stored id
  */
- void button_get_client(int gpio) {
+void *button_get_client(int gpio) {
 	 for (int i = 0; i < n_buttons; i++) {
 		 if (buttons[i].gpio == gpio) return buttons[i].client;
 	 }

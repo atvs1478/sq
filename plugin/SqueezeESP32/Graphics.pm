@@ -61,6 +61,10 @@ sub brightnessMap {
 	return (65535, 10, 50, 100, 200);
 }
 
+sub hasScrolling  {
+	return 0;
+}
+
 =comment
 sub bytesPerColumn {
 	return 4;
