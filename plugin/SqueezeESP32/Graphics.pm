@@ -8,6 +8,7 @@ use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 
 my $prefs = preferences('plugin.squeezeesp32');
+my $log   = logger('plugin.squeezeesp32');
 
 my $VISUALIZER_NONE = 0;
 my $width = $prefs->get('width') || 128;
@@ -59,10 +60,6 @@ sub nmodes {
 
 sub brightnessMap {
 	return (65535, 10, 50, 100, 200);
-}
-
-sub hasScrolling  {
-	return 0;
 }
 
 =comment

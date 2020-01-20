@@ -37,13 +37,14 @@ static const char *TAG = "display";
 // handlers
 static bool init(char *config, char *welcome);
 static void text(enum display_pos_e pos, int attribute, char *text);
-static void v_draw(u8_t *data);
+static void draw_cbr(u8_t *data);
+static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
 static void brightness(u8_t level);
 static void on(bool state);
 static void update(void);
 
 // display structure for others to use
-struct display_s SSD1306_display = { init, on, brightness, text, update, v_draw, NULL };
+struct display_s SSD1306_display = { 0, 0, init, on, brightness, text, update, draw, draw_cbr, NULL };
 
 // SSD1306 specific function
 static struct SSD1306_Device Display;
@@ -90,6 +91,8 @@ static bool init(char *config, char *welcome) {
 			SSD1306_SetHFlip( &Display, strcasestr(config, "HFlip") ? true : false);
 			SSD1306_SetVFlip( &Display, strcasestr(config, "VFlip") ? true : false);
 			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
+			SSD1306_display.width = width;
+			SSD1306_display.height = height;
 			text(DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
@@ -138,9 +141,9 @@ static void text(enum display_pos_e pos, int attribute, char *text) {
 }
 
 /****************************************************************************************
- * Process graphic display data
+ * Process graphic display data from column-oriented bytes, MSbit first
  */
-static void v_draw( u8_t *data) {
+static void draw_cbr(u8_t *data) {
 #ifndef FULL_REFRESH
 	// force addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
@@ -149,6 +152,7 @@ static void v_draw( u8_t *data) {
 	}
 	
 	// try to minimize I2C traffic which is very slow
+	// TODO: this should move to grfe
 	int rows = (Display.Height > 32) ? 4 : Display.Height / 8;
 	for (int r = 0; r < rows; r++) {
 		uint8_t first = 0, last;	
@@ -156,12 +160,12 @@ static void v_draw( u8_t *data) {
 		
 		// row/col swap, frame buffer comparison and bit-reversing
 		for (int c = 0; c < Display.Width; c++) {
-			*iptr = BitReverseTable256[*iptr];
-			if (*iptr != *optr) {
+			u8_t byte = BitReverseTable256[*iptr];
+			if (byte != *optr) {
 				if (!first) first = c + 1;
 				last = c ;
 			}	
-			*optr++ = *iptr;
+			*optr++ = byte;
 			iptr += rows;
 		}
 		
@@ -174,11 +178,12 @@ static void v_draw( u8_t *data) {
 	}	
 #else
 	int len = (Display.Width * Display.Height) / 8;
-
+	
 	// to be verified, but this is as fast as using a pointer on data
-	for (int i = len - 1; i >= 0; i--) data[i] = BitReverseTable256[data[i]];
+	for (int i = len - 1; i >= 0; i--) Display.Framebuffer[i] = BitReverseTable256[data[i]];
 	
 	// 64 pixels display are not handled by LMS (bitmap is 32 pixels)
+	// TODO: this should move to grfe
 	if (Display.Height > 32) SSD1306_SetPageAddress( &Display, 0, 32/8-1);
 	
 	// force addressing mode by columns
@@ -187,8 +192,48 @@ static void v_draw( u8_t *data) {
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
 	
-	SSD1306_WriteRawData(&Display, data, len);
+	SSD1306_WriteRawData(&Display, Display.Framebuffer, len);
  #endif	
+}
+
+/****************************************************************************************
+ * Process graphic display data MSBit first
+ */
+static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
+	
+	if (y1 % 8 || y2 % 8) {
+		ESP_LOGW(TAG, "must write rows on byte boundaries (%u,%u) to (%u,%u)", x1, y1, x2, y2);
+		return;
+	}
+	
+	// default end point to display size
+	if (x2 == -1) x2 = Display.Width - 1;
+	if (y2 == -1) y2 = Display.Height - 1;
+			
+	// set addressing mode to match data
+	if (by_column && AddressMode != AddressMode_Vertical) {
+		AddressMode = AddressMode_Vertical;
+		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		
+		// copy the window and do row/col exchange
+		for (int r = y1/8; r <=  y2/8; r++) {
+			uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r;
+			for (int c = x1; c <= x2; c++) {
+				*optr++ = *iptr;
+				iptr += (y2-y1)/8 + 1;
+			}	
+		}	
+	} else {
+		// just copy the window inside the frame buffer
+		for (int r = y1/8; r <= y2/8; r++) {
+			uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r*(x2-x1+1);
+			for (int c = x1; c <= x2; c++) *optr++ = *iptr++;
+		}	
+	}
+		
+	SSD1306_SetColumnAddress( &Display, x1, x2);
+	SSD1306_SetPageAddress( &Display, y1/8, y2/8);
+	SSD1306_WriteRawData( &Display, data, (x2-x1 + 1) * ((y2-y1)/8 + 1));
 }
 
 /****************************************************************************************

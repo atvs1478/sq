@@ -23,11 +23,14 @@
 
 enum display_pos_e { DISPLAY_TOP_LEFT, DISPLAY_MIDDLE_LEFT, DISPLAY_BOTTOM_LEFT, DISPLAY_CENTER };
 
+// don't change anything there w/o changing all drivers init code
 extern struct display_s {
+	int width, height;
 	bool (*init)(char *config, char *welcome);
 	void (*on)(bool state);
 	void (*brightness)(u8_t level);
 	void (*text)(enum display_pos_e pos, int attribute, char *msg);
 	void (*update)(void);
-	void (*v_draw)(u8_t *data);
+	void (*draw)(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
+	void (*draw_cbr)(u8_t *data);
 } *display;

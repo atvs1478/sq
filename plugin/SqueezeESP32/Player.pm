@@ -34,4 +34,8 @@ sub playerSettingsFrame {
 	}
 }
 
+sub hasScrolling  {
+	return 1;
+}
+
 1;

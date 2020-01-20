@@ -21,9 +21,11 @@
 #include "squeezelite.h"
 #include "display.h"
 
+#pragma pack(push, 1)
+
 struct grfb_packet {
 	char  opcode[4];
-	u16_t  brightness;
+	s16_t  brightness;
 };
 
 struct grfe_packet {
@@ -51,12 +53,27 @@ struct grfg_packet {
 	u16_t  width;		// # of pixels of scrollable
 };
 
-#define LINELEN		40
+#pragma pack(pop)
+
+static struct scroller_s {
+	TaskHandle_t task;
+	bool active;
+	u8_t  screen, direction;	
+	u32_t pause, speed;		
+	u16_t by, mode, width, scroll_width;		
+	u16_t max, size;
+	u8_t *scroll_frame, *back_frame;
+} scroller;
+
+#define SCROLL_STACK_SIZE	2048
+#define LINELEN				40
 
 static log_level loglevel = lINFO;
-
+static SemaphoreHandle_t display_sem;
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
+
+#define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static void server(in_addr_t ip, u16_t hport, u16_t cport);
 static bool handler(u8_t *data, int len);
@@ -65,6 +82,7 @@ static void grfe_handler( u8_t *data, int len);
 static void grfb_handler(u8_t *data, int len);
 static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
+static void scroll_task(void* arg);
 
 /* scrolling undocumented information
 	grfs	
@@ -91,7 +109,19 @@ ANIM_SCREEN_2     0x08 # For scrollonce only, screen 2 was scrolling
  * 
  */
 void sb_display_init(void) {
+	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+	static EXT_RAM_ATTR StackType_t xStack[SCROLL_STACK_SIZE] __attribute__ ((aligned (4)));
 	
+	// create scroll management task
+	display_sem = xSemaphoreCreateMutex();
+	scroller.task = xTaskCreateStatic( (TaskFunction_t) scroll_task, "scroll_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+	
+	// size scroller
+	scroller.max = (display->width * display->height / 8) * 10;
+	scroller.scroll_frame = malloc(scroller.max);
+	scroller.back_frame = malloc(display->width * display->height / 8);
+
+	// chain handlers
 	slimp_handler_chain = slimp_handler;
 	slimp_handler = handler;
 	
@@ -251,21 +281,26 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
  * Process graphic display data
  */
 static void grfe_handler( u8_t *data, int len) {
-	display->v_draw(data + 8);
+	scroller.active = false;
+	xSemaphoreTake(display_sem, portMAX_DELAY);
+	display->draw_cbr(data + sizeof(struct grfe_packet));
+	xSemaphoreGive(display_sem);
 }	
 
 /****************************************************************************************
  * Brightness
  */
 static void grfb_handler(u8_t *data, int len) {
-	s16_t brightness = htons(*(uint16_t*) (data + 4));
+	struct grfb_packet *pkt = (struct grfb_packet*) data;
 	
-	LOG_INFO("brightness %hx", brightness);
-	if (brightness < 0) {
+	pkt->brightness = htons(pkt->brightness);
+	
+	LOG_INFO("brightness %hu", pkt->brightness);
+	if (pkt->brightness < 0) {
 		display->on(false); 
 	} else {
 		display->on(true);
-		display->brightness(brightness);
+		display->brightness(pkt->brightness);
 	}
 }
 
@@ -273,12 +308,108 @@ static void grfb_handler(u8_t *data, int len) {
  * Scroll set
  */
 static void grfs_handler(u8_t *data, int len) {
-}	
+	struct grfs_packet *pkt = (struct grfs_packet*) data;
+	int size = len - sizeof(struct grfs_packet);
+	int offset = htons(pkt->offset);
 	
+	LOG_INFO("gfrs s:%u d:%u p:%u sp:%u by:%hu m:%hu w:%hu o:%hu", 
+				(int) pkt->screen,
+				(int) pkt->direction,	// 1=left, 2=right
+				htonl(pkt->pause),		// in ms	
+				htonl(pkt->speed),		// in ms
+				htons(pkt->by),			// # of pixel of scroll step
+				htons(pkt->mode),			// 0=continuous, 1=once and stop, 2=once and end
+				htons(pkt->width),		// total width of animation
+				htons(pkt->offset)		// offset if multiple packets are sent
+	);
+
+	// copy scroll parameters
+	scroller.screen = pkt->screen;
+	scroller.direction = pkt->direction;
+	scroller.pause = htonl(pkt->pause);
+	scroller.speed = htonl(pkt->speed);
+	scroller.by = htons(pkt->by);
+	scroller.mode = htons(pkt->mode);
+	scroller.width = htons(pkt->width);
+
+	// copy scroll frame data
+	if (scroller.size + size < scroller.max) {
+		memcpy(scroller.scroll_frame + offset, data + sizeof(struct grfs_packet), size);
+		scroller.size = offset + size;
+		LOG_INFO("scroller size now %u", scroller.size);
+	} else {
+		LOG_INFO("scroller too larger %u/%u", scroller.size + size, scroller.max);
+	}	
+}
+
 /****************************************************************************************
- * Scroll go
+ * Scroll background frame update & go
  */
 static void grfg_handler(u8_t *data, int len) {
+	struct grfg_packet *pkt = (struct grfg_packet*) data;
+	
+	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
+	scroller.scroll_width = htons(pkt->width);
+	scroller.active = true;
+	vTaskResume(scroller.task);
+	
+	LOG_INFO("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
+}
+
+/****************************************************************************************
+ * Scroll task
+ */
+static void scroll_task(void *args) {
+	u8_t *scroll_ptr, *frame;
+	bool active = false;
+	int len = display->width * display->height / 8;
+	int scroll_len;
+
+	while (1) {
+		if (!active) vTaskSuspend(NULL);
+		
+		// restart at the beginning - I don't know what right scrolling means ...
+		scroll_ptr = scroller.scroll_frame;
+		scroll_len = len - (display->width - scroller.scroll_width) * display->height / 8;
+		frame = malloc(display->width * display->height / 8);
+						
+		// scroll required amount of columns (within the window)
+		while (scroll_ptr <= scroller.scroll_frame + scroller.size - scroller.by * display->height / 8 - len) {
+			scroll_ptr += scroller.by * display->height / 8;
+						
+			// build a combined frame
+			memcpy(frame, scroller.back_frame, len);
+			for (int i = 0; i < scroll_len; i++) frame[i] |= scroll_ptr[i];
+			
+			xSemaphoreTake(display_sem, portMAX_DELAY);
+			active = scroller.active;
+			
+			if (!active) {
+				LOG_INFO("scrolling interrupted");
+				xSemaphoreGive(display_sem);
+				break;
+			}
+			
+			display->draw_cbr(frame);		
+			xSemaphoreGive(display_sem);
+			usleep(scroller.speed * 1000);
+		}
+		
+		if (active) {
+			// build default screen
+			memcpy(frame, scroller.back_frame, len);
+			for (int i = 0; i < scroll_len; i++) frame[i] |= scroller.scroll_frame[i];
+			xSemaphoreTake(display_sem, portMAX_DELAY);
+			display->draw_cbr(frame);		
+			xSemaphoreGive(display_sem);
+		
+			// pause for required time and continue (or not)
+			usleep(scroller.pause * 1000);
+			active = (scroller.mode == 0);
+		}	
+		
+		free(frame);
+	}	
 }	
 
 
