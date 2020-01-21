@@ -306,6 +306,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "i2c_config");
 	config_set_default(NVS_TYPE_STR, "i2c_config", "", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "Vcc_GPIO");
+	config_set_default(NVS_TYPE_STR, "Vcc_GPIO", "", 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 

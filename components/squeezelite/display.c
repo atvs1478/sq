@@ -67,6 +67,7 @@ static struct scroller_s {
 
 #define SCROLL_STACK_SIZE	2048
 #define LINELEN				40
+#define HEIGHT				32
 
 static log_level loglevel = lINFO;
 static SemaphoreHandle_t display_sem;
@@ -283,7 +284,7 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
 static void grfe_handler( u8_t *data, int len) {
 	scroller.active = false;
 	xSemaphoreTake(display_sem, portMAX_DELAY);
-	display->draw_cbr(data + sizeof(struct grfe_packet));
+	display->draw_cbr(data + sizeof(struct grfe_packet), HEIGHT);
 	xSemaphoreGive(display_sem);
 }	
 
@@ -390,7 +391,7 @@ static void scroll_task(void *args) {
 				break;
 			}
 			
-			display->draw_cbr(frame);		
+			display->draw_cbr(frame, HEIGHT);		
 			xSemaphoreGive(display_sem);
 			usleep(scroller.speed * 1000);
 		}
@@ -400,7 +401,7 @@ static void scroll_task(void *args) {
 			memcpy(frame, scroller.back_frame, len);
 			for (int i = 0; i < scroll_len; i++) frame[i] |= scroller.scroll_frame[i];
 			xSemaphoreTake(display_sem, portMAX_DELAY);
-			display->draw_cbr(frame);		
+			display->draw_cbr(frame, HEIGHT);		
 			xSemaphoreGive(display_sem);
 		
 			// pause for required time and continue (or not)

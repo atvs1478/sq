@@ -29,6 +29,8 @@ static const char *TAG = "services";
  * 
  */
 void services_init(void) {
+	char *nvs_item;
+	
 	gpio_install_isr_service(0);
 	
 #ifdef CONFIG_SQUEEZEAMP
@@ -37,6 +39,21 @@ void services_init(void) {
 		ESP_LOGE(TAG, "can't use i2c port 0 on SqueezeAMP");
 	}
 #endif
+
+	// set fixed gpio if any
+	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "Vcc_GPIO")) != NULL) {
+		char *p = nvs_item;
+		while (p && *p) {
+			int gpio = atoi(p);
+			gpio_pad_select_gpio(gpio);
+			gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
+			gpio_set_level(gpio, 1);
+			p = strchr(p, ',');
+			ESP_LOGI(TAG, "set GPIO %u to Vcc", gpio);
+			if (p) p++;
+		} 
+		free(nvs_item);
+	}	
 
 	const i2c_config_t * i2c_config = config_i2c_get(&i2c_system_port);
 

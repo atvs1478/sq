@@ -37,7 +37,7 @@ static const char *TAG = "display";
 // handlers
 static bool init(char *config, char *welcome);
 static void text(enum display_pos_e pos, int attribute, char *text);
-static void draw_cbr(u8_t *data);
+static void draw_cbr(u8_t *data, int height);
 static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
 static void brightness(u8_t level);
 static void on(bool state);
@@ -143,7 +143,7 @@ static void text(enum display_pos_e pos, int attribute, char *text) {
 /****************************************************************************************
  * Process graphic display data from column-oriented bytes, MSbit first
  */
-static void draw_cbr(u8_t *data) {
+static void draw_cbr(u8_t *data, int height) {
 #ifndef FULL_REFRESH
 	// force addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
@@ -152,8 +152,7 @@ static void draw_cbr(u8_t *data) {
 	}
 	
 	// try to minimize I2C traffic which is very slow
-	// TODO: this should move to grfe
-	int rows = (Display.Height > 32) ? 4 : Display.Height / 8;
+	int rows = (height ? height : Display.Height) / 8;
 	for (int r = 0; r < rows; r++) {
 		uint8_t first = 0, last;	
 		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
@@ -177,14 +176,14 @@ static void draw_cbr(u8_t *data) {
 		}
 	}	
 #else
-	int len = (Display.Width * Display.Height) / 8;
-	
-	// to be verified, but this is as fast as using a pointer on data
-	for (int i = len - 1; i >= 0; i--) Display.Framebuffer[i] = BitReverseTable256[data[i]];
-	
-	// 64 pixels display are not handled by LMS (bitmap is 32 pixels)
-	// TODO: this should move to grfe
-	if (Display.Height > 32) SSD1306_SetPageAddress( &Display, 0, 32/8-1);
+	if (!height) height = Display->Height;
+
+	// copy data in frame buffer	
+	for (int c = 0; c < Display.Width; c++)
+		for (int r = 0; r < height / 8; r++)
+			Display.Framebuffer[c*Display.Height/8 + r] = BitReverseTable256[data[c*height/8 +r]];
+		
+	SSD1306_SetPageAddress( &Display, 0, height / 8 - 1);
 	
 	// force addressing mode by columns
 	if (AddressMode != AddressMode_Vertical) {
@@ -192,12 +191,13 @@ static void draw_cbr(u8_t *data) {
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
 	
-	SSD1306_WriteRawData(&Display, Display.Framebuffer, len);
+	SSD1306_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Heigth);
  #endif	
 }
 
 /****************************************************************************************
  * Process graphic display data MSBit first
+ * WARNING: this has not been tested yet
  */
 static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
 	
@@ -209,11 +209,14 @@ static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
 	// default end point to display size
 	if (x2 == -1) x2 = Display.Width - 1;
 	if (y2 == -1) y2 = Display.Height - 1;
-			
+	
 	// set addressing mode to match data
-	if (by_column && AddressMode != AddressMode_Vertical) {
-		AddressMode = AddressMode_Vertical;
-		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+	if (by_column) {
+		
+		if (AddressMode != AddressMode_Vertical) {
+			AddressMode = AddressMode_Vertical;
+			SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		}	
 		
 		// copy the window and do row/col exchange
 		for (int r = y1/8; r <=  y2/8; r++) {

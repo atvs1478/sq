@@ -32,5 +32,5 @@ extern struct display_s {
 	void (*text)(enum display_pos_e pos, int attribute, char *msg);
 	void (*update)(void);
 	void (*draw)(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
-	void (*draw_cbr)(u8_t *data);
+	void (*draw_cbr)(u8_t *data, int height);		// height is the # of columns in data, as oppoosed to display height (0 = display height) 
 } *display;
