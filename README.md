@@ -25,7 +25,21 @@ XMT - 3.3V
 Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 
 ## Configuration
-To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters 
+To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
+
+### I2C
+The NVS parameter "i2c_config" set the I2C's gpio needed to enable. Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+```
+sda=<gpio_num>,scl=<gpio_num>,port=<0|1>
+```
+
+## Display
+The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
+```
+I2C|SPI,width=<pixels>,height=<pixels>[,address=<i2c_address>][,HFlip][,VFlip]
+```
+- VFlip and HFlip are optional can be used to change display orientation
+
 ### Buttons
 Buttons are described using a JSON string with the following syntax
 ```
