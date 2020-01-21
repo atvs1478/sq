@@ -40,7 +40,7 @@ I2C|SPI,width=<pixels>,height=<pixels>[,address=<i2c_address>][,HFlip][,VFlip]
 - VFlip and HFlip are optional can be used to change display orientation
 
 ### Vcc GPIO
-The parameter "Vcc_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) at boot. Be careful because there is no conflict checks being made with which GPIO you're changing, so you might damage your board or create a conflict here.
+The parameter "Vcc_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) at boot. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here.
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
