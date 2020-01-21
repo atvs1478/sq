@@ -30,7 +30,7 @@ To access NVS, in the webUI, go to credits and select "shows nvs editor". Go int
 ### I2C
 The NVS parameter "i2c_config" set the I2C's gpio needed to enable. Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
 ```
-sda=<gpio_num>,scl=<gpio_num>,port=<0|1>
+sda=<gpio_num>,scl=<gpio_num>,port=0|1
 ```
 
 ## Display
