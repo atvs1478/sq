@@ -364,23 +364,30 @@ static void scroll_task(void *args) {
 	u8_t *scroll_ptr, *frame;
 	bool active = false;
 	int len = display->width * display->height / 8;
-	int scroll_len;
+	int scroll_len, scroll_step;
 
 	while (1) {
 		if (!active) vTaskSuspend(NULL);
-		
+
 		// restart at the beginning - I don't know what right scrolling means ...
-		scroll_ptr = scroller.scroll_frame;
 		scroll_len = len - (display->width - scroller.scroll_width) * display->height / 8;
+		if (scroller.direction == 1) {
+			scroll_ptr = scroller.scroll_frame; 
+			scroll_step = scroller.by * display->height / 8;
+		} else	{
+			scroll_ptr = scroller.scroll_frame + scroller.size - scroll_len;
+			scroll_step = -scroller.by * display->height / 8;
+		}	
+			
 		frame = malloc(display->width * display->height / 8);
 						
 		// scroll required amount of columns (within the window)
-		while (scroll_ptr <= scroller.scroll_frame + scroller.size - scroller.by * display->height / 8 - len) {
-			scroll_ptr += scroller.by * display->height / 8;
-						
+		while (scroller.direction == 1 ? (scroll_ptr <= scroller.scroll_frame + scroller.size - scroll_step - len) :
+									     (scroll_ptr + scroll_step >= scroller.scroll_frame) ) {
 			// build a combined frame
 			memcpy(frame, scroller.back_frame, len);
 			for (int i = 0; i < scroll_len; i++) frame[i] |= scroll_ptr[i];
+			scroll_ptr += scroll_step;
 			
 			xSemaphoreTake(display_sem, portMAX_DELAY);
 			active = scroller.active;
