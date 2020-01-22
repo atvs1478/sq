@@ -43,7 +43,8 @@
 #include "dmap_parser.h"
 #include "log_util.h"
 
-#define RTSP_STACK_SIZE (8*1024)
+#define RTSP_STACK_SIZE 	(8*1024)
+#define SEARCH_STACK_SIZE	(2*1048)
 
 typedef struct raop_ctx_s {
 #ifdef WIN32
@@ -60,7 +61,7 @@ typedef struct raop_ctx_s {
 #else
 	TaskHandle_t thread, search_thread, joiner;
 	StaticTask_t *xTaskBuffer;
-    StackType_t *xStack;
+	StackType_t xStack[RTSP_STACK_SIZE] __attribute__ ((aligned (4)));
 #endif
 	unsigned char mac[6];
 	int latency;
@@ -71,14 +72,19 @@ typedef struct raop_ctx_s {
 	struct rtp_s *rtp;
 	raop_cmd_cb_t	cmd_cb;
 	raop_data_cb_t	data_cb;
-	/*
 	struct {
 		char				DACPid[32], id[32];
 		struct in_addr		host;
 		u16_t				port;
+#ifdef WIN32
 		struct mDNShandle_s *handle;
+#else
+		bool running;
+		TaskHandle_t thread, joiner;
+		StaticTask_t *xTaskBuffer;
+		StackType_t xStack[SEARCH_STACK_SIZE] __attribute__ ((aligned (4)));;
+#endif
 	} active_remote;
-	*/
 	void *owner;
 } raop_ctx_t;
 
@@ -98,7 +104,7 @@ static void* 	search_remote(void *args);
 extern char private_key[];
 enum { RSA_MODE_KEY, RSA_MODE_AUTH };
 
-static void on_dmap_string(void *ctx, const char *code, const char *name, const char *buf, size_t len);
+static void on_dmap_string(void *ctx, const char *code, const char *name, const char *buf, size_t len);
 
 /*----------------------------------------------------------------------------*/
 struct raop_ctx_s *raop_create(struct in_addr host, char *name,
@@ -186,26 +192,23 @@ struct raop_ctx_s *raop_create(struct in_addr host, char *name,
 	ESP_ERROR_CHECK( mdns_service_add(id, "_raop", "_tcp", ctx->port, txt, sizeof(txt) / sizeof(mdns_txt_item_t)) );
 	
     ctx->xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    ctx->xStack = (StackType_t*) malloc(RTSP_STACK_SIZE);
 	ctx->thread = xTaskCreateStatic( (TaskFunction_t) rtsp_thread, "RTSP_thread", RTSP_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->xStack, ctx->xTaskBuffer);
 #endif
 
 	return ctx;
 }
 
-
 /*----------------------------------------------------------------------------*/
 void raop_delete(struct raop_ctx_s *ctx) {
+#ifdef WIN32
 	int sock;
 	struct sockaddr addr;
 	socklen_t nlen = sizeof(struct sockaddr);
-
-	if (!ctx) return;
-	
-#if !defined WIN32
-	ctx->joiner = xTaskGetCurrentTaskHandle();
 #endif
+	
+if (!ctx) return;
 
+#ifdef WIN32
 	ctx->running = false;
 
 	// wake-up thread by connecting socket, needed for freeBSD
@@ -214,65 +217,98 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	connect(sock, (struct sockaddr*) &addr, sizeof(addr));
 	closesocket(sock);
 
-#ifdef WIN32
 	pthread_join(ctx->thread, NULL);
-#else
-	xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
-	vTaskDelete(ctx->thread);
-	free(ctx->xStack);
-	heap_caps_free(ctx->xTaskBuffer);
-#endif
 
 	rtp_end(ctx->rtp);
 
-#ifdef WIN32
 	shutdown(ctx->sock, SD_BOTH);
-#else
-	shutdown(ctx->sock, SHUT_RDWR);
-#endif
 	closesocket(ctx->sock);
 
-	/*
 	// terminate search, but do not reclaim memory of pthread if never launched
 	if (ctx->active_remote.handle) {
 		close_mDNS(ctx->active_remote.handle);
 		pthread_join(ctx->search_thread, NULL);
 	}
-	*/
+
+	// stop broadcasting devices
+	mdns_service_remove(ctx->svr, ctx->svc);
+	mdnsd_stop(ctx->svr);
+#else 
+	// first stop the search task if any
+	if (ctx->active_remote.running) {
+		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
+		ctx->active_remote.running = false;
+
+		vTaskResume(ctx->active_remote.thread);
+		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+		vTaskDelete(ctx->active_remote.thread);
+
+		heap_caps_free(ctx->active_remote.xTaskBuffer);
+	}
+
+	// then the RTSP task
+	ctx->joiner = xTaskGetCurrentTaskHandle();
+	ctx->running = false;
+
+	ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+	vTaskDelete(ctx->thread);
+	heap_caps_free(ctx->xTaskBuffer);
+
+	rtp_end(ctx->rtp);
+
+	shutdown(ctx->sock, SHUT_RDWR);
+	closesocket(ctx->sock);
+		
+	mdns_service_remove("_raop", "_tcp");	
+#endif
 
 	NFREE(ctx->rtsp.aeskey);
 	NFREE(ctx->rtsp.aesiv);
 	NFREE(ctx->rtsp.fmtp);
-	
-	// stop broadcasting devices
-#ifdef WIN32
-	mdns_service_remove(ctx->svr, ctx->svc);
-	mdnsd_stop(ctx->svr);
-#else
-	mdns_service_remove("_raop", "_tcp");	
-#endif
 
 	free(ctx);
 }
 
-
 /*----------------------------------------------------------------------------*/
-void  raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
-/*
+void raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 	struct sockaddr_in addr;
 	int sock;
 	char *command = NULL;
 
 	// first notify the remote controller (if any)
 	switch(event) {
+		case RAOP_REW:
+			command = strdup("beginrew");
+			break;
+		case RAOP_FWD:
+			command = strdup("beginff");
+			break;
+		case RAOP_PREV:
+			command = strdup("previtem");
+			break;
+		case RAOP_NEXT:
+			command = strdup("nextitem");
+			break;
+		case RAOP_TOGGLE:
+			command = strdup("playpause");
+			break;
 		case RAOP_PAUSE:
 			command = strdup("pause");
 			break;
 		case RAOP_PLAY:
 			command = strdup("play");
 			break;
+		case RAOP_RESUME:
+			command = strdup("playresume");
+			break;
 		case RAOP_STOP:
 			command = strdup("stop");
+			break;
+		case RAOP_VOLUME_UP:
+			command = strdup("volumeup");
+			break;
+		case RAOP_VOLUME_DOWN:
+			command = strdup("volumedown");
 			break;
 		case RAOP_VOLUME: {
 			float Volume = *((float*) param);
@@ -286,9 +322,9 @@ void  raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 
 	// no command to send to remote or no remote found yet
 	if (!command || !ctx->active_remote.port) {
-		NFREE(command);
-		return;
-	}
+		NFREE(command);
+		return;
+	}
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -317,11 +353,7 @@ void  raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 	}
 
 	free(command);
-
 	closesocket(sock);
-*/
-	// then notify local system
-	ctx->cmd_cb(event, param);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -366,7 +398,7 @@ static void *rtsp_thread(void *arg) {
 	if (sock != -1) closesocket(sock);
 
 #ifndef WIN32
-	xTaskNotify(ctx->joiner, 0, eNoAction);
+	xTaskNotifyGive(ctx->joiner);
 	vTaskSuspend(NULL);
 #endif
 
@@ -429,11 +461,26 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		NFREE(ctx->rtsp.aesiv);
 		NFREE(ctx->rtsp.fmtp);
 		
-		// LMS might has taken over the player, leaving us with a running RTP session
+		// LMS might has taken over the player, leaving us with a running RTP session (should not happen)
 		if (ctx->rtp) {
-			LOG_INFO("[%p]: closing unfinished RTP session", ctx);
+			LOG_WARN("[%p]: closing unfinished RTP session", ctx);
 			rtp_end(ctx->rtp);
 		}	
+
+		// same, should not happen unless we have missed a teardown ...
+		if (ctx->active_remote.running) {
+			ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
+			ctx->active_remote.running = false;
+			
+			vTaskResume(ctx->active_remote.thread);
+			ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+			vTaskDelete(ctx->active_remote.thread);
+
+			heap_caps_free(ctx->active_remote.xTaskBuffer);
+			memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
+
+			LOG_WARN("[%p]: closing unfinished mDNS search", ctx);
+		}
 
 		if ((p = strcasestr(body, "rsaaeskey")) != NULL) {
 			unsigned char *aeskey;
@@ -467,13 +514,17 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		}
 
 		// on announce, search remote
-		/*
 		if ((buf = kd_lookup(headers, "DACP-ID")) != NULL) strcpy(ctx->active_remote.DACPid, buf);
 		if ((buf = kd_lookup(headers, "Active-Remote")) != NULL) strcpy(ctx->active_remote.id, buf);
 
+#ifdef WIN32	
 		ctx->active_remote.handle = init_mDNS(false, ctx->host);
 		pthread_create(&ctx->search_thread, NULL, &search_remote, ctx);
-		*/
+#else
+		ctx->active_remote.running = true;
+		ctx->active_remote.xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+		ctx->active_remote.thread = xTaskCreateStatic( (TaskFunction_t) search_remote, "search_remote", SEARCH_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->active_remote.xStack, ctx->active_remote.xTaskBuffer);
+#endif		
 
 	} else if (!strcmp(method, "SETUP") && ((buf = kd_lookup(headers, "Transport")) != NULL)) {
 		char *p;
@@ -481,7 +532,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		short unsigned tport = 0, cport = 0;
 
 		// we are about to stream, do something if needed
-		ctx->cmd_cb(RAOP_SETUP, NULL);
+		success = ctx->cmd_cb(RAOP_SETUP, NULL);
 
 		if ((p = strcasestr(buf, "timing_port")) != NULL) sscanf(p, "%*[^=]=%hu", &tport);
 		if ((p = strcasestr(buf, "control_port")) != NULL) sscanf(p, "%*[^=]=%hu", &cport);
@@ -520,7 +571,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 		if (ctx->rtp) rtp_record(ctx->rtp, seqno, rtptime);
 
-		ctx->cmd_cb(RAOP_STREAM, NULL);
+		success = ctx->cmd_cb(RAOP_STREAM, NULL);
 
 	}  else if (!strcmp(method, "FLUSH")) {
 		unsigned short seqno = 0;
@@ -533,7 +584,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 		// only send FLUSH if useful (discards frames above buffer head and top)
 		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime))
-			ctx->cmd_cb(RAOP_FLUSH, NULL);
+			success = ctx->cmd_cb(RAOP_FLUSH, NULL);
 
 	}  else if (!strcmp(method, "TEARDOWN")) {
 
@@ -541,20 +592,32 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 		ctx->rtp = NULL;
 
-		/*
 		// need to make sure no search is on-going and reclaim pthread memory
+#ifdef WIN32
 		if (ctx->active_remote.handle) close_mDNS(ctx->active_remote.handle);
 		pthread_join(ctx->search_thread, NULL);
-		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-		*/
+#else
+		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
+		ctx->active_remote.running = false;
 
+		// task might not need to be resumed anyway
+		vTaskResume(ctx->active_remote.thread);
+		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+		vTaskDelete(ctx->active_remote.thread);
+
+		heap_caps_free(ctx->active_remote.xTaskBuffer);
+		
+		LOG_INFO("[%p]: mDNS search task terminated", ctx);
+#endif
+
+		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
 		NFREE(ctx->rtsp.aeskey);
 		NFREE(ctx->rtsp.aesiv);
 		NFREE(ctx->rtsp.fmtp);
 
-		ctx->cmd_cb(RAOP_STOP, NULL);
+		success = ctx->cmd_cb(RAOP_STOP, NULL);
 
-	} if (!strcmp(method, "SET_PARAMETER")) {
+	} else if (!strcmp(method, "SET_PARAMETER")) {
 		char *p;
 
 		if (body && (p = strcasestr(body, "volume")) != NULL) {
@@ -563,7 +626,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			sscanf(p, "%*[^:]:%f", &volume);
 			LOG_INFO("[%p]: SET PARAMETER volume %f", ctx, volume);
 			volume = (volume == -144.0) ? 0 : (1 + volume / 30);
-			ctx->cmd_cb(RAOP_VOLUME, &volume);
+			success = ctx->cmd_cb(RAOP_VOLUME, &volume);
 		}
 /*
 		if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
@@ -585,7 +648,6 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 	}
 
 	// don't need to free "buf" because kd_lookup return a pointer, not a strdup
-
 	kd_add(resp, "Audio-Jack-Status", "connected; type=analog");
 	kd_add(resp, "CSeq", kd_lookup(headers, "CSeq"));
 
@@ -605,7 +667,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 }
 
 /*----------------------------------------------------------------------------*/
-/*
+#ifdef WIN32
 bool search_remote_cb(mDNSservice_t *slist, void *cookie, bool *stop) {
 	mDNSservice_t *s;
 	raop_ctx_t *ctx = (raop_ctx_t*) cookie;
@@ -625,11 +687,9 @@ bool search_remote_cb(mDNSservice_t *slist, void *cookie, bool *stop) {
 	// let caller clear list
 	return false;
 }
-*/
 
 
 /*----------------------------------------------------------------------------*/
-/*
 static void* search_remote(void *args) {
 	raop_ctx_t *ctx = (raop_ctx_t*) args;
 
@@ -637,7 +697,57 @@ static void* search_remote(void *args) {
 
 	return NULL;
 }
-*/
+
+#else
+
+/*----------------------------------------------------------------------------*/
+static void* search_remote(void *args) {
+	raop_ctx_t *ctx = (raop_ctx_t*) args;
+	bool found = false;
+	
+	LOG_INFO("starting remote search");
+
+	while (ctx->active_remote.running && !found) {
+		mdns_result_t *results = NULL;
+		mdns_result_t *r;
+		mdns_ip_addr_t *a;
+
+		if (mdns_query_ptr("_dacp", "_tcp", 3000, 32,  &results)) {
+			LOG_ERROR("mDNS active remote query Failed");
+			continue;
+		}
+
+		for (r = results; r && !strcasestr(r->instance_name, ctx->active_remote.DACPid); r = r->next);
+		if (r) {
+			for (a = r->addr; a && a->addr.type != IPADDR_TYPE_V4; a = a->next);
+			if (a) {
+				found = true;
+				ctx->active_remote.host.s_addr = a->addr.u_addr.ip4.addr;
+				ctx->active_remote.port = r->port;
+				LOG_INFO("found remote %s %s:%hu", r->instance_name, inet_ntoa(ctx->active_remote.host), ctx->active_remote.port);
+			}
+		}
+	
+		mdns_query_results_free(results);
+	}
+
+	/*
+	for some reason which is beyond me, if that tasks gives the semaphore 
+	before the RTSP tasks waits for it, then freeRTOS crashes in queue 
+	management caused by LWIP stack once the RTSP socket is closed. I have 
+	no clue why, but so we'll suspend the tasks as soon as we're done with 
+	search and wait for the resume then give the semaphore
+	*/
+	// PS: I know this is not fully race-condition free
+	if (ctx->active_remote.running) vTaskSuspend(NULL);
+	xTaskNotifyGive(ctx->active_remote.joiner);
+
+	// now our context will be deleted
+	vTaskSuspend(NULL);
+
+	return NULL;
+ }
+#endif
 
 /*----------------------------------------------------------------------------*/
 static char *rsa_apply(unsigned char *input, int inlen, int *outlen, int mode)

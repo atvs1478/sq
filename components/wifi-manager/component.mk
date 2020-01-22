@@ -7,6 +7,7 @@
 # please read the SDK documents if you need to do this.
 #
 COMPONENT_EMBED_FILES := style.css code.js index.html bootstrap.min.css.gz jquery.min.js.gz popper.min.js.gz bootstrap.min.js.gz
+
 #CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG 
 CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG \
 	-I$(COMPONENT_PATH)/../tools			

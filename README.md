@@ -1,7 +1,7 @@
 # Squeezelite-esp32
 ## Supported Hardware 
 ### SqueezeAMP
-Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md)
+Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP/blob/master/README.md). Add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml to LMS if you want to have a display
 
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
@@ -23,6 +23,106 @@ FMT - GND
 XMT - 3.3V 
 
 Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
+
+## Configuration
+To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
+
+### I2C
+The NVS parameter "i2c_config" set the I2C's gpio needed to enable. Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+```
+sda=<gpio_num>,scl=<gpio_num>,port=0|1
+```
+## Display
+The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
+```
+I2C|SPI,width=<pixels>,height=<pixels>[,address=<i2c_address>][,HFlip][,VFlip]
+```
+- VFlip and HFlip are optional can be used to change display orientation
+
+### Vcc GPIO
+The parameter "Vcc_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) at boot. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here.
+
+### Buttons
+Buttons are described using a JSON string with the following syntax
+```
+[
+{"gpio":<num>,		
+ "type":"BUTTON_LOW | BUTTON_HIGH",	
+ "pull":[true|false],
+ "long_press":<ms>, 
+ "debounce":<ms>,
+ "shifter_gpio":<-1|num>,
+ "normal": {"pressed":"<action>","released":"<action>"},
+ "longpress": { <same> },
+ "shifted": { <same> },
+ "longshifted": { <same> },
+ },
+ { ... },
+ { ... },
+] 
+```
+
+Where (all parameters are optionals except gpio) 
+ - "type": (BUTTON_LOW) logic level when the button is pressed 
+ - "pull": (false) activate internal pull up/down
+ - "long_press": (0) duration (in ms) of keypress to detect long press, 0 to disable it
+ - "debounce": (0) debouncing duration in ms (0 = internal default of 50 ms)
+ - "shifter_gpio": (-1) gpio number of another button that can be pressed together to create a "shift". Set to -1 to disable shifter
+ - "normal": ({"pressed":"ACTRLS_NONE","released":"ACTRLS_NONE"}) action to take when a button is pressed/released (see below)
+ - "longpress": action to take when a button is long-pressed/released (see above/below)
+ - "shifted": action to take when a button is pressed/released and shifted (see above/below)
+ - "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
+
+Where <action> is either the name of another configuration to load or one amongst 
+				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
+				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
+				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
+				
+One you've created such a string, use it to fill a new NVS parameter with any name below 16(?) characters. You can have as many of these configs as you can. Then set the config parameter "actrls_config" with the name of your default config
+
+For example a config named "buttons" :
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,"normal":{"pressed":"ACTRLS_VOLDOWN"},"longpress":{"pressed":"buttons_remap"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_TOGGLE"}}]
+``` 
+Defines two buttons
+- first on GPIO 4, active low. When pressed, it triggers a volume down command. When pressed more than 1000ms, it changes the button configuration for the one named "buttons_remap"
+- second on GPIO 5, acive low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
+
+While the config named "buttons_remap"
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,"normal":{"pressed":"BCTRLS_DOWN"},"longpress":{"pressed":"buttons"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"BCTRLS_UP"}}]
+``` 
+Defines two buttons
+- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
+- second on GPIO 5, active low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
+
+Below is a difficult but functional 2-buttons interface for your decoding pleasure
+
+*buttons*
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
+ "normal":{"pressed":"ACTRLS_VOLDOWN"},
+ "longpress":{"pressed":"buttons_remap"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"long_press":1000,"shifter_gpio":4,
+ "normal":{"pressed":"ACTRLS_VOLUP"}, 
+ "shifted":{"pressed":"ACTRLS_TOGGLE"}, 
+ "longpress":{"pressed":"ACTRLS_NEXT"}}
+]
+```
+*buttons_remap*
+```
+[{"gpio":4,"type":"BUTTON_LOW","pull":true,"long_press":1000,
+ "normal":{"pressed":"BCTRLS_DOWN"},
+ "longpress":{"pressed":"buttons"}},
+ {"gpio":5,"type":"BUTTON_LOW","pull":true,"long_press":1000,"shifter_gpio":4,
+ "normal":{"pressed":"BCTRLS_UP"},
+ "shifted":{"pressed":"BCTRLS_PUSH"},
+ "longpress":{"pressed":"ACTRLS_PLAY"},
+ "longshifted":{"pressed":"BCTRLS_LEFT"}}
+]
+```
 
 ## Setting up ESP-IDF
 ### Docker

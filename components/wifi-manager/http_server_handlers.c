@@ -708,10 +708,12 @@ esp_err_t recovery_post_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
-bool is_captive_portal_host_name(http_req_t *req){
+bool is_captive_portal_host_name(httpd_req_t *req){
 	const char * host_name=NULL;
 	const char * ap_host_name=NULL;
-
+	char * ap_ip_address=NULL;
+	bool request_contains_hostname = false;
+	esp_err_t hn_err =ESP_OK, err=ESP_OK;
 	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
 	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
 		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
@@ -722,10 +724,6 @@ bool is_captive_portal_host_name(http_req_t *req){
 
    ESP_LOGD_LOC(TAG,  "Getting host name from request");
 	char *req_host = alloc_get_http_header(req, "Host");
-
-
-
-
 
 	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
 		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
@@ -757,23 +755,6 @@ bool is_captive_portal_host_name(http_req_t *req){
 	}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     if((request_contains_hostname 		= (host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,host_name)) == true){
     	ESP_LOGD_LOC(TAG,"http request host = system host name %s", req_host);
     }
@@ -781,9 +762,10 @@ bool is_captive_portal_host_name(http_req_t *req){
     	ESP_LOGD_LOC(TAG,"http request host = AP system host name %s", req_host);
     }
 
+    FREE_AND_NULL(ap_ip_address);
     FREE_AND_NULL(req_host);
 
-
+    return request_contains_hostname;
 }
 esp_err_t redirect_200_ev_handler(httpd_req_t *req){
 	esp_err_t err=ESP_OK;

@@ -117,10 +117,6 @@ static void *decode_thread() {
 		}
 	}
 	
-#if EMBEDDED	
-	deregister_external();
-#endif	
-
 	return 0;
 }
 
@@ -246,6 +242,9 @@ void decode_close(void) {
 	pthread_join(thread, NULL);
 #endif
 	mutex_destroy(decode.mutex);
+#if EMBEDDED	
+	deregister_external();
+#endif	
 }
 
 void decode_flush(void) {

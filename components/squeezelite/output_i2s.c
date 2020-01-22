@@ -49,6 +49,8 @@ sure that using rate_delay would fix that
 #include <signal.h>
 #include "time.h"
 #include "led.h"
+#include "monitor.h"
+#include "config.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
@@ -83,7 +85,7 @@ sure that using rate_delay would fix that
 #define CONFIG_SPDIF_NUM -1
 #endif
 
-typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOG_UP, DAC_ANALOG_DOWN, DAC_VOLUME } dac_cmd_e;
+typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOGUE_OFF, DAC_ANALOGUE_ON, DAC_VOLUME } dac_cmd_e;
 
 // must have an integer ratio with FRAME_BLOCK (see spdif comment)
 #define DMA_BUF_LEN		512	
@@ -110,9 +112,9 @@ extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
 
-bool jack_mutes_amp = false;
-
 static log_level loglevel;
+
+static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
 static int bytes_per_frame;
@@ -121,7 +123,6 @@ static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
 static size_t dma_buf_frames;
-static int jack_status = -1;		// 0 = inserted
 
 DECLARE_ALL_MIN_MAX;
 
@@ -130,9 +131,9 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 static void *output_thread_i2s();
 static void *output_thread_i2s_stats();
 static void dac_cmd(dac_cmd_e cmd, ...);
-static void set_analogue(bool mute);
 static int tas57_detect(void);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
+static void (*jack_handler_chain)(bool inserted);
 
 #ifdef CONFIG_SQUEEZEAMP
 
@@ -158,7 +159,9 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 
 #define I2C_PORT	0
 #define VOLUME_GPIO	14
-#define JACK_GPIO	34
+
+#define TAS575x 0x98
+#define TAS578x	0x90
 
 struct tas57xx_cmd_s {
 	u8_t reg;
@@ -172,6 +175,8 @@ static const struct tas57xx_cmd_s tas57xx_init_sequence[] = {
     { 0x02, 0x10 },		// standby
     { 0x0d, 0x10 },		// use SCK for PLL
 	{ 0x25, 0x08 },		// ignore SCK halt 
+	{ 0x08, 0x10 },		// Mute control enable (from TAS5780)
+	{ 0x54, 0x02 },		// Mute output control (from TAS5780)
 	{ 0x02, 0x00 },		// restart
 	{ 0xff, 0xff }		// end of table
 };
@@ -189,8 +194,8 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 	{ 0x02, 0x00 },	// DAC_ACTIVE
 	{ 0x02, 0x10 },	// DAC_STANDBY
 	{ 0x02, 0x01 },	// DAC_DOWN
-	{ 46, 0x01 },	// DAC_ANALOG_UP
-	{ 46, 0x00 },	// DAC_ANALOG_DOWN
+	{ 0x56, 0x10 },	// DAC_ANALOGUE_OFF
+	{ 0x56, 0x00 },	// DAC_ANALOGUE_ON
 };
 
 static u8_t tas57_addr;
@@ -198,16 +203,32 @@ static u8_t tas57_addr;
 #endif
 
 /****************************************************************************************
+ * jack insertion handler
+ */
+static void jack_handler(bool inserted) {
+	// jack detection bounces a bit but that seems fine
+	if (jack_mutes_amp) {
+		LOG_INFO("switching amplifier %s", inserted ? "OFF" : "ON");
+		if (inserted) dac_cmd(DAC_ANALOGUE_OFF);
+		else dac_cmd(DAC_ANALOGUE_ON);
+	}
+	if (jack_handler_chain) (jack_handler_chain)(inserted);
+}
+
+/****************************************************************************************
  * Initialize the DAC output
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;
+	char *p;
+
+	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
+	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
+	free(p);
 	
 #ifdef TAS57xx
 	LOG_INFO("Initializing TAS57xx ");
-	gpio_pad_select_gpio(JACK_GPIO);
-	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
-			
+				
 	adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_7, ADC_ATTEN_DB_0);
     			
@@ -241,9 +262,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (ret != ESP_OK) {
 		LOG_ERROR("could not intialize TAS57xx %d", ret);
 	}
-	
-	// activate analogue output if needed
-	if (!jack_mutes_amp) set_analogue(true);
 #endif	
 	
 #ifdef CONFIG_I2S_BITS_PER_CHANNEL
@@ -334,6 +352,12 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	
 	dac_cmd(DAC_STANDBY);
 
+	jack_handler_chain = jack_handler_svc;
+	jack_handler_svc = jack_handler;
+	
+	if (jack_mutes_amp && jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_OFF);
+	else dac_cmd(DAC_ANALOGUE_ON);
+	
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
     cfg.thread_name= "output_i2s";
@@ -374,7 +398,6 @@ void output_close_i2s(void) {
  */
 bool output_volume_i2s(unsigned left, unsigned right) {
 #ifdef TAS57xx	
-
 	if (!spdif) {
 		LOG_INFO("TAS57xx volume (L:%u R:%u)", left, right);
 		gpio_set_level(VOLUME_GPIO, left || right);
@@ -382,7 +405,6 @@ bool output_volume_i2s(unsigned left, unsigned right) {
 #endif	
  return false;	
 } 
-	
 
 /****************************************************************************************
  * Write frames to the output buffer
@@ -452,24 +474,24 @@ static void *output_thread_i2s() {
 	while (running) {
 			
 		TIME_MEASUREMENT_START(timer_start);
-#ifdef TAS57xx
-		// handle jack insertion as a polling function (to avoid to have to do de-bouncing)
-		if (gpio_get_level(JACK_GPIO) != jack_status) {
-			jack_status = gpio_get_level(JACK_GPIO);
-			if (jack_mutes_amp) {
-				set_analogue(jack_status);
-				LOG_INFO("Changing jack status %d", jack_status);
-			}	
-		}
-#endif
+
 		LOCK;
 		
-		// manage led display
+		// manage led display & analogue
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
 			if (output.state == OUTPUT_OFF) led_blink(LED_GREEN, 100, 2500);
-			else if (output.state == OUTPUT_STOPPED) led_blink(LED_GREEN, 200, 1000);
-			else if (output.state == OUTPUT_RUNNING) led_on(LED_GREEN);
+			else if (output.state == OUTPUT_STOPPED) {
+#ifdef TAS57xx				
+				dac_cmd(DAC_ANALOGUE_OFF);
+#endif				
+				led_blink(LED_GREEN, 200, 1000);
+			} else if (output.state == OUTPUT_RUNNING) {
+#ifdef TAS57xx				
+				if (!jack_mutes_amp || !jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_ON);
+#endif				
+				led_on(LED_GREEN);
+			}	
 		}
 		state = output.state;
 		
@@ -570,11 +592,7 @@ static void *output_thread_i2s() {
  * Stats output thread
  */
 static void *output_thread_i2s_stats() {
-	//return;
 	while (running) {
-#ifdef TAS57xx		
-		LOG_ERROR("Jack %d Voltage %.2fV", !gpio_get_level(JACK_GPIO), adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
-#endif		
 		LOCK;
 		output_state state = output.state;
 		UNLOCK;
@@ -598,11 +616,6 @@ static void *output_thread_i2s_stats() {
 			LOG_INFO("              ----------+----------+-----------+-----------+");
 			RESET_ALL_MIN_MAX;
 		}
-		LOG_INFO("Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
-					heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-					heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-					heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 		usleep(STATS_PERIOD_MS *1000);
 	}
 	return NULL;
@@ -642,25 +655,11 @@ void dac_cmd(dac_cmd_e cmd, ...) {
 }
 
 /****************************************************************************************
- * Analogue mute
- */
-#ifdef TAS57xx
-static void set_analogue(bool active) {
-
-	dac_cmd(DAC_STANDBY);
-	// need to wait a bit for TAS to execute standby before sending backend-down command
-	usleep(50*1000);
-	dac_cmd(active ? DAC_ANALOG_UP : DAC_ANALOG_DOWN);
-	dac_cmd(DAC_ACTIVE);	 
-}
-#endif
-/****************************************************************************************
  * TAS57 detection
  */
 #ifdef TAS57xx
 static int tas57_detect(void) {
-
-	u8_t data, addr[] = {0x90, 0x98};
+	u8_t data, addr[] = {TAS578x, TAS575x};
 	int ret;
 	
 	for (int i = 0; i < sizeof(addr); i++) {
@@ -683,7 +682,7 @@ static int tas57_detect(void) {
 			return addr[i];
 		}	
 	}	
-
+	
 	return 0;
 }
 #endif

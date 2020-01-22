@@ -282,10 +282,6 @@
 #include <limits.h>
 #include <sys/types.h>
 
-#if EMBEDDED
-#include "embedded.h"
-#endif
-	
 #if LINUX || OSX || FREEBSD || EMBEDDED
 #include <unistd.h>
 #include <stdbool.h>
@@ -389,6 +385,10 @@ typedef BOOL bool;
 
 #define RTLD_NOW 0
 
+#endif
+
+#if EMBEDDED
+#include "embedded.h"
 #endif
 
 #if !defined(MSG_NOSIGNAL)

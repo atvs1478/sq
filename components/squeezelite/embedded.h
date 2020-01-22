@@ -8,6 +8,7 @@
 		- pthread_create_name
 		- stack size
 		- s16_t, s32_t, s64_t and u64_t
+		- PLAYER_ID
 	can overload (use #define)
 		- exit
 		- gettime_ms
@@ -25,7 +26,8 @@
 #define OUTPUT_THREAD_STACK_SIZE  6 * 1024
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
-//#define BASE_CAP "Model=squeezelite,AccuratePlayPoints=0,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION	
+#define PLAYER_ID 100
+#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 
 typedef int16_t   s16_t;
@@ -42,8 +44,15 @@ uint32_t 	_gettime_ms_(void);
 
 int			pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr, 
 				   void *(*start_routine)( void * ), void *arg, char *name);
-			
+
+// must provide	of #define as empty macros		
+void		embedded_init(void);
 void 		register_external(void);
 void 		deregister_external(void);
+void 		decode_resume(int external);
+
+// optional, please chain 
+bool		(*slimp_handler)(u8_t *data, int len);
+void 		(*server_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 				   
 #endif // EMBEDDED_H

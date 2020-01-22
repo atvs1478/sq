@@ -11,8 +11,9 @@
 #include "esp_pthread.h"
 #include "esp_system.h"
 #include "freertos/timers.h"
-#include "nvs_utilities.h"
+#include "config.h"
 #include "raop.h"
+#include "audio_controls.h"
 
 #include "log_util.h"
 
@@ -22,13 +23,67 @@
 #define CONFIG_AIRPLAY_NAME		"ESP32-AirPlay"
 #endif
 
-static const char * TAG = "platform";
-
 log_level	raop_loglevel = lINFO;
 log_level	util_loglevel;
 
 static log_level *loglevel = &raop_loglevel;
 static struct raop_ctx_s *raop;
+
+static void raop_volume_up(void) {
+	raop_cmd(raop, RAOP_VOLUME_UP, NULL);
+	LOG_INFO("AirPlay volume up");
+}
+
+static void raop_volume_down(void) {
+	raop_cmd(raop, RAOP_VOLUME_DOWN, NULL);
+	LOG_INFO("AirPlay volume down");
+}
+
+static void raop_toggle(void) {
+	raop_cmd(raop, RAOP_TOGGLE, NULL);
+	LOG_INFO("AirPlay play/pause");
+}
+
+static void raop_pause(void) {
+	raop_cmd(raop, RAOP_PAUSE, NULL);
+	LOG_INFO("AirPlay pause");
+}
+
+static void raop_play(void) {
+	raop_cmd(raop, RAOP_PLAY, NULL);
+	LOG_INFO("AirPlay play");
+}
+
+static void raop_stop(void) {
+	raop_cmd(raop, RAOP_STOP, NULL);
+	LOG_INFO("AirPlay stop");
+}
+
+static void raop_prev(void) {
+	raop_cmd(raop, RAOP_PREV, NULL);
+	LOG_INFO("AirPlay previous");
+}
+
+static void raop_next(void) {
+	raop_cmd(raop, RAOP_NEXT, NULL);
+	LOG_INFO("AirPlay next");
+}
+
+const static actrls_t controls = {
+	raop_volume_up, raop_volume_down,	// volume up, volume down
+	raop_toggle, raop_play,				// toggle, play
+	raop_pause, raop_stop,				// pause, stop
+	NULL, NULL,							// rew, fwd
+	raop_prev, raop_next,				// prev, next
+};
+
+/****************************************************************************************
+ * Airplay taking/giving audio system's control 
+ */
+void raop_master(bool on) {
+	if (on) actrls_set(controls, NULL);
+	else actrls_unset();
+}
 
 /****************************************************************************************
  * Airplay sink de-initialization
@@ -56,14 +111,14 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
     ESP_ERROR_CHECK( mdns_init() );
     ESP_ERROR_CHECK( mdns_hostname_set(hostname) );
         
-    char * sink_name_buffer= (char *)config_alloc_get(NVS_TYPE_STR, "airplay_name");
+    char * sink_name_buffer= (char *)config_alloc_get(NVS_TYPE_STR,"airplay_name");
     if(sink_name_buffer != NULL){
     	memset(sink_name, 0x00, sizeof(sink_name));
     	strncpy(sink_name,sink_name_buffer,sizeof(sink_name)-1 );
     	free(sink_name_buffer);
     }
 
-	ESP_LOGI(TAG, "mdns hostname set to: [%s] with servicename %s", hostname, sink_name);
+	LOG_INFO( "mdns hostname set to: [%s] with servicename %s", hostname, sink_name);
 
     // create RAOP instance, latency is set by controller
 	uint8_t mac[6];	
@@ -72,8 +127,10 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
 }
 
 /****************************************************************************************
- * Airplay local command (stop, start, volume ...)
+ * Airplay forced disconnection
  */
-void raop_sink_cmd(raop_event_t event, void *param) {
-	raop_cmd(raop, event, param);
+void raop_disconnect(void) {
+	LOG_INFO("forced disconnection");
+	raop_cmd(raop, RAOP_STOP, NULL);
+	actrls_unset();
 }

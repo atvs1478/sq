@@ -18,7 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+
+#include "config.h" 
 #include "squeezelite.h"
 #include "bt_app_sink.h"
 #include "raop_sink.h"
@@ -29,7 +30,7 @@
 #define LOCK_D   mutex_lock(decode.mutex);
 #define UNLOCK_D mutex_unlock(decode.mutex);
 
-enum { DECODE_BT = 1, DECODE_AIRPLAY };
+enum { DECODE_BT = 1, DECODE_RAOP };
 
 extern struct outputstate output;
 extern struct decodestate decode;
@@ -37,9 +38,9 @@ extern struct buffer *outputbuf;
 // this is the only system-wide loglevel variable
 extern log_level loglevel;
 
-// not great to have these here, but they should not be in embedded.h
-bool enable_bt_sink = false;
-bool enable_airplay = false;
+
+static bool enable_bt_sink;
+static bool enable_airplay;
 
 #define RAOP_OUTPUT_SIZE 	(RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
 #define SYNC_NB				5
@@ -60,8 +61,8 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
 {
     size_t bytes, space;
 		
-	// would be better to lock decoder, but really, it does not matter
-	if (decode.state != DECODE_STOPPED) {
+	// would be better to lock output, but really, it does not matter
+	if (!output.external) {
 		LOG_SDEBUG("Cannot use external sink while LMS is controlling player");
 		return;
 	} 
@@ -99,18 +100,18 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
  * BT sink command handler
  */
 
-static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...) 
+static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...) 
 {
 	va_list args;
 	
-	LOCK_D;
-	
-	if (decode.state != DECODE_STOPPED) {
-		LOG_WARN("Cannot use BT sink while LMS is controlling player");
-		UNLOCK_D;
-		return;
+	// don't LOCK_O as there is always a chance that LMS takes control later anyway
+	if (output.external != DECODE_BT && output.state > OUTPUT_STOPPED) {
+		LOG_WARN("Cannot use BT sink while LMS/AirPlay is controlling player");
+		return false;
 	} 	
-	
+
+	LOCK_D;
+
 	va_start(args, cmd);
 	
 	if (cmd != BT_SINK_VOLUME) LOCK_O;
@@ -119,12 +120,16 @@ static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 	case BT_SINK_CONNECTED:
 		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
+		output.frames_played = 0;
+		_buf_flush(outputbuf);
+		if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
+		bt_master(true);
 		LOG_INFO("BT sink started");
 		break;
 	case BT_SINK_DISCONNECTED:	
 		if (output.external == DECODE_BT) {
-			output.external = 0;
 			output.state = OUTPUT_OFF;
+			bt_master(false);
 			LOG_INFO("BT sink stopped");
 		}	
 		break;
@@ -154,6 +159,7 @@ static void bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 	UNLOCK_D;
 
 	va_end(args);
+	return true;
 }
 
 /****************************************************************************************
@@ -170,15 +176,15 @@ static void raop_sink_data_handler(const uint8_t *data, uint32_t len, u32_t play
 /****************************************************************************************
  * AirPlay sink command handler
  */
-void raop_sink_cmd_handler(raop_event_t event, void *param)
+static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 {
-	LOCK_D;
-	
-	if (decode.state != DECODE_STOPPED) {
-		LOG_WARN("Cannot use Airplay sink while LMS is controlling player");
-		UNLOCK_D;
-		return;
+	// don't LOCK_O as there is always a chance that LMS takes control later anyway
+	if (output.external != DECODE_RAOP && output.state > OUTPUT_STOPPED) {
+		LOG_WARN("Cannot use Airplay sink while LMS/BT is controlling player");
+		return false;
 	} 	
+
+	LOCK_D;
 	
 	if (event != RAOP_VOLUME) LOCK_O;
 	
@@ -232,6 +238,11 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 		case RAOP_SETUP:
 			// we need a fair bit of space for RTP process
 			_buf_resize(outputbuf, RAOP_OUTPUT_SIZE);
+			output.frames_played = 0;
+			output.external = DECODE_RAOP;
+			output.state = OUTPUT_STOPPED;
+			if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
+			raop_master(true);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;
 		case RAOP_STREAM:
@@ -241,16 +252,14 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 			raop_sync.idx = 0;
 			raop_sync.start = true;		
 			raop_sync.enabled = !strcasestr(output.device, "BT");
-			output.external = DECODE_AIRPLAY;
 			output.next_sample_rate = output.current_sample_rate = RAOP_SAMPLE_RATE;
-			output.state = OUTPUT_STOPPED;
 			break;
 		case RAOP_STOP:
 			LOG_INFO("Stop", NULL);
-			output.external = 0;
 			output.state = OUTPUT_OFF;
 			output.frames_played = 0;
 			raop_state = event;
+			raop_master(false);
 			break;
 		case RAOP_FLUSH:
 			LOG_INFO("Flush", NULL);
@@ -285,12 +294,25 @@ void raop_sink_cmd_handler(raop_event_t event, void *param)
 	if (event != RAOP_VOLUME) UNLOCK_O;
 	
 	UNLOCK_D;
+	return true;
 }
 
 /****************************************************************************************
  * We provide the generic codec register option
  */
 void register_external(void) {
+	char *p;
+
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_bt_sink")) != NULL) {
+		enable_bt_sink = strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0;
+		free(p);
+	}
+
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_airplay")) != NULL) {
+		enable_airplay = strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0;
+		free(p);
+	}
+
 	if (!strcasestr(output.device, "BT ") ) {
 		if(enable_bt_sink){
 			bt_sink_init(bt_sink_cmd_handler, sink_data_handler);
@@ -299,7 +321,8 @@ void register_external(void) {
 	} else {
 		LOG_WARN("Cannot be a BT sink and source");
 	}	
-	if(enable_airplay){
+
+	if (enable_airplay){
 		raop_sink_init(raop_sink_cmd_handler, raop_sink_data_handler);
 		LOG_INFO("Initializing AirPlay sink");
 	}
@@ -310,8 +333,20 @@ void deregister_external(void) {
 		bt_sink_deinit();
 		LOG_INFO("Stopping BT sink");
 	}
-	if(enable_airplay){
+	if (enable_airplay){
 		raop_sink_deinit();
 		LOG_INFO("Stopping AirPlay sink");
+	}
+}
+
+void decode_resume(int external) {
+	switch (external) {
+	case DECODE_BT:
+		bt_disconnect();
+		break;
+	case DECODE_RAOP:
+		raop_disconnect();
+		raop_state = RAOP_STOP;
+		break;
 	}
 }

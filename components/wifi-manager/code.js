@@ -765,6 +765,30 @@ function checkStatus(){
                 lastMsg = msg;
             }
         }
+        if (data.hasOwnProperty('Voltage')) {
+            var voltage = data['Voltage'];
+            var layer;
+            if (voltage > 0) {
+                if (inRange(voltage, 5.8, 6.2) || inRange(voltage, 8.8, 9.2)) {
+                    layer = bat0;
+                } else if (inRange(voltage, 6.2, 6.8) || inRange(voltage, 9.2, 10.0)) {
+                    layer = bat1;
+                } else if (inRange(voltage, 6.8, 7.1) || inRange(voltage, 10.0, 10.5)) {
+                    layer = bat2;
+                } else if (inRange(voltage, 7.1, 7.5) || inRange(voltage, 10.5, 11.0)) {
+                    layer = bat3;
+                } else {
+                    layer = bat4;
+                }
+                layer.setAttribute("display","inline");
+            }
+        }
+        if (data.hasOwnProperty('Jack')) {
+            var jack = data['Jack'];
+            if (jack == '1') {
+                o_jack.setAttribute("display","inline");
+            }
+        }
         blockAjax = false;
     })
     .fail(function(xhr, ajaxOptions, thrownError) {
@@ -787,6 +811,15 @@ function getConfig() {
                     }
                 } else if (key == 'autoexec1') {
                     $("textarea#autoexec1").val(data[key].value);
+                    var re = / -o "?(\S+)\b/g;
+                    var m = re.exec(data[key].value);
+                    if (m[1] =='I2S') {
+                        o_i2s.setAttribute("display","inline");
+                    } else if (m[1] =='SPDIF') {
+                        o_spdif.setAttribute("display","inline");
+                    } else if (m[1] =='BT') {
+                        o_bt.setAttribute("display","inline");
+                    }
                 } else if (key == 'host_name') {
                     $("input#dhcp-name1").val(data[key].value);
                     $("input#dhcp-name2").val(data[key].value);
@@ -836,4 +869,8 @@ function showMessage(message, severity) {
             $("#content").fadeTo("slow", 1.0);
         });
     });
+}
+
+function inRange(x, min, max) {
+    return ((x-min)*(x-max) <= 0);
 }

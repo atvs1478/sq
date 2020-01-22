@@ -46,10 +46,8 @@
 #include "squeezelite-ota.h"
 #include <math.h>
 #include "config.h"
+#include "audio_controls.h"
 
-extern bool enable_bt_sink;
-extern bool enable_airplay;
-extern bool jack_mutes_amp;
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -64,19 +62,13 @@ static const char TAG[] = "esp_app_main";
 #define DEFAULT_HOST_NAME "squeezelite"
 char * fwurl = NULL;
 
-#ifdef CONFIG_SQUEEZEAMP
-#define LED_GREEN_GPIO 	12
-#define LED_RED_GPIO	13
-#else
-#define LED_GREEN_GPIO 	-1
-#define LED_RED_GPIO	-1
-#endif
 static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 
-
-
+// as an exception _init function don't need include
+extern void services_init(void);
+extern void	display_init(char *welcome);
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -239,7 +231,6 @@ void register_default_nvs(){
 	esp_read_mac((uint8_t *)&mac, ESP_MAC_WIFI_STA);
 	snprintf(macStr, LOCAL_MAC_SIZE-1,"-%x%x%x", mac[3], mac[4], mac[5]);
 
-
 	DEFAULT_NAME_WITH_MAC(default_bt_name,CONFIG_BT_NAME);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_name", default_bt_name);
 	config_set_default(NVS_TYPE_STR, "bt_name", default_bt_name, 0);
@@ -287,8 +278,8 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "test_num", "0");
-
+	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
+	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
@@ -304,35 +295,20 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "ota_prio", number_buffer, 0);
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
-	char * flag = config_alloc_get_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
-	if(flag !=NULL){
-		enable_bt_sink= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_bt_sink'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
+	
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
-	flag = config_alloc_get_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
-	if(flag !=NULL){
-		enable_airplay= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'enable_airplay'");
-	}
+	config_set_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 
-
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "jack_mutes_amp", "n");
-	flag = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
-
-	if(flag !=NULL){
-		jack_mutes_amp= (strcmp(flag,"1")==0 ||strcasecmp(flag,"y")==0);
-		free(flag);
-	}
-	else {
-		ESP_LOGE(TAG,"Unable to get flag 'jack_mutes_amp'");
-	}
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", STR(CONFIG_DISPLAY_CONFIG));
+	config_set_default(NVS_TYPE_STR, "display_config", STR(CONFIG_DISPLAY_CONFIG), 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "i2c_config");
+	config_set_default(NVS_TYPE_STR, "i2c_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "Vcc_GPIO");
+	config_set_default(NVS_TYPE_STR, "Vcc_GPIO", "", 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
@@ -344,7 +320,7 @@ void app_main()
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-
+	
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
 
@@ -354,6 +330,12 @@ void app_main()
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
 
+	ESP_LOGD(TAG,"Configuring services");
+	services_init();
+
+	ESP_LOGD(TAG,"Initializing display");	
+	display_init("SqueezeESP32");
+
 #if !RECOVERY_APPLICATION
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");
 	update_certificates();
@@ -361,7 +343,6 @@ void app_main()
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
-
 
 	ESP_LOGD(TAG,"Getting value for WM bypass, nvs 'bypass_wm'");
 	char * bypass_wm = config_alloc_get_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
@@ -374,11 +355,17 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
-	ESP_LOGD(TAG,"Configuring Green led");
-
-	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
-	ESP_LOGD(TAG,"Configuring Red led");
-	led_config(LED_RED, LED_RED_GPIO, 0);
+	ESP_LOGD(TAG,"Getting audio control mapping ");
+	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
+	if (actrls_config) {
+		if(actrls_config[0] !='\0'){
+			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);
+			actrls_init_json(actrls_config, true);
+		}
+		free(actrls_config);
+	} else {
+		ESP_LOGD(TAG,"No audio control buttons");
+	}
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");

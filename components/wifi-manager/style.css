@@ -308,6 +308,33 @@ span#flash-status {
     font-size: 120%;
 }
 
+#info {
+    padding-top: 7px;
+    float: right;
+}
+
+svg#battery {
+    fill: #ddd;
+}
+
+svg#output {
+    fill: #ddd;
+    padding-right: 4px;
+}
+
+svg#jack {
+    fill: #ddd;
+    padding-right: 4px;
+}
+
+ul#navbar {
+    border-bottom: 0px;
+}
+
+#content {
+    border-top: 1px solid black;
+}
+
 .footer {
   position: fixed;
   left: 0;
@@ -335,6 +362,7 @@ td.value {
 
 iframe#dummyframe {
     float: right;
+    border: none;
 }
 
 div#message {

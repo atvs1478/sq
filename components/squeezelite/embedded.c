@@ -48,3 +48,11 @@ int	pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr,
 uint32_t _gettime_ms_(void) {
 	return (uint32_t) (esp_timer_get_time() / 1000);
 }
+
+extern void sb_controls_init(void);
+extern void sb_display_init(void);
+
+void embedded_init(void) {
+	sb_controls_init();
+	sb_display_init();
+}

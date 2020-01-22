@@ -43,6 +43,9 @@ static log_level loglevel;
 
 static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
+static u16_t slimproto_hport = 9000;
+static u16_t slimproto_cport = 9090;
+static u8_t	player_id = PLAYER_ID;
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -131,10 +134,12 @@ static void sendHELO(bool reconnect, const char *fixed_cap, const char *var_cap,
 	base_cap = BASE_CAP;
 #endif	
 
+	if (!reconnect) player_id = PLAYER_ID;
+
 	memset(&pkt, 0, sizeof(pkt));
 	memcpy(&pkt.opcode, "HELO", 4);
 	pkt.length = htonl(sizeof(struct HELO_packet) - 8 + strlen(base_cap) + strlen(fixed_cap) + strlen(var_cap));
-	pkt.deviceid = 12; // squeezeplay
+	pkt.deviceid = player_id;
 	pkt.revision = 0;
 	packn(&pkt.wlan_channellist, reconnect ? 0x4000 : 0x0000);
 	packN(&pkt.bytes_received_H, (u64_t)status.stream_bytes >> 32);
@@ -281,7 +286,7 @@ static void process_strm(u8_t *pkt, int len) {
 		break;
 	case 'q':
 		decode_flush();
-		output_flush();
+		if (!output.external) output_flush();
 		status.frames_played = 0;
 		stream_disconnect();
 		sendSTAT("STMf", 0);
@@ -289,7 +294,7 @@ static void process_strm(u8_t *pkt, int len) {
 		break;
 	case 'f':
 		decode_flush();
-		output_flush();
+		if (!output.external) output_flush();
 		status.frames_played = 0;
 		if (stream_disconnect()) {
 			sendSTAT("STMf", 0);
@@ -371,8 +376,11 @@ static void process_strm(u8_t *pkt, int len) {
 			sendSTAT("STMc", 0);
 			sentSTMu = sentSTMo = sentSTMl = false;
 			LOCK_O;
+#if EMBEDDED
+			if (output.external) decode_resume(output.external);
 			output.external = 0;
 			_buf_resize(outputbuf, output.init_size);
+#endif
 			output.threshold = strm->output_threshold;
 			output.next_replay_gain = unpackN(&strm->replay_gain);
 			output.fade_mode = strm->transition_type - '0';
@@ -437,6 +445,11 @@ static void process_audg(u8_t *pkt, int len) {
 	LOG_DEBUG("audg gainL: %u gainR: %u adjust: %u", audg->gainL, audg->gainR, audg->adjust);
 
 	set_volume(audg->adjust ? audg->gainL : FIXED_ONE, audg->adjust ? audg->gainR : FIXED_ONE);
+}
+
+static void process_dsco(u8_t *pkt, int len) {
+	LOG_INFO("got DSCO, switching from id %u to 12", (int) player_id);
+	player_id = 12;
 }
 
 static void process_setd(u8_t *pkt, int len) {
@@ -514,6 +527,7 @@ static struct handler handlers[] = {
 	{ "audg", process_audg },
 	{ "setd", process_setd },
 	{ "serv", process_serv },
+	{ "dsco", process_dsco },
 	{ "",     NULL  },
 };
 
@@ -524,7 +538,7 @@ static void process(u8_t *pack, int len) {
 	if (h->handler) {
 		LOG_DEBUG("%s", h->opcode);
 		h->handler(pack, len);
-	} else {
+	} else if (!slimp_handler || !(*slimp_handler)(pack, len)) {
 		pack[4] = '\0';
 		LOG_WARN("unhandled %s", (char *)pack);
 	}
@@ -768,16 +782,17 @@ void wake_controller(void) {
 in_addr_t discover_server(char *default_server) {
 	struct sockaddr_in d;
 	struct sockaddr_in s;
-	char *buf;
+	char buf[32], port_d[] = "JSON", clip_d[] = "CLIP";
 	struct pollfd pollinfo;
 	unsigned port;
+	u8_t len;
 
 	int disc_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	socklen_t enable = 1;
 	setsockopt(disc_sock, SOL_SOCKET, SO_BROADCAST, (const void *)&enable, sizeof(enable));
 
-	buf = "e";
+	len = sprintf(buf,"e%s%c%s", port_d, '\0', clip_d) + 1;
 
 	memset(&d, 0, sizeof(d));
 	d.sin_family = AF_INET;
@@ -792,15 +807,26 @@ in_addr_t discover_server(char *default_server) {
 		LOG_INFO("sending discovery");
 		memset(&s, 0, sizeof(s));
 
-		if (sendto(disc_sock, buf, 1, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
+		if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
 			LOG_INFO("error sending disovery");
 		}
 
 		if (poll(&pollinfo, 1, 5000) == 1) {
-			char readbuf[10];
+			char readbuf[32], *p;
 			socklen_t slen = sizeof(s);
-			recvfrom(disc_sock, readbuf, 10, 0, (struct sockaddr *)&s, &slen);
+			memset(readbuf, 0, 32);
+			recvfrom(disc_sock, readbuf, 32 - 1, 0, (struct sockaddr *)&s, &slen);
 			LOG_INFO("got response from: %s:%d", inet_ntoa(s.sin_addr), ntohs(s.sin_port));
+
+			 if ((p = strstr(readbuf, port_d)) != NULL) {
+				p += strlen(port_d);
+				slimproto_hport = atoi(p + 1);
+			}
+
+			 if ((p = strstr(readbuf, clip_d)) != NULL) {
+				p += strlen(clip_d);
+				slimproto_cport = atoi(p + 1);
+			}
 		}
 
 		if (default_server) {
@@ -950,6 +976,10 @@ void slimproto(log_level level, char *server, u8_t mac[6], const char *name, con
 			}
 
 			sendHELO(reconnect, fixed_cap, var_cap, mac);
+
+#if EMBEDDED
+			if (server_notify) (*server_notify)(slimproto_ip, slimproto_hport, slimproto_cport);
+#endif
 
 			slimproto_run();
 

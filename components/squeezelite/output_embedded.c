@@ -28,18 +28,19 @@ extern struct buffer *outputbuf;
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
 
+// output_bt.c
 extern void output_init_bt(log_level level, char *device, unsigned output_buf_size, char *params, 
 						  unsigned rates[], unsigned rate_delay, unsigned idle);
 extern void output_close_bt(void); 
 
+// output_i2s.c
 extern void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, 
 						  unsigned rates[], unsigned rate_delay, unsigned idle);					
 extern bool output_volume_i2s(unsigned left, unsigned right); 
 extern void output_close_i2s(void); 
 
-#ifdef CONFIG_BT_SINK
-extern void decode_bt_init(void);
-#endif
+// controls.c
+extern void cli_controls_init(void);
 
 static log_level loglevel;
 
