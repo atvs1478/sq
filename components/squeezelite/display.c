@@ -56,16 +56,32 @@ struct grfg_packet {
 #pragma pack(pop)
 
 static struct scroller_s {
-	TaskHandle_t task;
-	bool active;
+	// copy of grfs content
 	u8_t  screen, direction;	
 	u32_t pause, speed;		
-	u16_t by, mode, width, scroll_width;		
+	u16_t by, mode, full_width, window_width;		
 	u16_t max, size;
+	// scroller management & sharing between grfg and scrolling task
+	TaskHandle_t task;
 	u8_t *scroll_frame, *back_frame;
+	bool active, updated;
+	u8_t *scroll_ptr;
+	int scroll_len, scroll_step;
 } scroller;
 
+/*
+	ANIM_SCREEN_1                    => end of first scroll on screen 1
+	ANIM_SCREEN_2                    => end of first scroll on screen 2
+	ANIM_SCROLL_ONCE | ANIM_SCREEN_1 => end of scroll once on screen 1
+	ANIM_SCROLL_ONCE | ANIM_SCREEN_2 => end of scroll once on screen 2
+*/	
+#define ANIM_TRANSITION   0x01 // A transition animation has finished
+#define ANIM_SCROLL_ONCE  0x02 
+#define ANIM_SCREEN_1     0x04 
+#define ANIM_SCREEN_2     0x08 
+
 #define SCROLL_STACK_SIZE	2048
+
 #define LINELEN				40
 #define HEIGHT				32
 
@@ -98,12 +114,18 @@ static void scroll_task(void* arg);
 	grfd
 		W: screen number
 		W: width of scrollable area	in pixels
-		
-ANIC flags
-ANIM_TRANSITION   0x01 # A transition animation has finished
-ANIM_SCROLL_ONCE  0x02 # A scrollonce has finished
-ANIM_SCREEN_1     0x04 # For scrollonce only, screen 1 was scrolling
-ANIM_SCREEN_2     0x08 # For scrollonce only, screen 2 was scrolling
+	anic ( two versions, don't know what to chose)
+		B: flag
+			ANIM_TRANSITION (0x01) - transition animation has finished (previous use of ANIC)
+			ANIM_SCREEN_1 (0x04)                           - end of first scroll on screen 1
+			ANIM_SCREEN_2 (0x08)                           - end of first scroll on screen 2
+			ANIM_SCROLL_ONCE (0x02) | ANIM_SCREEN_1 (0x04) - end of scroll once on screen 1
+			ANIM_SCROLL_ONCE (0x02) | ANIM_SCREEN_2 (0x08) - end of scroll once on screen 2	
+		- or -
+			ANIM_TRANSITION   0x01 # A transition animation has finished
+			ANIM_SCROLL_ONCE  0x02 # A scrollonce has finished
+			ANIM_SCREEN_1     0x04 # For scrollonce only, screen 1 was scrolling
+			ANIM_SCREEN_2     0x08 # For scrollonce only, screen 2 was scrolling
 */
 
 /****************************************************************************************
@@ -282,10 +304,14 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
  * Process graphic display data
  */
 static void grfe_handler( u8_t *data, int len) {
-	scroller.active = false;
 	xSemaphoreTake(display_sem, portMAX_DELAY);
+	
+	scroller.active = false;
 	display->draw_cbr(data + sizeof(struct grfe_packet), HEIGHT);
+	
 	xSemaphoreGive(display_sem);
+	
+	LOG_DEBUG("grfe frame %u", len);
 }	
 
 /****************************************************************************************
@@ -323,21 +349,30 @@ static void grfs_handler(u8_t *data, int len) {
 				htons(pkt->width),		// total width of animation
 				htons(pkt->offset)		// offset if multiple packets are sent
 	);
+	
+	// new grfs frame, build scroller info
+	if (!offset) {	
+		// use the display as a general lock
+		xSemaphoreTake(display_sem, portMAX_DELAY);
 
-	// copy scroll parameters
-	scroller.screen = pkt->screen;
-	scroller.direction = pkt->direction;
-	scroller.pause = htonl(pkt->pause);
-	scroller.speed = htonl(pkt->speed);
-	scroller.by = htons(pkt->by);
-	scroller.mode = htons(pkt->mode);
-	scroller.width = htons(pkt->width);
+		// copy & set scroll parameters
+		scroller.screen = pkt->screen;
+		scroller.direction = pkt->direction;
+		scroller.pause = htonl(pkt->pause);
+		scroller.speed = htonl(pkt->speed);
+		scroller.by = htons(pkt->by);
+		scroller.mode = htons(pkt->mode);
+		scroller.full_width = htons(pkt->width);
+		scroller.updated = scroller.active = true;
 
-	// copy scroll frame data
+		xSemaphoreGive(display_sem);
+	}	
+
+	// copy scroll frame data (no semaphore needed)
 	if (scroller.size + size < scroller.max) {
 		memcpy(scroller.scroll_frame + offset, data + sizeof(struct grfs_packet), size);
 		scroller.size = offset + size;
-		LOG_INFO("scroller size now %u", scroller.size);
+		LOG_INFO("scroller current size %u", scroller.size);
 	} else {
 		LOG_INFO("scroller too larger %u/%u", scroller.size + size, scroller.max);
 	}	
@@ -349,76 +384,112 @@ static void grfs_handler(u8_t *data, int len) {
 static void grfg_handler(u8_t *data, int len) {
 	struct grfg_packet *pkt = (struct grfg_packet*) data;
 	
-	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
-	scroller.scroll_width = htons(pkt->width);
-	scroller.active = true;
-	vTaskResume(scroller.task);
-	
 	LOG_INFO("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
+	
+	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
+	scroller.window_width = htons(pkt->width);
+	
+	xSemaphoreTake(display_sem, portMAX_DELAY);
+
+	// can't be in grfs as we need full size & scroll_width
+	if (scroller.updated) {
+		scroller.scroll_len = display->width * display->height / 8 - (display->width - scroller.window_width) * display->height / 8;
+		if (scroller.direction == 1) {
+			scroller.scroll_ptr = scroller.scroll_frame; 
+			scroller.scroll_step = scroller.by * display->height / 8;
+		} else	{
+			scroller.scroll_ptr = scroller.scroll_frame + scroller.size - scroller.scroll_len;
+			scroller.scroll_step = -scroller.by * display->height / 8;
+		}
+		
+		scroller.updated = false;	
+	}	
+	
+	if (!scroller.active) {
+		// this is a background update and scroller has been finished, so need to update here
+		u8_t *frame = malloc(display->width * display->height / 8);
+		memcpy(frame, scroller.back_frame, display->width * display->height / 8);
+		for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
+		display->draw_cbr(frame, HEIGHT);		
+		free(frame);
+		LOG_DEBUG("direct drawing");
+	}	
+	else {
+		// if we just got a content update, let the scroller manage the screen
+		LOG_INFO("resuming scrolling task");
+		vTaskResume(scroller.task);
+	}
+	
+	xSemaphoreGive(display_sem);
 }
 
 /****************************************************************************************
  * Scroll task
  */
 static void scroll_task(void *args) {
-	u8_t *scroll_ptr, *frame;
-	bool active = false;
+	u8_t *frame = NULL;
 	int len = display->width * display->height / 8;
-	int scroll_len, scroll_step;
-
+	
 	while (1) {
-		if (!active) vTaskSuspend(NULL);
-
-		// restart at the beginning - I don't know what right scrolling means ...
-		scroll_len = len - (display->width - scroller.scroll_width) * display->height / 8;
-		if (scroller.direction == 1) {
-			scroll_ptr = scroller.scroll_frame; 
-			scroll_step = scroller.by * display->height / 8;
-		} else	{
-			scroll_ptr = scroller.scroll_frame + scroller.size - scroll_len;
-			scroll_step = -scroller.by * display->height / 8;
-		}	
-			
-		frame = malloc(display->width * display->height / 8);
-						
-		// scroll required amount of columns (within the window)
-		while (scroller.direction == 1 ? (scroll_ptr <= scroller.scroll_frame + scroller.size - scroll_step - len) :
-									     (scroll_ptr + scroll_step >= scroller.scroll_frame) ) {
-			// build a combined frame
-			memcpy(frame, scroller.back_frame, len);
-			for (int i = 0; i < scroll_len; i++) frame[i] |= scroll_ptr[i];
-			scroll_ptr += scroll_step;
-			
+		xSemaphoreTake(display_sem, portMAX_DELAY);
+		
+		// suspend ourselves if nothing to do, grfg will wake us up
+		if (!scroller.active)  {
+			xSemaphoreGive(display_sem);
+			vTaskSuspend(NULL);
 			xSemaphoreTake(display_sem, portMAX_DELAY);
-			active = scroller.active;
+		}	
+		
+		// lock screen & active status
+		frame = malloc(display->width * display->height / 8);
+				
+		// scroll required amount of columns (within the window)
+		while (scroller.direction == 1 ? (scroller.scroll_ptr <= scroller.scroll_frame + scroller.size - scroller.scroll_step - len) :
+									     (scroller.scroll_ptr + scroller.scroll_step >= scroller.scroll_frame) ) {
 			
-			if (!active) {
-				LOG_INFO("scrolling interrupted");
-				xSemaphoreGive(display_sem);
-				break;
-			}
-			
+			// don't do anything if we have aborted
+			if (!scroller.active) break;
+					
+			// scroll required amount of columns (within the window)
+			memcpy(frame, scroller.back_frame, display->width * display->height / 8);
+			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
+			scroller.scroll_ptr += scroller.scroll_step;
 			display->draw_cbr(frame, HEIGHT);		
+			
 			xSemaphoreGive(display_sem);
 			usleep(scroller.speed * 1000);
+			xSemaphoreTake(display_sem, portMAX_DELAY);
 		}
 		
-		if (active) {
-			// build default screen
+		// done with scrolling cycle reset scroller ptr
+		scroller.scroll_ptr = scroller.scroll_frame + (scroller.direction == 2 ? scroller.size - scroller.scroll_len : 0);
+				
+		// scrolling done, update screen and see if we need to continue
+		if (scroller.active) {
 			memcpy(frame, scroller.back_frame, len);
-			for (int i = 0; i < scroll_len; i++) frame[i] |= scroller.scroll_frame[i];
-			xSemaphoreTake(display_sem, portMAX_DELAY);
-			display->draw_cbr(frame, HEIGHT);		
+			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
+			display->draw_cbr(frame, HEIGHT);
+			free(frame);
+
+			// see if we need to pause or if we are done 				
+			if (scroller.mode) {
+				scroller.active = false;
+				xSemaphoreGive(display_sem);
+				//sendANIC(ANIM_SCROLL_ONCE | ANIM_SCREEN_1);
+				LOG_INFO("scroll-once terminated");
+			} else {
+				xSemaphoreGive(display_sem);
+				usleep(scroller.pause * 1000);
+				LOG_DEBUG("scroll cycle done, pausing for %u (ms)", scroller.pause);
+			}
+		} else {
+			free(frame);
 			xSemaphoreGive(display_sem);
-		
-			// pause for required time and continue (or not)
-			usleep(scroller.pause * 1000);
-			active = (scroller.mode == 0);
+			LOG_INFO("scroll aborted");
 		}	
-		
-		free(frame);
 	}	
 }	
+			
 
 
 

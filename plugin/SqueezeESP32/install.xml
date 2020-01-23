@@ -3,8 +3,8 @@
   <defaultState>enabled</defaultState>
   <email>philippe_44@outlook.com</email>
   <targetApplication>
-    <minVersion>*</minVersion>
-    <maxVersion>*.*</maxVersion>
+    <minVersion>7.5</minVersion>
+    <maxVersion>*</maxVersion>
     <id>SlimServer</id>
   </targetApplication>
   <name>PLUGIN_SQUEEZEESP32</name>
