@@ -85,8 +85,8 @@ void register_regular_handlers(httpd_handle_t server){
 	httpd_register_uri_handler(server, &connect_redirect_2);
 	httpd_uri_t connect_redirect_3 = { .uri = "/gen_204", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// Android 9.0
 	httpd_register_uri_handler(server, &connect_redirect_3);
-	httpd_uri_t connect_redirect_4 = { .uri = "/ncsi.txt", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// Windows
-	httpd_register_uri_handler(server, &connect_redirect_4);
+//	httpd_uri_t connect_redirect_4 = { .uri = "/ncsi.txt", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// Windows
+//	httpd_register_uri_handler(server, &connect_redirect_4);
 	httpd_uri_t connect_redirect_5 = { .uri = "/hotspot-detect.html", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context }; // iOS 8/9
 	httpd_register_uri_handler(server, &connect_redirect_5);
 	httpd_uri_t connect_redirect_6 = { .uri = "/library/test/success.html", .method = HTTP_GET, .handler = redirect_ev_handler, .user_ctx = rest_context };// iOS 8/9

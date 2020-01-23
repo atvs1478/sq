@@ -111,6 +111,8 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 //const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
 //const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
 //const static char http_redirect_hdr_end[] = "/\n\n";
+esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error);
+
 
 char * alloc_get_http_header(httpd_req_t * req, const char * key){
     char*  buf = NULL;
@@ -172,7 +174,65 @@ char * http_alloc_get_socket_address(httpd_req_t *req, u8_t local, in_port_t * p
 	}
 	return ipstr;
 }
+bool is_captive_portal_host_name(httpd_req_t *req){
+	const char * host_name=NULL;
+	const char * ap_host_name=NULL;
+	char * ap_ip_address=NULL;
+	bool request_contains_hostname = false;
+	esp_err_t hn_err =ESP_OK, err=ESP_OK;
+	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
+	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
+		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
+	}
+	else {
+		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
+	}
 
+   ESP_LOGD_LOC(TAG,  "Getting host name from request");
+	char *req_host = alloc_get_http_header(req, "Host");
+
+	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
+		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
+		// Access point is up and running. Get the current IP address
+		tcpip_adapter_ip_info_t ip_info;
+		esp_err_t ap_ip_err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+		if(ap_ip_err != ESP_OK){
+			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(ap_ip_err));
+		}
+		else {
+			ESP_LOGD_LOC(TAG,  "getting host name for TCPIP_ADAPTER_IF_AP");
+			if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_AP, &ap_host_name )) !=ESP_OK) {
+				ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
+				err=err==ESP_OK?hn_err:err;
+			}
+			else {
+				ESP_LOGD_LOC(TAG,  "Soft AP Host name is %s",ap_host_name);
+			}
+
+			ap_ip_address =  malloc(IP4ADDR_STRLEN_MAX);
+			memset(ap_ip_address, 0x00, IP4ADDR_STRLEN_MAX);
+			if(ap_ip_address){
+				ESP_LOGD_LOC(TAG,  "Converting soft ip address to string");
+				ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
+				ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
+			}
+		}
+
+	}
+
+
+    if((request_contains_hostname 		= (host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = system host name %s", req_host);
+    }
+    else if((request_contains_hostname 		= (ap_host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,ap_host_name)) == true){
+    	ESP_LOGD_LOC(TAG,"http request host = AP system host name %s", req_host);
+    }
+
+    FREE_AND_NULL(ap_ip_address);
+    FREE_AND_NULL(req_host);
+
+    return request_contains_hostname;
+}
 
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
@@ -200,6 +260,7 @@ session_context_t* get_session_context(httpd_req_t *req){
 
 bool is_user_authenticated(httpd_req_t *req){
 	session_context_t *ctx_data = get_session_context(req);
+
 	if(ctx_data->authenticated){
 		ESP_LOGD_LOC(TAG,"User is authenticated.");
 		return true;
@@ -252,8 +313,6 @@ static const char* get_path_from_uri(char *dest, const char *uri, size_t destsiz
     		last_fs=p;
     	}
     }
-
-
     /* Return pointer to path, skipping the base */
     return last_fs? ++last_fs: dest;
 }
@@ -708,109 +767,83 @@ esp_err_t recovery_post_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
-bool is_captive_portal_host_name(httpd_req_t *req){
-	const char * host_name=NULL;
-	const char * ap_host_name=NULL;
-	char * ap_ip_address=NULL;
-	bool request_contains_hostname = false;
-	esp_err_t hn_err =ESP_OK, err=ESP_OK;
-	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
-	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
-		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
-	}
-	else {
-		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
-	}
+char * get_ap_ip_address(){
+	static char ap_ip_address[IP4ADDR_STRLEN_MAX]={};
 
-   ESP_LOGD_LOC(TAG,  "Getting host name from request");
-	char *req_host = alloc_get_http_header(req, "Host");
+	tcpip_adapter_ip_info_t ip_info;
+	esp_err_t err=ESP_OK;
+	memset(ap_ip_address, 0x00, sizeof(ap_ip_address));
 
+	ESP_LOGD_LOC(TAG,  "checking if soft AP is enabled");
 	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
 		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
 		// Access point is up and running. Get the current IP address
-		tcpip_adapter_ip_info_t ip_info;
-		esp_err_t ap_ip_err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
-		if(ap_ip_err != ESP_OK){
-			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(ap_ip_err));
+		err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+		if(err != ESP_OK){
+			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(err));
 		}
 		else {
-			ESP_LOGD_LOC(TAG,  "getting host name for TCPIP_ADAPTER_IF_AP");
-			if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_AP, &ap_host_name )) !=ESP_OK) {
-				ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
-				err=err==ESP_OK?hn_err:err;
-			}
-			else {
-				ESP_LOGD_LOC(TAG,  "Soft AP Host name is %s",ap_host_name);
-			}
-
-			ap_ip_address =  malloc(IP4ADDR_STRLEN_MAX);
-			memset(ap_ip_address, 0x00, IP4ADDR_STRLEN_MAX);
-			if(ap_ip_address){
-				ESP_LOGD_LOC(TAG,  "Converting soft ip address to string");
-				ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
-				ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
-			}
+			ESP_LOGV_LOC(TAG,  "Converting soft ip address to string");
+			ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
+			ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
 		}
-
 	}
-
-
-    if((request_contains_hostname 		= (host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,host_name)) == true){
-    	ESP_LOGD_LOC(TAG,"http request host = system host name %s", req_host);
-    }
-    else if((request_contains_hostname 		= (ap_host_name!=NULL) && (req_host!=NULL) && strcasestr(req_host,ap_host_name)) == true){
-    	ESP_LOGD_LOC(TAG,"http request host = AP system host name %s", req_host);
-    }
-
-    FREE_AND_NULL(ap_ip_address);
-    FREE_AND_NULL(req_host);
-
-    return request_contains_hostname;
+	else{
+		ESP_LOGD_LOC(TAG,"AP Is not enabled. Returning blank string");
+	}
+	return ap_ip_address;
 }
-esp_err_t redirect_200_ev_handler(httpd_req_t *req){
-	esp_err_t err=ESP_OK;
+esp_err_t process_redirect(httpd_req_t *req, const char * status){
 	const char location_prefix[] = "http://";
-	char * ap_ip_address=NULL;
+	char * ap_ip_address=get_ap_ip_address();
 	char * remote_ip=NULL;
-	const char * host_name=NULL;
 	in_port_t port=0;
 
-	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
-	if((err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
-		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(err));
-	}
-	else {
-		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
-	}
-
-    ESP_LOGD_LOC(TAG,  "Getting remote socket address");
-    remote_ip = http_alloc_get_socket_address(req,0, &port);
+	ESP_LOGD_LOC(TAG,  "Getting remote socket address");
+	remote_ip = http_alloc_get_socket_address(req,0, &port);
 
 	size_t buf_size = strlen(redirect_payload1) +strlen(redirect_payload2) + strlen(redirect_payload3) +2*(strlen(location_prefix)+strlen(ap_ip_address))+1;
 	char * redirect=malloc(buf_size);
-	snprintf(redirect, buf_size,"%s%s%s%s%s%s%s",redirect_payload1, location_prefix, ap_ip_address,redirect_payload2, location_prefix, ap_ip_address,redirect_payload3);
-	ESP_LOGI_LOC(TAG,  "Redirecting host [%s] to %s",remote_ip, redirect);
-	httpd_resp_set_type(req, "text/plain");
+
+	if(strcasestr(status,"302")){
+		size_t url_buf_size = strlen(location_prefix) + strlen(ap_ip_address)+1;
+		char * redirect_url = malloc(url_buf_size);
+		memset(redirect_url,0x00,url_buf_size);
+		snprintf(redirect_url, buf_size,"%s%s/",location_prefix, ap_ip_address);
+		ESP_LOGW_LOC(TAG,  "Redirecting host [%s] to %s (from uri %s)",remote_ip, redirect_url,req->uri);
+		httpd_resp_set_hdr(req,"Location",redirect_url);
+		snprintf(redirect, buf_size,"OK");
+		FREE_AND_NULL(redirect_url);
+	}
+	else {
+
+		snprintf(redirect, buf_size,"%s%s%s%s%s%s%s",redirect_payload1, location_prefix, ap_ip_address,redirect_payload2, location_prefix, ap_ip_address,redirect_payload3);
+		ESP_LOGW_LOC(TAG,  "Responding to host [%s] (from uri %s) with redirect html page %s",remote_ip, req->uri,redirect);
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
 	httpd_resp_set_hdr(req,"Cache-Control","no-cache");
-	httpd_resp_set_status(req, "200 OK");
+	httpd_resp_set_status(req, status);
 	httpd_resp_send(req, redirect, HTTPD_RESP_USE_STRLEN);
 	FREE_AND_NULL(redirect);
-	FREE_AND_NULL(ap_ip_address);
 	FREE_AND_NULL(remote_ip);
+
+	return ESP_OK;
+}
+esp_err_t redirect_200_ev_handler(httpd_req_t *req){
+	ESP_LOGD_LOC(TAG,"Processing known redirect url %s",req->uri);
+	process_redirect(req,"200 OK");
 	return ESP_OK;
 }
 esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 	esp_err_t err=ESP_OK;
-
-	const char location_prefix[] = "http://";
 	const char * host_name=NULL;
 	const char * ap_host_name=NULL;
 	char * user_agent=NULL;
 	char * remote_ip=NULL;
 	char * sta_ip_address=NULL;
-	char * ap_ip_address=NULL;
+	char * ap_ip_address=get_ap_ip_address();
 	char * socket_local_address=NULL;
-	char * redirect  = NULL;
 	bool request_contains_hostname = false;
 	bool request_contains_ap_ip_address 	= false;
 	bool request_is_sta_ip_address 	= false;
@@ -818,7 +851,7 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 	bool connected_to_sta_ip_interface = false;
 	bool useragentiscaptivenetwork = false;
 
-	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+	ESP_LOGW_LOC(TAG, "Invalid URL requested: [%s]", req->uri);
     if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
 		sta_ip_address = strdup(wifi_manager_get_sta_ip_string());
 		wifi_manager_unlock_sta_ip_string();
@@ -829,61 +862,33 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 	}
 
     in_port_t port=0;
-    ESP_LOGD_LOC(TAG,  "Getting remote socket address");
+    ESP_LOGV_LOC(TAG,  "Getting remote socket address");
     remote_ip = http_alloc_get_socket_address(req,0, &port);
 
-    ESP_LOGD_LOC(TAG,  "Getting host name from request");
+    ESP_LOGV_LOC(TAG,  "Getting host name from request");
     char *req_host = alloc_get_http_header(req, "Host");
 
     user_agent = alloc_get_http_header(req,"User-Agent");
     if((useragentiscaptivenetwork = strcasestr(user_agent,"CaptiveNetworkSupport"))==true){
-    	ESP_LOGD_LOC(TAG,"Found user agent that supports captive networks! [%s]",user_agent);
+    	ESP_LOGW_LOC(TAG,"Found user agent that supports captive networks! [%s]",user_agent);
     }
 
 	esp_err_t hn_err = ESP_OK;
-	ESP_LOGD_LOC(TAG,  "Getting adapter host name");
+	ESP_LOGV_LOC(TAG,  "Getting adapter host name");
 	if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_STA, &host_name )) !=ESP_OK) {
 		ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
 		err=err==ESP_OK?hn_err:err;
 	}
 	else {
-		ESP_LOGD_LOC(TAG,  "Host name is %s",host_name);
+		ESP_LOGV_LOC(TAG,  "Host name is %s",host_name);
 	}
 
 
 	in_port_t loc_port=0;
-	ESP_LOGD_LOC(TAG,  "Getting local socket address");
+	ESP_LOGV_LOC(TAG,  "Getting local socket address");
 	socket_local_address= http_alloc_get_socket_address(req,1, &loc_port);
 
-	ESP_LOGD_LOC(TAG,  "checking if soft AP is enabled");
-	if(tcpip_adapter_is_netif_up(TCPIP_ADAPTER_IF_AP)){
-		ESP_LOGD_LOC(TAG,  "Soft AP is enabled. getting ip info");
-		// Access point is up and running. Get the current IP address
-		tcpip_adapter_ip_info_t ip_info;
-		esp_err_t ap_ip_err = tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
-		if(ap_ip_err != ESP_OK){
-			ESP_LOGE_LOC(TAG,  "Unable to get local AP ip address. Error: %s",esp_err_to_name(ap_ip_err));
-		}
-		else {
-			ESP_LOGD_LOC(TAG,  "getting host name for TCPIP_ADAPTER_IF_AP");
-			if((hn_err  = tcpip_adapter_get_hostname(TCPIP_ADAPTER_IF_AP, &ap_host_name )) !=ESP_OK) {
-				ESP_LOGE_LOC(TAG,  "Unable to get host name. Error: %s",esp_err_to_name(hn_err));
-				err=err==ESP_OK?hn_err:err;
-			}
-			else {
-				ESP_LOGD_LOC(TAG,  "Soft AP Host name is %s",ap_host_name);
-			}
 
-			ap_ip_address =  malloc(IP4ADDR_STRLEN_MAX);
-			memset(ap_ip_address, 0x00, IP4ADDR_STRLEN_MAX);
-			if(ap_ip_address){
-				ESP_LOGD_LOC(TAG,  "Converting soft ip address to string");
-				ip4addr_ntoa_r(&ip_info.ip, ap_ip_address, IP4ADDR_STRLEN_MAX);
-				ESP_LOGD_LOC(TAG,"TCPIP_ADAPTER_IF_AP is up and has ip address %s ", ap_ip_address);
-			}
-		}
-
-	}
 
     ESP_LOGD_LOC(TAG,  "Peer IP: %s [port %u], System AP IP address: %s, System host: %s. Requested Host: [%s], uri [%s]",STR_OR_NA(remote_ip), port, STR_OR_NA(ap_ip_address), STR_OR_NA(host_name), STR_OR_NA(req_host), req->uri);
     /* captive portal functionality: redirect to access point IP for HOST that are not the access point IP OR the STA IP */
@@ -909,16 +914,7 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
     }
 
    if((error == 0) || (error == HTTPD_404_NOT_FOUND && connected_to_ap_ip_interface && !(request_contains_ap_ip_address || request_contains_hostname ))) {
-
-		// known polling url's, send redirect 302
-		size_t buf_size = strlen(location_prefix) + strlen(ap_ip_address)+1;
-		redirect = malloc(buf_size);
-		snprintf(redirect, buf_size,"%s%s",location_prefix, ap_ip_address);
-		ESP_LOGI_LOC(TAG,  "Redirecting host [%s] to %s",remote_ip, redirect);
-		httpd_resp_set_type(req, "text/plain");
-		httpd_resp_set_status(req, "302 Found");
-		httpd_resp_set_hdr(req,"Location",redirect);
-		httpd_resp_send(req, "", HTTPD_RESP_USE_STRLEN);
+		process_redirect(req,"302 Found");
 
 	}
 	else {
@@ -927,12 +923,11 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 	}
 
 	FREE_AND_NULL(socket_local_address);
-	FREE_AND_NULL(redirect);
+
 	FREE_AND_NULL(req_host);
 	FREE_AND_NULL(user_agent);
 
     FREE_AND_NULL(sta_ip_address);
-	FREE_AND_NULL(ap_ip_address);
 	FREE_AND_NULL(remote_ip);
 	return err;
 
