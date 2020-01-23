@@ -40,7 +40,6 @@
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "nvs_utilities.h"
-#include "http_server.h"
 #include "trace.h"
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"

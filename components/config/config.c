@@ -578,7 +578,7 @@ void config_delete_key(const char *key){
 	ESP_LOGD(TAG, "Deleting nvs entry for [%s]", key);
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 		ESP_LOGE(TAG, "Unable to lock config for delete");
-		return false;
+		return ;
 	}
 	esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
 	if (err == ESP_OK) {

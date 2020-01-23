@@ -114,7 +114,7 @@ esp_err_t http_server_start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 20;
-    config.max_open_sockets = 8;
+    config.max_open_sockets = 5;
     config.uri_match_fn = httpd_uri_match_wildcard;
     //todo:  use the endpoint below to configure session token?
     // config.open_fn
