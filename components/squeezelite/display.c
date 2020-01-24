@@ -53,6 +53,12 @@ struct grfg_packet {
 	u16_t  width;		// # of pixels of scrollable
 };
 
+struct ANIC_header {
+	char  opcode[4];
+	u32_t length;
+	u8_t mode;
+};
+
 #pragma pack(pop)
 
 static struct scroller_s {
@@ -69,30 +75,28 @@ static struct scroller_s {
 	int scroll_len, scroll_step;
 } scroller;
 
-/*
-	ANIM_SCREEN_1                    => end of first scroll on screen 1
-	ANIM_SCREEN_2                    => end of first scroll on screen 2
-	ANIM_SCROLL_ONCE | ANIM_SCREEN_1 => end of scroll once on screen 1
-	ANIM_SCROLL_ONCE | ANIM_SCREEN_2 => end of scroll once on screen 2
-*/	
+#define ANIM_NONE		  0x00
 #define ANIM_TRANSITION   0x01 // A transition animation has finished
 #define ANIM_SCROLL_ONCE  0x02 
 #define ANIM_SCREEN_1     0x04 
 #define ANIM_SCREEN_2     0x08 
 
-#define SCROLL_STACK_SIZE	2048
+static u8_t ANIC_resp = ANIM_NONE;
 
+#define SCROLL_STACK_SIZE	2048
 #define LINELEN				40
-#define HEIGHT				32
 
 static log_level loglevel = lINFO;
 static SemaphoreHandle_t display_sem;
 static bool (*slimp_handler_chain)(u8_t *data, int len);
+static void (*slimp_loop_chain)(void);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
+static int display_width, display_height;
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static void server(in_addr_t ip, u16_t hport, u16_t cport);
+static void send_server(void);
 static bool handler(u8_t *data, int len);
 static void vfdc_handler( u8_t *_data, int bytes_read);
 static void grfe_handler( u8_t *data, int len);
@@ -135,21 +139,53 @@ void sb_display_init(void) {
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[SCROLL_STACK_SIZE] __attribute__ ((aligned (4)));
 	
+	// need to force height to 32 maximum
+	display_width = display->width;
+	display_height = min(display->height, 32);
+	
 	// create scroll management task
 	display_sem = xSemaphoreCreateMutex();
 	scroller.task = xTaskCreateStatic( (TaskFunction_t) scroll_task, "scroll_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller
-	scroller.max = (display->width * display->height / 8) * 10;
+	scroller.max = (display_width * display_height / 8) * 10;
 	scroller.scroll_frame = malloc(scroller.max);
-	scroller.back_frame = malloc(display->width * display->height / 8);
+	scroller.back_frame = malloc(display_width * display_height / 8);
 
 	// chain handlers
 	slimp_handler_chain = slimp_handler;
 	slimp_handler = handler;
 	
+	slimp_loop_chain = slimp_loop;
+	slimp_loop = send_server;
+	
 	notify_chain = server_notify;
 	server_notify = server;
+}
+
+/****************************************************************************************
+ * Send message to server (ANIC at that time)
+ */
+static void send_server(void) {
+	/* 
+	 This complication is needed as we cannot send direclty to LMS, because 
+	 send_packet is not thread safe. So must subscribe to slimproto busy loop
+	 end send from there
+	*/ 
+	if (ANIC_resp != ANIM_NONE) {
+		struct ANIC_header pkt_header;
+
+		memset(&pkt_header, 0, sizeof(pkt_header));
+		memcpy(&pkt_header.opcode, "ANIC", 4);
+		pkt_header.length = htonl(sizeof(pkt_header) - 8);
+		pkt_header.mode = ANIC_resp;
+
+		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
+		
+		ANIC_resp = ANIM_NONE;
+	}	
+	
+	if (slimp_loop_chain) (*slimp_loop_chain)();
 }
 
 /****************************************************************************************
@@ -307,7 +343,7 @@ static void grfe_handler( u8_t *data, int len) {
 	xSemaphoreTake(display_sem, portMAX_DELAY);
 	
 	scroller.active = false;
-	display->draw_cbr(data + sizeof(struct grfe_packet), HEIGHT);
+	display->draw_cbr(data + sizeof(struct grfe_packet), display_height);
 	
 	xSemaphoreGive(display_sem);
 	
@@ -393,13 +429,13 @@ static void grfg_handler(u8_t *data, int len) {
 
 	// can't be in grfs as we need full size & scroll_width
 	if (scroller.updated) {
-		scroller.scroll_len = display->width * display->height / 8 - (display->width - scroller.window_width) * display->height / 8;
+		scroller.scroll_len = display_width * display_height / 8 - (display_width - scroller.window_width) * display_height / 8;
 		if (scroller.direction == 1) {
 			scroller.scroll_ptr = scroller.scroll_frame; 
-			scroller.scroll_step = scroller.by * display->height / 8;
+			scroller.scroll_step = scroller.by * display_height / 8;
 		} else	{
 			scroller.scroll_ptr = scroller.scroll_frame + scroller.size - scroller.scroll_len;
-			scroller.scroll_step = -scroller.by * display->height / 8;
+			scroller.scroll_step = -scroller.by * display_height / 8;
 		}
 		
 		scroller.updated = false;	
@@ -407,10 +443,10 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	if (!scroller.active) {
 		// this is a background update and scroller has been finished, so need to update here
-		u8_t *frame = malloc(display->width * display->height / 8);
-		memcpy(frame, scroller.back_frame, display->width * display->height / 8);
+		u8_t *frame = malloc(display_width * display_height / 8);
+		memcpy(frame, scroller.back_frame, display_width * display_height / 8);
 		for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
-		display->draw_cbr(frame, HEIGHT);		
+		display->draw_cbr(frame, display_height);		
 		free(frame);
 		LOG_DEBUG("direct drawing");
 	}	
@@ -428,7 +464,7 @@ static void grfg_handler(u8_t *data, int len) {
  */
 static void scroll_task(void *args) {
 	u8_t *frame = NULL;
-	int len = display->width * display->height / 8;
+	int len = display_width * display_height / 8;
 	
 	while (1) {
 		xSemaphoreTake(display_sem, portMAX_DELAY);
@@ -441,7 +477,7 @@ static void scroll_task(void *args) {
 		}	
 		
 		// lock screen & active status
-		frame = malloc(display->width * display->height / 8);
+		frame = malloc(display_width * display_height / 8);
 				
 		// scroll required amount of columns (within the window)
 		while (scroller.direction == 1 ? (scroller.scroll_ptr <= scroller.scroll_frame + scroller.size - scroller.scroll_step - len) :
@@ -451,10 +487,10 @@ static void scroll_task(void *args) {
 			if (!scroller.active) break;
 					
 			// scroll required amount of columns (within the window)
-			memcpy(frame, scroller.back_frame, display->width * display->height / 8);
+			memcpy(frame, scroller.back_frame, display_width * display_height / 8);
 			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
 			scroller.scroll_ptr += scroller.scroll_step;
-			display->draw_cbr(frame, HEIGHT);		
+			display->draw_cbr(frame, display_height);		
 			
 			xSemaphoreGive(display_sem);
 			usleep(scroller.speed * 1000);
@@ -468,14 +504,15 @@ static void scroll_task(void *args) {
 		if (scroller.active) {
 			memcpy(frame, scroller.back_frame, len);
 			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
-			display->draw_cbr(frame, HEIGHT);
+			display->draw_cbr(frame, display_height);
 			free(frame);
 
 			// see if we need to pause or if we are done 				
 			if (scroller.mode) {
 				scroller.active = false;
 				xSemaphoreGive(display_sem);
-				//sendANIC(ANIM_SCROLL_ONCE | ANIM_SCREEN_1);
+				// can't call directly send_packet from slimproto as it's not re-entrant
+				ANIC_resp = ANIM_SCROLL_ONCE | ANIM_SCREEN_1;
 				LOG_INFO("scroll-once terminated");
 			} else {
 				xSemaphoreGive(display_sem);

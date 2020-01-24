@@ -49,10 +49,11 @@ int			pthread_create_name(pthread_t *thread, _CONST pthread_attr_t  *attr,
 void		embedded_init(void);
 void 		register_external(void);
 void 		deregister_external(void);
-void 		decode_resume(int external);
+void 		decode_restore(int external);
 
-// optional, please chain 
+// optional, please chain if used 
 bool		(*slimp_handler)(u8_t *data, int len);
+void 		(*slimp_loop)(void);
 void 		(*server_notify)(in_addr_t ip, u16_t hport, u16_t cport);
 				   
 #endif // EMBEDDED_H

@@ -339,7 +339,7 @@ void deregister_external(void) {
 	}
 }
 
-void decode_resume(int external) {
+void decode_restore(int external) {
 	switch (external) {
 	case DECODE_BT:
 		bt_disconnect();

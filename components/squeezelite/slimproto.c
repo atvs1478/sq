@@ -87,13 +87,13 @@ static struct {
 	stream_state stream_state;
 } status;
 
-int autostart;
-bool sentSTMu, sentSTMo, sentSTMl;
-u32_t new_server;
-char *new_server_cap;
+static int autostart;
+static bool sentSTMu, sentSTMo, sentSTMl;
+static u32_t new_server;
+static char *new_server_cap;
 #define PLAYER_NAME_LEN 64
-char player_name[PLAYER_NAME_LEN + 1] = "";
-const char *name_file = NULL;
+static char player_name[PLAYER_NAME_LEN + 1] = "";
+static const char *name_file = NULL;
 
 void send_packet(u8_t *packet, size_t len) {
 	u8_t *ptr = packet;
@@ -377,7 +377,7 @@ static void process_strm(u8_t *pkt, int len) {
 			sentSTMu = sentSTMo = sentSTMl = false;
 			LOCK_O;
 #if EMBEDDED
-			if (output.external) decode_resume(output.external);
+			if (output.external) decode_restore(output.external);
 			output.external = 0;
 			_buf_resize(outputbuf, output.init_size);
 #endif
@@ -770,6 +770,7 @@ static void slimproto_run() {
 #if IR
 			if (_sendIR)   sendIR(ir_code, ir_ts);
 #endif
+			if (*slimp_loop) (*slimp_loop)();
 		}
 	}
 }
