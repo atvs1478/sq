@@ -47,11 +47,8 @@ typedef struct metadata_s {
 	u8_t  channels;
 } metadata_t;
 
-/*
 void 		free_metadata(struct metadata_s *metadata);
 void 		dup_metadata(struct metadata_s *dst, struct metadata_s *src);
-*/
-
 u32_t 		gettime_ms(void);
 
 #ifdef WIN32

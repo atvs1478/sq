@@ -36,7 +36,11 @@ static const char *TAG = "display";
 
 // handlers
 static bool init(char *config, char *welcome);
-static void text(enum display_pos_e pos, int attribute, char *text);
+static void clear(void);
+static bool set_font(int num, enum display_font_e font, int space);
+static void text(enum display_font_e font, enum display_pos_e pos, int attribute, char *text, ...);
+static bool line(int num, enum display_pos_e pos, int offset, int attribute, char *text);
+static int stretch(int num, char *string, int max);
 static void draw_cbr(u8_t *data, int height);
 static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
 static void brightness(u8_t level);
@@ -44,7 +48,9 @@ static void on(bool state);
 static void update(void);
 
 // display structure for others to use
-struct display_s SSD1306_display = { 0, 0, init, on, brightness, text, update, draw, draw_cbr, NULL };
+struct display_s SSD1306_display = { 0, 0, 
+									init, clear, set_font, on, brightness, 
+									text, line, stretch, update, draw, draw_cbr, NULL };
 
 // SSD1306 specific function
 static struct SSD1306_Device Display;
@@ -70,6 +76,13 @@ static const unsigned char BitReverseTable256[] =
   0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF
 };
 
+#define MAX_LINES	8
+
+static struct {
+	int y, space;
+	const struct SSD1306_FontDef *font;
+} lines[MAX_LINES];
+
 /****************************************************************************************
  * 
  */
@@ -93,7 +106,7 @@ static bool init(char *config, char *welcome) {
 			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 			SSD1306_display.width = width;
 			SSD1306_display.height = height;
-			text(DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
+			text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
 		} else {
@@ -109,18 +122,170 @@ static bool init(char *config, char *welcome) {
 /****************************************************************************************
  * 
  */
-static void text(enum display_pos_e pos, int attribute, char *text) {
+static void clear(void) {
+	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
+	SSD1306_Update( &Display );
+}	
+
+/****************************************************************************************
+ *  Set fonts for each line in text mode
+ */
+static bool set_font(int num, enum display_font_e font, int space) {
+	if (--num >= MAX_LINES) return false;
+	
+	switch(font) {
+	case DISPLAY_FONT_TINY:
+		lines[num].font = &Font_droid_sans_fallback_11x13;
+		break;		
+	case DISPLAY_FONT_SMALL:	
+		lines[num].font = &Font_droid_sans_mono_7x13;	
+		break;
+	case DISPLAY_FONT_MEDIUM:			
+		lines[num].font = &Font_liberation_mono_9x15;	
+		break;
+	case DISPLAY_FONT_LARGE:	
+		lines[num].font = &Font_Earthbound18x21;
+		break;		
+	case DISPLAY_FONT_HUGE:	
+		lines[num].font = &Font_droid_sans_fallback_24x28;
+		break;				
+	case DISPLAY_FONT_SEGMENT:			
+		if (Display.Height == 32) lines[num].font = &Font_Tarable7Seg_16x32;
+		else lines[num].font = &Font_Tarable7Seg_32x64;
+		break;		
+	case DISPLAY_FONT_DEFAULT:
+	default:	
+		lines[num].font = &Font_droid_sans_fallback_15x17;
+		break;
+	}
+	
+	// re-calculate lines absolute position
+	lines[num].space = space;
+	for (int i = 1; i <= num; i++) lines[i].y = lines[i-1].y + lines[i-1].font->Height + lines[i-1].space;
+	
+	ESP_LOGI(TAG, "adding line %u at %u (height:%u)", num + 1, lines[num].y, lines[num].font->Height);
+	
+	if (lines[num].y + lines[num].font->Height > Display.Height) {
+		ESP_LOGW(TAG, "line does not fit display");
+		return false;
+	}
+	
+	return true;
+}
+
+/****************************************************************************************
+ * 
+ */
+static bool line(int num, enum display_pos_e pos, int x, int attribute, char *text) {
+	bool fits;
+	
+	// counting 1..n
+	num--;
+	
+	// always horizontal mode for text display
+	if (AddressMode != AddressMode_Horizontal) {
+		AddressMode = AddressMode_Horizontal;
+		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+	}	
+	
+	SSD1306_SetFont( &Display, lines[num].font );	
+	
+	// erase line if requested
+	if (attribute & DISPLAY_CLEAR) {
+		for (int x = 0 ; x < Display.Width; x++) 
+			for (int y = lines[num].y; y < lines[num].y + lines[num].font->Height; y++)
+				SSD1306_DrawPixelFast( &Display, x, y, SSD_COLOR_BLACK );
+	}	
+	
+	fits = SSD1306_FontMeasureString( &Display, text ) + x <= Display.Width;
+	SSD1306_FontDrawString( &Display, x, lines[num].y, text, SSD_COLOR_WHITE );
+	
+	ESP_LOGI(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
+	
+	// update whole display if requested
+	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
+	
+	return fits;
+}
+
+/****************************************************************************************
+ * Try to align string for better scrolling visual. there is probably much better to do
+ */
+static int stretch(int num, char *string, int max) {
+	char space[] = "     ";
+	int len = strlen(string), extra = 0, boundary;
+	
+	num--;
+	
+	// we might already fit
+	SSD1306_SetFont( &Display, lines[num].font );	
+	if (SSD1306_FontMeasureString( &Display, string ) <= Display.Width) return 0;
+		
+	// add some space for better visual 
+	strncat(string, space, max-len);
+	string[max] = '\0';
+	len = strlen(string);
+	
+	// mark the end of the extended string
+	boundary = SSD1306_FontMeasureString( &Display, string );
+		
+	// add a full display width	
+	while (len < max && SSD1306_FontMeasureString( &Display, string ) - boundary < Display.Width) {
+		string[len++] = string[extra++];
+	}
+	
+	// string has space for max+1 
+	string[len] = '\0';
+	
+	return boundary;
+}
+
+/****************************************************************************************
+ * 
+ */
+static void text(enum display_font_e font, enum display_pos_e pos, int attribute, char *text, ...) {
+	va_list args;
+
+	va_start(args, text);
 	TextAnchor Anchor = TextAnchor_Center;	
 	
 	if (attribute & DISPLAY_CLEAR) SSD1306_Clear( &Display, SSD_COLOR_BLACK );
 	
 	if (!text) return;
 	
+	switch(font) {
+	case DISPLAY_FONT_TINY:	
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_11x13 );
+		break;		
+	case DISPLAY_FONT_SMALL:	
+		SSD1306_SetFont( &Display, &Font_droid_sans_mono_7x13 );	
+		break;
+	case DISPLAY_FONT_LARGE:	
+		SSD1306_SetFont( &Display, &Font_Earthbound18x21 );
+		break;		
+	case DISPLAY_FONT_HUGE:	
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
+		break;				
+	case DISPLAY_FONT_MEDIUM:			
+		SSD1306_SetFont( &Display, &Font_liberation_mono_9x15 );	
+		break;
+	case DISPLAY_FONT_SEGMENT:			
+		if (Display.Height == 32) SSD1306_SetFont( &Display, &Font_Tarable7Seg_16x32 );
+		else SSD1306_SetFont( &Display, &Font_Tarable7Seg_32x64 );
+		break;		
+	case DISPLAY_FONT_DEFAULT:
+	default:	
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
+		break;
+	}
+
 	switch(pos) {
 	case DISPLAY_TOP_LEFT: 
+	default:
 		Anchor = TextAnchor_NorthWest; 
 		break;
 	case DISPLAY_MIDDLE_LEFT:
+		Anchor = TextAnchor_West;
 		break;
 	case DISPLAY_BOTTOM_LEFT:
 		Anchor = TextAnchor_SouthWest;
@@ -131,13 +296,16 @@ static void text(enum display_pos_e pos, int attribute, char *text) {
 	}	
 	
 	ESP_LOGD(TAG, "SSDD1306 displaying %s at %u with attribute %u", text, Anchor, attribute);
-
+	
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}	
+	
 	SSD1306_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
 	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
+	
+	va_end(args);
 }
 
 /****************************************************************************************
@@ -191,7 +359,7 @@ static void draw_cbr(u8_t *data, int height) {
 		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
 	}
 	
-	SSD1306_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Heigth);
+	SSD1306_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Height/8);
  #endif	
 }
 

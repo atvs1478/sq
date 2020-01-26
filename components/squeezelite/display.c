@@ -61,6 +61,8 @@ struct ANIC_header {
 
 #pragma pack(pop)
 
+extern struct outputstate output;
+
 static struct scroller_s {
 	// copy of grfs content
 	u8_t  screen, direction;	
@@ -87,7 +89,7 @@ static u8_t ANIC_resp = ANIM_NONE;
 #define LINELEN				40
 
 static log_level loglevel = lINFO;
-static SemaphoreHandle_t display_sem;
+static SemaphoreHandle_t display_mutex;
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static void (*slimp_loop_chain)(void);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
@@ -144,7 +146,7 @@ void sb_display_init(void) {
 	display_height = min(display->height, 32);
 	
 	// create scroll management task
-	display_sem = xSemaphoreCreateMutex();
+	display_mutex = xSemaphoreCreateMutex();
 	scroller.task = xTaskCreateStatic( (TaskFunction_t) scroll_task, "scroll_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller
@@ -194,7 +196,7 @@ static void send_server(void) {
 static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	char msg[32];
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
-	display->text(DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
 
@@ -203,6 +205,9 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
  */
 static bool handler(u8_t *data, int len){
 	bool res = true;
+	
+	// don't do anything if we dont own the display (no lock needed)
+	if (output.external && output.state >= OUTPUT_STOPPED) return true;
 
 	if (!strncmp((char*) data, "vfdc", 4)) {
 		vfdc_handler(data, len);
@@ -285,8 +290,8 @@ static void show_display_buffer(char *ddram) {
 
 	LOG_INFO("\n\t%.40s\n\t%.40s", line1, line2);
 
-	display->text(DISPLAY_TOP_LEFT, DISPLAY_CLEAR, line1);	
-	display->text(DISPLAY_BOTTOM_LEFT, DISPLAY_UPDATE, line2);	
+	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_TOP_LEFT, DISPLAY_CLEAR, line1);	
+	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_BOTTOM_LEFT, DISPLAY_UPDATE, line2);	
 }
 
 /****************************************************************************************
@@ -340,12 +345,12 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
  * Process graphic display data
  */
 static void grfe_handler( u8_t *data, int len) {
-	xSemaphoreTake(display_sem, portMAX_DELAY);
+	xSemaphoreTake(display_mutex, portMAX_DELAY);
 	
 	scroller.active = false;
 	display->draw_cbr(data + sizeof(struct grfe_packet), display_height);
 	
-	xSemaphoreGive(display_sem);
+	xSemaphoreGive(display_mutex);
 	
 	LOG_DEBUG("grfe frame %u", len);
 }	
@@ -389,7 +394,7 @@ static void grfs_handler(u8_t *data, int len) {
 	// new grfs frame, build scroller info
 	if (!offset) {	
 		// use the display as a general lock
-		xSemaphoreTake(display_sem, portMAX_DELAY);
+		xSemaphoreTake(display_mutex, portMAX_DELAY);
 
 		// copy & set scroll parameters
 		scroller.screen = pkt->screen;
@@ -401,7 +406,7 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.full_width = htons(pkt->width);
 		scroller.updated = scroller.active = true;
 
-		xSemaphoreGive(display_sem);
+		xSemaphoreGive(display_mutex);
 	}	
 
 	// copy scroll frame data (no semaphore needed)
@@ -425,7 +430,7 @@ static void grfg_handler(u8_t *data, int len) {
 	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 	scroller.window_width = htons(pkt->width);
 	
-	xSemaphoreTake(display_sem, portMAX_DELAY);
+	xSemaphoreTake(display_mutex, portMAX_DELAY);
 
 	// can't be in grfs as we need full size & scroll_width
 	if (scroller.updated) {
@@ -456,7 +461,7 @@ static void grfg_handler(u8_t *data, int len) {
 		vTaskResume(scroller.task);
 	}
 	
-	xSemaphoreGive(display_sem);
+	xSemaphoreGive(display_mutex);
 }
 
 /****************************************************************************************
@@ -467,13 +472,13 @@ static void scroll_task(void *args) {
 	int len = display_width * display_height / 8;
 	
 	while (1) {
-		xSemaphoreTake(display_sem, portMAX_DELAY);
+		xSemaphoreTake(display_mutex, portMAX_DELAY);
 		
 		// suspend ourselves if nothing to do, grfg will wake us up
 		if (!scroller.active)  {
-			xSemaphoreGive(display_sem);
+			xSemaphoreGive(display_mutex);
 			vTaskSuspend(NULL);
-			xSemaphoreTake(display_sem, portMAX_DELAY);
+			xSemaphoreTake(display_mutex, portMAX_DELAY);
 		}	
 		
 		// lock screen & active status
@@ -492,9 +497,10 @@ static void scroll_task(void *args) {
 			scroller.scroll_ptr += scroller.scroll_step;
 			display->draw_cbr(frame, display_height);		
 			
-			xSemaphoreGive(display_sem);
-			usleep(scroller.speed * 1000);
-			xSemaphoreTake(display_sem, portMAX_DELAY);
+			xSemaphoreGive(display_mutex);
+	        vTaskDelay(scroller.speed / portTICK_PERIOD_MS);
+     
+			xSemaphoreTake(display_mutex, portMAX_DELAY);
 		}
 		
 		// done with scrolling cycle reset scroller ptr
@@ -510,18 +516,18 @@ static void scroll_task(void *args) {
 			// see if we need to pause or if we are done 				
 			if (scroller.mode) {
 				scroller.active = false;
-				xSemaphoreGive(display_sem);
+				xSemaphoreGive(display_mutex);
 				// can't call directly send_packet from slimproto as it's not re-entrant
 				ANIC_resp = ANIM_SCROLL_ONCE | ANIM_SCREEN_1;
 				LOG_INFO("scroll-once terminated");
 			} else {
-				xSemaphoreGive(display_sem);
-				usleep(scroller.pause * 1000);
+				xSemaphoreGive(display_mutex);
+				vTaskDelay(scroller.pause / portTICK_PERIOD_MS);
 				LOG_DEBUG("scroll cycle done, pausing for %u (ms)", scroller.pause);
 			}
 		} else {
 			free(frame);
-			xSemaphoreGive(display_sem);
+			xSemaphoreGive(display_mutex);
 			LOG_INFO("scroll aborted");
 		}	
 	}	

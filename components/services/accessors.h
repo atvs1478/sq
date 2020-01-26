@@ -13,3 +13,4 @@
 
 esp_err_t 				config_i2c_set(const i2c_config_t * config, int port);
 const i2c_config_t * 	config_i2c_get(int * i2c_port);
+char * 					config_metadata_format(char *artist, char *album, char *title, int *speed, int len);

@@ -14,9 +14,10 @@
 #include "config.h"
 #include "raop.h"
 #include "audio_controls.h"
+#include "display.h"
+#include "accessors.h"
 
 #include "log_util.h"
-
 #include "trace.h"
 
 #ifndef CONFIG_AIRPLAY_NAME
@@ -28,6 +29,7 @@ log_level	util_loglevel;
 
 static log_level *loglevel = &raop_loglevel;
 static struct raop_ctx_s *raop;
+raop_cmd_vcb_t cmd_handler_chain;
 
 static void raop_volume_up(void) {
 	raop_cmd(raop, RAOP_VOLUME_UP, NULL);
@@ -78,6 +80,51 @@ const static actrls_t controls = {
 };
 
 /****************************************************************************************
+ * Command handler
+ */
+bool cmd_handler(raop_event_t event, ...) {
+	bool res = true;
+	va_list args;	
+	
+	va_start(args, event);
+	
+	switch(event) {
+	case RAOP_SETUP:
+		displayer_control(DISPLAYER_ACTIVATE);
+		res = cmd_handler_chain(event, args);
+		break;
+	case RAOP_STOP:
+		displayer_control(DISPLAYER_SUSPEND);
+		res = cmd_handler_chain(event, args);
+		break;
+	case RAOP_METADATA: {
+		int speed;
+		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
+		char *string = config_metadata_format(artist, album, title, &speed, 256);
+		displayer_scroll(string, speed);
+		free(string);
+		break;
+	}	
+	case RAOP_PROGRESS: {
+		u32_t elapsed = va_arg(args, u32_t);
+		u32_t duration = va_arg(args, u32_t);
+		char msg[32];
+		
+		if (elapsed > 3600) snprintf(msg, 32, "AIRPLAY %2u:%02u:%02u", elapsed / 3600, elapsed / 60, elapsed % 60);
+		else snprintf(msg, 32, "AIRPLAY %2u:%02u", elapsed / 60, elapsed % 60);
+		display->line(1, DISPLAY_LEFT, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+		break;
+	}	
+	default:
+		res = cmd_handler_chain(event, args);
+	}
+	
+	va_end(args);
+	
+	return res;
+}
+
+/****************************************************************************************
  * Airplay taking/giving audio system's control 
  */
 void raop_master(bool on) {
@@ -96,7 +143,7 @@ void raop_sink_deinit(void) {
 /****************************************************************************************
  * Airplay sink initialization
  */
-void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
+void raop_sink_init(raop_cmd_vcb_t cmd_cb, raop_data_cb_t data_cb) {
     const char *hostname;
 	char sink_name[64-6] = CONFIG_AIRPLAY_NAME;
 	tcpip_adapter_ip_info_t ipInfo; 
@@ -123,7 +170,8 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
     // create RAOP instance, latency is set by controller
 	uint8_t mac[6];	
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-	raop = raop_create(host, sink_name, mac, 0, cmd_cb, data_cb);
+	cmd_handler_chain = cmd_cb;
+	raop = raop_create(host, sink_name, mac, 0, cmd_handler, data_cb);
 }
 
 /****************************************************************************************
@@ -131,6 +179,7 @@ void raop_sink_init(raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb) {
  */
 void raop_disconnect(void) {
 	LOG_INFO("forced disconnection");
+	displayer_control(DISPLAYER_SHUTDOWN);
 	raop_cmd(raop, RAOP_STOP, NULL);
 	actrls_unset();
 }

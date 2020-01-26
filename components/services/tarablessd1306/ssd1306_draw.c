@@ -40,7 +40,7 @@ __attribute__( ( always_inline ) ) static inline void SwapInt( int* a, int* b ) 
     *a = Temp;
 }
 
-static inline void IRAM_ATTR SSD1306_DrawPixelFast( struct SSD1306_Device* DeviceHandle, int X, int Y, int Color ) {
+inline void IRAM_ATTR SSD1306_DrawPixelFast( struct SSD1306_Device* DeviceHandle, int X, int Y, int Color ) {
     uint32_t YBit = ( Y & 0x07 );
     uint8_t* FBOffset = NULL;
 

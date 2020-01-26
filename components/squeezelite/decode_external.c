@@ -176,7 +176,7 @@ static void raop_sink_data_handler(const uint8_t *data, uint32_t len, u32_t play
 /****************************************************************************************
  * AirPlay sink command handler
  */
-static bool raop_sink_cmd_handler(raop_event_t event, void *param)
+static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 {
 	// don't LOCK_O as there is always a chance that LMS takes control later anyway
 	if (output.external != DECODE_RAOP && output.state > OUTPUT_STOPPED) {
@@ -273,7 +273,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			LOG_INFO("Play", NULL);
 			if (raop_state != RAOP_PLAY) {
 				output.state = OUTPUT_START_AT;
-				output.start_at = *(u32_t*) param;
+				output.start_at = va_arg(args, u32_t);
 				raop_sync.start_time = output.start_at;
 				LOG_INFO("Starting at %u (in %d ms)", output.start_at, output.start_at - gettime_ms());
 			}
@@ -281,7 +281,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			break;
 		}
 		case RAOP_VOLUME: {
-			float volume = *((float*) param);
+			float volume = va_arg(args, double);
 			LOG_INFO("Volume[0..1] %0.4f", volume);
 			volume = 65536 * powf(volume, 3);
 			set_volume((u16_t) volume, (u16_t) volume);

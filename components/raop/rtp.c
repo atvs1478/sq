@@ -429,7 +429,7 @@ static void buffer_put_packet(rtp_t *ctx, seq_t seqno, unsigned rtptime, bool fi
 			ctx->playing = true;
 			ctx->resent_req = ctx->resent_rec = ctx->silent_frames = ctx->discarded = 0;
 			playtime = ctx->synchro.time + (((s32_t)(rtptime - ctx->synchro.rtp)) * 1000) / RAOP_SAMPLE_RATE;
-			ctx->cmd_cb(RAOP_PLAY, &playtime);
+			ctx->cmd_cb(RAOP_PLAY, playtime);
 		} else {
 			pthread_mutex_unlock(&ctx->ab_mutex);
 			return;
@@ -671,7 +671,7 @@ static void *rtp_thread_func(void *arg) {
 					count = 3;
 				}
 
-				if ((ctx->synchro.status & RTP_SYNC) && (ctx->synchro.status & NTP_SYNC)) ctx->cmd_cb(RAOP_TIMING, NULL);
+				if ((ctx->synchro.status & RTP_SYNC) && (ctx->synchro.status & NTP_SYNC)) ctx->cmd_cb(RAOP_TIMING);
 
 				break;
 			}

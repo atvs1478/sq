@@ -16,6 +16,8 @@
 
 static const char *TAG = "services";
 
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+
 /****************************************************************************************
  * 
  */
@@ -56,3 +58,60 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 	if(i2c_port) *i2c_port=i2c_system_port;
 	return &i2c;
 }
+
+/****************************************************************************************
+ * 
+ */
+char *config_metadata_format(char *artist, char *album, char *title, int *speed, int len) {
+	char *nvs_item, *string = calloc(len + 1, 1), *p;
+	
+	nvs_item = config_alloc_get(NVS_TYPE_STR, "metadata_config");
+	
+	if (nvs_item) {
+		if ((p = strcasestr(nvs_item, "format")) != NULL) {
+			char token[16], *q;
+			int space = len;
+			bool skip = false;
+			
+			p = strchr(nvs_item, '=');
+			
+			while (p++) {
+				// find token and copy what's after when reaching last one
+				if (sscanf(p, "%*[^%%]%%%[^%]%%", token) < 0) {
+					q = strchr(p, ',');
+					strncat(string, p, q ? min(q - p, space) : space);
+					break;
+				}
+
+				// copy what's before token (be safe)
+				if ((q = strchr(p, '%')) == NULL) break;
+				
+				// skip whatever is after a token if this token is empty
+				if (!skip) {
+					strncat(string, p, min(q - p, space));
+					space = len - strlen(string);
+				}	
+
+				// then copy token's content
+				if (strcasestr(q, "artist") && artist) strncat(string, p = artist, space);
+				else if (strcasestr(q, "album") && album) strncat(string, p = album, space);
+				else if (strcasestr(q, "title") && title) strncat(string, p = title, space);
+				space = len - strlen(string);
+				
+				// flag to skip the data following an empty field
+				if (*p) skip = false;
+				else skip = true;
+
+				// advance to next separator
+				p = strchr(q + 1, '%');
+			}
+		} else {
+			string = strdup(title ? title : "");
+		}
+		// get optional scroll speed
+		if ((p = strcasestr(nvs_item, "speed")) != NULL) sscanf(p, "%*[^=]=%d", speed);
+		else *speed = 0;
+	}
+	
+	return string;
+}	
