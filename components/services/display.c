@@ -45,6 +45,7 @@ static EXT_RAM_ATTR struct {
 	enum { DISPLAYER_DISABLED, DISPLAYER_IDLE, DISPLAYER_ACTIVE } state;
 	char string[SCROLLABLE_SIZE + 1];
 	int offset, boundary;
+	char *metadata_config;
 } displayer;
 
 static void displayer_task(void *args);
@@ -87,6 +88,8 @@ void display_init(char *welcome) {
 		// set lines for "fixed" text mode
 		display->set_font(1, DISPLAY_FONT_TINY, 0);
 		display->set_font(2, DISPLAY_FONT_LARGE, 0);
+		
+		displayer.metadata_config = config_alloc_get(NVS_TYPE_STR, "metadata_config");
 	}
 	
 	if (item) free(item);
@@ -120,6 +123,72 @@ static void displayer_task(void *args) {
 		
 		vTaskDelay(scroll_pause / portTICK_PERIOD_MS);
 	}
+}	
+
+/****************************************************************************************
+ * 
+ */
+void displayer_metadata(char *artist, char *album, char *title) {
+	char *string = displayer.string, *p;
+	int len = SCROLLABLE_SIZE;
+	
+	if (!displayer.metadata_config) {
+		strncpy(displayer.string, title ? title : "", SCROLLABLE_SIZE);
+		return;
+	}
+	
+	// format metadata parameters and write them directly
+	if ((p = strcasestr(displayer.metadata_config, "format")) != NULL) {
+		char token[16], *q;
+		int space = len;
+		bool skip = false;
+			
+		displayer.string[0] = '\0';	
+		p = strchr(displayer.metadata_config, '=');
+			
+		while (p++) {
+			// find token and copy what's after when reaching last one
+			if (sscanf(p, "%*[^%%]%%%[^%]%%", token) < 0) {
+				q = strchr(p, ',');
+				strncat(string, p, q ? min(q - p, space) : space);
+				break;
+			}
+
+			// copy what's before token (be safe)
+			if ((q = strchr(p, '%')) == NULL) break;
+			
+			// skip whatever is after a token if this token is empty
+			if (!skip) {
+				strncat(string, p, min(q - p, space));
+				space = len - strlen(string);
+			}	
+
+			// then copy token's content
+			if (strcasestr(q, "artist") && artist) strncat(string, p = artist, space);
+			else if (strcasestr(q, "album") && album) strncat(string, p = album, space);
+			else if (strcasestr(q, "title") && title) strncat(string, p = title, space);
+			space = len - strlen(string);
+				
+			// flag to skip the data following an empty field
+			if (*p) skip = false;
+			else skip = true;
+
+			// advance to next separator
+			p = strchr(q + 1, '%');
+		}
+	} else {
+		string = strdup(title ? title : "");
+	}
+	
+	// get optional scroll speed
+	if ((p = strcasestr(displayer.metadata_config, "speed")) != NULL) sscanf(p, "%*[^=]=%d", &displayer.speed);
+	
+	// just starts displayer directly
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+	displayer.offset = 0;	
+	displayer.state = DISPLAYER_ACTIVE;
+	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
+	xSemaphoreGive(displayer.mutex);
 }	
 
 

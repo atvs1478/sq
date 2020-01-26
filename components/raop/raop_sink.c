@@ -98,11 +98,8 @@ bool cmd_handler(raop_event_t event, ...) {
 		res = cmd_handler_chain(event, args);
 		break;
 	case RAOP_METADATA: {
-		int speed;
 		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
-		char *string = config_metadata_format(artist, album, title, &speed, 256);
-		displayer_scroll(string, speed);
-		free(string);
+		displayer_metadata(artist, album, title);
 		break;
 	}	
 	case RAOP_PROGRESS: {

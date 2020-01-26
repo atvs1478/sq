@@ -45,3 +45,4 @@ extern struct display_s {
 
 void displayer_scroll(char *string, int speed);
 void displayer_control(enum displayer_cmd_e cmd);
+void displayer_metadata(char *artist, char *album, char *title);
