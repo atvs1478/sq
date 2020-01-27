@@ -196,7 +196,7 @@ static void send_server(void) {
 static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	char msg[32];
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
-	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
 
@@ -290,8 +290,8 @@ static void show_display_buffer(char *ddram) {
 
 	LOG_INFO("\n\t%.40s\n\t%.40s", line1, line2);
 
-	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_TOP_LEFT, DISPLAY_CLEAR, line1);	
-	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_BOTTOM_LEFT, DISPLAY_UPDATE, line2);	
+	display->line(1, DISPLAY_LEFT, DISPLAY_CLEAR, line1);	
+	display->line(2, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, line2);	
 }
 
 /****************************************************************************************

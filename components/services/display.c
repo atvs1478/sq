@@ -36,16 +36,22 @@ static const char *TAG = "display";
 
 #define DISPLAYER_STACK_SIZE 	2048
 #define SCROLLABLE_SIZE			384
+#define HEADER_SIZE				64
+#define	DEFAULT_SLEEP			3600
 
 
 static EXT_RAM_ATTR struct {
 	TaskHandle_t task;
 	SemaphoreHandle_t mutex;
 	int pause, speed, by;
-	enum { DISPLAYER_DISABLED, DISPLAYER_IDLE, DISPLAYER_ACTIVE } state;
+	enum { DISPLAYER_DISABLED, DISPLAYER_AUTO_DISABLE, DISPLAYER_ACTIVE } state;
+	char header[HEADER_SIZE + 1];
 	char string[SCROLLABLE_SIZE + 1];
 	int offset, boundary;
 	char *metadata_config;
+	bool timer;
+	uint32_t elapsed, duration;
+	TickType_t tick;
 } displayer;
 
 static void displayer_task(void *args);
@@ -86,8 +92,8 @@ void display_init(char *welcome) {
 		displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", DISPLAYER_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 		
 		// set lines for "fixed" text mode
-		display->set_font(1, DISPLAY_FONT_TINY, 0);
-		display->set_font(2, DISPLAY_FONT_LARGE, 0);
+		display->set_font(1, DISPLAY_FONT_LINE1, -3);
+		display->set_font(2, DISPLAY_FONT_LARGE, -3);
 		
 		displayer.metadata_config = config_alloc_get(NVS_TYPE_STR, "metadata_config");
 	}
@@ -96,32 +102,62 @@ void display_init(char *welcome) {
 }
 
 /****************************************************************************************
- * 
+ * This is not really thread-safe as displayer_task might be in the middle of line drawing
+ * but it won't crash (I think) and making it thread-safe would be complicated for a
+ * feature which is secondary (the LMS version of scrolling is thread-safe)
  */
 static void displayer_task(void *args) {
+	int scroll_sleep = 0, timer_sleep;
+	
 	while (1) {
-		int scroll_pause = displayer.pause;
-		
 		// suspend ourselves if nothing to do
 		if (displayer.state == DISPLAYER_DISABLED) {
 			vTaskSuspend(NULL);
 			display->clear();
+			display->line(1, DISPLAY_LEFT, DISPLAY_UPDATE, displayer.header);
+			scroll_sleep = 0;
 		}	
 		
-		// something to scroll (or we'll wake-up every pause ms ... no big deal)
-		if (*displayer.string && displayer.state == DISPLAYER_ACTIVE) {
-			display->line(2, DISPLAY_LEFT, -displayer.offset, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
+		// we have been waken up before our requested time
+		if (scroll_sleep <= 10) {
+			// something to scroll (or we'll wake-up every pause ms ... no big deal)
+			if (*displayer.string && displayer.state == DISPLAYER_ACTIVE) {
+				display->line(2, -displayer.offset, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
 			
-			xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-			scroll_pause = displayer.offset ? displayer.speed : displayer.pause;
-			displayer.offset = displayer.offset >= displayer.boundary ? 0 : (displayer.offset + min(displayer.by, displayer.boundary - displayer.offset));			
-			xSemaphoreGive(displayer.mutex);
-		} else if (displayer.state == DISPLAYER_IDLE) {
-			display->line(2, DISPLAY_LEFT, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
-			scroll_pause = displayer.pause;
-		}
+				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+				scroll_sleep = displayer.offset ? displayer.speed : displayer.pause;
+				displayer.offset = displayer.offset >= displayer.boundary ? 0 : (displayer.offset + min(displayer.by, displayer.boundary - displayer.offset));			
+				xSemaphoreGive(displayer.mutex);
+			} else if (displayer.state == DISPLAYER_AUTO_DISABLE) {
+				display->line(2, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
+				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+				displayer.state = DISPLAYER_DISABLED;
+				xSemaphoreGive(displayer.mutex);
+			} else scroll_sleep = DEFAULT_SLEEP;
+		}	
 		
-		vTaskDelay(scroll_pause / portTICK_PERIOD_MS);
+		// handler timer
+		if (displayer.timer && displayer.state == DISPLAYER_ACTIVE) {
+			char counter[12];
+			TickType_t tick = xTaskGetTickCount();
+			uint32_t elapsed = (tick - displayer.tick) * portTICK_PERIOD_MS;
+			
+			if (elapsed >= 1000) {
+				displayer.tick = tick;
+				displayer.elapsed += elapsed / 1000;
+				if (displayer.elapsed < 3600) sprintf(counter, "%2u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
+				else sprintf(counter, "%2u:%2u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
+				display->line(1, DISPLAY_RIGHT, (DISPLAY_CLEAR | DISPLAY_ONLY_EOL) | DISPLAY_UPDATE, counter);
+				timer_sleep = 1000;
+			} else timer_sleep = 1000 - elapsed;	
+		} else timer_sleep = DEFAULT_SLEEP;
+		
+		// don't bother sleeping if we are disactivated
+		if (displayer.state == DISPLAYER_ACTIVE) {
+			int sleep = min(scroll_sleep, timer_sleep);
+			scroll_sleep -= sleep;
+			vTaskDelay( sleep / portTICK_PERIOD_MS);
+		}	
 	}
 }	
 
@@ -136,6 +172,8 @@ void displayer_metadata(char *artist, char *album, char *title) {
 		strncpy(displayer.string, title ? title : "", SCROLLABLE_SIZE);
 		return;
 	}
+	
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	
 	// format metadata parameters and write them directly
 	if ((p = strcasestr(displayer.metadata_config, "format")) != NULL) {
@@ -183,26 +221,21 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	// get optional scroll speed
 	if ((p = strcasestr(displayer.metadata_config, "speed")) != NULL) sscanf(p, "%*[^=]=%d", &displayer.speed);
 	
-	// just starts displayer directly
-	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	displayer.offset = 0;	
-	displayer.state = DISPLAYER_ACTIVE;
 	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
+	
 	xSemaphoreGive(displayer.mutex);
 }	
 
 
 /****************************************************************************************
- * This is not really thread-safe as displayer_task might be in the middle of line drawing
- * but it won't crash (I think) and making it thread-safe would be complicated for a
- * feature which is secondary (the LMS version of scrolling is thread-safe)
+ *
  */
 void displayer_scroll(char *string, int speed) {
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 	if (speed) displayer.speed = speed;
 	displayer.offset = 0;	
-	displayer.state = DISPLAYER_ACTIVE;
 	strncpy(displayer.string, string, SCROLLABLE_SIZE);
 	displayer.string[SCROLLABLE_SIZE] = '\0';
 	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
@@ -211,30 +244,62 @@ void displayer_scroll(char *string, int speed) {
 }
 
 /****************************************************************************************
+ * 
+ */
+void displayer_timer(enum displayer_time_e mode, uint32_t elapsed, uint32_t duration) {
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+
+	displayer.elapsed = elapsed;	
+	displayer.duration = duration;	
+	displayer.timer = true;
+	displayer.tick = xTaskGetTickCount();
+		
+	xSemaphoreGive(displayer.mutex);
+}	
+
+/****************************************************************************************
  * See above comment
  */
-void displayer_control(enum displayer_cmd_e cmd) {
+void displayer_control(enum displayer_cmd_e cmd, ...) {
+	va_list args;
+	
+	va_start(args, cmd);
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	
 	displayer.offset = 0;	
 	displayer.boundary = 0;
 	
 	switch(cmd) {
+	case DISPLAYER_ACTIVATE: {	
+		char *header = va_arg(args, char*);
+		strncpy(displayer.header, header, HEADER_SIZE);
+		displayer.header[HEADER_SIZE] = '\0';
+		displayer.state = DISPLAYER_ACTIVE;
+		displayer.timer = false;
+		displayer.string[0] = '\0';
+		vTaskResume(displayer.task);
+		break;
+	}	
+	case DISPLAYER_DISABLE:		
+		displayer.state = DISPLAYER_AUTO_DISABLE;
+		break;		
 	case DISPLAYER_SHUTDOWN:
 		displayer.state = DISPLAYER_DISABLED;
 		vTaskSuspend(displayer.task);
 		break;
-	case DISPLAYER_ACTIVATE:	
-		displayer.state = DISPLAYER_ACTIVE;
-		displayer.string[0] = '\0';
-		vTaskResume(displayer.task);
+	case DISPLAYER_TIMER_RESUME:
+		if (!displayer.timer) {
+			displayer.timer = true;		
+			displayer.tick = xTaskGetTickCount();		
+		}	
 		break;
-	case DISPLAYER_SUSPEND:		
-		displayer.state = DISPLAYER_IDLE;
+	case DISPLAYER_TIMER_PAUSE:
+		displayer.timer = false;
 		break;
 	default:
 		break;
 	}	
 	
 	xSemaphoreGive(displayer.mutex);
+	va_end(args);
 }

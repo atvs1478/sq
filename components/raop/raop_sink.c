@@ -29,7 +29,7 @@ log_level	util_loglevel;
 
 static log_level *loglevel = &raop_loglevel;
 static struct raop_ctx_s *raop;
-raop_cmd_vcb_t cmd_handler_chain;
+static raop_cmd_vcb_t cmd_handler_chain;
 
 static void raop_volume_up(void) {
 	raop_cmd(raop, RAOP_VOLUME_UP, NULL);
@@ -82,39 +82,42 @@ const static actrls_t controls = {
 /****************************************************************************************
  * Command handler
  */
-bool cmd_handler(raop_event_t event, ...) {
-	bool res = true;
+static bool cmd_handler(raop_event_t event, ...) {
+	bool chain = true, res = true;
 	va_list args;	
 	
 	va_start(args, event);
 	
 	switch(event) {
 	case RAOP_SETUP:
-		displayer_control(DISPLAYER_ACTIVATE);
-		res = cmd_handler_chain(event, args);
+		displayer_control(DISPLAYER_ACTIVATE, "AIRPLAY");
 		break;
+	case RAOP_PLAY:
+		displayer_control(DISPLAYER_TIMER_RESUME);
+		break;		
+	case RAOP_FLUSH:
+		displayer_control(DISPLAYER_TIMER_PAUSE);
+		break;		
 	case RAOP_STOP:
-		displayer_control(DISPLAYER_SUSPEND);
-		res = cmd_handler_chain(event, args);
+		displayer_control(DISPLAYER_DISABLE);
 		break;
 	case RAOP_METADATA: {
 		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
 		displayer_metadata(artist, album, title);
+		chain = false;
 		break;
 	}	
 	case RAOP_PROGRESS: {
-		u32_t elapsed = va_arg(args, u32_t);
-		u32_t duration = va_arg(args, u32_t);
-		char msg[32];
-		
-		if (elapsed > 3600) snprintf(msg, 32, "AIRPLAY %2u:%02u:%02u", elapsed / 3600, elapsed / 60, elapsed % 60);
-		else snprintf(msg, 32, "AIRPLAY %2u:%02u", elapsed / 60, elapsed % 60);
-		display->line(1, DISPLAY_LEFT, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+		u32_t elapsed = va_arg(args, u32_t), duration = va_arg(args, u32_t);
+		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
+		chain = false;
 		break;
 	}	
-	default:
-		res = cmd_handler_chain(event, args);
+	default: 
+		break;
 	}
+	
+	if (chain) res = cmd_handler_chain(event, args);
 	
 	va_end(args);
 	

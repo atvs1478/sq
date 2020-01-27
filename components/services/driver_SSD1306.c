@@ -34,12 +34,14 @@
 
 static const char *TAG = "display";
 
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+
 // handlers
 static bool init(char *config, char *welcome);
 static void clear(void);
 static bool set_font(int num, enum display_font_e font, int space);
 static void text(enum display_font_e font, enum display_pos_e pos, int attribute, char *text, ...);
-static bool line(int num, enum display_pos_e pos, int offset, int attribute, char *text);
+static bool line(int num, int x, int attribute, char *text);
 static int stretch(int num, char *string, int max);
 static void draw_cbr(u8_t *data, int height);
 static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
@@ -106,7 +108,7 @@ static bool init(char *config, char *welcome) {
 			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 			SSD1306_display.width = width;
 			SSD1306_display.height = height;
-			text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTER, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
+			text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
 			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
 			res = true;
 		} else {
@@ -134,6 +136,9 @@ static bool set_font(int num, enum display_font_e font, int space) {
 	if (--num >= MAX_LINES) return false;
 	
 	switch(font) {
+	case DISPLAY_FONT_LINE1:	
+		lines[num].font = &Font_line1_11x13;
+		break;
 	case DISPLAY_FONT_TINY:
 		lines[num].font = &Font_droid_sans_fallback_11x13;
 		break;		
@@ -144,7 +149,7 @@ static bool set_font(int num, enum display_font_e font, int space) {
 		lines[num].font = &Font_liberation_mono_9x15;	
 		break;
 	case DISPLAY_FONT_LARGE:	
-		lines[num].font = &Font_Earthbound18x21;
+		lines[num].font = &Font_VDS_Compensated15x22;
 		break;		
 	case DISPLAY_FONT_HUGE:	
 		lines[num].font = &Font_droid_sans_fallback_24x28;
@@ -161,8 +166,9 @@ static bool set_font(int num, enum display_font_e font, int space) {
 	
 	// re-calculate lines absolute position
 	lines[num].space = space;
-	for (int i = 1; i <= num; i++) lines[i].y = lines[i-1].y + lines[i-1].font->Height + lines[i-1].space;
-	
+	lines[0].y = lines[0].space;
+	for (int i = 1; i <= num; i++) lines[i].y = lines[i-1].y + lines[i-1].font->Height + lines[i].space;
+		
 	ESP_LOGI(TAG, "adding line %u at %u (height:%u)", num + 1, lines[num].y, lines[num].font->Height);
 	
 	if (lines[num].y + lines[num].font->Height > Display.Height) {
@@ -176,8 +182,8 @@ static bool set_font(int num, enum display_font_e font, int space) {
 /****************************************************************************************
  * 
  */
-static bool line(int num, enum display_pos_e pos, int x, int attribute, char *text) {
-	bool fits;
+static bool line(int num, int x, int attribute, char *text) {
+	int width;
 	
 	// counting 1..n
 	num--;
@@ -189,23 +195,29 @@ static bool line(int num, enum display_pos_e pos, int x, int attribute, char *te
 	}	
 	
 	SSD1306_SetFont( &Display, lines[num].font );	
+	if (attribute & DISPLAY_MONOSPACE) SSD1306_FontForceMonospace( &Display, true );
 	
-	// erase line if requested
+	width = SSD1306_FontMeasureString( &Display, text );
+	
+	// adjusting position, erase only EoL for rigth-justified
+	if (x == DISPLAY_RIGHT) x = Display.Width - width - 1;
+	else if (x == DISPLAY_CENTER) x = (Display.Width - width) / 2;
+	
+	// erase if requested
 	if (attribute & DISPLAY_CLEAR) {
-		for (int x = 0 ; x < Display.Width; x++) 
+		for (int c = (attribute & DISPLAY_ONLY_EOL) ? x : 0; c < Display.Width; c++) 
 			for (int y = lines[num].y; y < lines[num].y + lines[num].font->Height; y++)
-				SSD1306_DrawPixelFast( &Display, x, y, SSD_COLOR_BLACK );
+				SSD1306_DrawPixelFast( &Display, c, y, SSD_COLOR_BLACK );
 	}	
-	
-	fits = SSD1306_FontMeasureString( &Display, text ) + x <= Display.Width;
+		
 	SSD1306_FontDrawString( &Display, x, lines[num].y, text, SSD_COLOR_WHITE );
 	
-	ESP_LOGI(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
+	ESP_LOGD(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
 	
 	// update whole display if requested
 	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
 	
-	return fits;
+	return width + x < Display.Width;
 }
 
 /****************************************************************************************
@@ -228,15 +240,13 @@ static int stretch(int num, char *string, int max) {
 	
 	// mark the end of the extended string
 	boundary = SSD1306_FontMeasureString( &Display, string );
-		
+			
 	// add a full display width	
 	while (len < max && SSD1306_FontMeasureString( &Display, string ) - boundary < Display.Width) {
 		string[len++] = string[extra++];
+		string[len] = '\0';
 	}
-	
-	// string has space for max+1 
-	string[len] = '\0';
-	
+		
 	return boundary;
 }
 
@@ -254,6 +264,9 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	if (!text) return;
 	
 	switch(font) {
+	case DISPLAY_FONT_LINE1:	
+		SSD1306_SetFont( &Display, &Font_line1_11x13 );
+		break;
 	case DISPLAY_FONT_TINY:	
 		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_11x13 );
 		break;		
@@ -261,7 +274,7 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 		SSD1306_SetFont( &Display, &Font_droid_sans_mono_7x13 );	
 		break;
 	case DISPLAY_FONT_LARGE:	
-		SSD1306_SetFont( &Display, &Font_Earthbound18x21 );
+		SSD1306_SetFont( &Display, &Font_VDS_Compensated15x22 );
 		break;		
 	case DISPLAY_FONT_HUGE:	
 		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
@@ -290,7 +303,7 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	case DISPLAY_BOTTOM_LEFT:
 		Anchor = TextAnchor_SouthWest;
 		break;
-	case DISPLAY_CENTER:
+	case DISPLAY_CENTERED:
 		Anchor = TextAnchor_Center;
 		break;
 	}	

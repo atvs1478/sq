@@ -28,6 +28,7 @@
 #include "trace.h"
 #include "audio_controls.h"
 #include "sys/lock.h"
+#include "display.h"
 
 // AVRCP used transaction label
 #define APP_RC_CT_TL_GET_CAPS            (0)
@@ -73,6 +74,8 @@ static bool s_volume_notify;
 static esp_avrc_playback_stat_t s_play_status = ESP_AVRC_PLAYBACK_STOPPED;
 static uint8_t s_remote_bda[6];
 static int tl;
+static bt_cmd_vcb_t cmd_handler_chain;
+static char *s_artist, *s_album, *s_title;
 
 static void bt_volume_up(void) {
 	// volume UP/DOWN buttons are not supported by iPhone/Android
@@ -129,10 +132,57 @@ void bt_master(bool on) {
 
 /* disconnection */
 void bt_disconnect(void) {
+	displayer_control(DISPLAYER_SHUTDOWN);
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	esp_a2d_sink_disconnect(s_remote_bda);
 	actrls_unset();
 	ESP_LOGI(BT_AV_TAG, "forced disconnection");
+}
+
+/* command handler */
+static bool cmd_handler(bt_sink_cmd_t cmd, ...) {
+	bool chain = true, res = true;
+	va_list args;	
+	
+	va_start(args, cmd);
+	
+	switch(cmd) {
+	case BT_SINK_CONNECTED:
+		displayer_control(DISPLAYER_ACTIVATE, "BLUETOOTH");
+		break;
+	case BT_SINK_PLAY:
+		displayer_control(DISPLAYER_TIMER_RESUME);
+		break;		
+	case BT_SINK_PAUSE:
+		displayer_control(DISPLAYER_TIMER_PAUSE);
+		break;		
+	case BT_SINK_STOP:
+		displayer_control(DISPLAYER_DISABLE);
+		break;
+	case BT_SINK_DISCONNECTED:
+		displayer_control(DISPLAYER_DISABLE);
+		break;
+	case BT_SINK_METADATA: {
+		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
+		displayer_metadata(artist, album, title);
+		chain = false;
+		break;
+	}	
+	case BT_SINK_PROGRESS: {
+		uint32_t elapsed = va_arg(args, uint32_t), duration = va_arg(args, uint32_t);
+		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
+		chain = false;
+		break;
+	}	
+	default: 
+		break;
+	}
+	
+	if (chain) res = cmd_handler_chain(cmd, args);
+	
+	va_end(args);
+	
+	return res;
 }
 
 /* callback for A2DP sink */
@@ -267,7 +317,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 static void bt_av_new_track(void)
 {
     // request metadata
-    uint8_t attr_mask = ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST | ESP_AVRC_MD_ATTR_ALBUM | ESP_AVRC_MD_ATTR_GENRE;
+    uint8_t attr_mask = ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST | ESP_AVRC_MD_ATTR_ALBUM;
     esp_avrc_ct_send_metadata_cmd(APP_RC_CT_TL_GET_META_DATA, attr_mask);
 
     // register notification if peer support the event_id
@@ -287,7 +337,7 @@ static void bt_av_playback_changed(void)
 
 static void bt_av_play_pos_changed(void)
 {
-    if (esp_avrc_rn_evt_bit_mask_operation(ESP_AVRC_BIT_MASK_OP_TEST, &s_avrc_peer_rn_cap,
+	if (esp_avrc_rn_evt_bit_mask_operation(ESP_AVRC_BIT_MASK_OP_TEST, &s_avrc_peer_rn_cap,
                                            ESP_AVRC_RN_PLAY_POS_CHANGED)) {
         esp_avrc_ct_send_register_notification_cmd(APP_RC_CT_TL_RN_PLAY_POS_CHANGE, ESP_AVRC_RN_PLAY_POS_CHANGED, 10);
     }
@@ -298,6 +348,7 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
     switch (event_id) {
     case ESP_AVRC_RN_TRACK_CHANGE:
         bt_av_new_track();
+		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, 0);
         break;
     case ESP_AVRC_RN_PLAY_STATUS_CHANGE:
         ESP_LOGI(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
@@ -335,7 +386,25 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_CT_METADATA_RSP_EVT: {
+		char **p = NULL;
         ESP_LOGI(BT_RC_CT_TAG, "AVRC metadata rsp: attribute id 0x%x, %s", rc->meta_rsp.attr_id, rc->meta_rsp.attr_text);
+		
+		if (rc->meta_rsp.attr_id == 0x01) p = &s_title;
+		else if (rc->meta_rsp.attr_id == 0x02) p = &s_artist;
+		else if (rc->meta_rsp.attr_id == 0x04) p = &s_album;
+		
+		// not very pretty, but this is bluetooth anyway
+		if (p) {
+			if (*p) free(*p);
+			*p = strdup((char*) rc->meta_rsp.attr_text);
+		
+			if (s_artist && s_album && s_title) {
+				(*bt_app_a2d_cmd_cb)(BT_SINK_METADATA, s_artist, s_album, s_title);
+				free(s_artist); free(s_album); free(s_title);
+				s_artist = s_album = s_title = NULL;
+			}
+		}	
+		
         free(rc->meta_rsp.attr_text);
         break;
     }
@@ -427,12 +496,13 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param)
     }
 }
 
-void bt_sink_init(bt_cmd_cb_t cmd_cb, bt_data_cb_t data_cb)
+void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb)
 {
 	esp_err_t err;
 	
-	bt_app_a2d_cmd_cb = cmd_cb;
-	bt_app_a2d_data_cb = data_cb;
+	bt_app_a2d_cmd_cb = cmd_handler;
+	cmd_handler_chain = cmd_cb;
+  	bt_app_a2d_data_cb = data_cb;
 	
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
 

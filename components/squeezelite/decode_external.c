@@ -100,10 +100,8 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
  * BT sink command handler
  */
 
-static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...) 
+static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args) 
 {
-	va_list args;
-	
 	// don't LOCK_O as there is always a chance that LMS takes control later anyway
 	if (output.external != DECODE_BT && output.state > OUTPUT_STOPPED) {
 		LOG_WARN("Cannot use BT sink while LMS/AirPlay is controlling player");
@@ -112,8 +110,6 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 
 	LOCK_D;
 
-	va_start(args, cmd);
-	
 	if (cmd != BT_SINK_VOLUME) LOCK_O;
 		
 	switch(cmd) {
@@ -152,13 +148,14 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
 		break;
+	default:
+		break;
 	}
 	}
 	
 	if (cmd != BT_SINK_VOLUME) UNLOCK_O;
 	UNLOCK_D;
 
-	va_end(args);
 	return true;
 }
 

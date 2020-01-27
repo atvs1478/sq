@@ -12,15 +12,15 @@
 #include <stdint.h>
 
 typedef enum { 	BT_SINK_CONNECTED, BT_SINK_DISCONNECTED, BT_SINK_PLAY, BT_SINK_STOP, BT_SINK_PAUSE, 
-				BT_SINK_RATE, BT_SINK_VOLUME,  } bt_sink_cmd_t;
+				BT_SINK_RATE, BT_SINK_VOLUME, BT_SINK_METADATA, BT_SINK_PROGRESS } bt_sink_cmd_t;
 				
-typedef bool (*bt_cmd_cb_t)(bt_sink_cmd_t cmd, ...);
+typedef bool (*bt_cmd_vcb_t)(bt_sink_cmd_t cmd, va_list args);
 typedef void (*bt_data_cb_t)(const uint8_t *data, uint32_t len);
 
 /**
  * @brief     init sink mode (need to be provided)
  */
-void bt_sink_init(bt_cmd_cb_t cmd_cb, bt_data_cb_t data_cb);
+void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb);
 
 /**
  * @brief     deinit sink mode (need to be provided)
