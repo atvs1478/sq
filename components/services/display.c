@@ -23,6 +23,7 @@
 #include <arpa/inet.h>
 #include "esp_log.h"
 #include "config.h"
+#include "tools.h"
 #include "display.h"
 
 // here we should include all possible drivers
@@ -92,8 +93,8 @@ void display_init(char *welcome) {
 		displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", DISPLAYER_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 		
 		// set lines for "fixed" text mode
-		display->set_font(1, DISPLAY_FONT_LINE1, -3);
-		display->set_font(2, DISPLAY_FONT_LARGE, -3);
+		display->set_font(1, DISPLAY_FONT_LINE_1, -3);
+		display->set_font(2, DISPLAY_FONT_LINE_2, -3);
 		
 		displayer.metadata_config = config_alloc_get(NVS_TYPE_STR, "metadata_config");
 	}
@@ -222,8 +223,9 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	if ((p = strcasestr(displayer.metadata_config, "speed")) != NULL) sscanf(p, "%*[^=]=%d", &displayer.speed);
 	
 	displayer.offset = 0;	
+	utf8_decode(displayer.string);
 	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
-	
+		
 	xSemaphoreGive(displayer.mutex);
 }	
 

@@ -136,32 +136,27 @@ static bool set_font(int num, enum display_font_e font, int space) {
 	if (--num >= MAX_LINES) return false;
 	
 	switch(font) {
-	case DISPLAY_FONT_LINE1:	
-		lines[num].font = &Font_line1_11x13;
+	case DISPLAY_FONT_LINE_1:	
+		lines[num].font = &Font_line_1;
 		break;
-	case DISPLAY_FONT_TINY:
-		lines[num].font = &Font_droid_sans_fallback_11x13;
+	case DISPLAY_FONT_LINE_2:	
+		lines[num].font = &Font_line_2;
 		break;		
 	case DISPLAY_FONT_SMALL:	
-		lines[num].font = &Font_droid_sans_mono_7x13;	
+		lines[num].font = &Font_droid_sans_fallback_11x13;	
 		break;
 	case DISPLAY_FONT_MEDIUM:			
-		lines[num].font = &Font_liberation_mono_9x15;	
+	case DISPLAY_FONT_DEFAULT:
+	default:		
+		lines[num].font = &Font_droid_sans_fallback_15x17;	
 		break;
 	case DISPLAY_FONT_LARGE:	
-		lines[num].font = &Font_VDS_Compensated15x22;
-		break;		
-	case DISPLAY_FONT_HUGE:	
 		lines[num].font = &Font_droid_sans_fallback_24x28;
-		break;				
+		break;		
 	case DISPLAY_FONT_SEGMENT:			
 		if (Display.Height == 32) lines[num].font = &Font_Tarable7Seg_16x32;
 		else lines[num].font = &Font_Tarable7Seg_32x64;
 		break;		
-	case DISPLAY_FONT_DEFAULT:
-	default:	
-		lines[num].font = &Font_droid_sans_fallback_15x17;
-		break;
 	}
 	
 	// re-calculate lines absolute position
@@ -264,32 +259,27 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	if (!text) return;
 	
 	switch(font) {
-	case DISPLAY_FONT_LINE1:	
-		SSD1306_SetFont( &Display, &Font_line1_11x13 );
+	case DISPLAY_FONT_LINE_1:	
+		SSD1306_SetFont( &Display, &Font_line_1 );
 		break;
-	case DISPLAY_FONT_TINY:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_11x13 );
+	case DISPLAY_FONT_LINE_2:	
+		SSD1306_SetFont( &Display, &Font_line_2 );
 		break;		
 	case DISPLAY_FONT_SMALL:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_mono_7x13 );	
-		break;
-	case DISPLAY_FONT_LARGE:	
-		SSD1306_SetFont( &Display, &Font_VDS_Compensated15x22 );
-		break;		
-	case DISPLAY_FONT_HUGE:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
-		break;				
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_11x13 );	
+		break;	
 	case DISPLAY_FONT_MEDIUM:			
-		SSD1306_SetFont( &Display, &Font_liberation_mono_9x15 );	
-		break;
+	case DISPLAY_FONT_DEFAULT:
+	default:
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );	
+		break;		
+	case DISPLAY_FONT_LARGE:	
+		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
+		break;		
 	case DISPLAY_FONT_SEGMENT:			
 		if (Display.Height == 32) SSD1306_SetFont( &Display, &Font_Tarable7Seg_16x32 );
 		else SSD1306_SetFont( &Display, &Font_Tarable7Seg_32x64 );
 		break;		
-	case DISPLAY_FONT_DEFAULT:
-	default:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
-		break;
 	}
 
 	switch(pos) {
