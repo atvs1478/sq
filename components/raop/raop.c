@@ -628,11 +628,12 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			volume = (volume == -144.0) ? 0 : (1 + volume / 30);
 			success = ctx->cmd_cb(RAOP_VOLUME, volume);
 		} else if (body && (p = strcasestr(body, "progress")) != NULL) {
-			u32_t start, current, stop = 0;
+			int start, current, stop = 0;
 
 			sscanf(p, "%*[^:]:%u/%u/%u", &start, &current, &stop);
 			current = (current - start) / 44100;
 			if (stop) stop = (stop - start) / 44100;
+			else stop = -1;
 			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
 			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
 		}

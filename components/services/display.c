@@ -248,11 +248,11 @@ void displayer_scroll(char *string, int speed) {
 /****************************************************************************************
  * 
  */
-void displayer_timer(enum displayer_time_e mode, uint32_t elapsed, uint32_t duration) {
+void displayer_timer(enum displayer_time_e mode, int elapsed, int duration) {
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
-	displayer.elapsed = elapsed;	
-	displayer.duration = duration;	
+	if (elapsed >= 0) displayer.elapsed = elapsed;	
+	if (duration >= 0) displayer.duration = duration;	
 	displayer.timer = true;
 	displayer.tick = xTaskGetTickCount();
 		

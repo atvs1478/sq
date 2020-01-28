@@ -108,7 +108,7 @@ static bool cmd_handler(raop_event_t event, ...) {
 		break;
 	}	
 	case RAOP_PROGRESS: {
-		u32_t elapsed = va_arg(args, u32_t), duration = va_arg(args, u32_t);
+		int elapsed = va_arg(args, int), duration = va_arg(args, int);
 		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
 		chain = false;
 		break;

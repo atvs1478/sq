@@ -169,7 +169,7 @@ static bool cmd_handler(bt_sink_cmd_t cmd, ...) {
 		break;
 	}	
 	case BT_SINK_PROGRESS: {
-		uint32_t elapsed = va_arg(args, uint32_t), duration = va_arg(args, uint32_t);
+		int elapsed = va_arg(args, int), duration = va_arg(args, int);
 		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
 		chain = false;
 		break;
@@ -317,7 +317,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 static void bt_av_new_track(void)
 {
     // request metadata
-    uint8_t attr_mask = ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST | ESP_AVRC_MD_ATTR_ALBUM;
+    uint8_t attr_mask = ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST | ESP_AVRC_MD_ATTR_ALBUM | ESP_AVRC_MD_ATTR_PLAYING_TIME;
     esp_avrc_ct_send_metadata_cmd(APP_RC_CT_TL_GET_META_DATA, attr_mask);
 
     // register notification if peer support the event_id
@@ -357,6 +357,7 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
         break;
     case ESP_AVRC_RN_PLAY_POS_CHANGED:
         ESP_LOGI(BT_AV_TAG, "Play position changed: %d-ms", event_parameter->play_pos);
+		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, event_parameter->play_pos, -1);
         bt_av_play_pos_changed();
         break;
     }
@@ -389,10 +390,11 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
 		char **p = NULL;
         ESP_LOGI(BT_RC_CT_TAG, "AVRC metadata rsp: attribute id 0x%x, %s", rc->meta_rsp.attr_id, rc->meta_rsp.attr_text);
 		
-		if (rc->meta_rsp.attr_id == 0x01) p = &s_title;
-		else if (rc->meta_rsp.attr_id == 0x02) p = &s_artist;
-		else if (rc->meta_rsp.attr_id == 0x04) p = &s_album;
-		
+		if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_TITLE) p = &s_title;
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ARTIST) p = &s_artist;
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ALBUM) p = &s_album;
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_PLAYING_TIME) (*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, -1, atoi((char*) rc->meta_rsp.attr_text));
+				
 		// not very pretty, but this is bluetooth anyway
 		if (p) {
 			if (*p) free(*p);
