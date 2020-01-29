@@ -308,6 +308,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "Vcc_GPIO");
 	config_set_default(NVS_TYPE_STR, "Vcc_GPIO", "", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "metadata_config");
+	config_set_default(NVS_TYPE_STR, "metadata_config", "", 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 

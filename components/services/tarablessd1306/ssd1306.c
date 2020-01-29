@@ -136,6 +136,8 @@ void SSD1306_SetDisplayAddressMode( struct SSD1306_Device* DeviceHandle, SSD1306
 
 void SSD1306_Update( struct SSD1306_Device* DeviceHandle ) {
     NullCheck( DeviceHandle, return );
+	SSD1306_SetColumnAddress( DeviceHandle, 0, DeviceHandle->Width - 1);
+	SSD1306_SetPageAddress( DeviceHandle, 0, DeviceHandle->Height / 8 - 1);
     SSD1306_WriteData( DeviceHandle, DeviceHandle->Framebuffer, DeviceHandle->FramebufferSize );
 }
 

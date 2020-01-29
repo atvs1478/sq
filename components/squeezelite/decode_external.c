@@ -100,10 +100,8 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
  * BT sink command handler
  */
 
-static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...) 
+static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args) 
 {
-	va_list args;
-	
 	// don't LOCK_O as there is always a chance that LMS takes control later anyway
 	if (output.external != DECODE_BT && output.state > OUTPUT_STOPPED) {
 		LOG_WARN("Cannot use BT sink while LMS/AirPlay is controlling player");
@@ -112,24 +110,22 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 
 	LOCK_D;
 
-	va_start(args, cmd);
-	
 	if (cmd != BT_SINK_VOLUME) LOCK_O;
 		
 	switch(cmd) {
-	case BT_SINK_CONNECTED:
+	case BT_SINK_AUDIO_STARTED:
+		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
 		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
 		output.frames_played = 0;
 		_buf_flush(outputbuf);
 		if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
-		bt_master(true);
 		LOG_INFO("BT sink started");
 		break;
-	case BT_SINK_DISCONNECTED:	
+	case BT_SINK_AUDIO_STOPPED:	
+		// do we still need that?
 		if (output.external == DECODE_BT) {
 			output.state = OUTPUT_OFF;
-			bt_master(false);
 			LOG_INFO("BT sink stopped");
 		}	
 		break;
@@ -139,9 +135,11 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		break;
 	case BT_SINK_STOP:		
 		_buf_flush(outputbuf);
-	case BT_SINK_PAUSE:		
 		output.state = OUTPUT_STOPPED;
 		LOG_INFO("BT sink stopped");
+		break;
+	case BT_SINK_PAUSE:		
+		LOG_INFO("BT sink paused, just silence");
 		break;
 	case BT_SINK_RATE:
 		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
@@ -152,13 +150,14 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, ...)
 		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
 		break;
+	default:
+		break;
 	}
 	}
 	
 	if (cmd != BT_SINK_VOLUME) UNLOCK_O;
 	UNLOCK_D;
 
-	va_end(args);
 	return true;
 }
 
@@ -176,7 +175,7 @@ static void raop_sink_data_handler(const uint8_t *data, uint32_t len, u32_t play
 /****************************************************************************************
  * AirPlay sink command handler
  */
-static bool raop_sink_cmd_handler(raop_event_t event, void *param)
+static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 {
 	// don't LOCK_O as there is always a chance that LMS takes control later anyway
 	if (output.external != DECODE_RAOP && output.state > OUTPUT_STOPPED) {
@@ -242,7 +241,6 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			output.external = DECODE_RAOP;
 			output.state = OUTPUT_STOPPED;
 			if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
-			raop_master(true);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;
 		case RAOP_STREAM:
@@ -259,7 +257,6 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			output.state = OUTPUT_OFF;
 			output.frames_played = 0;
 			raop_state = event;
-			raop_master(false);
 			break;
 		case RAOP_FLUSH:
 			LOG_INFO("Flush", NULL);
@@ -273,7 +270,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			LOG_INFO("Play", NULL);
 			if (raop_state != RAOP_PLAY) {
 				output.state = OUTPUT_START_AT;
-				output.start_at = *(u32_t*) param;
+				output.start_at = va_arg(args, u32_t);
 				raop_sync.start_time = output.start_at;
 				LOG_INFO("Starting at %u (in %d ms)", output.start_at, output.start_at - gettime_ms());
 			}
@@ -281,7 +278,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, void *param)
 			break;
 		}
 		case RAOP_VOLUME: {
-			float volume = *((float*) param);
+			float volume = va_arg(args, double);
 			LOG_INFO("Volume[0..1] %0.4f", volume);
 			volume = 65536 * powf(volume, 3);
 			set_volume((u16_t) volume, (u16_t) volume);
@@ -339,7 +336,7 @@ void deregister_external(void) {
 	}
 }
 
-void decode_resume(int external) {
+void decode_restore(int external) {
 	switch (external) {
 	case DECODE_BT:
 		bt_disconnect();

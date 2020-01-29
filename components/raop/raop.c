@@ -532,7 +532,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		short unsigned tport = 0, cport = 0;
 
 		// we are about to stream, do something if needed
-		success = ctx->cmd_cb(RAOP_SETUP, NULL);
+		success = ctx->cmd_cb(RAOP_SETUP);
 
 		if ((p = strcasestr(buf, "timing_port")) != NULL) sscanf(p, "%*[^=]=%hu", &tport);
 		if ((p = strcasestr(buf, "control_port")) != NULL) sscanf(p, "%*[^=]=%hu", &cport);
@@ -571,7 +571,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 		if (ctx->rtp) rtp_record(ctx->rtp, seqno, rtptime);
 
-		success = ctx->cmd_cb(RAOP_STREAM, NULL);
+		success = ctx->cmd_cb(RAOP_STREAM);
 
 	}  else if (!strcmp(method, "FLUSH")) {
 		unsigned short seqno = 0;
@@ -584,7 +584,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 		// only send FLUSH if useful (discards frames above buffer head and top)
 		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime))
-			success = ctx->cmd_cb(RAOP_FLUSH, NULL);
+			success = ctx->cmd_cb(RAOP_FLUSH);
 
 	}  else if (!strcmp(method, "TEARDOWN")) {
 
@@ -615,7 +615,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		NFREE(ctx->rtsp.aesiv);
 		NFREE(ctx->rtsp.fmtp);
 
-		success = ctx->cmd_cb(RAOP_STOP, NULL);
+		success = ctx->cmd_cb(RAOP_STOP);
 
 	} else if (!strcmp(method, "SET_PARAMETER")) {
 		char *p;
@@ -626,9 +626,18 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			sscanf(p, "%*[^:]:%f", &volume);
 			LOG_INFO("[%p]: SET PARAMETER volume %f", ctx, volume);
 			volume = (volume == -144.0) ? 0 : (1 + volume / 30);
-			success = ctx->cmd_cb(RAOP_VOLUME, &volume);
+			success = ctx->cmd_cb(RAOP_VOLUME, volume);
+		} else if (body && (p = strcasestr(body, "progress")) != NULL) {
+			int start, current, stop = 0;
+
+			sscanf(p, "%*[^:]:%u/%u/%u", &start, &current, &stop);
+			current = (current - start) / 44100;
+			if (stop) stop = (stop - start) / 44100;
+			else stop = -1;
+			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
+			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
 		}
-/*
+
 		if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
 			struct metadata_s metadata;
 			dmap_settings settings = {
@@ -636,23 +645,28 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 				NULL
 			};
 
+			LOG_INFO("[%p]: received metadata");
 			settings.ctx = &metadata;
 			memset(&metadata, 0, sizeof(struct metadata_s));
 			if (!dmap_parse(&settings, body, len)) {
 				LOG_INFO("[%p]: received metadata\n\tartist: %s\n\talbum:  %s\n\ttitle:  %s",
 						 ctx, metadata.artist, metadata.album, metadata.title);
+				success = ctx->cmd_cb(RAOP_METADATA, metadata.artist, metadata.album, metadata.title);
 				free_metadata(&metadata);
 			}
 		}
-*/
 	}
 
 	// don't need to free "buf" because kd_lookup return a pointer, not a strdup
 	kd_add(resp, "Audio-Jack-Status", "connected; type=analog");
 	kd_add(resp, "CSeq", kd_lookup(headers, "CSeq"));
 
-	if (success) buf = http_send(sock, "RTSP/1.0 200 OK", resp);
-	else buf = http_send(sock, "RTSP/1.0 500 ERROR", NULL);
+	if (success) {
+		buf = http_send(sock, "RTSP/1.0 200 OK", resp);
+	} else {
+		buf = http_send(sock, "RTSP/1.0 503 ERROR", NULL);
+		closesocket(sock);
+	}	
 
 	if (strcmp(method, "OPTIONS")) {
 		LOG_INFO("[%p]: responding:\n%s", ctx, buf ? buf : "<void>");

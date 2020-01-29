@@ -553,6 +553,7 @@ void buf_destroy(struct buffer *buf);
 void slimproto(log_level level, char *server, u8_t mac[6], const char *name, const char *namefile, const char *modelname, int maxSampleRate);
 void slimproto_stop(void);
 void wake_controller(void);
+void send_packet(u8_t *packet, size_t len);
 
 // stream.c
 typedef enum { STOPPED = 0, DISCONNECT, STREAMING_WAIT,
