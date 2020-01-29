@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-typedef enum { 	BT_SINK_CONNECTED, BT_SINK_DISCONNECTED, BT_SINK_PLAY, BT_SINK_STOP, BT_SINK_PAUSE, 
+typedef enum { 	BT_SINK_CONNECTED, BT_SINK_DISCONNECTED, BT_SINK_AUDIO_STARTED, BT_SINK_AUDIO_STOPPED, BT_SINK_PLAY, BT_SINK_STOP, BT_SINK_PAUSE, 
 				BT_SINK_RATE, BT_SINK_VOLUME, BT_SINK_METADATA, BT_SINK_PROGRESS } bt_sink_cmd_t;
 				
 typedef bool (*bt_cmd_vcb_t)(bt_sink_cmd_t cmd, va_list args);
@@ -26,11 +26,6 @@ void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb);
  * @brief     deinit sink mode (need to be provided)
  */
 void bt_sink_deinit(void);
-
-/**
- * @brief     * @brief     do what's necessary when becoming in charge
- */
-void bt_master(bool on);
 
 /**
  * @brief     force disconnection

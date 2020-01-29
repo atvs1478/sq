@@ -113,19 +113,19 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 	if (cmd != BT_SINK_VOLUME) LOCK_O;
 		
 	switch(cmd) {
-	case BT_SINK_CONNECTED:
+	case BT_SINK_AUDIO_STARTED:
+		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
 		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
 		output.frames_played = 0;
 		_buf_flush(outputbuf);
 		if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
-		bt_master(true);
 		LOG_INFO("BT sink started");
 		break;
-	case BT_SINK_DISCONNECTED:	
+	case BT_SINK_AUDIO_STOPPED:	
+		// do we still need that?
 		if (output.external == DECODE_BT) {
 			output.state = OUTPUT_OFF;
-			bt_master(false);
 			LOG_INFO("BT sink stopped");
 		}	
 		break;
@@ -135,9 +135,11 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		break;
 	case BT_SINK_STOP:		
 		_buf_flush(outputbuf);
-	case BT_SINK_PAUSE:		
 		output.state = OUTPUT_STOPPED;
 		LOG_INFO("BT sink stopped");
+		break;
+	case BT_SINK_PAUSE:		
+		LOG_INFO("BT sink paused, just silence");
 		break;
 	case BT_SINK_RATE:
 		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
@@ -239,7 +241,6 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			output.external = DECODE_RAOP;
 			output.state = OUTPUT_STOPPED;
 			if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
-			raop_master(true);
 			LOG_INFO("resizing buffer %u", outputbuf->size);
 			break;
 		case RAOP_STREAM:
@@ -256,7 +257,6 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			output.state = OUTPUT_OFF;
 			output.frames_played = 0;
 			raop_state = event;
-			raop_master(false);
 			break;
 		case RAOP_FLUSH:
 			LOG_INFO("Flush", NULL);

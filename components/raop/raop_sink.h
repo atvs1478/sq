@@ -33,11 +33,6 @@ void raop_sink_init(raop_cmd_vcb_t cmd_cb, raop_data_cb_t data_cb);
 void raop_sink_deinit(void);
 
 /**
- * @brief     do what's necessary when becoming in charge
- */
-void raop_master(bool on);
-
-/**
  * @brief     force disconnection
  */
 void raop_disconnect(void);

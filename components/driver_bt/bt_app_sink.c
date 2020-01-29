@@ -64,18 +64,29 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param);
 static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param);
 static void volume_set_by_local_host(uint8_t volume);
 
-static esp_a2d_audio_state_t s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
 static const char *s_a2d_conn_state_str[] = {"Disconnected", "Connecting", "Connected", "Disconnecting"};
 static const char *s_a2d_audio_state_str[] = {"Suspended", "Stopped", "Started"};
 static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
+
 static _lock_t s_volume_lock;
 static uint8_t s_volume = 0;
 static bool s_volume_notify;
-static esp_avrc_playback_stat_t s_play_status = ESP_AVRC_PLAYBACK_STOPPED;
-static uint8_t s_remote_bda[6];
+static bool s_playing = false; 
+static enum { AUDIO_IDLE, AUDIO_CONNECTED, AUDIO_ACTIVATED } s_audio = AUDIO_IDLE;
+
+static int s_sample_rate;
 static int tl;
 static bt_cmd_vcb_t cmd_handler_chain;
-static char *s_artist, *s_album, *s_title;
+
+#define METADATA_LEN 128
+
+static EXT_RAM_ATTR struct {
+	char artist[METADATA_LEN + 1];
+	char album[METADATA_LEN + 1];
+	char title[METADATA_LEN + 1];
+	int duration;
+	bool updated;
+} s_metadata;	
 
 static void bt_volume_up(void) {
 	// volume UP/DOWN buttons are not supported by iPhone/Android
@@ -91,9 +102,8 @@ static void bt_volume_down(void) {
 }
 
 static void bt_toggle(void) {
-	if (s_play_status != ESP_AVRC_PLAYBACK_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	else esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	//s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
+	if (s_playing) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	else esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
 static void bt_play(void) {
@@ -124,65 +134,68 @@ const static actrls_t controls = {
 	bt_prev, bt_next,	// prev, next
 };
 
-/* taking/giving audio system's control */
-void bt_master(bool on) {
-	if (on) actrls_set(controls, NULL);
-	else actrls_unset();
-}
-
 /* disconnection */
 void bt_disconnect(void) {
 	displayer_control(DISPLAYER_SHUTDOWN);
-	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
-	esp_a2d_sink_disconnect(s_remote_bda);
+	if (s_playing) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	actrls_unset();
 	ESP_LOGI(BT_AV_TAG, "forced disconnection");
 }
 
+/* update metadata if any */
+void update_metadata(bool force) {
+	if ((s_metadata.updated || force) && s_audio == AUDIO_ACTIVATED) {
+		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, -1, s_metadata.duration);
+		(*bt_app_a2d_cmd_cb)(BT_SINK_METADATA, s_metadata.artist, s_metadata.album, s_metadata.title);
+		s_metadata.updated = false;
+	} else s_metadata.updated = force;
+}	
+
 /* command handler */
 static bool cmd_handler(bt_sink_cmd_t cmd, ...) {
-	bool chain = true, res = true;
 	va_list args;	
 	
 	va_start(args, cmd);
 	
+	// handle audio event and stop if forbidden
+	if (!cmd_handler_chain(cmd, args)) {
+		va_end(args);
+		return false;
+	}
+
+	// now handle events for display
 	switch(cmd) {
-	case BT_SINK_CONNECTED:
+	case BT_SINK_AUDIO_STARTED:
 		displayer_control(DISPLAYER_ACTIVATE, "BLUETOOTH");
 		break;
-	case BT_SINK_PLAY:
-		displayer_control(DISPLAYER_TIMER_RESUME);
+	case BT_SINK_AUDIO_STOPPED:
+		displayer_control(DISPLAYER_SUSPEND);
 		break;		
+	case BT_SINK_PLAY:
+		displayer_control(DISPLAYER_TIMER_RUN);
+		break;		
+	case BT_SINK_STOP:		
+		// not sure of difference between pause and stop for displayer 
 	case BT_SINK_PAUSE:
 		displayer_control(DISPLAYER_TIMER_PAUSE);
 		break;		
-	case BT_SINK_STOP:
-		displayer_control(DISPLAYER_DISABLE);
-		break;
-	case BT_SINK_DISCONNECTED:
-		displayer_control(DISPLAYER_DISABLE);
-		break;
 	case BT_SINK_METADATA: {
 		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
 		displayer_metadata(artist, album, title);
-		chain = false;
 		break;
 	}	
 	case BT_SINK_PROGRESS: {
 		int elapsed = va_arg(args, int), duration = va_arg(args, int);
 		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
-		chain = false;
 		break;
 	}	
 	default: 
 		break;
 	}
 	
-	if (chain) res = cmd_handler_chain(cmd, args);
-	
 	va_end(args);
 	
-	return res;
+	return true;
 }
 
 /* callback for A2DP sink */
@@ -260,26 +273,40 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_DISCONNECTED);
-			actrls_unset();
         } else if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_CONNECTED){
-			memcpy(s_remote_bda, bda, 6);
             esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
-			if (!(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED)){
-				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
-				esp_a2d_sink_disconnect(s_remote_bda);
-			}
+			(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED);
         }
         break;
     }
     case ESP_A2D_AUDIO_STATE_EVT: {
         a2d = (esp_a2d_cb_param_t *)(p_param);
         ESP_LOGI(BT_AV_TAG, "A2DP audio state: %s", s_a2d_audio_state_str[a2d->audio_stat.state]);
-        s_audio_state = a2d->audio_stat.state;
+
         if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
-			(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
+			s_audio = AUDIO_CONNECTED;
+			
+			// verify that we can take control
+			if ((*bt_app_a2d_cmd_cb)(BT_SINK_AUDIO_STARTED, s_sample_rate)) {
+				// resynchronize events as¨PLAY might be sent before STARTED ...
+				s_audio = AUDIO_ACTIVATED;
+				
+				// send PLAY there, in case it was sent before AUDIO_STATE
+				if (s_playing) (*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
+				
+				// force metadata update
+				update_metadata(true);
+				
+				actrls_set(controls, NULL);
+			} else if (s_playing) {
+				// if decoder is busy but BT is playing, stop it (would be better to not ACK this command, but don't know how)
+				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);	
+			}	
 		} else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state ||
 				   ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND == a2d->audio_stat.state) {
-			(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
+			(*bt_app_a2d_cmd_cb)(BT_SINK_AUDIO_STOPPED);
+			s_audio = AUDIO_IDLE;
+			actrls_unset();
 		}	
         break;
     }
@@ -288,23 +315,23 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         ESP_LOGI(BT_AV_TAG, "A2DP audio stream configuration, codec type %d", a2d->audio_cfg.mcc.type);
         // for now only SBC stream is supported
         if (a2d->audio_cfg.mcc.type == ESP_A2D_MCT_SBC) {
-            int sample_rate = 16000;
+            s_sample_rate = 16000;
             char oct0 = a2d->audio_cfg.mcc.cie.sbc[0];
             if (oct0 & (0x01 << 6)) {
-                sample_rate = 32000;
+                s_sample_rate = 32000;
             } else if (oct0 & (0x01 << 5)) {
-                sample_rate = 44100;
+                s_sample_rate = 44100;
             } else if (oct0 & (0x01 << 4)) {
-                sample_rate = 48000;
+                s_sample_rate = 48000;
             }
-			(*bt_app_a2d_cmd_cb)(BT_SINK_RATE, sample_rate);
+			(*bt_app_a2d_cmd_cb)(BT_SINK_RATE, s_sample_rate);
             
             ESP_LOGI(BT_AV_TAG, "Configure audio player %x-%x-%x-%x",
                      a2d->audio_cfg.mcc.cie.sbc[0],
                      a2d->audio_cfg.mcc.cie.sbc[1],
                      a2d->audio_cfg.mcc.cie.sbc[2],
                      a2d->audio_cfg.mcc.cie.sbc[3]);
-            ESP_LOGI(BT_AV_TAG, "Audio player configured, sample rate=%d", sample_rate);
+            ESP_LOGI(BT_AV_TAG, "Audio player configured, sample rate=%d", s_sample_rate);
         }
         break;
     }
@@ -347,12 +374,26 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
 {
     switch (event_id) {
     case ESP_AVRC_RN_TRACK_CHANGE:
+		ESP_LOGI(BT_AV_TAG, "Track changed");
         bt_av_new_track();
 		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, 0);
         break;
     case ESP_AVRC_RN_PLAY_STATUS_CHANGE:
         ESP_LOGI(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
-		s_play_status = event_parameter->playback;
+		// re-synchronize events
+		s_playing = (event_parameter->playback == ESP_AVRC_PLAYBACK_PLAYING);
+		if (event_parameter->playback == ESP_AVRC_PLAYBACK_PLAYING && s_audio != AUDIO_IDLE) {
+			// if decoder is busy then stop (would be better to not ACK this command, but don't know how)
+			if (s_audio == AUDIO_CONNECTED || !(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY)) {
+				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+			} else {
+				update_metadata(false);
+			}	
+		} else if (event_parameter->playback == ESP_AVRC_PLAYBACK_PAUSED) (*bt_app_a2d_cmd_cb)(BT_SINK_PAUSE);
+		else if (event_parameter->playback == ESP_AVRC_PLAYBACK_STOPPED) {
+			(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, -1);			
+			(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
+		}	
         bt_av_playback_changed();
         break;
     case ESP_AVRC_RN_PLAY_POS_CHANGED:
@@ -387,25 +428,13 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_CT_METADATA_RSP_EVT: {
-		char **p = NULL;
         ESP_LOGI(BT_RC_CT_TAG, "AVRC metadata rsp: attribute id 0x%x, %s", rc->meta_rsp.attr_id, rc->meta_rsp.attr_text);
 		
-		if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_TITLE) p = &s_title;
-		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ARTIST) p = &s_artist;
-		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ALBUM) p = &s_album;
-		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_PLAYING_TIME) (*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, -1, atoi((char*) rc->meta_rsp.attr_text));
-				
-		// not very pretty, but this is bluetooth anyway
-		if (p) {
-			if (*p) free(*p);
-			*p = strdup((char*) rc->meta_rsp.attr_text);
-		
-			if (s_artist && s_album && s_title) {
-				(*bt_app_a2d_cmd_cb)(BT_SINK_METADATA, s_artist, s_album, s_title);
-				free(s_artist); free(s_album); free(s_title);
-				s_artist = s_album = s_title = NULL;
-			}
-		}	
+		if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_PLAYING_TIME) s_metadata.duration = atoi((char*) rc->meta_rsp.attr_text);
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_TITLE) strncpy(s_metadata.title, (char*) rc->meta_rsp.attr_text, METADATA_LEN);
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ARTIST) strncpy(s_metadata.artist, (char*) rc->meta_rsp.attr_text, METADATA_LEN);
+		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_ALBUM) strncpy(s_metadata.album, (char*) rc->meta_rsp.attr_text, METADATA_LEN);
+		update_metadata(true);
 		
         free(rc->meta_rsp.attr_text);
         break;

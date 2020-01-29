@@ -34,23 +34,23 @@ struct display_s *display;
 static const char *TAG = "display";
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
 
 #define DISPLAYER_STACK_SIZE 	2048
 #define SCROLLABLE_SIZE			384
 #define HEADER_SIZE				64
 #define	DEFAULT_SLEEP			3600
 
-
 static EXT_RAM_ATTR struct {
 	TaskHandle_t task;
 	SemaphoreHandle_t mutex;
 	int pause, speed, by;
-	enum { DISPLAYER_DISABLED, DISPLAYER_AUTO_DISABLE, DISPLAYER_ACTIVE } state;
+	enum { DISPLAYER_DOWN, DISPLAYER_IDLE, DISPLAYER_ACTIVE } state;
 	char header[HEADER_SIZE + 1];
 	char string[SCROLLABLE_SIZE + 1];
 	int offset, boundary;
 	char *metadata_config;
-	bool timer;
+	bool timer, refresh;
 	uint32_t elapsed, duration;
 	TickType_t tick;
 } displayer;
@@ -109,56 +109,58 @@ void display_init(char *welcome) {
  */
 static void displayer_task(void *args) {
 	int scroll_sleep = 0, timer_sleep;
-	
+		
 	while (1) {
 		// suspend ourselves if nothing to do
-		if (displayer.state == DISPLAYER_DISABLED) {
+		if (displayer.state < DISPLAYER_ACTIVE) {
+			if (displayer.state == DISPLAYER_IDLE) display->line(2, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
 			vTaskSuspend(NULL);
+			scroll_sleep = 0;
 			display->clear();
 			display->line(1, DISPLAY_LEFT, DISPLAY_UPDATE, displayer.header);
-			scroll_sleep = 0;
-		}	
+		} else if (displayer.refresh) {
+			// little trick when switching master while in IDLE and missing it
+			display->line(1, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.header);	
+			displayer.refresh = false;			
+		}
 		
 		// we have been waken up before our requested time
 		if (scroll_sleep <= 10) {
 			// something to scroll (or we'll wake-up every pause ms ... no big deal)
 			if (*displayer.string && displayer.state == DISPLAYER_ACTIVE) {
 				display->line(2, -displayer.offset, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
-			
 				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 				scroll_sleep = displayer.offset ? displayer.speed : displayer.pause;
 				displayer.offset = displayer.offset >= displayer.boundary ? 0 : (displayer.offset + min(displayer.by, displayer.boundary - displayer.offset));			
 				xSemaphoreGive(displayer.mutex);
-			} else if (displayer.state == DISPLAYER_AUTO_DISABLE) {
-				display->line(2, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
-				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-				displayer.state = DISPLAYER_DISABLED;
-				xSemaphoreGive(displayer.mutex);
-			} else scroll_sleep = DEFAULT_SLEEP;
+			} else {
+				scroll_sleep = DEFAULT_SLEEP;
+			}	
 		}	
 		
-		// handler timer
+		// handler elapsed track time
 		if (displayer.timer && displayer.state == DISPLAYER_ACTIVE) {
 			char counter[12];
 			TickType_t tick = xTaskGetTickCount();
 			uint32_t elapsed = (tick - displayer.tick) * portTICK_PERIOD_MS;
 			
 			if (elapsed >= 1000) {
+				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 				displayer.tick = tick;
 				displayer.elapsed += elapsed / 1000;
+				xSemaphoreGive(displayer.mutex);				
 				if (displayer.elapsed < 3600) sprintf(counter, "%2u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
 				else sprintf(counter, "%2u:%2u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
 				display->line(1, DISPLAY_RIGHT, (DISPLAY_CLEAR | DISPLAY_ONLY_EOL) | DISPLAY_UPDATE, counter);
 				timer_sleep = 1000;
-			} else timer_sleep = 1000 - elapsed;	
+			} else timer_sleep = max(1000 - elapsed, 0);	
 		} else timer_sleep = DEFAULT_SLEEP;
 		
-		// don't bother sleeping if we are disactivated
-		if (displayer.state == DISPLAYER_ACTIVE) {
-			int sleep = min(scroll_sleep, timer_sleep);
-			scroll_sleep -= sleep;
-			vTaskDelay( sleep / portTICK_PERIOD_MS);
-		}	
+		// then sleep the min amount of time
+		int sleep = min(scroll_sleep, timer_sleep);
+		ESP_LOGD(TAG, "timers s:%d t:%d", scroll_sleep, timer_sleep);
+		scroll_sleep -= sleep;
+		vTaskDelay(sleep / portTICK_PERIOD_MS);
 	}
 }	
 
@@ -203,9 +205,9 @@ void displayer_metadata(char *artist, char *album, char *title) {
 			}	
 
 			// then copy token's content
-			if (strcasestr(q, "artist") && artist) strncat(string, p = artist, space);
-			else if (strcasestr(q, "album") && album) strncat(string, p = album, space);
-			else if (strcasestr(q, "title") && title) strncat(string, p = title, space);
+			if (!strncasecmp(q + 1, "artist", 6) && artist) strncat(string, p = artist, space);
+			else if (!strncasecmp(q + 1, "album", 5) && album) strncat(string, p = album, space);
+			else if (!strncasecmp(q + 1, "title", 5) && title) strncat(string, p = title, space);
 			space = len - strlen(string);
 				
 			// flag to skip the data following an empty field
@@ -224,6 +226,7 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	
 	displayer.offset = 0;	
 	utf8_decode(displayer.string);
+	ESP_LOGI(TAG, "playing %s", displayer.string);
 	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
 		
 	xSemaphoreGive(displayer.mutex);
@@ -252,9 +255,8 @@ void displayer_timer(enum displayer_time_e mode, int elapsed, int duration) {
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 	if (elapsed >= 0) displayer.elapsed = elapsed;	
-	if (duration >= 0) displayer.duration = duration;	
-	displayer.timer = true;
-	displayer.tick = xTaskGetTickCount();
+	if (duration >= 0) displayer.duration = duration;
+	if (displayer.timer) displayer.tick = xTaskGetTickCount();
 		
 	xSemaphoreGive(displayer.mutex);
 }	
@@ -267,10 +269,7 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 	
 	va_start(args, cmd);
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-	
-	displayer.offset = 0;	
-	displayer.boundary = 0;
-	
+		
 	switch(cmd) {
 	case DISPLAYER_ACTIVATE: {	
 		char *header = va_arg(args, char*);
@@ -278,18 +277,22 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 		displayer.header[HEADER_SIZE] = '\0';
 		displayer.state = DISPLAYER_ACTIVE;
 		displayer.timer = false;
+		displayer.refresh = true;
 		displayer.string[0] = '\0';
+		displayer.elapsed = displayer.duration = 0;
+		displayer.offset = displayer.boundary = 0;
 		vTaskResume(displayer.task);
 		break;
 	}	
-	case DISPLAYER_DISABLE:		
-		displayer.state = DISPLAYER_AUTO_DISABLE;
+	case DISPLAYER_SUSPEND:		
+		// task will display the line 2 from beginning and suspend
+		displayer.state = DISPLAYER_IDLE;
 		break;		
 	case DISPLAYER_SHUTDOWN:
-		displayer.state = DISPLAYER_DISABLED;
-		vTaskSuspend(displayer.task);
+		// let the task self-suspend (we might be doing i2c_write)
+		displayer.state = DISPLAYER_DOWN;
 		break;
-	case DISPLAYER_TIMER_RESUME:
+	case DISPLAYER_TIMER_RUN:
 		if (!displayer.timer) {
 			displayer.timer = true;		
 			displayer.tick = xTaskGetTickCount();		

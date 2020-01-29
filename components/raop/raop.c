@@ -661,8 +661,12 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 	kd_add(resp, "Audio-Jack-Status", "connected; type=analog");
 	kd_add(resp, "CSeq", kd_lookup(headers, "CSeq"));
 
-	if (success) buf = http_send(sock, "RTSP/1.0 200 OK", resp);
-	else buf = http_send(sock, "RTSP/1.0 500 ERROR", NULL);
+	if (success) {
+		buf = http_send(sock, "RTSP/1.0 200 OK", resp);
+	} else {
+		buf = http_send(sock, "RTSP/1.0 503 ERROR", NULL);
+		closesocket(sock);
+	}	
 
 	if (strcmp(method, "OPTIONS")) {
 		LOG_INFO("[%p]: responding:\n%s", ctx, buf ? buf : "<void>");

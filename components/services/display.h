@@ -18,6 +18,18 @@
 
 #pragma once
 
+/* 
+ The displayer is not thread-safe and the caller must ensure use its own 
+ mutexes if it wants something better. Especially, text() line() and draw()
+ are not protected against each other.
+ In text mode (text/line) when using DISPLAY_SUSPEND, the displayer will 
+ refreshed line 2 one last time before suspending itself. As a result if it
+ is in a long sleep (scrolling pause), the refresh will happen after wakeup. 
+ So it can conflict with other display direct writes that have been made during
+ sleep. Note that if DISPLAY_SHUTDOWN has been called meanwhile, it (almost) 
+ never happens
+*/ 
+  
 #define DISPLAY_CLEAR 		0x01
 #define	DISPLAY_ONLY_EOL	0x02
 #define DISPLAY_UPDATE		0x04
@@ -33,7 +45,7 @@ enum display_font_e { DISPLAY_FONT_DEFAULT,
 					  DISPLAY_FONT_LINE_1, DISPLAY_FONT_LINE_2, DISPLAY_FONT_SEGMENT, 
 					  DISPLAY_FONT_TINY, DISPLAY_FONT_SMALL,  DISPLAY_FONT_MEDIUM, DISPLAY_FONT_LARGE, DISPLAY_FONT_HUGE };
 					  
-enum displayer_cmd_e 	{ DISPLAYER_SHUTDOWN, DISPLAYER_ACTIVATE, DISPLAYER_DISABLE, DISPLAYER_TIMER_PAUSE, DISPLAYER_TIMER_RESUME };
+enum displayer_cmd_e 	{ DISPLAYER_SHUTDOWN, DISPLAYER_ACTIVATE, DISPLAYER_SUSPEND, DISPLAYER_TIMER_PAUSE, DISPLAYER_TIMER_RUN };
 enum displayer_time_e 	{ DISPLAYER_ELAPSED, DISPLAYER_REMAINING };
 
 // don't change anything there w/o changing all drivers init code

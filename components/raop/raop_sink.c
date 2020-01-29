@@ -83,53 +83,49 @@ const static actrls_t controls = {
  * Command handler
  */
 static bool cmd_handler(raop_event_t event, ...) {
-	bool chain = true, res = true;
 	va_list args;	
 	
 	va_start(args, event);
 	
+	// handle audio event and stop if forbidden
+	if (!cmd_handler_chain(event, args)) {
+		va_end(args);
+		return false;
+	}
+
+	// now handle events for display
 	switch(event) {
 	case RAOP_SETUP:
+		actrls_set(controls, NULL);
 		displayer_control(DISPLAYER_ACTIVATE, "AIRPLAY");
 		break;
 	case RAOP_PLAY:
-		displayer_control(DISPLAYER_TIMER_RESUME);
+		displayer_control(DISPLAYER_TIMER_RUN);
 		break;		
 	case RAOP_FLUSH:
 		displayer_control(DISPLAYER_TIMER_PAUSE);
 		break;		
 	case RAOP_STOP:
-		displayer_control(DISPLAYER_DISABLE);
+		actrls_unset();
+		displayer_control(DISPLAYER_SUSPEND);
 		break;
 	case RAOP_METADATA: {
 		char *artist = va_arg(args, char*), *album = va_arg(args, char*), *title = va_arg(args, char*);
 		displayer_metadata(artist, album, title);
-		chain = false;
 		break;
 	}	
 	case RAOP_PROGRESS: {
 		int elapsed = va_arg(args, int), duration = va_arg(args, int);
 		displayer_timer(DISPLAYER_ELAPSED, elapsed, duration);
-		chain = false;
 		break;
 	}	
 	default: 
 		break;
 	}
 	
-	if (chain) res = cmd_handler_chain(event, args);
-	
 	va_end(args);
 	
-	return res;
-}
-
-/****************************************************************************************
- * Airplay taking/giving audio system's control 
- */
-void raop_master(bool on) {
-	if (on) actrls_set(controls, NULL);
-	else actrls_unset();
+	return true;
 }
 
 /****************************************************************************************
