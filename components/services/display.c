@@ -29,7 +29,7 @@
 // here we should include all possible drivers
 extern struct display_s SSD1306_display;
 
-struct display_s *display;
+struct display_s *display = NULL;
 
 static const char *TAG = "display";
 
@@ -72,6 +72,7 @@ void display_init(char *welcome) {
 				init = true;
 				ESP_LOGI(TAG, "Display initialization successful");
 			} else {
+				display = NULL;
 				ESP_LOGE(TAG, "Display initialization failed");
 			}
 		} else {
@@ -103,7 +104,7 @@ void display_init(char *welcome) {
 }
 
 /****************************************************************************************
- * This is not really thread-safe as displayer_task might be in the middle of line drawing
+ * This is not thread-safe as displayer_task might be in the middle of line drawing
  * but it won't crash (I think) and making it thread-safe would be complicated for a
  * feature which is secondary (the LMS version of scrolling is thread-safe)
  */
@@ -128,11 +129,19 @@ static void displayer_task(void *args) {
 		if (scroll_sleep <= 10) {
 			// something to scroll (or we'll wake-up every pause ms ... no big deal)
 			if (*displayer.string && displayer.state == DISPLAYER_ACTIVE) {
-				display->line(2, -displayer.offset, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
 				xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+				
+				// need to work with local copies as we don't want to suspend caller
+				int offset = -displayer.offset;
+				char *string = strdup(displayer.string);
 				scroll_sleep = displayer.offset ? displayer.speed : displayer.pause;
 				displayer.offset = displayer.offset >= displayer.boundary ? 0 : (displayer.offset + min(displayer.by, displayer.boundary - displayer.offset));			
-				xSemaphoreGive(displayer.mutex);
+				
+				xSemaphoreGive(displayer.mutex);				
+				
+				// now display using safe copies, can be lengthy
+				display->line(2, offset, DISPLAY_CLEAR | DISPLAY_UPDATE, string);
+				free(string);
 			} else {
 				scroll_sleep = DEFAULT_SLEEP;
 			}	
@@ -149,8 +158,8 @@ static void displayer_task(void *args) {
 				displayer.tick = tick;
 				displayer.elapsed += elapsed / 1000;
 				xSemaphoreGive(displayer.mutex);				
-				if (displayer.elapsed < 3600) sprintf(counter, "%2u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
-				else sprintf(counter, "%2u:%2u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
+				if (displayer.elapsed < 3600) sprintf(counter, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
+				else sprintf(counter, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
 				display->line(1, DISPLAY_RIGHT, (DISPLAY_CLEAR | DISPLAY_ONLY_EOL) | DISPLAY_UPDATE, counter);
 				timer_sleep = 1000;
 			} else timer_sleep = max(1000 - elapsed, 0);	
@@ -171,6 +180,10 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	char *string = displayer.string, *p;
 	int len = SCROLLABLE_SIZE;
 	
+	// need a display!
+	if (!display) return;
+	
+	// just do title if there is no config set
 	if (!displayer.metadata_config) {
 		strncpy(displayer.string, title ? title : "", SCROLLABLE_SIZE);
 		return;
@@ -218,7 +231,7 @@ void displayer_metadata(char *artist, char *album, char *title) {
 			p = strchr(q + 1, '%');
 		}
 	} else {
-		string = strdup(title ? title : "");
+		strncpy(string, title ? title : "", SCROLLABLE_SIZE);
 	}
 	
 	// get optional scroll speed
@@ -232,11 +245,13 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	xSemaphoreGive(displayer.mutex);
 }	
 
-
 /****************************************************************************************
  *
  */
 void displayer_scroll(char *string, int speed) {
+	// need a display!
+	if (!display) return;
+	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 	if (speed) displayer.speed = speed;
@@ -252,10 +267,13 @@ void displayer_scroll(char *string, int speed) {
  * 
  */
 void displayer_timer(enum displayer_time_e mode, int elapsed, int duration) {
+	// need a display!
+	if (!display) return;
+	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
-	if (elapsed >= 0) displayer.elapsed = elapsed;	
-	if (duration >= 0) displayer.duration = duration;
+	if (elapsed >= 0) displayer.elapsed = elapsed / 1000;	
+	if (duration >= 0) displayer.duration = duration / 1000;
 	if (displayer.timer) displayer.tick = xTaskGetTickCount();
 		
 	xSemaphoreGive(displayer.mutex);
@@ -266,6 +284,8 @@ void displayer_timer(enum displayer_time_e mode, int elapsed, int duration) {
  */
 void displayer_control(enum displayer_cmd_e cmd, ...) {
 	va_list args;
+	
+	if (!display) return;
 	
 	va_start(args, cmd);
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);

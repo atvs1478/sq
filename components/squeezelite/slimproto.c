@@ -45,7 +45,7 @@ static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
 static u16_t slimproto_hport = 9000;
 static u16_t slimproto_cport = 9090;
-static u8_t	player_id = PLAYER_ID;
+static u8_t	player_id;
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;

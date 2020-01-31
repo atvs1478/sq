@@ -47,7 +47,7 @@ void SSD1306_FontDrawChar( struct SSD1306_Device* DisplayHandle, char Character,
     
     NullCheck( ( GlyphData = GetCharPtr( DisplayHandle->Font, Character ) ), return );
 
-    if ( Character >= DisplayHandle->Font->StartChar || Character <= DisplayHandle->Font->EndChar ) {
+    if ( Character >= DisplayHandle->Font->StartChar && Character <= DisplayHandle->Font->EndChar ) {
         /* The first byte in the glyph data is the width of the character in pixels, skip over */
         GlyphData++;
         GlyphColumnLen = RoundUpFontHeight( DisplayHandle->Font ) / 8;

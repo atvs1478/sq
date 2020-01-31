@@ -50,9 +50,11 @@ uint32_t _gettime_ms_(void) {
 }
 
 extern void sb_controls_init(void);
-extern void sb_display_init(void);
+extern bool sb_display_init(void);
+
+u8_t custom_player_id = 12;
 
 void embedded_init(void) {
 	sb_controls_init();
-	sb_display_init();
+	if (sb_display_init()) custom_player_id = 100;
 }

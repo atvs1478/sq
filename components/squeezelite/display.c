@@ -137,9 +137,15 @@ static void scroll_task(void* arg);
 /****************************************************************************************
  * 
  */
-void sb_display_init(void) {
+bool sb_display_init(void) {
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[SCROLL_STACK_SIZE] __attribute__ ((aligned (4)));
+	
+	// no display, just make sure we won't have requests
+	if (!display || display->height == 0 || display->width == 0) {
+		LOG_INFO("no display for LMS");
+		return false;
+	}	
 	
 	// need to force height to 32 maximum
 	display_width = display->width;
@@ -163,6 +169,8 @@ void sb_display_init(void) {
 	
 	notify_chain = server_notify;
 	server_notify = server;
+	
+	return true;
 }
 
 /****************************************************************************************

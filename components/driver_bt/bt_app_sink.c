@@ -162,7 +162,7 @@ static bool cmd_handler(bt_sink_cmd_t cmd, ...) {
 		va_end(args);
 		return false;
 	}
-
+	
 	// now handle events for display
 	switch(cmd) {
 	case BT_SINK_AUDIO_STARTED:
@@ -175,7 +175,7 @@ static bool cmd_handler(bt_sink_cmd_t cmd, ...) {
 		displayer_control(DISPLAYER_TIMER_RUN);
 		break;		
 	case BT_SINK_STOP:		
-		// not sure of difference between pause and stop for displayer 
+		 // not sure of difference between pause and stop for displayer 
 	case BT_SINK_PAUSE:
 		displayer_control(DISPLAYER_TIMER_PAUSE);
 		break;		
@@ -397,7 +397,7 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
         bt_av_playback_changed();
         break;
     case ESP_AVRC_RN_PLAY_POS_CHANGED:
-        ESP_LOGI(BT_AV_TAG, "Play position changed: %d-ms", event_parameter->play_pos);
+        ESP_LOGD(BT_AV_TAG, "Play position changed: %d (ms)", event_parameter->play_pos);
 		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, event_parameter->play_pos, -1);
         bt_av_play_pos_changed();
         break;
@@ -440,7 +440,7 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_CT_CHANGE_NOTIFY_EVT: {
-        ESP_LOGI(BT_RC_CT_TAG, "AVRC event notification: %d", rc->change_ntf.event_id);
+        ESP_LOGD(BT_RC_CT_TAG, "AVRC event notification: %d", rc->change_ntf.event_id);
         bt_av_notify_evt_handler(rc->change_ntf.event_id, &rc->change_ntf.event_parameter);
         break;
     }
