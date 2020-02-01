@@ -47,8 +47,12 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
-### Vcc GPIO
-The parameter "Vcc_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) at boot. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here.
+### Set GPIO
+The parameter "set_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) or 0 (GND) at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. Syntax is:
+
+```
+<gpio_1>=Vcc|GND[,gpio_n=Vcc|GND]
+```
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
