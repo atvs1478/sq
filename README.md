@@ -99,7 +99,7 @@ For example a config named "buttons" :
 ``` 
 Defines two buttons
 - first on GPIO 4, active low. When pressed, it triggers a volume down command. When pressed more than 1000ms, it changes the button configuration for the one named "buttons_remap"
-- second on GPIO 5, acive low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
+- second on GPIO 5, active low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
 
 While the config named "buttons_remap"
 ```
