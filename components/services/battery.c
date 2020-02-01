@@ -17,6 +17,13 @@
 #include "driver/adc.h"
 #include "battery.h"
 
+/* 
+ There is a bug in esp32 which causes a spurious interrupt on gpio 36/39 when
+ using ADC, AMP and HALL sensor. Rather than making battery aware, we just ignore
+ if as the interrupt lasts 80ns and should be debounced (and the ADC read does not
+ happen very often)
+*/ 
+
 #define BATTERY_TIMER	(10*1000)
 
 static const char *TAG = "battery";
@@ -26,6 +33,13 @@ static struct {
 	int count;
 	TimerHandle_t timer;
 } battery;
+
+/****************************************************************************************
+ * 
+ */
+ int battery_value_svc(void) {
+	 return battery.avg;
+ }
 
 /****************************************************************************************
  * 

@@ -57,13 +57,12 @@ Contains the freeRTOS task and all necessary support
 #include "lwip/ip4_addr.h"
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
-#include "driver/gpio.h"
-#include "driver/adc.h"
 #include "cJSON.h"
 #include "config.h"
 #include "trace.h"
 #include "cmd_system.h"
 #include "monitor.h"
+#include "globdefs.h"
 
 #ifndef RECOVERY_APPLICATION
 #define RECOVERY_APPLICATION 0
@@ -270,6 +269,10 @@ void wifi_manager_init_wifi(){
     ESP_LOGD(TAG,   "Initializing wifi. Setting WiFi mode to WIFI_MODE_NULL");
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_NULL) );
     ESP_LOGD(TAG,   "Initializing wifi. Starting wifi");
+	if (gpio36_39_used) {
+		ESP_LOGW(TAG, "GPIO 36 or 39 are in use, need to disable WiFi PowerSave!");
+		esp_wifi_set_ps(WIFI_PS_NONE); 
+		}	
     ESP_ERROR_CHECK( esp_wifi_start() );
     taskYIELD();
     ESP_LOGD(TAG,   "Initializing wifi. done");
@@ -453,7 +456,7 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "ota_dsc", cJSON_CreateString(ota_get_status()));
 	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
 	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));
-	cJSON_AddNumberToObject(root,"Voltage",	adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1);
+	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
 	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);
 

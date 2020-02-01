@@ -22,6 +22,7 @@
 
 #define I2C_SYSTEM_PORT	1
 extern int i2c_system_port;
+extern bool gpio36_39_used;
 
 #ifdef CONFIG_SQUEEZEAMP
 #define JACK_GPIO		34

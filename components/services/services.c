@@ -41,17 +41,19 @@ void services_init(void) {
 #endif
 
 	// set fixed gpio if any
-	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "Vcc_GPIO")) != NULL) {
-		char *p = nvs_item;
-		while (p && *p) {
-			int gpio = atoi(p);
-			gpio_pad_select_gpio(gpio);
-			gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
-			gpio_set_level(gpio, 1);
+	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) != NULL) {
+		char *p = nvs_item, type[4];
+		int gpio;
+		do {
+			if (sscanf(p, "%d=%3[^,]", &gpio, type) > 0) {
+				gpio_pad_select_gpio(gpio);
+				gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
+				if (!strcasecmp(type, "vcc")) gpio_set_level(gpio, 1);
+				else if (!strcasecmp(type, "gnd")) gpio_set_level(gpio, 0);
+				ESP_LOGI(TAG, "set GPIO %u to %s", gpio, type);
+			} 	
 			p = strchr(p, ',');
-			ESP_LOGI(TAG, "set GPIO %u to Vcc", gpio);
-			if (p) p++;
-		} 
+		} while (p++);
 		free(nvs_item);
 	}	
 
