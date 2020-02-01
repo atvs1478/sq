@@ -85,7 +85,7 @@ Where (all parameters are optionals except gpio)
  - "shifted": action to take when a button is pressed/released and shifted (see above/below)
  - "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
 
-Where <action> is either the name of another configuration to load or one amongst 
+Where \<action\> is either the name of another configuration to load or one amongst 
 				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
 				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
