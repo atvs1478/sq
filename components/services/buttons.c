@@ -212,7 +212,7 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
 		}
 	}
 	
-	// nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1, AMP, Hall which WiFi when PS is activated
+	// nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1, AMP, Hall used which WiFi does when PS is activated
 	if (gpio == 36 || gpio == 39) gpio36_39_used = true;
 
 	gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
