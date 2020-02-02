@@ -564,7 +564,7 @@ static void *rtp_thread_func(void *arg) {
 
 	for (i = 0; i < 3; i++) {
 		if (ctx->rtp_sockets[i].sock > sock) sock = ctx->rtp_sockets[i].sock;
-		// send synchro requets 3 times
+		// send synchro request 3 times
 		ntp_sent = rtp_request_timing(ctx);
 	}
 
@@ -638,7 +638,9 @@ static void *rtp_thread_func(void *arg) {
 				u16_t flags = ntohs(*(u16_t*)(pktp+2));
 				u32_t remote_gap = NTP2MS(remote - ctx->timing.remote);
 				
+				// something is wrong and if we are supposed to be NTP synced, better ask for re-sync
 				if (remote_gap > 10000) {
+					if (ctx->synchro.status & NTP_SYNC) rtp_request_timing(ctx);
 					LOG_WARN("discarding remote timing information %u", remote_gap);
 					break;
 				}
@@ -683,8 +685,9 @@ static void *rtp_thread_func(void *arg) {
 				u64_t remote 	  =(((u64_t) ntohl(*(u32_t*)(pktp+16))) << 32) + ntohl(*(u32_t*)(pktp+20));
 				u32_t roundtrip   = gettime_ms() - reference;
 
-				// better discard sync packets when roundtrip is suspicious
+				// better discard sync packets when roundtrip is suspicious and ask for another one
 				if (roundtrip > 100) {
+					rtp_request_timing(ctx);
 					LOG_WARN("[%p]: discarding NTP roundtrip of %u ms", ctx, roundtrip);
 					break;
 				}
