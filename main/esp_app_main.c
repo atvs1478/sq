@@ -47,6 +47,7 @@
 #include <math.h>
 #include "config.h"
 #include "audio_controls.h"
+#include "telnet.h"
 
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
@@ -312,23 +313,34 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "metadata_config");
 	config_set_default(NVS_TYPE_STR, "metadata_config", "", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "telnet_enable");
+	config_set_default(NVS_TYPE_STR, "telnet_enable", "", 0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s", "telnet_buffer");
+	config_set_default(NVS_TYPE_STR, "telnet_buffer", "40000", 0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s", "telnet_block");
+	config_set_default(NVS_TYPE_STR, "telnet_block", "500", 0);
+
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
 void app_main()
 {
 	char * fwurl = NULL;
-	esp_err_t update_certificates();
+	ESP_LOGI(TAG,"Starting app_main");
+	initialize_nvs();
+	ESP_LOGI(TAG,"Setting up telnet.");
+	init_telnet(); // align on 32 bits boundaries
+
+	ESP_LOGI(TAG,"Setting up config subsystem.");
+	config_init();
+
 	ESP_LOGD(TAG,"Creating event group for wifi");
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 	
-	ESP_LOGI(TAG,"Starting app_main");
-	initialize_nvs();
-
-	ESP_LOGI(TAG,"Setting up config subsystem.");
-	config_init();
 
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
@@ -382,6 +394,10 @@ void app_main()
 		wifi_manager_start();
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
+		/* Start the telnet service after we are certain that the network stack has been properly initialized.
+		 * This can be either after we're started the AP mode, or after we've started the STA mode  */
+		wifi_manager_set_callback(ORDER_START_AP, &start_telnet);
+		wifi_manager_set_callback(ORDER_CONNECT_STA, &start_telnet);
 	}
 	console_start();
 	if(fwurl && strlen(fwurl)>0){

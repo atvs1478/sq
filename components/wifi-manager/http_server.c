@@ -84,7 +84,6 @@ const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAcce
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
 const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccess-Control-Allow-Origin: *\n\n";
-const static char http_svg_hdr[] = "HTTP/1.1 200 OK\nContent-type: image/svg+xml\nAccess-Control-Allow-Origin: *\n\n";
 const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
 const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
 const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";

@@ -542,7 +542,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 						
 		ctx->rtp = rtp.ctx;
 		
-		if (cport * tport * rtp.cport * rtp.tport * rtp.aport && rtp.ctx) {
+		if ( (cport * tport * rtp.cport * rtp.tport * rtp.aport) != 0 && rtp.ctx) {
 			char *transport;
 			asprintf(&transport, "RTP/AVP/UDP;unicast;mode=record;control_port=%u;timing_port=%u;server_port=%u", rtp.cport, rtp.tport, rtp.aport);
 			LOG_DEBUG("[%p]: audio=(%hu:%hu), timing=(%hu:%hu), control=(%hu:%hu)", ctx, 0, rtp.aport, tport, rtp.tport, cport, rtp.cport);
