@@ -630,9 +630,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		} else if (body && (p = strcasestr(body, "progress")) != NULL) {
 			int start, current, stop = 0;
 
+			// we want ms, not s
 			sscanf(p, "%*[^:]:%u/%u/%u", &start, &current, &stop);
-			current = (current - start) / 44100;
-			if (stop) stop = (stop - start) / 44100;
+			current = ((current - start) / 44100) * 1000;
+			if (stop) stop = ((stop - start) / 44100) * 1000;
 			else stop = -1;
 			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
 			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
