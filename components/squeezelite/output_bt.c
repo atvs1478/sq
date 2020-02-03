@@ -68,11 +68,6 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 DECLARE_ALL_MIN_MAX;	
 	
 void output_init_bt(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
-#ifdef CONFIG_SQUEEZEAMP
-	gpio_pad_select_gpio(config_spdif_gpio);
-	gpio_set_direction(config_spdif_gpio, GPIO_MODE_OUTPUT);
-	gpio_set_level(config_spdif_gpio, 0);
-#endif			
 	loglevel = level;
 	running = true;
 	output.write_cb = &_write_frames;

@@ -1,7 +1,8 @@
 /* 
  *  Squeezelite for esp32
  *
- *  (c) Philippe G. 2019, philippe_44@outlook.com
+ *  (c) Sebastien 2019
+ *      Philippe G. 2019, philippe_44@outlook.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,20 +18,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
-#pragma once
 
-#define I2C_SYSTEM_PORT	1
-extern int i2c_system_port;
-extern bool gpio36_39_used;
+#include "freertos/FreeRTOS.h"
+#include "driver/i2s.h"
 
-#ifdef CONFIG_SQUEEZEAMP
-#define JACK_GPIO		34
-#define SPKFAULT_GPIO	2			// this requires a pull-up, so can't be >34
-#define LED_GREEN_GPIO 	12
-#define LED_RED_GPIO	13
-#else 
-#define LED_GREEN_GPIO	CONFIG_LED_GREEN_GPIO
-#define LED_RED_GPIO	CONFIG_LED_RED_GPIO
-#define JACK_GPIO		CONFIG_JACK_GPIO
-#endif
+typedef enum { ADAC_ON = 0, ADAC_STANDBY, ADAC_OFF } adac_power_e;
+
+struct adac_s {
+	bool (*init)(int i2c_port_num, int i2s_num, i2s_config_t *config);
+	void (*deinit)(void);
+	void (*power)(adac_power_e mode);
+	void (*speaker)(bool active);
+	void (*headset)(bool active);
+	void (*volume)(unsigned left, unsigned right);
+};
+
+extern struct adac_s dac_tas57xx;
+extern struct adac_s dac_a1s;
+extern struct adac_s dac_null;
