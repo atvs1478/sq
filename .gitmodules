@@ -7,3 +7,7 @@
 [submodule "components/lws-esp32"]
 	path = components/lws-esp32
 	url = https://github.com/huming2207/lws-esp32.git
+[submodule "components/telnet/libtelnet"]
+	path = components/telnet/libtelnet
+	url = https://github.com/seanmiddleditch/libtelnet
+	branch = master
