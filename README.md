@@ -48,10 +48,18 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
 ### Set GPIO
-The parameter "set_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) or 0 (GND) at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. Syntax is:
+The parameter "set_GPIO" is use to set assign GPIO to various functions.
+
+GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
+
+This parameter can use used as well to assign a GPIO that will be set to 1 when playback starts and wil be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
+
+Finally, if you have an audio jack that supports insertion (ste to GND when inserted), you can specify whch GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
+
+Syntax is:
 
 ```
-<gpio_1>=Vcc|GND[,<gpio_n>=Vcc|GND]
+<gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
 ```
 
 ### Buttons
