@@ -54,7 +54,7 @@ GPIO can be set to GND provide or Vcc at boot. This is convenient to power devic
 
 This parameter can use used as well to assign a GPIO that will be set to 1 when playback starts and wil be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
 
-Finally, if you have an audio jack that supports insertion (ste to GND when inserted), you can specify whch GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
+Finally, if you have an audio jack that supports insertion (set to GND when inserted), you can specify whch GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
 
 Syntax is:
 
