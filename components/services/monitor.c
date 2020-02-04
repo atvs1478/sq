@@ -19,6 +19,7 @@
 #include "buttons.h"
 #include "led.h"
 #include "globdefs.h"
+#include "config.h"
 
 #define MONITOR_TIMER	(10*1000)
 
@@ -83,13 +84,12 @@ bool spkfault_svc (void) {
 #endif
 }
 
-#include "driver/rtc_io.h" 
 /****************************************************************************************
  * 
  */
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
-
+	
 #ifdef JACK_GPIO
 	gpio_pad_select_gpio(JACK_GPIO);
 	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
@@ -107,6 +107,12 @@ void monitor_svc_init(void) {
 	button_create(NULL, SPKFAULT_GPIO, BUTTON_LOW, true, 0, spkfault_handler_default, 0, -1);
 #endif
 
-	monitor_timer = xTimerCreate("monitor", MONITOR_TIMER / portTICK_RATE_MS, pdTRUE, NULL, monitor_callback);
-	xTimerStart(monitor_timer, portMAX_DELAY);
+	// do we want stats
+	char *p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
+	if (p && (*p == '1' || *p == 'Y' || *p == 'y')) {
+		monitor_timer = xTimerCreate("monitor", MONITOR_TIMER / portTICK_RATE_MS, pdTRUE, NULL, monitor_callback);
+		xTimerStart(monitor_timer, portMAX_DELAY);
+	}	
+	free(p);
+	
 }

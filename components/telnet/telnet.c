@@ -83,7 +83,6 @@ void start_telnet(void * pvParameter){
 	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
 	
 	if(!isStarted && bIsEnabled) {
-		// xTaskCreatePinnedToCore(&telnetTask, "telnet", 8048, NULL, 5, NULL, 0);
 		xTaskCreateStatic( (TaskFunction_t) &telnetTask, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, xTaskBuffer);
 		isStarted=true;
 	}

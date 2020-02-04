@@ -296,7 +296,7 @@ static void show_display_buffer(char *ddram) {
 	makeprintable((unsigned char *)line1);
 	makeprintable((unsigned char *)line2);
 
-	LOG_INFO("\n\t%.40s\n\t%.40s", line1, line2);
+	LOG_DEBUG("\n\t%.40s\n\t%.40s", line1, line2);
 
 	display->line(1, DISPLAY_LEFT, DISPLAY_CLEAR, line1);	
 	display->line(2, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, line2);	
@@ -388,7 +388,7 @@ static void grfs_handler(u8_t *data, int len) {
 	int size = len - sizeof(struct grfs_packet);
 	int offset = htons(pkt->offset);
 	
-	LOG_INFO("gfrs s:%u d:%u p:%u sp:%u by:%hu m:%hu w:%hu o:%hu", 
+	LOG_DEBUG("gfrs s:%u d:%u p:%u sp:%u by:%hu m:%hu w:%hu o:%hu", 
 				(int) pkt->screen,
 				(int) pkt->direction,	// 1=left, 2=right
 				htonl(pkt->pause),		// in ms	
@@ -433,7 +433,7 @@ static void grfs_handler(u8_t *data, int len) {
 static void grfg_handler(u8_t *data, int len) {
 	struct grfg_packet *pkt = (struct grfg_packet*) data;
 	
-	LOG_INFO("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
+	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
 	
 	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 	scroller.window_width = htons(pkt->width);
@@ -465,7 +465,7 @@ static void grfg_handler(u8_t *data, int len) {
 	}	
 	else {
 		// if we just got a content update, let the scroller manage the screen
-		LOG_INFO("resuming scrolling task");
+		LOG_DEBUG("resuming scrolling task");
 		vTaskResume(scroller.task);
 	}
 	

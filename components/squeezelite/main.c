@@ -52,8 +52,10 @@ static void usage(const char *argv0) {
 	printf(TITLE " See -t for license terms\n"
 		   "Usage: %s [options]\n"
 		   "  -s <server>[:<port>]\tConnect to specified server, otherwise uses autodiscovery to find server\n"
+#if !EMBEDDED		   
 		   "  -o <output device>\tSpecify output device, default \"default\", - = output to stdout\n"
 		   "  -l \t\t\tList output devices\n"
+#endif		   
 #if ALSA
 		   "  -a <b>:<p>:<f>:<m>\tSpecify ALSA params to open output device, b = buffer time in ms or size in bytes, p = period count or size in bytes, f sample format (16|24|24_3|32), m = use mmap (0|1)\n"
 #endif
@@ -535,7 +537,7 @@ int main(int argc, char **argv) {
 			pidfile = optarg;
 			break;
 #endif
-#ifndef EMBEDDED
+#if !EMBEDDED
 		case 'l':
 			list_devices();
 			exit(0);
