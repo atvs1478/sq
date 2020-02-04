@@ -89,7 +89,7 @@ bool spkfault_svc (void) {
  */
 void set_jack_gpio(int gpio, char *value) {
 	 if (!strcasecmp(value, "jack")) {
-		ESP_LOGI(TAG,"Adding jack detection gpio %d", gpio);
+		ESP_LOGI(TAG,"Adding jack detection GPIO %d", gpio);
 		
 		gpio_pad_select_gpio(JACK_GPIO);
 		gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
