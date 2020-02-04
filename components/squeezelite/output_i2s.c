@@ -259,14 +259,14 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	else adac->speaker(true);
 	
 	p = config_alloc_get_default(NVS_TYPE_STR, "amp_GPIO", NULL, 0);
-	if (p) {
+	if (p && *p) {
 		amp_gpio = atoi(p);
 		gpio_pad_select_gpio(amp_gpio);
 		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
 		gpio_set_level(amp_gpio, 0);
 		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
-		free(p);
 	}	
+	free(p);
 	
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
