@@ -142,7 +142,7 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 			
 	// configure I2S pins & install driver	
 	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = 27, .ws_io_num = 26, 
-															.data_out_num = 35, .data_in_num = 25 //Not used 
+															.data_out_num = 25, .data_in_num = 35 //Not used 
 								};
 	i2s_driver_install(i2s_num, i2s_config, 0, NULL);
 	i2s_set_pin(i2s_num, &i2s_pin_config);
@@ -170,18 +170,22 @@ static void volume(unsigned left, unsigned right) {
  * power
  */
 static void power(adac_power_e mode) {
+	esp_err_t ret = ESP_OK;
+	
 	switch(mode) {
 	case ADAC_STANDBY:
 	case ADAC_OFF:
-		ac101_stop();
+		ret = ac101_stop();
 		break;
 	case ADAC_ON:
-		ac101_start(AC_MODULE_ADC);
+		ret = ac101_start(AC_MODULE_DAC);
 		break;		
 	default:
 		ESP_LOGW(TAG, "unknown power command");
 		break;
 	}
+	
+	if (ret != ESP_OK) ESP_LOGW(TAG, "can't start AC101 %d", ret);
 }
 
 /****************************************************************************************

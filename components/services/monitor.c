@@ -90,7 +90,7 @@ bool spkfault_svc (void) {
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
 	
-#ifdef JACK_GPIO
+#if defined(JACK_GPIO) && JACK_GPIO != -1
 	gpio_pad_select_gpio(JACK_GPIO);
 	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
 
