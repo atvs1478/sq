@@ -321,6 +321,12 @@ void register_default_nvs(){
 
 	ESP_LOGD(TAG,"Registering default value for key %s", "telnet_block");
 	config_set_default(NVS_TYPE_STR, "telnet_block", "500", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
+	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "amp_GPIO");
+	config_set_default(NVS_TYPE_STR, "amp_GPIO", "", 0);
 
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }

@@ -77,6 +77,7 @@ sure that using rate_delay would fix that
 	RESET_MIN_MAX(buffering);
 	
 #define STATS_PERIOD_MS 5000
+#define STAT_STACK_SIZE	(3*1024)
 
 extern struct outputstate output;
 extern struct buffer *streambuf;
@@ -92,18 +93,21 @@ static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
 static int bytes_per_frame;
-static thread_type thread, stats_thread;
 static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
 static size_t dma_buf_frames;
+static pthread_t thread;
+static TaskHandle_t stats_task;
+static bool stats;
+static int amp_gpio = -1;
 
 DECLARE_ALL_MIN_MAX;
 
 static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
-static void *output_thread_i2s();
-static void *output_thread_i2s_stats();
+static void *output_thread_i2s(void *arg);
+static void *output_thread_i2s_stats(void *arg);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 static void (*jack_handler_chain)(bool inserted);
 
@@ -254,6 +258,16 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
 	else adac->speaker(true);
 	
+	p = config_alloc_get_default(NVS_TYPE_STR, "amp_GPIO", NULL, 0);
+	if (p) {
+		amp_gpio = atoi(p);
+		gpio_pad_select_gpio(amp_gpio);
+		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(amp_gpio, 0);
+		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
+		free(p);
+	}	
+	
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
     cfg.thread_name= "output_i2s";
@@ -263,11 +277,17 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
     esp_pthread_set_cfg(&cfg);
 	pthread_create(&thread, NULL, output_thread_i2s, NULL);
 	
-	cfg.thread_name= "output_i2s_sts";
-	cfg.prio = CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT - 1;
-    cfg.stack_size = 2048;	
-	esp_pthread_set_cfg(&cfg);
-	pthread_create(&stats_thread, NULL, output_thread_i2s_stats, NULL);
+	// do we want stats
+	p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
+	stats = p && (*p == '1' || *p == 'Y' || *p == 'y');
+	free(p);
+	
+	// memory still used but at least task is not created
+	if (stats) {
+		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+		static EXT_RAM_ATTR StackType_t xStack[STAT_STACK_SIZE] __attribute__ ((aligned (4)));
+		stats_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s_stats, "output_i2s_sts", STAT_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+	}	
 }
 
 
@@ -279,7 +299,7 @@ void output_close_i2s(void) {
 	running = false;
 	UNLOCK;
 	pthread_join(thread, NULL);
-	pthread_join(stats_thread, NULL);
+	if (stats) vTaskDelete(stats_task);
 	
 	i2s_driver_uninstall(CONFIG_I2S_NUM);
 	free(obuf);
@@ -345,7 +365,7 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 /****************************************************************************************
  * Main output thread
  */
-static void *output_thread_i2s() {
+static void *output_thread_i2s(void *arg) {
 	size_t count = 0, bytes;
 	frames_t iframes = FRAME_BLOCK;
 	uint32_t timer_start = 0;
@@ -369,8 +389,11 @@ static void *output_thread_i2s() {
 		// manage led display & analogue
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
-			if (output.state == OUTPUT_OFF) led_blink(LED_GREEN, 100, 2500);
-			else if (output.state == OUTPUT_STOPPED) {
+			if (output.state == OUTPUT_OFF) {
+				led_blink(LED_GREEN, 100, 2500);
+				if (amp_gpio != -1) gpio_set_level(amp_gpio, 0);
+				LOG_INFO("switching off amp GPIO %d", amp_gpio);
+			} else if (output.state == OUTPUT_STOPPED) {
 				adac->speaker(false);
 				led_blink(LED_GREEN, 200, 1000);
 			} else if (output.state == OUTPUT_RUNNING) {
@@ -432,6 +455,7 @@ static void *output_thread_i2s() {
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
 			i2s_start(CONFIG_I2S_NUM);
 			adac->power(ADAC_ON);	
+			if (amp_gpio != -1) gpio_set_level(amp_gpio, 1);
 		} 
 		
 		// this does not work well as set_sample_rates resets the fifos (and it's too early)
@@ -476,13 +500,12 @@ static void *output_thread_i2s() {
 /****************************************************************************************
  * Stats output thread
  */
-static void *output_thread_i2s_stats() {
-	//return;
-	while (running) {
-		LOCK;
+static void *output_thread_i2s_stats(void *arg) {
+	while (1) {
+		// no need to lock
 		output_state state = output.state;
-		UNLOCK;
-		if(state>OUTPUT_STOPPED){
+		
+		if(stats && state>OUTPUT_STOPPED){
 			LOG_INFO( "Output State: %d, current sample rate: %d, bytes per frame: %d",state,output.current_sample_rate, bytes_per_frame);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD1);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD2);
@@ -502,7 +525,7 @@ static void *output_thread_i2s_stats() {
 			LOG_INFO("              ----------+----------+-----------+-----------+");
 			RESET_ALL_MIN_MAX;
 		}
-		usleep(STATS_PERIOD_MS *1000);
+		vTaskDelay( pdMS_TO_TICKS( STATS_PERIOD_MS ) );
 	}
 	return NULL;
 }
