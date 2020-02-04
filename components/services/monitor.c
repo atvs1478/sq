@@ -87,15 +87,28 @@ bool spkfault_svc (void) {
 /****************************************************************************************
  * 
  */
+void set_jack_gpio(int gpio, char *value) {
+	 if (!strcasecmp(value, "jack")) {
+		ESP_LOGI(TAG,"Adding jack detection gpio %d", gpio);
+		
+		gpio_pad_select_gpio(JACK_GPIO);
+		gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
+
+		// re-use button management for jack handler, it's a GPIO after all
+		button_create(NULL, JACK_GPIO, BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
+	 }	
+ }
+
+/****************************************************************************************
+ * 
+ */
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
 	
-#if defined(JACK_GPIO) && JACK_GPIO != -1
-	gpio_pad_select_gpio(JACK_GPIO);
-	gpio_set_direction(JACK_GPIO, GPIO_MODE_INPUT);
-
-	// re-use button management for jack handler, it's a GPIO after all
-	button_create(NULL, JACK_GPIO, BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
+#if !defined(JACK_GPIO) || JACK_GPIO == -1
+	parse_set_GPIO(set_jack_gpio);
+#else 
+	set_jack_gpio(JACK_GPIO, "jack");	
 #endif
 
 #ifdef SPKFAULT_GPIO

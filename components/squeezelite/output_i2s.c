@@ -52,6 +52,7 @@ sure that using rate_delay would fix that
 #include "led.h"
 #include "monitor.h"
 #include "config.h"
+#include "accessors.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
@@ -150,6 +151,21 @@ static void jack_handler(bool inserted) {
 	// and chain if any
 	if (jack_handler_chain) (jack_handler_chain)(inserted);
 }
+
+/****************************************************************************************
+ * amp GPIO
+ */
+void set_amp_gpio(int gpio, char *value) {
+	if (!strcasecmp(value, "amp")) {
+		amp_gpio = gpio;
+		
+		gpio_pad_select_gpio(amp_gpio);
+		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(amp_gpio, 0);
+		
+		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
+	}	
+}	
 
 /****************************************************************************************
  * Initialize the DAC output
@@ -258,16 +274,8 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
 	else adac->speaker(true);
 	
-	p = config_alloc_get_default(NVS_TYPE_STR, "amp_GPIO", NULL, 0);
-	if (p && *p) {
-		amp_gpio = atoi(p);
-		gpio_pad_select_gpio(amp_gpio);
-		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
-		gpio_set_level(amp_gpio, 0);
-		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
-	}	
-	free(p);
-	
+	parse_set_GPIO(set_amp_gpio);
+		
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
     cfg.thread_name= "output_i2s";

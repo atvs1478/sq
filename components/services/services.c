@@ -28,6 +28,25 @@ static const char *TAG = "services";
 /****************************************************************************************
  * 
  */
+void set_power_gpio(int gpio, char *value) {
+	bool parsed = true;
+	
+	if (!strcasecmp(value, "vcc") ) {
+		gpio_pad_select_gpio(gpio);
+		gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(gpio, 1);
+	} else if (!strcasecmp(value, "gnd")) {
+		gpio_pad_select_gpio(gpio);
+		gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(gpio, 0);
+	} else parsed = false	;
+	
+	if (parsed) ESP_LOGI(TAG, "set GPIO %u to %s", gpio, value);
+ }	
+
+/****************************************************************************************
+ * 
+ */
 void services_init(void) {
 	char *nvs_item;
 	
@@ -40,22 +59,8 @@ void services_init(void) {
 	}
 #endif
 
-	// set fixed gpio if any
-	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) != NULL) {
-		char *p = nvs_item, type[4];
-		int gpio;
-		do {
-			if (sscanf(p, "%d=%3[^,]", &gpio, type) > 0) {
-				gpio_pad_select_gpio(gpio);
-				gpio_set_direction(gpio, GPIO_MODE_OUTPUT);
-				if (!strcasecmp(type, "vcc")) gpio_set_level(gpio, 1);
-				else if (!strcasecmp(type, "gnd")) gpio_set_level(gpio, 0);
-				ESP_LOGI(TAG, "set GPIO %u to %s", gpio, type);
-			} 	
-			p = strchr(p, ',');
-		} while (p++);
-		free(nvs_item);
-	}	
+	// set potential power GPIO
+	parse_set_GPIO(set_power_gpio);
 
 	const i2c_config_t * i2c_config = config_i2c_get(&i2c_system_port);
 

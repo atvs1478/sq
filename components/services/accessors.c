@@ -58,3 +58,22 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 	if(i2c_port) *i2c_port=i2c_system_port;
 	return &i2c;
 }
+
+/****************************************************************************************
+ * 
+ */
+void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
+	char *nvs_item, *p, type[4];
+	int gpio;
+	
+	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) == NULL) return;
+	
+	p = nvs_item;
+	
+	do {
+		if (sscanf(p, "%d=%3[^,]", &gpio, type) > 0) cb(gpio, type);
+		p = strchr(p, ',');
+	} while (p++);
+	
+	free(nvs_item);
+}	
