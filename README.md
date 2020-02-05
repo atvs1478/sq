@@ -62,6 +62,17 @@ Syntax is:
 <gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
 ```
 
+### Rotary Encoder
+One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
+
+Encoder is hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. There is no complex configuration like buttons (see below). Long press is not supported
+
+Use parameter rotary_config with the following syntax:
+
+```
+A=<gpio>,B=<gpio>[,SW=gpio>
+```
+
 ### Buttons
 Buttons are described using a JSON string with the following syntax
 ```
