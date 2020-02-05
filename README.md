@@ -70,7 +70,7 @@ Encoder is hard-coded to respectively knob left, right and push on LMS and to vo
 Use parameter rotary_config with the following syntax:
 
 ```
-A=<gpio>,B=<gpio>[,SW=gpio>
+A=<gpio>,B=<gpio>[,SW=gpio>]
 ```
 
 ### Buttons
