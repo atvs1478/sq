@@ -132,6 +132,8 @@ const static actrls_t controls = {
 	bt_pause, bt_stop,	// pause, stop
 	NULL, NULL,			// rew, fwd
 	bt_prev, bt_next,	// prev, next
+	NULL, NULL, NULL, NULL, // left, right, up, down
+	bt_volume_down, bt_volume_up, bt_toggle// knob left, knob_right, knob push
 };
 
 /* disconnection */

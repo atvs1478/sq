@@ -62,7 +62,9 @@ static const actrls_config_map_t actrls_config_map[] =
 #define EP(x) [x] = #x  /* ENUM PRINT */
 static const char * actrls_action_s[ ] = { EP(ACTRLS_VOLUP),EP(ACTRLS_VOLDOWN),EP(ACTRLS_TOGGLE),EP(ACTRLS_PLAY),
 									EP(ACTRLS_PAUSE),EP(ACTRLS_STOP),EP(ACTRLS_REW),EP(ACTRLS_FWD),EP(ACTRLS_PREV),EP(ACTRLS_NEXT),
-									EP(BCTRLS_PUSH), EP(BCTRLS_UP),EP(BCTRLS_DOWN),EP(BCTRLS_LEFT),EP(BCTRLS_RIGHT), ""} ;
+									EP(BCTRLS_UP),EP(BCTRLS_DOWN),EP(BCTRLS_LEFT),EP(BCTRLS_RIGHT), 
+									EP(KNOB_LEFT),EP(KNOB_RIGHT),EP(KNOB_PUSH),
+									""} ;
 									
 static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
@@ -117,6 +119,28 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 		ESP_LOGD(TAG, "calling action %u", action_detail.action);
 		if (current_controls[action_detail.action]) (*current_controls[action_detail.action])();
 	}	
+}
+
+static void control_rotary_handler(void *client, rotary_event_e event, bool long_press) {
+	actrls_action_e action;
+	
+	switch(event) {
+	case ROTARY_LEFT:
+		action = KNOB_LEFT;
+		break;
+	case ROTARY_RIGHT:
+		action = KNOB_RIGHT;
+		break;
+	case ROTARY_PRESSED:
+		// no handling of rotary long press
+		action = KNOB_PUSH;
+		break;
+	default:
+		action = ACTRLS_NONE;
+		break;
+	}
+	
+	if (action != ACTRLS_NONE) (*current_controls[action])();
 }
 
 /*
@@ -364,8 +388,26 @@ esp_err_t actrls_init_json(const char *profile_name, bool create) {
 	actrls_config_t *cur_config = NULL;
 	actrls_config_t *config_root = NULL;
 	const cJSON *button;
-
-	char *config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
+	
+	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+	if (config && *config) {
+		char *p;
+		int A = -1, B = -1, SW = -1;
+		
+		// parse config
+		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
+				
+		// create rotary (no handling of long press)
+		err = create_rotary(NULL, A, B, SW, 0, control_rotary_handler) ? ESP_OK : ESP_FAIL;
+	}
+			
+	if (config) free(config);	
+		
+	if (!profile_name || !*profile_name) return ESP_OK;
+	
+	config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
 	if(!config) return ESP_FAIL;
 
 	ESP_LOGD(TAG,"Parsing JSON structure %s", config);

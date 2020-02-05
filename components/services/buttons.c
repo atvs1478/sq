@@ -31,6 +31,7 @@
 #include "esp_task.h"
 #include "driver/gpio.h"
 #include "buttons.h"
+#include "rotary_encoder.h"
 #include "globdefs.h"
 
 bool gpio36_39_used;
@@ -42,6 +43,7 @@ static int n_buttons = 0;
 #define BUTTON_STACK_SIZE	4096
 #define MAX_BUTTONS			16
 #define DEBOUNCE			50
+#define BUTTON_QUEUE_LEN	10
 
 static EXT_RAM_ATTR struct button_s {
 	void *client;
@@ -56,7 +58,16 @@ static EXT_RAM_ATTR struct button_s {
 	TimerHandle_t timer;
 } buttons[MAX_BUTTONS];
 
-static xQueueHandle button_evt_queue = NULL;
+static struct {
+	QueueHandle_t queue;
+	void *client;
+	rotary_encoder_info_t info;
+	int A, B, SW;
+	rotary_handler handler;
+} rotary;
+
+static xQueueHandle button_evt_queue;
+static QueueSetHandle_t button_queue_set;
 
 static void buttons_task(void* arg);
 
@@ -103,44 +114,63 @@ static void buttons_task(void* arg) {
 	ESP_LOGI(TAG, "starting button tasks");
 	
     while (1) {
-		struct button_s button;
-		button_event_e event;
-		button_press_e press;
+		QueueSetMemberHandle_t xActivatedMember;
 
-        if (!xQueueReceive(button_evt_queue, &button, portMAX_DELAY)) continue;
+		// wait on button and rotary queues
+		if ((xActivatedMember = xQueueSelectFromSet( button_queue_set, portMAX_DELAY )) == NULL) continue;
+		
+		if (xActivatedMember == button_evt_queue) {
+			struct button_s button;
+			button_event_e event;
+			button_press_e press;
+			
+			// received a button event
+			xQueueReceive(button_evt_queue, &button, 0);
 
-		event = (button.level == button.type) ? BUTTON_PRESSED : BUTTON_RELEASED;		
+			event = (button.level == button.type) ? BUTTON_PRESSED : BUTTON_RELEASED;		
 
-		ESP_LOGD(TAG, "received event:%u from gpio:%u level:%u (timer %u shifting %u)", event, button.gpio, button.level, button.long_timer, button.shifting);
+			ESP_LOGD(TAG, "received event:%u from gpio:%u level:%u (timer %u shifting %u)", event, button.gpio, button.level, button.long_timer, button.shifting);
 
-		// find if shifting is activated
-		if (button.shifter && button.shifter->type == button.shifter->level) press = BUTTON_SHIFTED;
-		else press = BUTTON_NORMAL;
+			// find if shifting is activated
+			if (button.shifter && button.shifter->type == button.shifter->level) press = BUTTON_SHIFTED;
+			else press = BUTTON_NORMAL;
 	
-		/* 
-		long_timer will be set either because we truly have a long press 
-		or we have a release before the long press timer elapsed, so two 
-		events shall be sent
-		*/
-		if (button.long_timer) {
-			if (event == BUTTON_RELEASED) {
-				// early release of a long-press button, send press/release
-				if (!button.shifting) {
-					(*button.handler)(button.client, BUTTON_PRESSED, press, false);		
-					(*button.handler)(button.client, BUTTON_RELEASED, press, false);		
-				}
+			/* 
+			long_timer will be set either because we truly have a long press 
+			or we have a release before the long press timer elapsed, so two 
+			events shall be sent
+			*/
+			if (button.long_timer) {
+				if (event == BUTTON_RELEASED) {
+					// early release of a long-press button, send press/release
+					if (!button.shifting) {
+						(*button.handler)(button.client, BUTTON_PRESSED, press, false);		
+						(*button.handler)(button.client, BUTTON_RELEASED, press, false);		
+					}
+					// button is a copy, so need to go to real context
+					button.self->shifting = false;
+				} else if (!button.shifting) {
+					// normal long press and not shifting so don't discard
+					(*button.handler)(button.client, BUTTON_PRESSED, press, true);
+				}  
+			} else {
+				// normal press/release of a button or release of a long-press button
+				if (!button.shifting) (*button.handler)(button.client, event, press, button.long_press);
 				// button is a copy, so need to go to real context
 				button.self->shifting = false;
-			} else if (!button.shifting) {
-				// normal long press and not shifting so don't discard
-				(*button.handler)(button.client, BUTTON_PRESSED, press, true);
-			}  
+			}
 		} else {
-			// normal press/release of a button or release of a long-press button
-			if (!button.shifting) (*button.handler)(button.client, event, press, button.long_press);
-			// button is a copy, so need to go to real context
-			button.self->shifting = false;
-		}
+			rotary_encoder_event_t event = { 0 };
+			
+			// received a rotary event
+		    xQueueReceive(rotary.queue, &event, 0);
+			
+			ESP_LOGI(TAG, "Event: position %d, direction %s", event.state.position,
+                     event.state.direction ? (event.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? "CW" : "CCW") : "NOT_SET");
+			
+			rotary.handler(rotary.client, event.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? 
+										  ROTARY_RIGHT : ROTARY_LEFT, false);   
+		}	
     }
 }	
 	
@@ -163,7 +193,9 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
 	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
 
 	if (!n_buttons) {
-		button_evt_queue = xQueueCreate(10, sizeof(struct button_s));
+		button_evt_queue = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(struct button_s));
+		if (!button_queue_set) button_queue_set = xQueueCreateSet(BUTTON_QUEUE_LEN + 1);
+		xQueueAddToSet( button_evt_queue, button_queue_set );
 		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	}
 	
@@ -229,7 +261,18 @@ void *button_get_client(int gpio) {
 		 if (buttons[i].gpio == gpio) return buttons[i].client;
 	 }
 	 return NULL;
- }
+}
+
+/****************************************************************************************
+ * Get stored id
+ */
+bool button_is_pressed(int gpio, void *client) {
+	for (int i = 0; i < n_buttons; i++) {
+		if (gpio != -1 && buttons[i].gpio == gpio) return buttons[i].level == buttons[i].type;
+		else if (client && buttons[i].client == client) return buttons[i].level == buttons[i].type;
+	}
+	return false; 
+}
 
 /****************************************************************************************
  * Update buttons 
@@ -270,3 +313,47 @@ void *button_remap(void *client, int gpio, button_handler handler, int long_pres
 	
 	return prev_client;
 }
+
+/****************************************************************************************
+ * Create rotary encoder
+ */
+static void rotary_button_handler(void *id, button_event_e event, button_press_e mode, bool long_press) {
+	ESP_LOGI(TAG, "Rotary push-button %d", event);
+	rotary.handler(id, event == BUTTON_PRESSED ? ROTARY_PRESSED : ROTARY_RELEASED, long_press);
+}
+
+/****************************************************************************************
+ * Create rotary encoder
+ */
+bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler) {
+	if (A == -1 || B == -1) {
+		ESP_LOGI(TAG, "Cannot create rotary %d %d", A, B);
+		return false;
+	}
+
+	rotary.A = A;
+	rotary.B = B;
+	rotary.SW = SW;
+	rotary.client = id;
+	rotary.handler = handler;
+	
+	// nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1, AMP, Hall used which WiFi does when PS is activated
+	if (A == 36 || A == 39 || B == 36 || B == 39 || SW == 36 || SW == 39) gpio36_39_used = true;
+
+    // Initialise the rotary encoder device with the GPIOs for A and B signals
+    rotary_encoder_init(&rotary.info, A, B);
+		
+    // Create a queue for events from the rotary encoder driver.
+    rotary.queue = rotary_encoder_create_queue();
+    rotary_encoder_set_queue(&rotary.info, rotary.queue);
+	
+	if (!button_queue_set) button_queue_set = xQueueCreateSet(BUTTON_QUEUE_LEN + 1);
+	xQueueAddToSet( rotary.queue, button_queue_set );
+
+	// create companion button if rotary has a switch
+	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, rotary_button_handler, long_press, -1);
+	
+	ESP_LOGI(TAG, "Creating rotary encoder A:%d B:%d, SW:%d", A, B, SW);
+	
+	return true;
+}	

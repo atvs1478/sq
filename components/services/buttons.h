@@ -18,7 +18,7 @@
 
 #pragma once
  
-// button type (pressed = LOW or HIGH)
+// button type (pressed = LOW or HIGH, matches GPIO level)
 #define BUTTON_LOW 		0
 #define BUTTON_HIGH		1
 
@@ -36,3 +36,9 @@ NOTE: shifter buttons *must* be created before shiftee
 void button_create(void *client, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio);
 void *button_remap(void *client, int gpio, button_handler handler, int long_press, int shifter_gpio);
 void *button_get_client(int gpio);
+bool button_is_pressed(int gpio, void *client);
+
+typedef enum { ROTARY_LEFT, ROTARY_RIGHT, ROTARY_PRESSED, ROTARY_RELEASED } rotary_event_e; 
+typedef void (*rotary_handler)(void *id, rotary_event_e event, bool long_press);
+
+bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler);

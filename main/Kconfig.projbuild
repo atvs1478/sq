@@ -207,7 +207,11 @@ menu "Squeezelite-ESP32"
 			int "Jack insertion GPIO"
 			default -1
 			help
-				GPIO to detect speaker jack insertion (0 = inserted). Set to -1 for no detection
+				GPIO to detect speaker jack insertion. Set to -1 for no detection
+		config JACK_GPIO_LEVEL
+			depends on JACK_GPIO != -1
+			int "Level when inserted (0/1)"
+		        default 0
 	endmenu	
 	
 endmenu

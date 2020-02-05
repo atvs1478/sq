@@ -23,8 +23,9 @@
 // BEWARE: this is the index of the array of action below (change actrls_action_s as well!)
 typedef enum { 	ACTRLS_NONE = -1, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
-				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT, ACTRLS_REMAP,
-				ACTRLS_MAX 
+				BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT, 
+				KNOB_LEFT, KNOB_RIGHT, KNOB_PUSH,
+				ACTRLS_REMAP, ACTRLS_MAX 
 		} actrls_action_e;
 
 typedef void (*actrls_handler)(void);
