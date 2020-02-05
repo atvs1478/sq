@@ -28,7 +28,12 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
 
 ### I2C
-The NVS parameter "i2c_config" set the i2c's gpio. Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+```
+sda=<gpio>,scl=<gpio>,port=0|1
+```
+### I2S
+The NVS parameter "i2s_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
 sda=<gpio>,scl=<gpio>,port=0|1
 ```
@@ -37,9 +42,9 @@ The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF.
 
 SPDIF is made available by re-using i2s interface in a non-standard way, so although only one pin (DO) is needed, the controller must be fully initialized, so the bit clock (bck) and word clock (ws) must be set as well. As i2s and SPDIF are mutually exclusive, you can reuse the same IO if your hardware allows so.
 
-Note that on SqueezeAMP, these are automatically defined.
+Note that on SqueezeAMP, these are automatically defined, so this parameter does not matter.
 
-Leave it blank to disable SPDIF usage. Syntax is 
+Leave it blank to disable SPDIF usage, you can also define them at compile time using "make menuconfig". Syntax is 
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
