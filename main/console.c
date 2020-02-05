@@ -226,14 +226,14 @@ void run_command(char * line){
 	esp_err_t err = esp_console_run(line, &ret);
 
 	if (err == ESP_ERR_NOT_FOUND) {
-		printf("Unrecognized command\n");
+		ESP_LOGE(TAG,"Unrecognized command: %s\n", line);
 	} else if (err == ESP_ERR_INVALID_ARG) {
 		// command was empty
 	} else if (err == ESP_OK && ret != ESP_OK) {
-		printf("Command returned non-zero error code: 0x%x (%s)\n", ret,
+		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)\n", ret,
 				esp_err_to_name(err));
 	} else if (err != ESP_OK) {
-		printf("Internal error: %s\n", esp_err_to_name(err));
+		ESP_LOGE(TAG,"Internal error: %s\n", esp_err_to_name(err));
 	}
 }
 static void * console_thread() {

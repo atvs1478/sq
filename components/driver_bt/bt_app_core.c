@@ -18,7 +18,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
-static const char * TAG = "platform_esp32";
+static const char * TAG = "btappcore";
 
 static void bt_app_task_handler(void *arg);
 static bool bt_app_send_msg(bt_app_msg_t *msg);

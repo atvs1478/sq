@@ -47,45 +47,17 @@ sure that using rate_delay would fix that
 #include "driver/gpio.h"
 #include "perf_trace.h"
 #include <signal.h>
+#include "adac.h"
 #include "time.h"
 #include "led.h"
 #include "monitor.h"
 #include "config.h"
+#include "accessors.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
 
 #define FRAME_BLOCK MAX_SILENCE_FRAMES
-
-// Prevent compile errors if dac output is
-// included in the build and not actually activated in menuconfig
-#ifndef CONFIG_I2S_BCK_IO
-#define CONFIG_I2S_BCK_IO -1
-#endif
-#ifndef CONFIG_I2S_WS_IO
-#define CONFIG_I2S_WS_IO -1
-#endif
-#ifndef CONFIG_I2S_DO_IO
-#define CONFIG_I2S_DO_IO -1
-#endif
-#ifndef CONFIG_I2S_NUM
-#define CONFIG_I2S_NUM -1
-#endif
-
-#ifndef CONFIG_SPDIF_BCK_IO
-#define CONFIG_SPDIF_BCK_IO -1
-#endif
-#ifndef CONFIG_SPDIF_WS_IO
-#define CONFIG_SPDIF_WS_IO -1
-#endif
-#ifndef CONFIG_SPDIF_DO_IO
-#define CONFIG_SPDIF_DO_IO -1
-#endif
-#ifndef CONFIG_SPDIF_NUM
-#define CONFIG_SPDIF_NUM -1
-#endif
-
-typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOGUE_OFF, DAC_ANALOGUE_ON, DAC_VOLUME } dac_cmd_e;
 
 // must have an integer ratio with FRAME_BLOCK (see spdif comment)
 #define DMA_BUF_LEN		512	
@@ -106,11 +78,15 @@ typedef enum { DAC_ACTIVE = 0, DAC_STANDBY, DAC_DOWN, DAC_ANALOGUE_OFF, DAC_ANAL
 	RESET_MIN_MAX(buffering);
 	
 #define STATS_PERIOD_MS 5000
+#define STAT_STACK_SIZE	(3*1024)
 
 extern struct outputstate output;
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
+
+// by default no DAC selected
+struct adac_s *adac = &dac_null;
 
 static log_level loglevel;
 
@@ -118,36 +94,27 @@ static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
 static int bytes_per_frame;
-static thread_type thread, stats_thread;
 static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
 static size_t dma_buf_frames;
+static pthread_t thread;
+static TaskHandle_t stats_task;
+static bool stats;
+static int amp_gpio = -1;
 
 DECLARE_ALL_MIN_MAX;
 
 static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
-static void *output_thread_i2s();
-static void *output_thread_i2s_stats();
-static void dac_cmd(dac_cmd_e cmd, ...);
-static int tas57_detect(void);
+static void *output_thread_i2s(void *arg);
+static void *output_thread_i2s_stats(void *arg);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 static void (*jack_handler_chain)(bool inserted);
 
+// force all GPIOs to what we need
 #ifdef CONFIG_SQUEEZEAMP
-
 #define TAS57xx
-
-#undef	CONFIG_I2S_BCK_IO 
-#define CONFIG_I2S_BCK_IO 	33
-#undef 	CONFIG_I2S_WS_IO	
-#define CONFIG_I2S_WS_IO	25
-#undef 	CONFIG_I2S_DO_IO
-#define CONFIG_I2S_DO_IO	32
-#undef 	CONFIG_I2S_NUM
-#define CONFIG_I2S_NUM		0
-
 #undef	CONFIG_SPDIF_BCK_IO 
 #define CONFIG_SPDIF_BCK_IO 33
 #undef 	CONFIG_SPDIF_WS_IO	
@@ -156,51 +123,15 @@ static void (*jack_handler_chain)(bool inserted);
 #define CONFIG_SPDIF_DO_IO	15
 #undef 	CONFIG_SPDIF_NUM
 #define CONFIG_SPDIF_NUM	0
+#undef 	CONFIG_I2S_NUM
+#define CONFIG_I2S_NUM		0
+#elif defined CONFIG_A1S
+#define A1S
+#undef 	CONFIG_I2S_NUM
+#define CONFIG_I2S_NUM		0
+#endif
 
 #define I2C_PORT	0
-#define VOLUME_GPIO	14
-
-#define TAS575x 0x98
-#define TAS578x	0x90
-
-struct tas57xx_cmd_s {
-	u8_t reg;
-	u8_t value;
-};
-
-u8_t config_spdif_gpio = CONFIG_SPDIF_DO_IO;
-	
-static const struct tas57xx_cmd_s tas57xx_init_sequence[] = {
-    { 0x00, 0x00 },		// select page 0
-    { 0x02, 0x10 },		// standby
-    { 0x0d, 0x10 },		// use SCK for PLL
-	{ 0x25, 0x08 },		// ignore SCK halt 
-	{ 0x08, 0x10 },		// Mute control enable (from TAS5780)
-	{ 0x54, 0x02 },		// Mute output control (from TAS5780)
-	{ 0x02, 0x00 },		// restart
-	{ 0xff, 0xff }		// end of table
-};
-
-static const i2c_config_t i2c_config = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = 27,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = 26,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000,
-};
-
-static const struct tas57xx_cmd_s tas57xx_cmd[] = {
-	{ 0x02, 0x00 },	// DAC_ACTIVE
-	{ 0x02, 0x10 },	// DAC_STANDBY
-	{ 0x02, 0x01 },	// DAC_DOWN
-	{ 0x56, 0x10 },	// DAC_ANALOGUE_OFF
-	{ 0x56, 0x00 },	// DAC_ANALOGUE_ON
-};
-
-static u8_t tas57_addr;
-
-#endif
 
 /****************************************************************************************
  * jack insertion handler
@@ -209,11 +140,32 @@ static void jack_handler(bool inserted) {
 	// jack detection bounces a bit but that seems fine
 	if (jack_mutes_amp) {
 		LOG_INFO("switching amplifier %s", inserted ? "OFF" : "ON");
-		if (inserted) dac_cmd(DAC_ANALOGUE_OFF);
-		else dac_cmd(DAC_ANALOGUE_ON);
+		if (inserted) adac->speaker(false);
+		else adac->speaker(true);
 	}
+	
+	// activate headset
+	if (inserted) adac->headset(true);
+	else adac->headset(false);
+	
+	// and chain if any
 	if (jack_handler_chain) (jack_handler_chain)(inserted);
 }
+
+/****************************************************************************************
+ * amp GPIO
+ */
+void set_amp_gpio(int gpio, char *value) {
+	if (!strcasecmp(value, "amp")) {
+		amp_gpio = gpio;
+		
+		gpio_pad_select_gpio(amp_gpio);
+		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(amp_gpio, 0);
+		
+		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
+	}	
+}	
 
 /****************************************************************************************
  * Initialize the DAC output
@@ -225,44 +177,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
 	free(p);
-	
-#ifdef TAS57xx
-	LOG_INFO("Initializing TAS57xx ");
-				
-	adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_7, ADC_ATTEN_DB_0);
-    			
-	// init volume & mute
-	gpio_pad_select_gpio(VOLUME_GPIO);
-	gpio_set_direction(VOLUME_GPIO, GPIO_MODE_OUTPUT);
-	gpio_set_level(VOLUME_GPIO, 0);
-	
-	// configure i2c
-	i2c_param_config(I2C_PORT, &i2c_config);
-	i2c_driver_install(I2C_PORT, I2C_MODE_MASTER, false, false, false);
-	
-	// find which TAS we are using
-	tas57_addr = tas57_detect();
-	
-	i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
-	
-	for (int i = 0; tas57xx_init_sequence[i].reg != 0xff; i++) {
-		i2c_master_start(i2c_cmd);
-		i2c_master_write_byte(i2c_cmd, tas57_addr | I2C_MASTER_WRITE, I2C_MASTER_NACK);
-		i2c_master_write_byte(i2c_cmd, tas57xx_init_sequence[i].reg, I2C_MASTER_NACK);
-		i2c_master_write_byte(i2c_cmd, tas57xx_init_sequence[i].value, I2C_MASTER_NACK);
-
-		LOG_DEBUG("i2c write %x at %u", tas57xx_init_sequence[i].reg, tas57xx_init_sequence[i].value);
-	}
-
-	i2c_master_stop(i2c_cmd);	
-	esp_err_t ret = i2c_master_cmd_begin(I2C_PORT, i2c_cmd, 500 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(i2c_cmd);
-	
-	if (ret != ESP_OK) {
-		LOG_ERROR("could not intialize TAS57xx %d", ret);
-	}
-#endif	
 	
 #ifdef CONFIG_I2S_BITS_PER_CHANNEL
 	switch (CONFIG_I2S_BITS_PER_CHANNEL) {
@@ -287,8 +201,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	bytes_per_frame = 2*2;
 #endif
 
-	if (strcasestr(device, "spdif")) spdif = true;
-
 	output.write_cb = &_i2s_write_frames;
 	obuf = malloc(FRAME_BLOCK * bytes_per_frame);
 	if (!obuf) {
@@ -296,12 +208,20 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		return;
 	}
 		
-	running=true;
+	running = true;
 
-	i2s_pin_config_t pin_config;
-	
-	if (spdif) {
-		pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_SPDIF_BCK_IO, .ws_io_num = CONFIG_SPDIF_WS_IO, 
+	// common I2S initialization
+	i2s_config.mode = I2S_MODE_MASTER | I2S_MODE_TX;
+	i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
+	i2s_config.communication_format = I2S_COMM_FORMAT_I2S| I2S_COMM_FORMAT_I2S_MSB;
+	// in case of overflow, do not replay old buffer
+	i2s_config.tx_desc_auto_clear = true;		
+	i2s_config.use_apll = true;
+	i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1; //Interrupt level 1
+
+	if (strcasestr(device, "spdif")) {
+		spdif = true;	
+		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_SPDIF_BCK_IO, .ws_io_num = CONFIG_SPDIF_WS_IO, 
 										  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 //Not used
 									};
 		i2s_config.sample_rate = output.current_sample_rate * 2;
@@ -315,49 +235,47 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		   audio frame. So the real depth is true frames is (LEN * COUNT / 2)
 		*/   
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN / 2;	
+		i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
+		i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
+		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 	} else {
-		pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
-										.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = -1 //Not used
-									};
+#ifdef TAS57xx
+		gpio_pad_select_gpio(CONFIG_SPDIF_DO_IO);
+		gpio_set_direction(CONFIG_SPDIF_DO_IO, GPIO_MODE_OUTPUT);
+		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
+		adac = &dac_tas57xx;
+#elif defined(A1S)
+		adac = &dac_a1s;
+#endif	
 		i2s_config.sample_rate = output.current_sample_rate;
 		i2s_config.bits_per_sample = bytes_per_frame * 8 / 2;
 		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
 		i2s_config.dma_buf_len = DMA_BUF_LEN;	
 		i2s_config.dma_buf_count = DMA_BUF_COUNT;
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;	
-#ifdef TAS57xx	
-		gpio_pad_select_gpio(CONFIG_SPDIF_DO_IO);
-		gpio_set_direction(CONFIG_SPDIF_DO_IO, GPIO_MODE_OUTPUT);
-		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
-#endif			
+		
+		// finally let DAC driver initialize I2C and I2S
+		adac->init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
 	}
-
-	i2s_config.mode = I2S_MODE_MASTER | I2S_MODE_TX;
-	i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
-	i2s_config.communication_format = I2S_COMM_FORMAT_I2S| I2S_COMM_FORMAT_I2S_MSB;
-	// in case of overflow, do not replay old buffer
-	i2s_config.tx_desc_auto_clear = true;		
-	i2s_config.use_apll = true;
-	i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1; //Interrupt level 1
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 
 			spdif ? "S/PDIF" : "normal", 
 			i2s_config.sample_rate, i2s_config.bits_per_sample, i2s_config.dma_buf_len, i2s_config.dma_buf_count);
-
-	i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
-	i2s_set_pin(CONFIG_I2S_NUM, &pin_config);
+	
 	i2s_stop(CONFIG_I2S_NUM);
 	i2s_zero_dma_buffer(CONFIG_I2S_NUM);
 	isI2SStarted=false;
 	
-	dac_cmd(DAC_STANDBY);
+	adac->power(ADAC_STANDBY);
 
 	jack_handler_chain = jack_handler_svc;
 	jack_handler_svc = jack_handler;
 	
-	if (jack_mutes_amp && jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_OFF);
-	else dac_cmd(DAC_ANALOGUE_ON);
+	if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
+	else adac->speaker(true);
 	
+	parse_set_GPIO(set_amp_gpio);
+		
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	
     cfg.thread_name= "output_i2s";
@@ -367,11 +285,17 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
     esp_pthread_set_cfg(&cfg);
 	pthread_create(&thread, NULL, output_thread_i2s, NULL);
 	
-	cfg.thread_name= "output_i2s_sts";
-	cfg.prio = CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT - 1;
-    cfg.stack_size = 2048;	
-	esp_pthread_set_cfg(&cfg);
-	pthread_create(&stats_thread, NULL, output_thread_i2s_stats, NULL);
+	// do we want stats
+	p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
+	stats = p && (*p == '1' || *p == 'Y' || *p == 'y');
+	free(p);
+	
+	// memory still used but at least task is not created
+	if (stats) {
+		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+		static EXT_RAM_ATTR StackType_t xStack[STAT_STACK_SIZE] __attribute__ ((aligned (4)));
+		stats_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s_stats, "output_i2s_sts", STAT_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+	}	
 }
 
 
@@ -383,27 +307,20 @@ void output_close_i2s(void) {
 	running = false;
 	UNLOCK;
 	pthread_join(thread, NULL);
-	pthread_join(stats_thread, NULL);
+	if (stats) vTaskDelete(stats_task);
 	
 	i2s_driver_uninstall(CONFIG_I2S_NUM);
 	free(obuf);
 	
-#ifdef TAS57xx	
-	i2c_driver_delete(I2C_PORT);
-#endif	
+	adac->deinit();
 }
 
 /****************************************************************************************
  * change volume
  */
 bool output_volume_i2s(unsigned left, unsigned right) {
-#ifdef TAS57xx	
-	if (!spdif) {
-		LOG_INFO("TAS57xx volume (L:%u R:%u)", left, right);
-		gpio_set_level(VOLUME_GPIO, left || right);
-	}
-#endif	
- return false;	
+	adac->volume(left, right);
+	return false;	
 } 
 
 /****************************************************************************************
@@ -456,7 +373,7 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 /****************************************************************************************
  * Main output thread
  */
-static void *output_thread_i2s() {
+static void *output_thread_i2s(void *arg) {
 	size_t count = 0, bytes;
 	frames_t iframes = FRAME_BLOCK;
 	uint32_t timer_start = 0;
@@ -480,16 +397,15 @@ static void *output_thread_i2s() {
 		// manage led display & analogue
 		if (state != output.state) {
 			LOG_INFO("Output state is %d", output.state);
-			if (output.state == OUTPUT_OFF) led_blink(LED_GREEN, 100, 2500);
-			else if (output.state == OUTPUT_STOPPED) {
-#ifdef TAS57xx				
-				dac_cmd(DAC_ANALOGUE_OFF);
-#endif				
+			if (output.state == OUTPUT_OFF) {
+				led_blink(LED_GREEN, 100, 2500);
+				if (amp_gpio != -1) gpio_set_level(amp_gpio, 0);
+				LOG_INFO("switching off amp GPIO %d", amp_gpio);
+			} else if (output.state == OUTPUT_STOPPED) {
+				adac->speaker(false);
 				led_blink(LED_GREEN, 200, 1000);
 			} else if (output.state == OUTPUT_RUNNING) {
-#ifdef TAS57xx				
-				if (!jack_mutes_amp || !jack_inserted_svc()) dac_cmd(DAC_ANALOGUE_ON);
-#endif				
+				if (!jack_mutes_amp || !jack_inserted_svc()) adac->speaker(true);
 				led_on(LED_GREEN);
 			}	
 		}
@@ -500,7 +416,7 @@ static void *output_thread_i2s() {
 			if (isI2SStarted) {
 				isI2SStarted = false;
 				i2s_stop(CONFIG_I2S_NUM);
-				if (!spdif) dac_cmd(DAC_STANDBY);
+				adac->power(ADAC_STANDBY);
 				count = 0;
 			}
 			usleep(200000);
@@ -546,7 +462,8 @@ static void *output_thread_i2s() {
 			LOG_INFO("Restarting I2S.");
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
 			i2s_start(CONFIG_I2S_NUM);
-			if (!spdif) dac_cmd(DAC_ACTIVE);	
+			adac->power(ADAC_ON);	
+			if (amp_gpio != -1) gpio_set_level(amp_gpio, 1);
 		} 
 		
 		// this does not work well as set_sample_rates resets the fifos (and it's too early)
@@ -591,12 +508,12 @@ static void *output_thread_i2s() {
 /****************************************************************************************
  * Stats output thread
  */
-static void *output_thread_i2s_stats() {
-	while (running) {
-		LOCK;
+static void *output_thread_i2s_stats(void *arg) {
+	while (1) {
+		// no need to lock
 		output_state state = output.state;
-		UNLOCK;
-		if(state>OUTPUT_STOPPED){
+		
+		if(stats && state>OUTPUT_STOPPED){
 			LOG_INFO( "Output State: %d, current sample rate: %d, bytes per frame: %d",state,output.current_sample_rate, bytes_per_frame);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD1);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD2);
@@ -616,76 +533,10 @@ static void *output_thread_i2s_stats() {
 			LOG_INFO("              ----------+----------+-----------+-----------+");
 			RESET_ALL_MIN_MAX;
 		}
-		usleep(STATS_PERIOD_MS *1000);
+		vTaskDelay( pdMS_TO_TICKS( STATS_PERIOD_MS ) );
 	}
 	return NULL;
 }
-
-/****************************************************************************************
- * DAC specific commands
- */
-void dac_cmd(dac_cmd_e cmd, ...) {
-	va_list args;
-	esp_err_t ret = ESP_OK;
-	
-	va_start(args, cmd);
-#ifdef TAS57xx	
-	i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
-
-	switch(cmd) {
-	case DAC_VOLUME:
-		LOG_ERROR("volume not handled yet");
-		break;
-	default:
-		i2c_master_start(i2c_cmd);
-		i2c_master_write_byte(i2c_cmd, tas57_addr | I2C_MASTER_WRITE, I2C_MASTER_NACK);
-		i2c_master_write_byte(i2c_cmd, tas57xx_cmd[cmd].reg, I2C_MASTER_NACK);
-		i2c_master_write_byte(i2c_cmd, tas57xx_cmd[cmd].value, I2C_MASTER_NACK);
-		i2c_master_stop(i2c_cmd);	
-		ret	= i2c_master_cmd_begin(I2C_PORT, i2c_cmd, 50 / portTICK_RATE_MS);
-	}
-	
-    i2c_cmd_link_delete(i2c_cmd);
-	
-	if (ret != ESP_OK) {
-		LOG_ERROR("could not intialize TAS57xx %d", ret);
-	}
-#endif	
-	va_end(args);
-}
-
-/****************************************************************************************
- * TAS57 detection
- */
-#ifdef TAS57xx
-static int tas57_detect(void) {
-	u8_t data, addr[] = {TAS578x, TAS575x};
-	int ret;
-	
-	for (int i = 0; i < sizeof(addr); i++) {
-		i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
-
-		i2c_master_start(i2c_cmd);
-		i2c_master_write_byte(i2c_cmd, addr[i] | I2C_MASTER_WRITE, I2C_MASTER_NACK);
-		i2c_master_write_byte(i2c_cmd, 00, I2C_MASTER_NACK);
-		
-		i2c_master_start(i2c_cmd);			
-		i2c_master_write_byte(i2c_cmd, addr[i] | I2C_MASTER_READ, I2C_MASTER_NACK);
-		i2c_master_read_byte(i2c_cmd, &data, I2C_MASTER_NACK);
-		
-		i2c_master_stop(i2c_cmd);	
-		ret	= i2c_master_cmd_begin(I2C_PORT, i2c_cmd, 50 / portTICK_RATE_MS);
-		i2c_cmd_link_delete(i2c_cmd);	
-		
-		if (ret == ESP_OK) {
-			LOG_INFO("Detected TAS @0x%x", addr[i]);
-			return addr[i];
-		}	
-	}	
-	
-	return 0;
-}
-#endif
 
 /****************************************************************************************
  * SPDIF support

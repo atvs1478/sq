@@ -61,7 +61,7 @@ config DEFAULT_AP_BEACON_INTERVAL
 	100ms is the recommended default.
 config DEFAULT_COMMAND_LINE
     string "Default command line to execute"
-    default "squeezelite -o I2S -b 500:2000 -d all=info"
+    default "squeezelite -o I2S -b 500:2000 -d all=info -C 30"
     help
 	This is the command to run when starting the device
 endmenu

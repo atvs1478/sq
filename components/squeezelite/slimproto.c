@@ -45,7 +45,7 @@ static sockfd sock = -1;
 static in_addr_t slimproto_ip = 0;
 static u16_t slimproto_hport = 9000;
 static u16_t slimproto_cport = 9090;
-static u8_t	player_id = PLAYER_ID;
+static u8_t	player_id;
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -284,22 +284,14 @@ static void process_strm(u8_t *pkt, int len) {
 	case 't':
 		sendSTAT("STMt", strm->replay_gain); // STMt replay_gain is no longer used to track latency, but support it
 		break;
+	case 'f':	
 	case 'q':
 		decode_flush();
 		if (!output.external) output_flush();
 		status.frames_played = 0;
-		stream_disconnect();
-		sendSTAT("STMf", 0);
+		if (stream_disconnect() && strm->command == 'f') sendSTAT("STMf", 0);
 		buf_flush(streambuf);
-		break;
-	case 'f':
-		decode_flush();
-		if (!output.external) output_flush();
-		status.frames_played = 0;
-		if (stream_disconnect()) {
-			sendSTAT("STMf", 0);
-		}
-		buf_flush(streambuf);
+		output.stop_time = gettime_ms();
 		break;
 	case 'p':
 		{

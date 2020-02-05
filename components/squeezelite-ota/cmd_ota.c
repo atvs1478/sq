@@ -26,7 +26,7 @@
 #include "esp32/rom/uart.h"
 #include "sdkconfig.h"
 
-static const char * TAG = "platform_esp32";
+static const char * TAG = "ota";
 extern esp_err_t start_ota(const char * bin_url);
 static struct {
     struct arg_str *url;

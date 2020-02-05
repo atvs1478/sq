@@ -207,7 +207,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 				ms = ((u64_t) ((_buf_used(outputbuf) - raop_sync.len) / BYTES_PER_FRAME + output.device_frames + output.frames_in_process) * 1000) / RAOP_SAMPLE_RATE - (now - output.updated);
 				raop_sync.error[raop_sync.idx] = (raop_sync.playtime - now) - ms;
 				sync_nb = SYNC_NB;
-				LOG_INFO("head local:%u, remote:%u (delta:%d)", ms, raop_sync.playtime - now, raop_sync.error[raop_sync.idx]);
+				LOG_DEBUG("head local:%u, remote:%u (delta:%d)", ms, raop_sync.playtime - now, raop_sync.error[raop_sync.idx]);
 				LOG_DEBUG("obuf:%u, sync_len:%u, devframes:%u, inproc:%u", _buf_used(outputbuf), raop_sync.len, output.device_frames, output.frames_in_process);
 			}	
 			

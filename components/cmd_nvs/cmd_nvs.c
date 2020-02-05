@@ -29,7 +29,7 @@ extern "C" {
 
 
 static const char *ARG_TYPE_STR = "type can be: i8, u8, i16, u16 i32, u32 i64, u64, str, blob";
-static const char * TAG = "platform_esp32";
+static const char * TAG = "cmd_nvs";
 
 static struct {
     struct arg_str *key;

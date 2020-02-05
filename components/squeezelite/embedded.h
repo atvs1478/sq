@@ -26,7 +26,10 @@
 #define OUTPUT_THREAD_STACK_SIZE  6 * 1024
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
-#define PLAYER_ID 100
+// or can be as simple as #define PLAYER_ID 100
+#define PLAYER_ID custom_player_id;
+extern u8_t custom_player_id;
+
 #define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 

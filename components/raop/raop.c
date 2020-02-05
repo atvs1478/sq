@@ -542,7 +542,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 						
 		ctx->rtp = rtp.ctx;
 		
-		if (cport * tport * rtp.cport * rtp.tport * rtp.aport && rtp.ctx) {
+		if ( (cport * tport * rtp.cport * rtp.tport * rtp.aport) != 0 && rtp.ctx) {
 			char *transport;
 			asprintf(&transport, "RTP/AVP/UDP;unicast;mode=record;control_port=%u;timing_port=%u;server_port=%u", rtp.cport, rtp.tport, rtp.aport);
 			LOG_DEBUG("[%p]: audio=(%hu:%hu), timing=(%hu:%hu), control=(%hu:%hu)", ctx, 0, rtp.aport, tport, rtp.tport, cport, rtp.cport);
@@ -630,9 +630,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		} else if (body && (p = strcasestr(body, "progress")) != NULL) {
 			int start, current, stop = 0;
 
+			// we want ms, not s
 			sscanf(p, "%*[^:]:%u/%u/%u", &start, &current, &stop);
-			current = (current - start) / 44100;
-			if (stop) stop = (stop - start) / 44100;
+			current = ((current - start) / 44100) * 1000;
+			if (stop) stop = ((stop - start) / 44100) * 1000;
 			else stop = -1;
 			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
 			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);

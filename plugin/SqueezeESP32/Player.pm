@@ -12,10 +12,6 @@ sub model { 'squeezeesp32' }
 sub modelName { 'SqueezeESP32' }
 sub hasIR { 0 }
 
-# We need to implement this to allow us to receive SETD commands
-# and we need SETD to support custom display widths
-sub directBodyFrame { 1 }
-
 # Allow the player to define it's display width (and probably more)
 sub playerSettingsFrame {
 	my $client   = shift;
@@ -32,6 +28,8 @@ sub playerSettingsFrame {
 			$client->update;
 		} 
 	}
+	
+	$client->SUPER::playerSettingsFrame($data_ref);
 }
 
 sub hasScrolling  {

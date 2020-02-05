@@ -22,6 +22,7 @@
 #include "driver/gpio.h"
 #include "squeezelite.h"
 #include "perf_trace.h"
+#include "config.h"
 
 extern struct outputstate output;
 extern struct buffer *outputbuf;
@@ -45,6 +46,7 @@ static log_level loglevel;
 static bool running = false;
 static uint8_t *btout;
 static frames_t oframes;
+static bool stats;
 
 static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
@@ -68,15 +70,13 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 DECLARE_ALL_MIN_MAX;	
 	
 void output_init_bt(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
-#ifdef CONFIG_SQUEEZEAMP
-	gpio_pad_select_gpio(config_spdif_gpio);
-	gpio_set_direction(config_spdif_gpio, GPIO_MODE_OUTPUT);
-	gpio_set_level(config_spdif_gpio, 0);
-#endif			
 	loglevel = level;
 	running = true;
 	output.write_cb = &_write_frames;
 	hal_bluetooth_init(device);
+	char *p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
+	stats = p && (*p == '1' || *p == 'Y' || *p == 'y');
+	free(p);
 }
 
 void output_close_bt(void) {
@@ -166,12 +166,12 @@ void output_bt_tick(void) {
 	static time_t lastTime=0;
 	
 	if (!running) return;
-		
+	
 	LOCK_S;
     SET_MIN_MAX_SIZED(_buf_used(streambuf), stream_buf, streambuf->size);
     UNLOCK_S;
 	
-	if (lastTime <= gettime_ms() )
+	if (stats && lastTime <= gettime_ms() )
 	{
 		lastTime = gettime_ms() + STATS_REPORT_DELAY_MS;
 		LOG_INFO("Statistics over %u secs. " , STATS_REPORT_DELAY_MS/1000);

@@ -164,7 +164,7 @@ static bool set_font(int num, enum display_font_e font, int space) {
 	lines[0].y = lines[0].space;
 	for (int i = 1; i <= num; i++) lines[i].y = lines[i-1].y + lines[i-1].font->Height + lines[i].space;
 		
-	ESP_LOGI(TAG, "adding line %u at %u (height:%u)", num + 1, lines[num].y, lines[num].font->Height);
+	ESP_LOGI(TAG, "Adding line %u at %d (height:%u)", num + 1, lines[num].y, lines[num].font->Height);
 	
 	if (lines[num].y + lines[num].font->Height > Display.Height) {
 		ESP_LOGW(TAG, "line does not fit display");

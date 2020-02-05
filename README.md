@@ -47,8 +47,20 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
-### Vcc GPIO
-The parameter "Vcc_GPIO" is a comma-separated list of GPIO that will be configured as output with their value set to 1 (Vcc) at boot. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here.
+### Set GPIO
+The parameter "set_GPIO" is use to set assign GPIO to various functions.
+
+GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
+
+This parameter can use used as well to assign a GPIO that will be set to 1 when playback starts and wil be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
+
+Finally, if you have an audio jack that supports insertion (set to GND when inserted), you can specify whch GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
+
+Syntax is:
+
+```
+<gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
+```
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
@@ -81,7 +93,7 @@ Where (all parameters are optionals except gpio)
  - "shifted": action to take when a button is pressed/released and shifted (see above/below)
  - "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
 
-Where <action> is either the name of another configuration to load or one amongst 
+Where \<action\> is either the name of another configuration to load or one amongst 
 				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
 				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
@@ -95,7 +107,7 @@ For example a config named "buttons" :
 ``` 
 Defines two buttons
 - first on GPIO 4, active low. When pressed, it triggers a volume down command. When pressed more than 1000ms, it changes the button configuration for the one named "buttons_remap"
-- second on GPIO 5, acive low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
+- second on GPIO 5, active low. When pressed it triggers a volume up command. If first button is pressed together with this button, then a play/pause toggle command is generated.
 
 While the config named "buttons_remap"
 ```

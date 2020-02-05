@@ -62,6 +62,8 @@ menu "Squeezelite-ESP32"
 	            Type of hardware platform
 	        config SQUEEZEAMP 
 	            bool "SqueezeAMP (TAS575x & Bluetooth)"
+			config A1S
+	            bool "ESP32-A1S module"				
 	        config BASIC_I2C_BT
 	            bool "Generic I2S & Bluetooth"
 	    endchoice
@@ -75,7 +77,7 @@ menu "Squeezelite-ESP32"
 		            I2S dma channel to use.  
 		    config I2S_BCK_IO         
 		        int "I2S Bit clock GPIO number. "
-		        default 26
+		        default 33
 		        help
 		            I2S Bit Clock gpio pin to use.  
 		    config I2S_WS_IO         
@@ -85,29 +87,13 @@ menu "Squeezelite-ESP32"
 		            I2S Word Select gpio pin to use.
 		    config I2S_DO_IO         
 		        int "I2S Data I/O GPIO number. "
-		        default 22
+		        default 32
 		        help
 		            I2S data I/O gpio pin to use.
-		    choice 
-	  			prompt "Bit Depth for I2S output"
-		        default I2S_BITS_PER_CHANNEL_16
-		        config I2S_BITS_PER_CHANNEL_24
-		            bool "24 Bits"
-		        config I2S_BITS_PER_CHANNEL_16
-		            bool "16 Bits"
-		        config I2S_BITS_PER_CHANNEL_8
-		            bool "8 Bits"
-		    endchoice
-			config I2S_BITS_PER_CHANNEL
-			    int
-			    default 16
-			    default 16 if I2S_BITS_PER_CHANNEL_16
-			    default 24 if I2S_BITS_PER_CHANNEL_24
-			    default 8 if I2S_BITS_PER_CHANNEL_8
 		endmenu
 		
 		menu "SPDIF settings" 
-		    depends on BASIC_I2C_BT
+		    depends on BASIC_I2C_BT || A1S
 			config SDIF_NUM         
 		        int "SDPIF/I2S channel (0 or 1)"
 		        default 0
@@ -115,19 +101,19 @@ menu "Squeezelite-ESP32"
 		            I2S dma channel to use.  
 		    config SPDIF_BCK_IO         
 		        int "SDPIF/I2S Bit clock GPIO number"
-		        default 26
+		        default -1
 		        help
-		            Not used but must be configured.  
+		            Must be set even if you don't use SPDIF  
 		    config SPDIF_WS_IO         
 		        int "SPDIF/I2S Word Select GPIO number"
-		        default 25
+		        default -1
 		        help
-		            Not used but must be configured.  
+		            Must be set even if you don't use SPDIF  
 		    config SPDIF_DO_IO         
 		        int "I2S Data I/O GPIO number"
-		        default 15
+		        default -1
 		        help
-		            SPDIF/I2S data I/O gpio pin to use
+		            Must be set even if you don't use SPDIF  
 		endmenu
 				
 		menu "A2DP settings"
@@ -217,6 +203,11 @@ menu "Squeezelite-ESP32"
 			default -1
 			help
 				Set to -1 for no LED
+		config JACK_GPIO				
+			int "Jack insertion GPIO"
+			default -1
+			help
+				GPIO to detect speaker jack insertion (0 = inserted). Set to -1 for no detection
 	endmenu	
 	
 endmenu
