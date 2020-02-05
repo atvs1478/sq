@@ -71,7 +71,14 @@ static actrls_config_t *json_config;
 cJSON * control_profiles = NULL;
 static actrls_t default_controls, current_controls;
 static actrls_hook_t *default_hook, *current_hook;
+static struct {
+	bool long_state;
+	bool volume_lock;
+} rotary;
 
+/****************************************************************************************
+ * 
+ */
 static void control_handler(void *client, button_event_e event, button_press_e press, bool long_press) {
 	actrls_config_t *key = (actrls_config_t*) client;
 	actrls_action_detail_t  action_detail;
@@ -121,53 +128,34 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 	}	
 }
 
+/****************************************************************************************
+ * 
+ */
 static void control_rotary_handler(void *client, rotary_event_e event, bool long_press) {
-	actrls_action_e action;
+	actrls_action_e action = ACTRLS_NONE;
 	
 	switch(event) {
 	case ROTARY_LEFT:
-		action = KNOB_LEFT;
+		if (rotary.long_state) action = ACTRLS_PREV;
+		else if (rotary.volume_lock) action = ACTRLS_VOLDOWN;
+		else action = KNOB_LEFT;
 		break;
 	case ROTARY_RIGHT:
-		action = KNOB_RIGHT;
+		if (rotary.long_state) action = ACTRLS_NEXT;
+		else if (rotary.volume_lock) action = ACTRLS_VOLUP;
+		else action = KNOB_RIGHT;
 		break;
 	case ROTARY_PRESSED:
-		// no handling of rotary long press
-		action = KNOB_PUSH;
+		if (long_press)	rotary.long_state = !rotary.long_state;
+		else if (rotary.volume_lock) action = ACTRLS_TOGGLE;
+		else action = KNOB_RIGHT;
 		break;
 	default:
-		action = ACTRLS_NONE;
 		break;
 	}
 	
 	if (action != ACTRLS_NONE) (*current_controls[action])();
 }
-
-/*
-void up(void *id, button_event_e event, button_press_e press, bool longpress) {
-	if (press == BUTTON_NORMAL) {
-		if (longpress) ESP_LOGI(TAG, "up long %u", event);
-		else ESP_LOGI(TAG, "up %u", event);
-	} else if (press == BUTTON_SHIFTED) {
-		if (longpress) ESP_LOGI(TAG, "up shifted long %u", event);
-		else ESP_LOGI(TAG, "up shifted %u", event);
-	} else {
-		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
-	}
-}
-
-void down(void *id, button_event_e event, button_press_e press, bool longpress) {
-	if (press == BUTTON_NORMAL) {
-		if (longpress) ESP_LOGI(TAG, "down long %u", event);
-		else ESP_LOGI(TAG, "down %u", event);
-	} else if (press == BUTTON_SHIFTED) {
-		if (longpress) ESP_LOGI(TAG, "down shifted long %u", event);
-		else ESP_LOGI(TAG, "down shifted %u", event);
-	} else {
-		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
-	}
-}
-*/
 
 /****************************************************************************************
  * 
@@ -392,15 +380,17 @@ esp_err_t actrls_init_json(const char *profile_name, bool create) {
 	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
 	if (config && *config) {
 		char *p;
-		int A = -1, B = -1, SW = -1;
+		int A = -1, B = -1, SW = -1, longpress = 0;
 		
 		// parse config
 		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
+		if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
 				
 		// create rotary (no handling of long press)
-		err = create_rotary(NULL, A, B, SW, 0, control_rotary_handler) ? ESP_OK : ESP_FAIL;
+		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
 	}
 			
 	if (config) free(config);	
