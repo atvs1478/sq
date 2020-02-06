@@ -49,12 +49,8 @@ static size_t log_buf_size=2000;      //32-bit aligned size
 static bool bIsEnabled=false;
 const static char tag[] = "telnet";
 
-int _log_vprintf(const char *fmt, va_list args);
-void telnet_esp32_listenForClients();
-int telnet_esp32_vprintf(const char *fmt, va_list va);
-
 static void telnetTask(void *data);
-
+static void doTelnet(int partnerSocket) ;
 
 static int uart_fd=0;
 
@@ -68,21 +64,50 @@ struct telnetUserData {
 	int sockfd;
 };
 
-
-
 static void telnetTask(void *data) {
 	ESP_LOGD(tag, ">> telnetTask");
-	telnet_esp32_listenForClients();
+	int serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	struct sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverAddr.sin_port = htons(23);
+
+	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+	if (rc < 0) {
+		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
+		return;
+	}
+
+	rc = listen(serverSocket, 5);
+	if (rc < 0) {
+		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
+		return;
+	}
+
+	while(1) {
+		socklen_t len = sizeof(serverAddr);
+		rc = accept(serverSocket, (struct sockaddr *)&serverAddr, &len);
+		if (rc < 0 ){
+			ESP_LOGE(tag, "accept: %d (%s)", errno, strerror(errno));
+			return;
+		}
+		else {
+			int partnerSocket = rc;
+			ESP_LOGD(tag, "We have a new client connection!");
+			doTelnet(partnerSocket);
+			ESP_LOGD(tag, "Telnet connection terminated");
+		}
+	}
 	ESP_LOGD(tag, "<< telnetTask");
 	vTaskDelete(NULL);
 }
 
 void start_telnet(void * pvParameter){
 	static bool isStarted=false;
-	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
-	
 	if(!isStarted && bIsEnabled) {
+		StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+		StackType_t *xStack = malloc(TELNET_STACK_SIZE);
 		xTaskCreateStatic( (TaskFunction_t) &telnetTask, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, xTaskBuffer);
 		isStarted=true;
 	}
@@ -117,6 +142,25 @@ static ssize_t stdout_write(int fd, const void * data, size_t size) {
 	}
 	return write(uart_fd, data, size);
 }
+static ssize_t uart_v_write(const char *fmt, va_list va) {
+	ssize_t required=vsnprintf(NULL,0,fmt,va);
+	if(required>0){
+		char * buf=malloc(required);
+		vsprintf(buf,fmt,va);
+		required=write(uart_fd, buf,required);
+		free(buf);
+	}
+	return required;
+}
+static ssize_t uart_printf(const char *fmt, ...) {
+	ssize_t printed=0;
+	va_list args;
+	va_start(args, fmt);
+	uart_v_write(fmt,args);
+	va_end(args);
+	return printed;
+}
+
 
 static ssize_t stdout_read(int fd, void* data, size_t size) {
 	return read(fd, data, size);
@@ -136,7 +180,7 @@ static int stdout_fstat(int fd, struct stat * st) {
 }
 
 
-void kchal_stdout_register() {
+void stdout_register() {
 	const esp_vfs_t vfs = {
 		.flags = ESP_VFS_FLAG_DEFAULT,
 		.write = &stdout_write,
@@ -149,7 +193,7 @@ void kchal_stdout_register() {
 	ESP_ERROR_CHECK(esp_vfs_register("/dev/pkspstdout", &vfs, NULL));
 	freopen("/dev/pkspstdout", "w", stdout);
 	freopen("/dev/pkspstdout", "w", stderr);
-	//printf("8bkc_hal_stdout_register: Custom stdout/stderr handler installed.\n");
+
 }
 /*********************************
  * Telnet Support
@@ -195,9 +239,8 @@ void init_telnet(){
 		return;
 	}
 
-	ESP_LOGI(tag, "***Redirecting log output to telnet");
-	//esp_log_set_vprintf(&_log_vprintf);
-	kchal_stdout_register();
+	ESP_LOGI(tag, "***Redirecting stdout and stderr output to telnet");
+	stdout_register();
 }
 /**
  * Convert a telnet event type to its string representation.
@@ -237,27 +280,6 @@ static char *eventToString(telnet_event_type_t type) {
 	}
 	return "Unknown type";
 } // eventToString
-
-
-/**
- * Send data to the telnet partner.
- */
-void telnet_esp32_sendData(uint8_t *buffer, size_t size) {
-	if (tnHandle != NULL) {
-		telnet_send(tnHandle, (char *)buffer, size);
-	}
-} // telnet_esp32_sendData
-
-
-/**
- * Send a vprintf formatted output to the telnet partner.
- */
-int telnet_esp32_vprintf(const char *fmt, va_list va) {
-	if (tnHandle == NULL) {
-		return 0;
-	}
-	return telnet_vprintf(tnHandle, fmt, va);
-} // telnet_esp32_vprintf
 
 /**
  * Telnet handler.
@@ -299,7 +321,7 @@ static void telnetHandler(
 		break;
 
 	default:
-		printf("telnet event: %s\n", eventToString(event->type));
+		printf("%s()=>telnet event: %s\n", __FUNCTION__, eventToString(event->type));
 		break;
 	} // End of switch event type
 } // myTelnetHandler
@@ -325,10 +347,8 @@ static void handleLogBuffer(int partnerSocket, UBaseType_t count){
 
 		if (item != NULL) {
 			uxBytesToSend-=item_size;
-			if(partnerSocket!=0)
-				telnet_esp32_sendData((uint8_t *)item, item_size);
-			else{
-				//printf("%s() flushing %u bytes from log buffer\n", __FUNCTION__, item_size);
+			if(partnerSocket!=0 && tnHandle != NULL){
+				telnet_send(tnHandle, (char *)item, item_size);
 			}
 			//Return Item
 			vRingbufferReturnItem(buf_handle, (void *)item);
@@ -377,43 +397,3 @@ static void doTelnet(int partnerSocket) {
   }
 
 } // doTelnet
-
-/**
- * Listen for telnet clients and handle them.
- */
-void telnet_esp32_listenForClients() {
-	//ESP_LOGD(tag, ">> telnet_listenForClients");
-	int serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-	struct sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serverAddr.sin_port = htons(23);
-
-	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-	if (rc < 0) {
-		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
-		return;
-	}
-
-	rc = listen(serverSocket, 5);
-	if (rc < 0) {
-		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
-		return;
-	}
-
-	while(1) {
-		socklen_t len = sizeof(serverAddr);
-		rc = accept(serverSocket, (struct sockaddr *)&serverAddr, &len);
-		if (rc < 0 ){
-			ESP_LOGE(tag, "accept: %d (%s)", errno, strerror(errno));
-			return;
-		}
-		else {
-			int partnerSocket = rc;
-			ESP_LOGD(tag, "We have a new client connection!");
-			doTelnet(partnerSocket);
-			ESP_LOGD(tag, "Telnet connection terminated");
-		}
-	}
-} // listenForNewClient
