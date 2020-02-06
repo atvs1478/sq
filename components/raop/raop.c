@@ -933,7 +933,7 @@ static unsigned int token_decode(const char *token)
 		val += pos(token[i]);
 	}
 	if (marker > 2)
-	return DECODE_ERROR;
+		return DECODE_ERROR;
 	return (marker << 24) | val;
 }
 

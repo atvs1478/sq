@@ -311,7 +311,7 @@ static void handleLogBuffer(int partnerSocket, UBaseType_t count){
     UBaseType_t uxItemsWaiting;
     UBaseType_t uxBytesToSend=count;
 
-	vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, &uxItemsWaiting);
+	vRingbufferGetInfo(buf_handle, NULL, NULL, NULL,NULL, &uxItemsWaiting);
 	if( partnerSocket ==0 && (uxItemsWaiting*100 / log_buf_size) <75){
 		// We still have some room in the ringbuffer and there's no telnet
 		// connection yet, so bail out for now.
