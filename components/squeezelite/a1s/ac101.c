@@ -35,6 +35,12 @@
 
 const static char TAG[] = "AC101";
 
+#define SPKOUT_EN ((1 << 11) | (1 << 7))
+#define EAROUT_EN ((1 << 11) | (1 << 12) | (1 << 13))
+
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+
 #define AC_ASSERT(a, format, b, ...) \
     if ((a) != 0) { \
         ESP_LOGE(TAG, format, ##__VA_ARGS__); \
@@ -52,13 +58,12 @@ struct adac_s dac_a1s = { init, deinit, power, speaker, headset, volume };
 
 static esp_err_t i2c_write_reg(uint8_t reg, uint16_t val);
 static uint16_t i2c_read_reg(uint8_t reg);
-static esp_err_t ac101_start(ac_module_t mode);
-static esp_err_t ac101_stop(void);
-static esp_err_t ac101_set_earph_volume(uint8_t volume);
-static esp_err_t ac101_set_spk_volume(uint8_t volume);
+static void ac101_start(ac_module_t mode);
+static void ac101_stop(void);
+static void ac101_set_earph_volume(uint8_t volume);
+static void ac101_set_spk_volume(uint8_t volume);
+static int ac101_get_spk_volume(void);
 	
-//static void pa_power(bool enable);
-
 static int i2c_port;
 
 /****************************************************************************************
@@ -85,16 +90,14 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	ESP_LOGI(TAG, "DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
 	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
-	
 	//huh?
 	//vTaskDelay(1000 / portTICK_PERIOD_MS); 
+	
 	if (ESP_OK != res) {
-		ESP_LOGE(TAG, "reset failed!");
+		ESP_LOGE(TAG, "AC101 reset failed! %d", res);
 		return false;
 	} 
-	
-	i2c_write_reg(SPKOUT_CTRL, 0xe880);
-
+			
 	// Enable the PLL from 256*44.1KHz MCLK source
 	i2c_write_reg(PLL_CTRL1, 0x014f);
 	//res |= i2c_write_reg(PLL_CTRL2, 0x83c0);
@@ -107,10 +110,10 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	i2c_write_reg(I2S_SR_CTRL, 0x7000);			//sample rate
 	 
 	//AIF config
-	i2c_write_reg(I2S1LCK_CTRL, 0x8850);			//BCLK/LRCK
-	i2c_write_reg(I2S1_SDOUT_CTRL, 0xc000);		//
+	i2c_write_reg(I2S1LCK_CTRL, 0x8850);		//BCLK/LRCK
+	i2c_write_reg(I2S1_SDOUT_CTRL, 0xc000);		
 	i2c_write_reg(I2S1_SDIN_CTRL, 0xc000);
-	i2c_write_reg(I2S1_MXR_SRC, 0x2200);			//
+	i2c_write_reg(I2S1_MXR_SRC, 0x2200);		
 
 	i2c_write_reg(ADC_SRCBST_CTRL, 0xccc4);
 	i2c_write_reg(ADC_SRC, 0x2020);
@@ -121,17 +124,10 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	i2c_write_reg(DAC_MXR_SRC, 0xcc00);
 	i2c_write_reg(DAC_DIG_CTRL, 0x8000);
 	i2c_write_reg(OMIXER_SR, 0x0081);
-	i2c_write_reg(OMIXER_DACA_CTRL, 0xf080);//}
-
-	//* Enable Speaker output
-	i2c_write_reg(0x58, 0xeabd);
-
-    //ac101_pa_power(true);
-
-	uint16_t regval;
-
+	i2c_write_reg(OMIXER_DACA_CTRL, 0xf080);
+	
 	// configure I2S		
-	regval = i2c_read_reg(I2S1LCK_CTRL);
+	uint16_t regval = i2c_read_reg(I2S1LCK_CTRL);
 	regval &= 0xffc3;
 	regval |= (AC_MODE_SLAVE << 15);
 	regval |= (BIT_LENGTH_16_BITS << 4);
@@ -145,7 +141,16 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 								};
 	i2s_driver_install(i2s_num, i2s_config, 0, NULL);
 	i2s_set_pin(i2s_num, &i2s_pin_config);
-
+	
+	// enable earphone & speaker
+	i2c_write_reg(SPKOUT_CTRL, 0x0220);
+	i2c_write_reg(OMIXER_DACA_CTRL, 0xff00);
+	i2c_write_reg(HPOUT_CTRL, 0x3801);
+	
+	// set gain for speaker and earphone
+	ac101_set_spk_volume(100);
+	ac101_set_earph_volume(100);
+	
 	ESP_LOGI(TAG, "DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 
 	return true;
@@ -169,46 +174,36 @@ static void volume(unsigned left, unsigned right) {
  * power
  */
 static void power(adac_power_e mode) {
-	esp_err_t ret = ESP_OK;
-	
 	switch(mode) {
 	case ADAC_STANDBY:
 	case ADAC_OFF:
-		ret = ac101_stop();
+		ac101_stop();
 		break;
 	case ADAC_ON:
-		ret = ac101_start(AC_MODULE_DAC);
+		ac101_start(AC_MODULE_DAC);
 		break;		
 	default:
 		ESP_LOGW(TAG, "unknown power command");
 		break;
 	}
-	
-	if (ret != ESP_OK) ESP_LOGW(TAG, "can't start AC101 %d", ret);
 }
 
 /****************************************************************************************
  * speaker
  */
 static void speaker(bool active) {
-	if (active) i2c_write_reg(SPKOUT_CTRL, 0xeabd);
-	else i2c_write_reg(SPKOUT_CTRL, 0xe880);		//disable speaker
+	uint16_t value = i2c_read_reg(SPKOUT_CTRL);
+	if (active) i2c_write_reg(SPKOUT_CTRL, value | SPKOUT_EN);
+	else i2c_write_reg(SPKOUT_CTRL, value & ~SPKOUT_EN);
 } 
 
 /****************************************************************************************
  * headset
  */
 static void headset(bool active) {
-	if (active) {
-		i2c_write_reg(OMIXER_DACA_CTRL, 0xff80);
-    	i2c_write_reg(HPOUT_CTRL, 0xc3c1);
-    	i2c_write_reg(HPOUT_CTRL, 0xcb00);
-		// huh?
-    	vTaskDelay(100 / portTICK_PERIOD_MS);
-		i2c_write_reg(HPOUT_CTRL, 0xfbc0);
-	} else {
-		i2c_write_reg(HPOUT_CTRL, 0x01);			//disable earphone
-	}	
+	uint16_t value = i2c_read_reg(HPOUT_CTRL);
+	if (active) i2c_write_reg(HPOUT_CTRL, value | EAROUT_EN);
+	else i2c_write_reg(HPOUT_CTRL, value & ~EAROUT_EN);			
 } 	
 
 /****************************************************************************************
@@ -254,66 +249,65 @@ static uint16_t i2c_read_reg(uint8_t reg) {
 /****************************************************************************************
  * 
  */
-void set_codec_clk(ac_adda_fs_i2s1_t rate) {
+void set_sample_rate(int rate) {
+	if (rate == 8000) rate = SAMPLE_RATE_8000;
+	else if (rate == 11025) rate = SAMPLE_RATE_11052;
+	else if (rate == 12000) rate = SAMPLE_RATE_12000;
+	else if (rate == 16000) rate = SAMPLE_RATE_16000;
+	else if (rate == 22050)	rate = SAMPLE_RATE_22050;
+	else if (rate == 24000)	rate = SAMPLE_RATE_24000;
+	else if (rate == 32000)	rate = SAMPLE_RATE_32000;
+	else if (rate == 44100)	rate = SAMPLE_RATE_44100;
+	else if (rate == 48000)	rate = SAMPLE_RATE_48000;
+	else if (rate == 96000)	rate = SAMPLE_RATE_96000;
+	else if (rate == 192000) rate = SAMPLE_RATE_192000;
+	else {
+		ESP_LOGW(TAG, "Unknown sample rate %hu", rate);
+		rate = SAMPLE_RATE_44100;
+	}
 	i2c_write_reg(I2S_SR_CTRL, rate);
 }
 
 /****************************************************************************************
- * 
+ * Get normalized (0..100) speaker volume
  */
 static int ac101_get_spk_volume(void) {
-    int res;
-    res = i2c_read_reg(SPKOUT_CTRL);
-    res &= 0x1f;
-    return res*2;
+	return ((i2c_read_reg(SPKOUT_CTRL) & 0x1f) * 100) / 0x1f;
 }
 
 /****************************************************************************************
- * 
+ * Set normalized (0..100) volume
  */
-static esp_err_t ac101_set_spk_volume(uint8_t volume) {
-	uint16_t res;
-	esp_err_t ret;
-	volume = volume/2;
-	res = i2c_read_reg(SPKOUT_CTRL);
-	res &= (~0x1f);
-	volume &= 0x1f;
-	res |= volume;
-	ret = i2c_write_reg(SPKOUT_CTRL,res);
-	return ret;
+static void ac101_set_spk_volume(uint8_t volume) {
+	volume = max(volume, 0x1f);
+	volume = ((int) volume * 0x1f) / 100;
+	volume |= i2c_read_reg(SPKOUT_CTRL) & ~0x1f;
+	i2c_write_reg(SPKOUT_CTRL, volume);
 }
 
 /****************************************************************************************
- * 
+ * Get normalized (0..100) earphonz volume
  */
 static int ac101_get_earph_volume(void) {
-    int res;
-    res = i2c_read_reg(HPOUT_CTRL);
-    return (res>>4)&0x3f;
+	return (((i2c_read_reg(HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
+}
+
+/****************************************************************************************
+ * Set normalized (0..100) earphone volume
+ */
+static void ac101_set_earph_volume(uint8_t volume) {
+	volume = max(volume, 0x3f);
+	volume = (((int) volume * 0x3f) / 100) << 4;
+	volume |= i2c_read_reg(HPOUT_CTRL) & ~(0x3f << 4);
+	i2c_write_reg(HPOUT_CTRL, volume);
 }
 
 /****************************************************************************************
  * 
  */
-static esp_err_t ac101_set_earph_volume(uint8_t volume) {
-	uint16_t res,tmp;
-	esp_err_t ret;
-	res = i2c_read_reg(HPOUT_CTRL);
-	tmp = ~(0x3f<<4);
-	res &= tmp;
-	volume &= 0x3f;
-	res |= (volume << 4);
-	ret = i2c_write_reg(HPOUT_CTRL,res);
-	return ret;
-}
-
-/****************************************************************************************
- * 
- */
-static esp_err_t ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_output_mixer_source_t source)
+static void ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_output_mixer_source_t source)
 {
 	uint16_t regval,temp,clrbit;
-	esp_err_t ret;
 	regval = i2c_read_reg(OMIXER_BST1_CTRL);
 	switch(source){
 	case SRC_MIC1:
@@ -329,106 +323,60 @@ static esp_err_t ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_outp
 		clrbit = ~0x7;
 		break;
 	default:
-		return -1;
+		return;
 	}
 	regval &= clrbit;
 	regval |= temp;
-	ret = i2c_write_reg(OMIXER_BST1_CTRL,regval);
-	return ret;
+	i2c_write_reg(OMIXER_BST1_CTRL,regval);
 }
 
 /****************************************************************************************
  * 
  */
-static esp_err_t ac101_start(ac_module_t mode) {
-	esp_err_t res = 0;
-	
+static void ac101_start(ac_module_t mode) {
     if (mode == AC_MODULE_LINE) {
-		res |= i2c_write_reg(0x51, 0x0408);
-		res |= i2c_write_reg(0x40, 0x8000);
-		res |= i2c_write_reg(0x50, 0x3bc0);
+		i2c_write_reg(0x51, 0x0408);
+		i2c_write_reg(0x40, 0x8000);
+		i2c_write_reg(0x50, 0x3bc0);
     }
     if (mode == AC_MODULE_ADC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
 		//I2S1_SDOUT_CTRL
-		//res |= i2c_write_reg(PLL_CTRL2, 0x8120);
-    	res |= i2c_write_reg(0x04, 0x800c);
-    	res |= i2c_write_reg(0x05, 0x800c);
+		//i2c_write_reg(PLL_CTRL2, 0x8120);
+    	i2c_write_reg(0x04, 0x800c);
+    	i2c_write_reg(0x05, 0x800c);
 		//res |= i2c_write_reg(0x06, 0x3000);
     }
     if (mode == AC_MODULE_DAC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
-    	//* Enable Headphone output   注意使用耳机时，最后开以下寄存器
-		res |= i2c_write_reg(OMIXER_DACA_CTRL, 0xff80);
-    	res |= i2c_write_reg(HPOUT_CTRL, 0xc3c1);
-    	res |= i2c_write_reg(HPOUT_CTRL, 0xcb00);
-		// huh?
-    	vTaskDelay(100 / portTICK_PERIOD_MS);
-		res |= i2c_write_reg(HPOUT_CTRL, 0xfbc0);
-
-    	//* Enable Speaker output
-		res |= i2c_write_reg(SPKOUT_CTRL, 0xeabd);
-		// huh?
-		vTaskDelay(10 / portTICK_PERIOD_MS);
-		ac101_set_earph_volume(255);
-		ac101_set_spk_volume(255);
+		headset(true);
+		speaker(true);
+		ac101_set_earph_volume(100);
+		ac101_set_spk_volume(100);
     }
-
-    return res;
 }
 
 /****************************************************************************************
  * 
  */
-esp_err_t ac101_stop(void) {
-	esp_err_t res = 0;
-	res |= i2c_write_reg(HPOUT_CTRL, 0x01);			//disable earphone
-	res |= i2c_write_reg(SPKOUT_CTRL, 0xe880);		//disable speaker
-	return res;
+static void ac101_stop(void) {
+	speaker(false);
+	headset(false);	
 }
 
 /****************************************************************************************
  * 
  */
-esp_err_t ac101_deinit(void) {
-	return	i2c_write_reg(CHIP_AUDIO_RS, 0x123);		//soft reset
+static void ac101_deinit(void) {
+	i2c_write_reg(CHIP_AUDIO_RS, 0x123);		//soft reset
 }
-
 
 /****************************************************************************************
  * Don't know when this one is supposed to be called
  */
-esp_err_t AC101_i2s_config_clock(ac_i2s_clock_t *cfg) {
-	esp_err_t res = 0;
+static void ac101_i2s_config_clock(ac_i2s_clock_t *cfg) {
 	uint16_t regval=0;
 	regval = i2c_read_reg(I2S1LCK_CTRL);
 	regval &= 0xe03f;
 	regval |= (cfg->bclk_div << 9);
 	regval |= (cfg->lclk_div << 6);
-	res = i2c_write_reg(I2S1LCK_CTRL, regval);
-	return res;
+	i2c_write_reg(I2S1LCK_CTRL, regval);
 }
-
-/****************************************************************************************
- * 
- */
-esp_err_t ac101_get_voice_volume(int* volume) {
-	*volume = ac101_get_earph_volume();
-	return 0;
-}
-
-/*
-void ac101_pa_power(bool enable) {
-    gpio_config_t  io_conf;
-    memset(&io_conf, 0, sizeof(io_conf));
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = BIT(GPIO_PA_EN);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-    if (enable) {
-        gpio_set_level(GPIO_PA_EN, 1);
-    } else {
-        gpio_set_level(GPIO_PA_EN, 0);
-    }
-}
-*/
