@@ -29,9 +29,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/i2c.h>
+#include <driver/i2s.h>
 #include "adac.h"
-
-//#include "audio_hal.h"
 #include "ac101.h"
 
 const static char TAG[] = "AC101";

@@ -328,6 +328,12 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "spdif_config");
+	config_set_default(NVS_TYPE_STR, "spdif_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "dac_config");
+	config_set_default(NVS_TYPE_STR, "dac_config", "", 0);
+	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 

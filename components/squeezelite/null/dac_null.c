@@ -19,9 +19,13 @@
  *
  */
  
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/i2s.h>
+#include "config.h"
 #include "adac.h"
 
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config) { return true; };
+static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config);
 static void deinit(void) { };
 static void speaker(bool active) { };
 static void headset(bool active) { } ;
@@ -29,4 +33,35 @@ static void volume(unsigned left, unsigned right) { };
 static void power(adac_power_e mode) { };
 
 struct adac_s dac_null = { init, deinit, power, speaker, headset, volume };
+
+static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config) { 
+#if !defined(CONFIG_SQUEEZEAMP) && !defined(CONFIG_A1S)
+	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
+															.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = -1 //Not used 	};
+	char *nvs_item = config_alloc_get(NVS_TYPE_STR, "dac_config");
+	
+	if (nvs_item) {
+		if ((p = strcasestr(nvs_item, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
+		free(nvs_item);
+	} 
+	
+	if (i2s_pin_config.bck_io_num != -1 && i2s_pin_config.ws_io_num != -1 && i2s_pin_config.data_out_num != -1) {
+		i2s_driver_install(i2s_num, i2s_config, 0, NULL);
+		i2s_set_pin(i2s_num, &i2s_pin_config);
+
+		ESP_LOGI(TAG, "DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+
+		return true;
+	} else {
+		LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
+																		   i2s_pin_config.ws_io_num, 
+																		   i2s_pin_config.data_out_num);
+		return false;
+	}
+#else
+	return true;
+#endif	
+}
 
