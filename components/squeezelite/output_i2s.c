@@ -86,7 +86,7 @@ extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
 
 // by default no DAC selected
-struct adac_s *adac = &dac_null;
+struct adac_s *adac = &dac_external;
 
 static log_level loglevel;
 

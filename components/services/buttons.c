@@ -165,7 +165,7 @@ static void buttons_task(void* arg) {
 			// received a rotary event
 		    xQueueReceive(rotary.queue, &event, 0);
 			
-			ESP_LOGI(TAG, "Event: position %d, direction %s", event.state.position,
+			ESP_LOGD(TAG, "Event: position %d, direction %s", event.state.position,
                      event.state.direction ? (event.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? "CW" : "CCW") : "NOT_SET");
 			
 			rotary.handler(rotary.client, event.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? 
