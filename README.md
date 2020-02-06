@@ -32,8 +32,8 @@ The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g.
 ```
 sda=<gpio>,scl=<gpio>,port=0|1
 ```
-### I2S
-The NVS parameter "i2s_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
+### DAC/I2S
+The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
 sda=<gpio>,scl=<gpio>,port=0|1
 ```
