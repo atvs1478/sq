@@ -32,7 +32,7 @@ static void headset(bool active) { } ;
 static void volume(unsigned left, unsigned right) { };
 static void power(adac_power_e mode) { };
 
-struct adac_s dac_null = { init, deinit, power, speaker, headset, volume };
+struct adac_s dac_external = { init, deinit, power, speaker, headset, volume };
 
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config) { 
 #if !defined(CONFIG_SQUEEZEAMP) && !defined(CONFIG_A1S)
