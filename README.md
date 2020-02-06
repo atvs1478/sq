@@ -5,9 +5,11 @@ Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.p
 
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
+### ESP32-A1S
+Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board or an external amplifier if you want direct speaker connection. 
+
 ### ESP32-WROVER + I2S DAC
-Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements.  
-To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
+Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements. To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
 
 I2S - WROVER  
 VCC - 3.3V  
@@ -16,9 +18,9 @@ GND - GND
 FLT - GND  
 DMP - GND  
 SCL - GND  
-BCK - 26  
-DIN - 22  
-LCK - 25  
+BCK - (see below)  
+DIN - (see below)  
+LCK - (see below)
 FMT - GND  
 XMT - 3.3V 
 
