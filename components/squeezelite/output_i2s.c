@@ -113,14 +113,13 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 static void (*jack_handler_chain)(bool inserted);
 
 // force all GPIOs to what we need
-#ifdef CONFIG_SQUEEZEAMP
 #undef 	CONFIG_I2S_NUM
 #define CONFIG_I2S_NUM		0
+
+#ifdef CONFIG_SQUEEZEAMP
 #undef	CONFIG_SPDIF_DO_IO
 #define	CONFIG_SPDIF_DO_IO	15
 #elif defined CONFIG_A1S
-#undef 	CONFIG_I2S_NUM
-#define CONFIG_I2S_NUM		0
 #endif
 
 #define I2C_PORT	0
