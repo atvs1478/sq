@@ -62,14 +62,23 @@ static const actrls_config_map_t actrls_config_map[] =
 #define EP(x) [x] = #x  /* ENUM PRINT */
 static const char * actrls_action_s[ ] = { EP(ACTRLS_VOLUP),EP(ACTRLS_VOLDOWN),EP(ACTRLS_TOGGLE),EP(ACTRLS_PLAY),
 									EP(ACTRLS_PAUSE),EP(ACTRLS_STOP),EP(ACTRLS_REW),EP(ACTRLS_FWD),EP(ACTRLS_PREV),EP(ACTRLS_NEXT),
-									EP(BCTRLS_PUSH), EP(BCTRLS_UP),EP(BCTRLS_DOWN),EP(BCTRLS_LEFT),EP(BCTRLS_RIGHT), ""} ;
+									EP(BCTRLS_UP),EP(BCTRLS_DOWN),EP(BCTRLS_LEFT),EP(BCTRLS_RIGHT), 
+									EP(KNOB_LEFT),EP(KNOB_RIGHT),EP(KNOB_PUSH),
+									""} ;
 									
 static const char * TAG = "audio controls";
 static actrls_config_t *json_config;
 cJSON * control_profiles = NULL;
 static actrls_t default_controls, current_controls;
 static actrls_hook_t *default_hook, *current_hook;
+static struct {
+	bool long_state;
+	bool volume_lock;
+} rotary;
 
+/****************************************************************************************
+ * 
+ */
 static void control_handler(void *client, button_event_e event, button_press_e press, bool long_press) {
 	actrls_config_t *key = (actrls_config_t*) client;
 	actrls_action_detail_t  action_detail;
@@ -119,31 +128,34 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 	}	
 }
 
-/*
-void up(void *id, button_event_e event, button_press_e press, bool longpress) {
-	if (press == BUTTON_NORMAL) {
-		if (longpress) ESP_LOGI(TAG, "up long %u", event);
-		else ESP_LOGI(TAG, "up %u", event);
-	} else if (press == BUTTON_SHIFTED) {
-		if (longpress) ESP_LOGI(TAG, "up shifted long %u", event);
-		else ESP_LOGI(TAG, "up shifted %u", event);
-	} else {
-		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
+/****************************************************************************************
+ * 
+ */
+static void control_rotary_handler(void *client, rotary_event_e event, bool long_press) {
+	actrls_action_e action = ACTRLS_NONE;
+	
+	switch(event) {
+	case ROTARY_LEFT:
+		if (rotary.long_state) action = ACTRLS_PREV;
+		else if (rotary.volume_lock) action = ACTRLS_VOLDOWN;
+		else action = KNOB_LEFT;
+		break;
+	case ROTARY_RIGHT:
+		if (rotary.long_state) action = ACTRLS_NEXT;
+		else if (rotary.volume_lock) action = ACTRLS_VOLUP;
+		else action = KNOB_RIGHT;
+		break;
+	case ROTARY_PRESSED:
+		if (long_press)	rotary.long_state = !rotary.long_state;
+		else if (rotary.volume_lock) action = ACTRLS_TOGGLE;
+		else action = KNOB_RIGHT;
+		break;
+	default:
+		break;
 	}
+	
+	if (action != ACTRLS_NONE) (*current_controls[action])();
 }
-
-void down(void *id, button_event_e event, button_press_e press, bool longpress) {
-	if (press == BUTTON_NORMAL) {
-		if (longpress) ESP_LOGI(TAG, "down long %u", event);
-		else ESP_LOGI(TAG, "down %u", event);
-	} else if (press == BUTTON_SHIFTED) {
-		if (longpress) ESP_LOGI(TAG, "down shifted long %u", event);
-		else ESP_LOGI(TAG, "down shifted %u", event);
-	} else {
-		ESP_LOGI(TAG, "don't know what we are doing here %u", event);
-	}
-}
-*/
 
 /****************************************************************************************
  * 
@@ -364,8 +376,28 @@ esp_err_t actrls_init_json(const char *profile_name, bool create) {
 	actrls_config_t *cur_config = NULL;
 	actrls_config_t *config_root = NULL;
 	const cJSON *button;
-
-	char *config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
+	
+	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+	if (config && *config) {
+		char *p;
+		int A = -1, B = -1, SW = -1, longpress = 0;
+		
+		// parse config
+		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
+		if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
+				
+		// create rotary (no handling of long press)
+		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
+	}
+			
+	if (config) free(config);	
+		
+	if (!profile_name || !*profile_name) return ESP_OK;
+	
+	config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
 	if(!config) return ESP_FAIL;
 
 	ESP_LOGD(TAG,"Parsing JSON structure %s", config);

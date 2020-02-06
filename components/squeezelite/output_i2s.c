@@ -114,19 +114,11 @@ static void (*jack_handler_chain)(bool inserted);
 
 // force all GPIOs to what we need
 #ifdef CONFIG_SQUEEZEAMP
-#define TAS57xx
-#undef	CONFIG_SPDIF_BCK_IO 
-#define CONFIG_SPDIF_BCK_IO 33
-#undef 	CONFIG_SPDIF_WS_IO	
-#define CONFIG_SPDIF_WS_IO	25
-#undef 	CONFIG_SPDIF_DO_IO
-#define CONFIG_SPDIF_DO_IO	15
-#undef 	CONFIG_SPDIF_NUM
-#define CONFIG_SPDIF_NUM	0
 #undef 	CONFIG_I2S_NUM
 #define CONFIG_I2S_NUM		0
+#undef	CONFIG_SPDIF_DO_IO
+#define	CONFIG_SPDIF_DO_IO	15
 #elif defined CONFIG_A1S
-#define A1S
 #undef 	CONFIG_I2S_NUM
 #define CONFIG_I2S_NUM		0
 #endif
@@ -221,9 +213,28 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 
 	if (strcasestr(device, "spdif")) {
 		spdif = true;	
+		
+#ifdef CONFIG_SQUEEZEAMP
+		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = 33, .ws_io_num = 25, 
+															  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 };
+#else
 		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_SPDIF_BCK_IO, .ws_io_num = CONFIG_SPDIF_WS_IO, 
-										  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 //Not used
-									};
+															  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 };
+		char *nvs_item = config_alloc_get(NVS_TYPE_STR, "spdif_config");
+		if (nvs_item) {
+			if ((p = strcasestr(nvs_item, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
+			if ((p = strcasestr(nvs_item, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
+			if ((p = strcasestr(nvs_item, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
+			free(nvs_item);
+		} 
+		
+		if (i2s_pin_config.bck_io_num == -1 || i2s_pin_config.ws_io_num == -1 || i2s_pin_config.data_out_num == -1) {
+			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
+																		   i2s_pin_config.ws_io_num, 
+																		   i2s_pin_config.data_out_num);
+		}
+#endif	
+									
 		i2s_config.sample_rate = output.current_sample_rate * 2;
 		i2s_config.bits_per_sample = 32;
 		// Normally counted in frames, but 16 sample are transformed into 32 bits in spdif
@@ -239,12 +250,12 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
 		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 	} else {
-#ifdef TAS57xx
+#ifdef CONFIG_SQUEEZEAMP
 		gpio_pad_select_gpio(CONFIG_SPDIF_DO_IO);
 		gpio_set_direction(CONFIG_SPDIF_DO_IO, GPIO_MODE_OUTPUT);
 		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
 		adac = &dac_tas57xx;
-#elif defined(A1S)
+#elif defined(CONFIG_A1S)
 		adac = &dac_a1s;
 #endif	
 		i2s_config.sample_rate = output.current_sample_rate;

@@ -85,7 +85,15 @@ static void lms_right(void) {
 	cli_send_cmd("button arrow_right");
 }
 
-static void lms_push(void) {
+static void lms_knob_left(void) {
+	cli_send_cmd("button knob_left");
+}
+
+static void lms_knob_right(void) {
+	cli_send_cmd("button knob_right");
+}
+
+static void lms_knob_push(void) {
 	cli_send_cmd("button knob_push");
 }
 
@@ -95,9 +103,9 @@ const actrls_t LMS_controls = {
 	lms_pause, lms_stop,	// pause, stop
 	lms_rew, lms_fwd,		// rew, fwd
 	lms_prev, lms_next,		// prev, next
-	lms_push, 
 	lms_up, lms_down,
 	lms_left, lms_right, 
+	lms_knob_left, lms_knob_right, lms_knob_push,
 };
 
 /****************************************************************************************

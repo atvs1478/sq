@@ -77,6 +77,8 @@ const static actrls_t controls = {
 	raop_pause, raop_stop,				// pause, stop
 	NULL, NULL,							// rew, fwd
 	raop_prev, raop_next,				// prev, next
+	NULL, NULL, NULL, NULL, // left, right, up, down
+	raop_volume_down, raop_volume_up, raop_toggle// knob left, knob_right, knob push
 };
 
 /****************************************************************************************

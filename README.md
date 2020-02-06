@@ -5,9 +5,11 @@ Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.p
 
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
+### ESP32-A1S
+Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board or an external amplifier if you want direct speaker connection. 
+
 ### ESP32-WROVER + I2S DAC
-Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements.  
-To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
+Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements. To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
 
 I2S - WROVER  
 VCC - 3.3V  
@@ -16,9 +18,9 @@ GND - GND
 FLT - GND  
 DMP - GND  
 SCL - GND  
-BCK - 26  
-DIN - 22  
-LCK - 25  
+BCK - (see below)  
+DIN - (see below)  
+LCK - (see below)
 FMT - GND  
 XMT - 3.3V 
 
@@ -28,9 +30,25 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
 
 ### I2C
-The NVS parameter "i2c_config" set the I2C's gpio needed to enable. Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
 ```
-sda=<gpio_num>,scl=<gpio_num>,port=0|1
+bck=<gpio>,ws=<gpio>,do=<gpio>
+```
+### DAC/I2S
+The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
+```
+sda=<gpio>,scl=<gpio>,port=0|1
+```
+### SPDIF
+The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
+
+SPDIF is made available by re-using i2s interface in a non-standard way, so although only one pin (DO) is needed, the controller must be fully initialized, so the bit clock (bck) and word clock (ws) must be set as well. As i2s and SPDIF are mutually exclusive, you can reuse the same IO if your hardware allows so.
+
+Note that on SqueezeAMP, these are automatically defined, so this parameter does not matter.
+
+Leave it blank to disable SPDIF usage, you can also define them at compile time using "make menuconfig". Syntax is 
+```
+bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
 ## Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
@@ -47,6 +65,8 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
+Currently only 128x32 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) are supported
+
 ### Set GPIO
 The parameter "set_GPIO" is use to set assign GPIO to various functions.
 
@@ -60,6 +80,17 @@ Syntax is:
 
 ```
 <gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
+```
+
+### Rotary Encoder
+One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
+
+Encoder is hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. There is no complex configuration like buttons (see below). Long press is not supported
+
+Use parameter rotary_config with the following syntax:
+
+```
+A=<gpio>,B=<gpio>[,SW=gpio>]
 ```
 
 ### Buttons
@@ -143,7 +174,6 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "longshifted":{"pressed":"BCTRLS_LEFT"}}
 ]
 ```
-
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  

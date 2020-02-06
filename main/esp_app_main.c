@@ -280,6 +280,9 @@ void register_default_nvs(){
 
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
 	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","rotary_config");
+	config_set_default(NVS_TYPE_STR, "rotary_config", "", 0);
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
@@ -323,6 +326,12 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "spdif_config");
+	config_set_default(NVS_TYPE_STR, "spdif_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "dac_config");
+	config_set_default(NVS_TYPE_STR, "dac_config", "", 0);
 	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
@@ -374,15 +383,12 @@ void app_main()
 
 	ESP_LOGD(TAG,"Getting audio control mapping ");
 	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
-	if (actrls_config) {
-		if(actrls_config[0] !='\0'){
-			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);
-			actrls_init_json(actrls_config, true);
-		}
-		free(actrls_config);
+	if (actrls_init_json(actrls_config, true) == ESP_OK) {
+		ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
 	} else {
 		ESP_LOGD(TAG,"No audio control buttons");
 	}
+	if (actrls_config) free(actrls_config);
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
