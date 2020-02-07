@@ -81,17 +81,18 @@ Syntax is:
 ```
 <gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
 ```
-
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
-Encoder is hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. There is no complex configuration like buttons (see below). Long press is not supported
+Encoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. Using the option 'volume' makes it hard-coded to volume down/up/play toggle all the time (even in LMS). The option 'longpress' allows an alternate mode when SW is long-pressed. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes.
 
 Use parameter rotary_config with the following syntax:
 
 ```
-A=<gpio>,B=<gpio>[,SW=gpio>]
+A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
 ```
+
+HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc then. Look at your board schedmatic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
