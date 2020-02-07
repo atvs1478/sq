@@ -37,6 +37,7 @@ const static char TAG[] = "AC101";
 
 #define SPKOUT_EN ((1 << 11) | (1 << 7))
 #define EAROUT_EN ((1 << 11) | (1 << 12) | (1 << 13))
+#define BIN(a,b,c,d)	0b##a##b##c##d
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define max(a,b) (((a) > (b)) ? (a) : (b))
@@ -90,51 +91,52 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	ESP_LOGI(TAG, "DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
 	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
-	//huh?
-	//vTaskDelay(1000 / portTICK_PERIOD_MS); 
+	// huh?
+	 vTaskDelay(100 / portTICK_PERIOD_MS); 
 	
 	if (ESP_OK != res) {
 		ESP_LOGE(TAG, "AC101 reset failed! %d", res);
 		return false;
 	} 
 			
-	// Enable the PLL from 256*44.1KHz MCLK source
-	i2c_write_reg(PLL_CTRL1, 0x014f);
-	//res |= i2c_write_reg(PLL_CTRL2, 0x83c0);
-	i2c_write_reg(PLL_CTRL2, 0x8600);
+	// enable the PLL from BCLK source
+	i2c_write_reg(PLL_CTRL1, BIN(0000,0001,0100,1111));			// F=1,M=1,PLL,INT=31 (medium)				
+	i2c_write_reg(PLL_CTRL2, BIN(1000,0110,0000,0000));			// PLL, F=96,N_i=1024-96,F=0,N_f=0*0.2;
+	// i2c_write_reg(PLL_CTRL2, BIN(1000,0011,1100,0000));										
 
-	//Clocking system
-	i2c_write_reg(SYSCLK_CTRL, 0x8b08);
-	i2c_write_reg(MOD_CLK_ENA, 0x800c);
-	i2c_write_reg(MOD_RST_CTRL, 0x800c);
-	i2c_write_reg(I2S_SR_CTRL, 0x7000);			//sample rate
+	// clocking system
+	i2c_write_reg(SYSCLK_CTRL,  BIN(1010,1010,0000,1000));		// PLLCLK, BCLK1, IS1CLK, PLL, SYSCLK 
+	i2c_write_reg(MOD_CLK_ENA,  BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
+	i2c_write_reg(MOD_RST_CTRL, BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
+	i2c_write_reg(I2S_SR_CTRL,  BIN(0111,0000,0000,0000));		// 44.1kHz
 	 
-	//AIF config
-	i2c_write_reg(I2S1LCK_CTRL, 0x8850);		//BCLK/LRCK
-	i2c_write_reg(I2S1_SDOUT_CTRL, 0xc000);		
-	i2c_write_reg(I2S1_SDIN_CTRL, 0xc000);
-	i2c_write_reg(I2S1_MXR_SRC, 0x2200);		
-
-	i2c_write_reg(ADC_SRCBST_CTRL, 0xccc4);
-	i2c_write_reg(ADC_SRC, 0x2020);
-	i2c_write_reg(ADC_DIG_CTRL, 0x8000);
-	i2c_write_reg(ADC_APC_CTRL, 0xbbc3);
+	// analogue config
+	i2c_write_reg(I2S1LCK_CTRL, 	BIN(1000,1000,0101,0000));	// Slave, BCLK=I2S/8,LRCK=32,16bits,I2Smode, Stereo
+	i2c_write_reg(I2S1_SDOUT_CTRL, 	BIN(1100,0000,0000,0000));	// I2S1ADC (R&L) 	
+	i2c_write_reg(I2S1_SDIN_CTRL, 	BIN(1100,0000,0000,0000));	// IS21DAC (R&L)
+	i2c_write_reg(I2S1_MXR_SRC, 	BIN(0010,0010,0000,0000));	// ADCL, ADCR
+	i2c_write_reg(ADC_SRCBST_CTRL, BIN(0100,0100,0100,0000));	// disable all boost (default)
+#if ENABLE_ADC
+	i2c_write_reg(ADC_SRC, 		   BIN(0000,0100,0000,1000));	// source=linein(R/L)
+	i2c_write_reg(ADC_DIG_CTRL,    BIN(1000,0000,0000,0000));	// enable digital ADC
+	i2c_write_reg(ADC_ANA_CTRL,    BIN(1011, 1011,0000,0000));	// enable analogue R/L, 0dB
+#else
+	i2c_write_reg(ADC_SRC, 		   BIN(0000,0000,0000,0000));	// source=none
+	i2c_write_reg(ADC_DIG_CTRL,    BIN(0000,0000,0000,0000));	// disable digital ADC
+	i2c_write_reg(ADC_ANA_CTRL,    BIN(0011, 0011,0000,0000));	// disable analogue R/L, 0dB
+#endif	
 
 	//Path Configuration
-	i2c_write_reg(DAC_MXR_SRC, 0xcc00);
-	i2c_write_reg(DAC_DIG_CTRL, 0x8000);
-	i2c_write_reg(OMIXER_SR, 0x0081);
-	i2c_write_reg(OMIXER_DACA_CTRL, 0xf080);
+	i2c_write_reg(DAC_MXR_SRC, 		BIN(1000,1000,0000,0000));	// DAC from I2S
+	i2c_write_reg(DAC_DIG_CTRL, 	BIN(1000,0000,0000,0000));	// enable DAC
+	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,0000,0000,000));	// enable DAC/Analogue (see note on offset removal and PA)
+	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1100,0000,0000,000));	// enable DAC/Analogue (see note on offset removal and PA)
+#if ENABLE_ADC	
+	i2c_write_reg(OMIXER_SR, 		BIN(0000,0001,0000,0010));	// source=DAC(R/L) (are DACR and DACL really inverted in bitmap?)
+#else
+	i2c_write_reg(OMIXER_SR, 		BIN(0000,0101,0000,1010));	// source=DAC(R/L) and LINEIN(R/L)
+#endif	
 	
-	// configure I2S		
-	uint16_t regval = i2c_read_reg(I2S1LCK_CTRL);
-	regval &= 0xffc3;
-	regval |= (AC_MODE_SLAVE << 15);
-	regval |= (BIT_LENGTH_16_BITS << 4);
-	regval |= (AC_MODE_SLAVE << 2);
-	res |= i2c_write_reg(I2S1LCK_CTRL, regval);
-	res |= i2c_write_reg(I2S_SR_CTRL, SAMPLE_RATE_44100);
-			
 	// configure I2S pins & install driver	
 	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = 27, .ws_io_num = 26, 
 															.data_out_num = 25, .data_in_num = 35 //Not used 
