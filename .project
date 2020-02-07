@@ -3,6 +3,7 @@
 	<name>squeezelite-esp32</name>
 	<comment></comment>
 	<projects>
+		<project>esp-idf</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

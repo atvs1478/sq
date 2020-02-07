@@ -61,7 +61,7 @@
 #define DAC_VOL_CTRL		0x49
 #define DAC_MXR_SRC			0x4c
 #define DAC_MXR_GAIN		0x4d
-#define ADC_APC_CTRL		0x50
+#define ADC_ANA_CTRL		0x50
 #define ADC_SRC				0x51
 #define ADC_SRCBST_CTRL		0x52
 #define OMIXER_DACA_CTRL	0x53

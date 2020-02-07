@@ -148,7 +148,7 @@ static void control_rotary_handler(void *client, rotary_event_e event, bool long
 	case ROTARY_PRESSED:
 		if (long_press)	rotary.long_state = !rotary.long_state;
 		else if (rotary.volume_lock) action = ACTRLS_TOGGLE;
-		else action = KNOB_RIGHT;
+		else action = KNOB_PUSH;
 		break;
 	default:
 		break;

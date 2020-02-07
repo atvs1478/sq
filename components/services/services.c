@@ -70,7 +70,7 @@ void services_init(void) {
 		i2c_param_config(i2c_system_port, i2c_config);
 		i2c_driver_install(i2c_system_port, i2c_config->mode, 0, 0, 0 );
 	} else {
-		ESP_LOGE(TAG, "can't initialize I2C");
+		ESP_LOGW(TAG, "no I2C configured");
 	}	
 
 	ESP_LOGD(TAG,"Configuring LEDs");
