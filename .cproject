@@ -227,7 +227,7 @@
             			
             <storageModule moduleId="cdtBuildSystem" version="4.0.0">
                 				
-                <configuration artifactName="${ProjName}" buildProperties="" description="Building recovery in windows" id="cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291" name="recovery_windows" optionalBuildProperties="" parent="org.eclipse.cdt.build.core.emptycfg">
+                <configuration artifactName="${ProjName}" buildProperties="" description="Building recovery in windows" id="cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291" name="recovery_windows" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="org.eclipse.cdt.build.core.emptycfg">
                     					
                     <folderInfo id="cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291." name="/" resourcePath="">
                         						
@@ -239,7 +239,7 @@
                             							
                             <targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1831977109" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
                             							
-                            <builder arguments="&quot;C:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot; -j8 EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=1 -DSQUEEZELITE_ESP32_RELEASE_URL=\&quot;https://github.com/sle118/squeezelite-esp32/releases\&quot; '" command="python" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+                            <builder arguments="&quot;c:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot;  EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=${RECOVERY_APPLICATION}'" buildPath="${workspace_loc:/squeezelite-esp32}" command="python" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="cdt.managedbuild.builder.gnu.cross"/>
                             							
                             <tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.1302011176" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
                                 								
@@ -495,6 +495,12 @@
             		
         </scannerConfigBuildInfo>
         		
+        <scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934;cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934.;cdt.managedbuild.tool.gnu.cross.cpp.compiler.40066190;cdt.managedbuild.tool.gnu.cpp.compiler.input.773825889">
+            			
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+            		
+        </scannerConfigBuildInfo>
+        		
         <scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736;cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736.;cdt.managedbuild.tool.gnu.cross.cpp.compiler.1907231332;cdt.managedbuild.tool.gnu.cpp.compiler.input.604467026">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
@@ -556,6 +562,12 @@
         </scannerConfigBuildInfo>
         		
         <scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.cross.base.1476804786;cdt.managedbuild.toolchain.gnu.cross.base.1476804786.1800826258;cdt.managedbuild.tool.gnu.cross.c.compiler.1502936757;cdt.managedbuild.tool.gnu.c.compiler.input.1614739014">
+            			
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+            		
+        </scannerConfigBuildInfo>
+        		
+        <scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934;cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934.;cdt.managedbuild.tool.gnu.cross.c.compiler.1397900624;cdt.managedbuild.tool.gnu.c.compiler.input.24917724">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
             		
