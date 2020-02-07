@@ -81,7 +81,8 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 
 	if (xTimerGetPeriod(button->timer) > button->debounce / portTICK_RATE_MS) xTimerChangePeriodFromISR(button->timer, button->debounce / portTICK_RATE_MS, &woken); // does that restart the timer? 
 	else xTimerResetFromISR(button->timer, &woken);
-	// ESP_EARLY_LOGI(TAG, "INT gpio %u level %u", button->gpio, button->level);
+	if (woken) portYIELD_FROM_ISR();
+	ESP_EARLY_LOGD(TAG, "INT gpio %u level %u", button->gpio, button->level);
 }
 
 /****************************************************************************************
