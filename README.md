@@ -92,7 +92,7 @@ Use parameter rotary_config with the following syntax:
 A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
 ```
 
-HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc then. Look at your board schedmatic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
+HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
