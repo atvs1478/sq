@@ -55,7 +55,7 @@ Leave it blank to disable SPDIF usage, you can also define them at compile time 
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
-## Display
+### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
 I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip]
