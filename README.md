@@ -32,12 +32,17 @@ To access NVS, in the webUI, go to credits and select "shows nvs editor". Go int
 ### I2C
 The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
 ```
-bck=<gpio>,ws=<gpio>,do=<gpio>
+sda=<gpio>,scl=<gpio>,port=0|1
+```
+### SPI
+The NVS parameter "spi_config" set the spi's gpio used for generic purpose (e.g. display). Leave it blank to disable SPI usage. The D/C parameter is needed for displays. Syntax is
+```
+data=<gpio>,clk=<gpio>[,d/c=<gpio>][,host=0|1|2]
 ```
 ### DAC/I2S
 The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
-sda=<gpio>,scl=<gpio>,port=0|1
+bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
@@ -50,10 +55,11 @@ Leave it blank to disable SPDIF usage, you can also define them at compile time 
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
-## Display
+### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
-I2C|SPI,width=<pixels>,height=<pixels>[,address=<i2c_address>][,HFlip][,VFlip]
+I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip]
+SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,HFlip][,VFlip]
 ```
 - VFlip and HFlip are optional can be used to change display orientation
 
@@ -79,8 +85,9 @@ Finally, if you have an audio jack that supports insertion (set to GND when inse
 Syntax is:
 
 ```
-<gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
+<gpio_1>=Vcc|GND|amp|jack_h|jack_l[,<gpio_n>=Vcc|GND|amp|jack_h|jack_l]
 ```
+NB: jack_h is for jack inserted sets GPIO to 1 and jack_l is for 0
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
@@ -175,6 +182,12 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "longshifted":{"pressed":"BCTRLS_LEFT"}}
 ]
 ```
+### Battery / ADC
+The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
+```
+channel=0..7,scale=<scale>
+```
+NB: Set parameter to empty to disable battery reading
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  
