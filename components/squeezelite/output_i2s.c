@@ -242,9 +242,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
 #endif
 
-		// not very pretty ...
-		adac = &ADAC;
-
 		i2s_config.sample_rate = output.current_sample_rate;
 		i2s_config.bits_per_sample = bytes_per_frame * 8 / 2;
 		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
@@ -253,8 +250,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;	
 		
 		// finally let DAC driver initialize I2C and I2S
-		adac->init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
-	}
+		if (dac_tas57xx.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_tas57xx;
+		else if (dac_a1s.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_a1s;
+		else {
+			dac_external.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
+			adac = &dac_external;
+		}
+	}	
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 
 			spdif ? "S/PDIF" : "normal", 

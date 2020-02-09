@@ -21,6 +21,7 @@
 #include "globdefs.h"
 #include "config.h"
 #include "accessors.h"
+
 #define MONITOR_TIMER	(10*1000)
 
 static const char *TAG = "monitor";
@@ -30,8 +31,8 @@ static TimerHandle_t monitor_timer;
 static struct {
 	int gpio;
 	int active;
-} 	jack = { CONFIG_JACK_GPIO, CONFIG_JACK_GPIO_LEVEL },
-	spkfault = { CONFIG_SPKFAULT_GPIO, CONFIG_SPKFAULT_GPIO_LEVEL };
+} 	jack = { CONFIG_JACK_GPIO, 0 },
+	spkfault = { CONFIG_SPKFAULT_GPIO, 0 };
 
 void (*jack_handler_svc)(bool inserted);
 bool jack_inserted_svc(void);
@@ -91,13 +92,28 @@ void set_jack_gpio(int gpio, char *value) {
 		jack.gpio = gpio;	
 		if ((p = strchr(value, ':')) != NULL) jack.active = atoi(p + 1);
 	}	
- }
+}
+
+/****************************************************************************************
+ * 
+ */
+void set_spkfault_gpio(int gpio, char *value) {
+	if (strcasestr(value, "spkfault")) {
+		char *p;
+		spkfault.gpio = gpio;	
+		if ((p = strchr(value, ':')) != NULL) spkfault.active = atoi(p + 1);
+	}	
+}
 
 /****************************************************************************************
  * 
  */
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
+	
+#ifdef CONFIG_JACK_GPIO_LEVEL
+	jack.active = CONFIG_JACK_GPIO_LEVEL;
+#endif
 
 #ifndef CONFIG_JACK_LOCKED
 	parse_set_GPIO(set_jack_gpio);
@@ -108,6 +124,10 @@ void monitor_svc_init(void) {
 		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", jack.active ? "high" : "low", jack.gpio);					 
 		button_create(NULL, jack.gpio, jack.active ? BUTTON_HIGH : BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
 	}	
+	
+#ifdef CONFIG_SPKFAULT_GPIO_LEVEL
+	spkfault.active = CONFIG_SPKFAULT_GPIO_LEVEL;
+#endif	
 
 #ifndef CONFIG_SPKFAULT_LOCKED
 	parse_set_GPIO(set_spkfault_gpio);

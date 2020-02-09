@@ -73,7 +73,6 @@ static int i2c_port;
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {	 
 	esp_err_t res;
 	
-	ESP_LOGI(TAG, "Initializing AC101");
 	i2c_port = i2c_port_num;
 
 	// configure i2c
@@ -88,17 +87,21 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 		
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
-	ESP_LOGI(TAG, "DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
+	
+	res = i2c_read_reg(CHIP_AUDIO_RS);
+	
+	if (!res) {
+		ESP_LOGW(TAG, "No AC101 detected");
+		i2c_driver_delete(i2c_port);
+		return 0;		
+	}
+	
+	ESP_LOGI(TAG, "AC101 DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
 	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
 	// huh?
-	 vTaskDelay(100 / portTICK_PERIOD_MS); 
+	vTaskDelay(100 / portTICK_PERIOD_MS); 
 	
-	if (ESP_OK != res) {
-		ESP_LOGE(TAG, "AC101 reset failed! %d", res);
-		return false;
-	} 
-			
 	// enable the PLL from BCLK source
 	i2c_write_reg(PLL_CTRL1, BIN(0000,0001,0100,1111));			// F=1,M=1,PLL,INT=31 (medium)				
 	i2c_write_reg(PLL_CTRL2, BIN(1000,0110,0000,0000));			// PLL, F=96,N_i=1024-96,F=0,N_f=0*0.2;

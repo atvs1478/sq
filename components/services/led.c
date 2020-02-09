@@ -36,9 +36,9 @@ static struct led_s {
 
 static struct {
 	int gpio;
-	int state;
-} green = { CONFIG_LED_GREEN_GPIO, CONFIG_LED_GREEN_GPIO_LEVEL},
-  red = { CONFIG_LED_RED_GPIO, CONFIG_LED_RED_GPIO_LEVEL };
+	int active;
+} green = { CONFIG_LED_GREEN_GPIO, 0 },
+  red = { CONFIG_LED_RED_GPIO, 0 };
 
 /****************************************************************************************
  * 
@@ -162,19 +162,27 @@ void set_led_gpio(int gpio, char *value) {
 	
 	if (strcasestr(value, "green")) {
 		green.gpio = gpio;
-		if ((p = strchr(value, ':')) != NULL) green.state = atoi(p + 1);
+		if ((p = strchr(value, ':')) != NULL) green.active = atoi(p + 1);
 	} else 	if (strcasestr(value, "red")) {
-		red.state = gpio;
-		if ((p = strchr(value, ':')) != NULL) red.state = atoi(p + 1);
+		red.active = gpio;
+		if ((p = strchr(value, ':')) != NULL) red.active = atoi(p + 1);
 	}	
 }
 
 void led_svc_init(void) {
+	
+#ifdef CONFIG_LED_GREEN_GPIO_LEVEL
+	green.active = CONFIG_LED_GREEN_GPIO_LEVEL;
+#endif
+#ifdef CONFIG_LED_RED_GPIO_LEVEL
+	red.active = CONFIG_LED_RED_GPIO_LEVEL;
+#endif
+
 #ifndef CONFIG_LED_LOCKED
 	parse_set_GPIO(set_led_gpio);
 #endif
-	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d), red:%d (active:%d)", green.gpio, green.state, red.gpio, red.state);
+	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d), red:%d (active:%d)", green.gpio, green.active, red.gpio, red.active);
 
-	led_config(LED_GREEN, green.gpio, green.state);
-	led_config(LED_RED, red.gpio, red.state);
+	led_config(LED_GREEN, green.gpio, green.active);
+	led_config(LED_RED, red.gpio, red.active);
 }

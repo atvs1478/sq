@@ -54,7 +54,7 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config) {
 		i2s_driver_install(i2s_num, config, 0, NULL);
 		i2s_set_pin(i2s_num, &i2s_pin_config);
 
-		ESP_LOGI(TAG, "DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+		ESP_LOGI(TAG, "External DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 
 		return true;
 	} else {

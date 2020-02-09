@@ -78,14 +78,7 @@ static int tas57_detect(void);
  * init
  */
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{	 
-	LOG_INFO("Initializing TAS57xx ");
-	
 	i2c_port = i2c_port_num;
-	
-	// init volume & mute
-	gpio_pad_select_gpio(VOLUME_GPIO);
-	gpio_set_direction(VOLUME_GPIO, GPIO_MODE_OUTPUT);
-	gpio_set_level(VOLUME_GPIO, 0);
 	
 	// configure i2c
 	i2c_config_t i2c_config = {
@@ -96,13 +89,26 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
 			.master.clk_speed = 100000,
 		};
+		
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
-	LOG_INFO("DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
-	
-	// find which TAS we are using
+		
+	// find which TAS we are using (if any)
 	tas57_addr = tas57_detect();
 	
+	if (!tas57_addr) {
+		LOG_WARN("No TAS57xx detected");
+		i2c_driver_delete(i2c_port);
+		return 0;
+	}
+	
+	LOG_INFO("TAS57xx DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
+	
+	// init volume & mute
+	gpio_pad_select_gpio(VOLUME_GPIO);
+	gpio_set_direction(VOLUME_GPIO, GPIO_MODE_OUTPUT);
+	gpio_set_level(VOLUME_GPIO, 0);
+
 	i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
 	
 	for (int i = 0; tas57xx_init_sequence[i].reg != 0xff; i++) {
