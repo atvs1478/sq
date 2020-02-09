@@ -170,7 +170,7 @@ void set_led_gpio(int gpio, char *value) {
 }
 
 void led_svc_init(void) {
-#ifndef LED_LOCKED
+#ifndef CONFIG_LED_LOCKED
 	parse_set_GPIO(set_led_gpio);
 #endif
 	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d), red:%d (active:%d)", green.gpio, green.state, red.gpio, red.state);

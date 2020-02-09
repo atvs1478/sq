@@ -29,7 +29,6 @@ extern int spi_system_dc_gpio;
 extern bool gpio36_39_used;
 
 #ifdef CONFIG_SQUEEZEAMP
-#define SPKFAULT_GPIO			2			// this requires a pull-up, so can't be >34
 #define ADAC dac_tas57xx
 #elif defined(CONFIG_A1S)
 #define ADAC dac_a1s

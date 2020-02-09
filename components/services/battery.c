@@ -62,7 +62,7 @@ void battery_svc_init(void) {
 	battery.channel = CONFIG_BAT_CHANNEL;
 	battery.scale = atof(CONFIG_BAT_SCALE);
 
-#ifndef BAT_LOCKED
+#ifndef CONFIG_BAT_LOCKED
 	char *nvs_item = config_alloc_get_default(NVS_TYPE_STR, "bat_config", "n", 0);
 	if (nvs_item) {
 		char *p;

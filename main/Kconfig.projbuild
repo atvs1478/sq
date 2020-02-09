@@ -31,6 +31,8 @@ menu "Squeezelite-ESP32"
 		bool		
 	config LED_LOCKED
 		bool				
+	config SPKFAULT_LOCKED
+		bool				
     menu "Audio Output"
 		choice OUTPUT_TYPE
 			prompt "Output Type"
@@ -44,6 +46,7 @@ menu "Squeezelite-ESP32"
 				select I2C_LOCKED
 				select SPDIF_LOCKED
 				select LED_LOCKED
+				select SPKFAULT_LOCKED
 			config A1S
 	            bool "ESP32-A1S module"				
 				select I2C_LOCKED
@@ -249,11 +252,24 @@ menu "Squeezelite-ESP32"
 			default -1 if !SQUEEZEAMP
 			default 34 if SQUEEZEAMP
 			help
-				GPIO to detect speaker jack insertion. Set to -1 for no detection. This takes precedence over runtime jack GPIO
+				GPIO to detect speaker jack insertion. Set to -1 for no detection. 
 		config JACK_GPIO_LEVEL
 			depends on JACK_GPIO != -1
 			int "Level when inserted (0/1)"
-		        default 0
+			default 0
+	endmenu	
+	menu "Speaker Fault"	
+		visible if !SQUEEZEAMP
+		config SPKFAULT_GPIO		
+			int "Speaker fault GPIO"
+			default -1 if !SQUEEZEAMP
+			default 2 if SQUEEZEAMP
+			help
+				GPIO to detect speaker fault condition. Set to -1 for no detection. 
+		config SPKFAULT_GPIO_LEVEL
+			depends on SPKFAULT_GPIO != -1
+			int "Level when fault (0/1)"
+			default 0
 	endmenu	
 	menu "Battery measure"	
 		visible if !SQUEEZEAMP
