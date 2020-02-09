@@ -182,6 +182,12 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "longshifted":{"pressed":"BCTRLS_LEFT"}}
 ]
 ```
+### Battery / ADC
+The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
+```
+channel=0..7,scale=<scale>
+```
+NB: Set parameter to empty to disable battery reading
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  
