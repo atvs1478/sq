@@ -29,6 +29,8 @@ menu "Squeezelite-ESP32"
 		bool
 	config SPDIF_LOCKED
 		bool		
+	config LED_LOCKED
+		bool				
     menu "Audio Output"
 		choice OUTPUT_TYPE
 			prompt "Output Type"
@@ -41,6 +43,7 @@ menu "Squeezelite-ESP32"
 				select BAT_LOCKED
 				select I2C_LOCKED
 				select SPDIF_LOCKED
+				select LED_LOCKED
 			config A1S
 	            bool "ESP32-A1S module"				
 				select I2C_LOCKED
@@ -49,7 +52,7 @@ menu "Squeezelite-ESP32"
 	    endchoice
 	  	
 		menu "DAC I2S settings" 
-			visible if !SQUEEZEAMP && !A1S
+			visible if BASIC_I2C_BT
 			config I2S_NUM         
 		        int "I2S channel (0 or 1). "
 		        default 0
@@ -83,7 +86,7 @@ menu "Squeezelite-ESP32"
 		endmenu
 		
 		menu "SPDIF settings" 
-			visible if !SQUEEZEAMP && !A1S
+			visible if BASIC_I2C_BT
 		    config SDIF_NUM         
 		        int "I2S channel for SDPIF (0 or 1)"
 		        default 0 
@@ -202,9 +205,11 @@ menu "Squeezelite-ESP32"
 			default ""
 			help
 				Set parameters of shared GPIO with special values. 
-				<gpio_1>=Vcc|GND|amp|jack_h|jack_l[,<gpio_n>=Vcc|GND|amp|jack_h|jack_l]
-				'amp'  means a GPIO that is set when playback starts 
-				'jack_h' means the audio_gpio insertion detection (1=inserted, use 'jack_l' when 0=inserted) - see also "Jack Insertion GPIO"
+				<gpio_1>=Vcc|GND|amp|jack[:0|1][,<gpio_n>=Vcc|GND|amp|jack[:0|1]]
+				'amp'  => GPIO that is set when playback starts 
+				'jack' => GPIO used for audio jack detection
+				'green', 'red' => GPIO for status LED
+				'[:0|1] means set the active value for that GPIO can be low or high
 		config ROTARY_ENCODER
 			string "Rotary Encoder configuration"
 			default ""
@@ -220,12 +225,22 @@ menu "Squeezelite-ESP32"
 			default 12 if SQUEEZEAMP
 			help
 				Set to -1 for no LED
+		config LED_GREEN_GPIO_LEVEL
+			int "Green led ON level"
+			depends on LED_GREEN_GPIO != -1
+			default 0 if SQUEEZEAMP
+			default 1 if !SQUEEZEAMP
 		config LED_RED_GPIO				
 			int "Red led GPIO"
 			default -1 if !SQUEEZEAMP
 			default 13 if SQUEEZEAMP
 			help
 				Set to -1 for no LED
+		config LED_RED_GPIO_LEVEL
+			int "Red led ON level"
+			depends on LED_RED_GPIO != -1
+			default 0 if SQUEEZEAMP
+			default 1 if !SQUEEZEAMP
 	endmenu
     menu "Audio JACK"	
 		visible if !SQUEEZEAMP
@@ -242,12 +257,19 @@ menu "Squeezelite-ESP32"
 	endmenu	
 	menu "Battery measure"	
 		visible if !SQUEEZEAMP
-		config BAT_CONFIG	
-			string "Set channel and scale"
-			default "" if !SQUEEZEAMP
-			default "channel=7,scale=20.24" if SQUEEZEAMP
+		config BAT_CHANNEL	
+			int "Set channel (0..7)"
+			default -1 if !SQUEEZEAMP
+			default 7 if SQUEEZEAMP
 			help
-				Read a value every 10s on ADC1. Configuration format: channel=0..7,scale=<scale>
+				Read a value every 10s on ADC1 on set Channel
+		config BAT_SCALE	
+			string "Set scaling factor"
+			depends on BAT_CHANNEL != -1
+			default "" if !SQUEEZEAMP
+			default "20.24" if SQUEEZEAMP
+			help
+				Set the scaling factor for this 12 bits ADC
 	endmenu	
 	
 endmenu

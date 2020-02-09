@@ -88,24 +88,23 @@ bool spkfault_svc (void) {
  * 
  */
 void set_jack_gpio(int gpio, char *value) {
-	bool low = false;
+	char *p;
+	int active = 1;
 	
-	if (!strcasecmp(value, "jack_l")) {
+	if (strcasestr(value, "jack")) {
 		jack_gpio = gpio;	
-		low = true;
-	} else if (!strcasecmp(value, "jack_h")) {
-		jack_gpio = gpio;	
+		if ((p = strchr(value, ':')) != NULL) active = atoi(p + 1);
 	}	
 	
 	if (jack_gpio != -1) {
 		gpio_pad_select_gpio(jack_gpio);
 		gpio_set_direction(jack_gpio, GPIO_MODE_INPUT);
-		gpio_set_pull_mode(jack_gpio, low ? GPIO_PULLUP_ONLY : GPIO_PULLDOWN_ONLY);
+		gpio_set_pull_mode(jack_gpio, active ? GPIO_PULLDOWN_ONLY : GPIO_PULLUP_ONLY);
 		
-		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", low ? "low" : "high", gpio);					 
+		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", active ? "high" : "low", gpio);					 
 		
 		// re-use button management for jack handler, it's a GPIO after all
-		button_create(NULL, jack_gpio, low ? BUTTON_LOW : BUTTON_HIGH, false, 250, jack_handler_default, 0, -1);
+		button_create(NULL, jack_gpio, active ? BUTTON_HIGH : BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
 	}	
  }
 
@@ -115,14 +114,12 @@ void set_jack_gpio(int gpio, char *value) {
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
 
-#ifdef CONFIG_JACK_GPIO
-	jack_gpio = CONFIG_JACK_GPIO;
 #if CONFIG_JACK_GPIO_LEVEL == 1		
-	set_jack_gpio(CONFIG_JACK_GPIO, "jack_h");	
+	set_jack_gpio(CONFIG_JACK_GPIO, "jack:1");	
 #else
-	set_jack_gpio(CONFIG_JACK_GPIO, "jack_l");	
+	set_jack_gpio(CONFIG_JACK_GPIO, "jack:0");	
 #endif
-#endif
+
 #ifndef CONFIG_JACK_LOCKED
 	parse_set_GPIO(set_jack_gpio);
 #endif	

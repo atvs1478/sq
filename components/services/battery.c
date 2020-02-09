@@ -46,7 +46,6 @@ int battery_value_svc(void) {
 /****************************************************************************************
  * 
  */
-#ifdef CONFIG_BAT_CONFIG  
 static void battery_callback(TimerHandle_t xTimer) {
 	battery.sum += adc1_get_raw(battery.channel) * battery.scale / 4095.0;
 	if (++battery.count == 30) {
@@ -55,27 +54,25 @@ static void battery_callback(TimerHandle_t xTimer) {
 		ESP_LOGI(TAG, "Voltage %.2fV", battery.avg);
 	}	
 }
-#endif
 
 /****************************************************************************************
  * 
  */
 void battery_svc_init(void) {
-#ifdef CONFIG_BAT_CONFIG
-	char *p;	
-	if ((p = strcasestr(CONFIG_BAT_CONFIG, "channel")) != NULL) battery.channel = atof(strchr(p, '=') + 1);
-	if ((p = strcasestr(CONFIG_BAT_CONFIG, "scale")) != NULL) battery.scale = atof(strchr(p, '=') + 1);
+	battery.channel = CONFIG_BAT_CHANNEL;
+	battery.scale = atof(CONFIG_BAT_SCALE);
 
 #ifndef BAT_LOCKED
 	char *nvs_item = config_alloc_get_default(NVS_TYPE_STR, "bat_config", "n", 0);
 	if (nvs_item) {
+		char *p;
 		if ((p = strcasestr(nvs_item, "channel")) != NULL) battery.channel = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "scale")) != NULL) battery.scale = atof(strchr(p, '=') + 1);
 		free(nvs_item);
 	}	
 #endif	
 
-	if (battery.scale) {
+	if (battery.channel != -1) {
 		ESP_LOGI(TAG, "Battery measure channel: %u, scale %f", battery.channel, battery.scale);
 	
 		adc1_config_width(ADC_WIDTH_BIT_12);
@@ -86,5 +83,4 @@ void battery_svc_init(void) {
 	} else {
 		ESP_LOGI(TAG, "No battery");
 	}	
-#endif				
 }

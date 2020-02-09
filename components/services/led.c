@@ -17,6 +17,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "led.h"
+#include "accessors.h"
 
 #define MAX_LED	8
 #define BLOCKTIME	10	// up to portMAX_DELAY
@@ -33,10 +34,15 @@ static struct led_s {
 	TimerHandle_t timer;
 } leds[MAX_LED];
 
-void led_svc_init(void) {
-	ESP_LOGI(TAG, "Initializing led");
-}
+static struct {
+	int gpio;
+	int state;
+} green = { CONFIG_LED_GREEN_GPIO, CONFIG_LED_GREEN_GPIO_LEVEL},
+  red = { CONFIG_LED_RED_GPIO, CONFIG_LED_RED_GPIO_LEVEL };
 
+/****************************************************************************************
+ * 
+ */
 static void vCallbackFunction( TimerHandle_t xTimer ) {
 	struct led_s *led = (struct led_s*) pvTimerGetTimerID (xTimer);
 	
@@ -53,6 +59,9 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
 	xTimerChangePeriod(xTimer, (led->on ? led->ontime : led->offtime) / portTICK_RATE_MS, BLOCKTIME);
 }
 
+/****************************************************************************************
+ * 
+ */
 bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	if (!leds[idx].gpio || leds[idx].gpio<0 ) return false;
 	
@@ -99,6 +108,9 @@ bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	return true;
 } 
 
+/****************************************************************************************
+ * 
+ */
 bool led_unpush(int idx) {
 	if (!leds[idx].gpio || leds[idx].gpio<0) return false;
 	
@@ -108,6 +120,9 @@ bool led_unpush(int idx) {
 	return true;
 }	
 
+/****************************************************************************************
+ * 
+ */
 bool led_config(int idx, gpio_num_t gpio, int onstate) {
 	if(gpio<0){
 		ESP_LOGW(TAG,"LED GPIO not configured");
@@ -127,6 +142,9 @@ bool led_config(int idx, gpio_num_t gpio, int onstate) {
 	return true;
 }
 
+/****************************************************************************************
+ * 
+ */
 bool led_unconfig(int idx) {
 	if (idx >= MAX_LED) return false;	
 	
@@ -134,4 +152,29 @@ bool led_unconfig(int idx) {
 	leds[idx].timer = NULL;
 	
 	return true;
+}
+
+/****************************************************************************************
+ * 
+ */
+void set_led_gpio(int gpio, char *value) {
+	char *p;
+	
+	if (strcasestr(value, "green")) {
+		green.gpio = gpio;
+		if ((p = strchr(value, ':')) != NULL) green.state = atoi(p + 1);
+	} else 	if (strcasestr(value, "red")) {
+		red.state = gpio;
+		if ((p = strchr(value, ':')) != NULL) red.state = atoi(p + 1);
+	}	
+}
+
+void led_svc_init(void) {
+#ifndef LED_LOCKED
+	parse_set_GPIO(set_led_gpio);
+#endif
+	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d), red:%d (active:%d)", green.gpio, green.state, red.gpio, red.state);
+
+	led_config(LED_GREEN, green.gpio, green.state);
+	led_config(LED_RED, red.gpio, red.state);
 }

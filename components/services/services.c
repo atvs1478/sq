@@ -45,6 +45,7 @@ void set_power_gpio(int gpio, char *value) {
 	
 	if (parsed) ESP_LOGI(TAG, "set GPIO %u to %s", gpio, value);
  }	
+ 
 
 /****************************************************************************************
  * 
@@ -88,11 +89,7 @@ void services_init(void) {
 		ESP_LOGW(TAG, "no SPI configured");
 	}	
 
-	ESP_LOGD(TAG,"Configuring LEDs green:%d red:%d", CONFIG_LED_GREEN_GPIO, CONFIG_LED_RED_GPIO);
 	led_svc_init();
-	led_config(LED_GREEN, CONFIG_LED_GREEN_GPIO, 0);
-	led_config(LED_RED, CONFIG_LED_RED_GPIO, 0);
-
 	battery_svc_init();
 	monitor_svc_init();
 }
