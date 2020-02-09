@@ -16,6 +16,7 @@
 #include "esp_log.h"
 #include "driver/adc.h"
 #include "battery.h"
+#include "config.h"
 
 /* 
  There is a bug in esp32 which causes a spurious interrupt on gpio 36/39 when
@@ -29,7 +30,8 @@
 static const char *TAG = "battery";
 
 static struct {
-	float sum, avg;
+	int channel;
+	float sum, avg, scale;
 	int count;
 	TimerHandle_t timer;
 } battery;
@@ -37,23 +39,21 @@ static struct {
 /****************************************************************************************
  * 
  */
- int battery_value_svc(void) {
+int battery_value_svc(void) {
 	 return battery.avg;
  }
 
 /****************************************************************************************
  * 
  */
-#ifdef CONFIG_SQUEEZEAMP
+#ifdef CONFIG_BAT_CONFIG  
 static void battery_callback(TimerHandle_t xTimer) {
-
-	battery.sum += adc1_get_raw(ADC1_CHANNEL_7) / 4095. * (10+174)/10. * 1.1;
+	battery.sum += adc1_get_raw(battery.channel) * battery.scale / 4095.0;
 	if (++battery.count == 30) {
 		battery.avg = battery.sum / battery.count;
 		battery.sum = battery.count = 0;
 		ESP_LOGI(TAG, "Voltage %.2fV", battery.avg);
 	}	
-
 }
 #endif
 
@@ -61,13 +61,30 @@ static void battery_callback(TimerHandle_t xTimer) {
  * 
  */
 void battery_svc_init(void) {
-#ifdef CONFIG_SQUEEZEAMP			
-	ESP_LOGI(TAG, "Initializing battery");
+#ifdef CONFIG_BAT_CONFIG
+	char *p;	
+	if ((p = strcasestr(CONFIG_BAT_CONFIG, "channel")) != NULL) battery.channel = atof(strchr(p, '=') + 1);
+	if ((p = strcasestr(CONFIG_BAT_CONFIG, "scale")) != NULL) battery.scale = atof(strchr(p, '=') + 1);
 
-	adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_7, ADC_ATTEN_DB_0);
+#ifndef BAT_LOCKED
+	char *nvs_item = config_alloc_get_default(NVS_TYPE_STR, "bat_config", "n", 0);
+	if (nvs_item) {
+		if ((p = strcasestr(nvs_item, "channel")) != NULL) battery.channel = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "scale")) != NULL) battery.scale = atof(strchr(p, '=') + 1);
+		free(nvs_item);
+	}	
+#endif	
 
-	battery.timer = xTimerCreate("battery", BATTERY_TIMER / portTICK_RATE_MS, pdTRUE, NULL, battery_callback);
-	xTimerStart(battery.timer, portMAX_DELAY);
+	if (battery.scale) {
+		ESP_LOGI(TAG, "Battery measure channel: %u, scale %f", battery.channel, battery.scale);
+	
+		adc1_config_width(ADC_WIDTH_BIT_12);
+		adc1_config_channel_atten(battery.channel, ADC_ATTEN_DB_0);
+    
+		battery.timer = xTimerCreate("battery", BATTERY_TIMER / portTICK_RATE_MS, pdTRUE, NULL, battery_callback);
+		xTimerStart(battery.timer, portMAX_DELAY);
+	} else {
+		ESP_LOGI(TAG, "No battery");
+	}	
 #endif				
 }

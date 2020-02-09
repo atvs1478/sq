@@ -21,16 +21,18 @@
 #pragma once
 
 #define I2C_SYSTEM_PORT	1
+#define SPI_SYSTEM_HOST	SPI2_HOST
+
 extern int i2c_system_port;
+extern int spi_system_host;
+extern int spi_system_dc_gpio;
 extern bool gpio36_39_used;
 
 #ifdef CONFIG_SQUEEZEAMP
-#define JACK_GPIO		34
-#define SPKFAULT_GPIO	2			// this requires a pull-up, so can't be >34
-#define LED_GREEN_GPIO 	12
-#define LED_RED_GPIO	13
-#else 
-#define LED_GREEN_GPIO	CONFIG_LED_GREEN_GPIO
-#define LED_RED_GPIO	CONFIG_LED_RED_GPIO
-#define JACK_GPIO		CONFIG_JACK_GPIO
+#define SPKFAULT_GPIO			2			// this requires a pull-up, so can't be >34
+#define ADAC dac_tas57xx
+#elif defined(CONFIG_A1S)
+#define ADAC dac_a1s
+#else
+#define ADAC dac_external
 #endif

@@ -25,10 +25,10 @@
 #include "display.h"
 #include "globdefs.h"
 
-#include "ssd1306.h"
-#include "ssd1306_draw.h"
-#include "ssd1306_font.h"
-#include "ssd1306_default_if.h"
+#include "ssd13x6.h"
+#include "ssd13x6_draw.h"
+#include "ssd13x6_font.h"
+#include "ssd13x6_default_if.h"
 
 #define I2C_ADDRESS	0x3C
 
@@ -50,13 +50,13 @@ static void on(bool state);
 static void update(void);
 
 // display structure for others to use
-struct display_s SSD1306_display = { 0, 0, 
+struct display_s SSD13x6_display = { 0, 0, 
 									init, clear, set_font, on, brightness, 
 									text, line, stretch, update, draw, draw_cbr, NULL };
 
-// SSD1306 specific function
-static struct SSD1306_Device Display;
-static SSD1306_AddressMode AddressMode = AddressMode_Invalid;
+// SSD13x6 specific function
+static struct SSD13x6_Device Display;
+static SSD13x6_AddressMode AddressMode = AddressMode_Invalid;
 
 static const unsigned char BitReverseTable256[] = 
 {
@@ -82,7 +82,7 @@ static const unsigned char BitReverseTable256[] =
 
 static struct {
 	int y, space;
-	const struct SSD1306_FontDef *font;
+	const struct SSD13x6_FontDef *font;
 } lines[MAX_LINES];
 
 /****************************************************************************************
@@ -90,32 +90,51 @@ static struct {
  */
 static bool init(char *config, char *welcome) {
 	bool res = false;
+	int width = -1, height = -1, model = SSD1306;
+	char *p;
+	
+	ESP_LOGI(TAG, "Initializing display with config: %s",config);
+	
+	// no time for smart parsing - this is for tinkerers
+	if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "ssd1326")) != NULL) model = SSD1326;
+	
+	if (width == -1 || height == -1) {
+		ESP_LOGW(TAG, "No display configured %s [%d x %d]", config, width, height);
+		return false;
+	}	
 
 	if (strstr(config, "I2C")) {
-		int width = -1, height = -1, address = I2C_ADDRESS;
-		char *p;
-		ESP_LOGI(TAG, "Initializing I2C display with config: %s",config);
-		// no time for smart parsing - this is for tinkerers
-		if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
+		int address = I2C_ADDRESS;
+				
 		if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
-
-		if (width != -1 && height != -1) {
-			SSD1306_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
-			SSD1306_I2CMasterAttachDisplayDefault( &Display, width, height, address, -1 );
-			SSD1306_SetHFlip( &Display, strcasestr(config, "HFlip") ? true : false);
-			SSD1306_SetVFlip( &Display, strcasestr(config, "VFlip") ? true : false);
-			SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
-			SSD1306_display.width = width;
-			SSD1306_display.height = height;
-			text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
-			ESP_LOGI(TAG, "Initialized I2C display %dx%d", width, height);
-			res = true;
-		} else {
-			ESP_LOGI(TAG, "Cannot initialized I2C display %s [%dx%d]", config, width, height);
-		}
+		
+		SSD13x6_I2CMasterInitDefault( i2c_system_port, -1, -1 ) ;
+		SSD13x6_I2CMasterAttachDisplayDefault( &Display, model, width, height, address, -1 );
+		SSD13x6_SetHFlip( &Display, strcasestr(config, "HFlip") ? true : false);
+		SSD13x6_SetVFlip( &Display, strcasestr(config, "VFlip") ? true : false);
+		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
+		SSD13x6_display.width = width;
+		SSD13x6_display.height = height;
+		text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
+		ESP_LOGI(TAG, "Display is I2C on port %u", address);
+		res = true;
+	} else if (strstr(config, "SPI")) {
+		int CS_pin = -1;
+		
+		if ((p = strcasestr(config, "CS")) != NULL) CS_pin = atoi(strchr(p, '=') + 1);
+		
+		SSD13x6_SPIMasterInitDefault( spi_system_host, spi_system_dc_gpio );
+        SSD13x6_SPIMasterAttachDisplayDefault( &Display, model, width, height, CS_pin, -1 );
+		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
+		SSD13x6_display.width = width;
+		SSD13x6_display.height = height;
+		text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
+		ESP_LOGI(TAG, "Display is SPI host %u with CS:%d", spi_system_host, CS_pin);
+		
 	} else {
-		ESP_LOGE(TAG, "Non-I2C display not supported. Display config %s", config);
+		ESP_LOGE(TAG, "Unknown display type");
 	}
 
 	return res;
@@ -125,8 +144,8 @@ static bool init(char *config, char *welcome) {
  * 
  */
 static void clear(void) {
-	SSD1306_Clear( &Display, SSD_COLOR_BLACK );
-	SSD1306_Update( &Display );
+	SSD13x6_Clear( &Display, SSD_COLOR_BLACK );
+	SSD13x6_Update( &Display );
 }	
 
 /****************************************************************************************
@@ -186,13 +205,13 @@ static bool line(int num, int x, int attribute, char *text) {
 	// always horizontal mode for text display
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
-		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
 	}	
 	
-	SSD1306_SetFont( &Display, lines[num].font );	
-	if (attribute & DISPLAY_MONOSPACE) SSD1306_FontForceMonospace( &Display, true );
+	SSD13x6_SetFont( &Display, lines[num].font );	
+	if (attribute & DISPLAY_MONOSPACE) SSD13x6_FontForceMonospace( &Display, true );
 	
-	width = SSD1306_FontMeasureString( &Display, text );
+	width = SSD13x6_FontMeasureString( &Display, text );
 	
 	// adjusting position, erase only EoL for rigth-justified
 	if (x == DISPLAY_RIGHT) x = Display.Width - width - 1;
@@ -202,15 +221,15 @@ static bool line(int num, int x, int attribute, char *text) {
 	if (attribute & DISPLAY_CLEAR) {
 		for (int c = (attribute & DISPLAY_ONLY_EOL) ? x : 0; c < Display.Width; c++) 
 			for (int y = lines[num].y; y < lines[num].y + lines[num].font->Height; y++)
-				SSD1306_DrawPixelFast( &Display, c, y, SSD_COLOR_BLACK );
+				SSD13x6_DrawPixelFast( &Display, c, y, SSD_COLOR_BLACK );
 	}	
 		
-	SSD1306_FontDrawString( &Display, x, lines[num].y, text, SSD_COLOR_WHITE );
+	SSD13x6_FontDrawString( &Display, x, lines[num].y, text, SSD_COLOR_WHITE );
 	
 	ESP_LOGD(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
 	
 	// update whole display if requested
-	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
+	if (attribute & DISPLAY_UPDATE) SSD13x6_Update( &Display );
 	
 	return width + x < Display.Width;
 }
@@ -225,8 +244,8 @@ static int stretch(int num, char *string, int max) {
 	num--;
 	
 	// we might already fit
-	SSD1306_SetFont( &Display, lines[num].font );	
-	if (SSD1306_FontMeasureString( &Display, string ) <= Display.Width) return 0;
+	SSD13x6_SetFont( &Display, lines[num].font );	
+	if (SSD13x6_FontMeasureString( &Display, string ) <= Display.Width) return 0;
 		
 	// add some space for better visual 
 	strncat(string, space, max-len);
@@ -234,10 +253,10 @@ static int stretch(int num, char *string, int max) {
 	len = strlen(string);
 	
 	// mark the end of the extended string
-	boundary = SSD1306_FontMeasureString( &Display, string );
+	boundary = SSD13x6_FontMeasureString( &Display, string );
 			
 	// add a full display width	
-	while (len < max && SSD1306_FontMeasureString( &Display, string ) - boundary < Display.Width) {
+	while (len < max && SSD13x6_FontMeasureString( &Display, string ) - boundary < Display.Width) {
 		string[len++] = string[extra++];
 		string[len] = '\0';
 	}
@@ -254,31 +273,31 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	va_start(args, text);
 	TextAnchor Anchor = TextAnchor_Center;	
 	
-	if (attribute & DISPLAY_CLEAR) SSD1306_Clear( &Display, SSD_COLOR_BLACK );
+	if (attribute & DISPLAY_CLEAR) SSD13x6_Clear( &Display, SSD_COLOR_BLACK );
 	
 	if (!text) return;
 	
 	switch(font) {
 	case DISPLAY_FONT_LINE_1:	
-		SSD1306_SetFont( &Display, &Font_line_1 );
+		SSD13x6_SetFont( &Display, &Font_line_1 );
 		break;
 	case DISPLAY_FONT_LINE_2:	
-		SSD1306_SetFont( &Display, &Font_line_2 );
+		SSD13x6_SetFont( &Display, &Font_line_2 );
 		break;		
 	case DISPLAY_FONT_SMALL:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_11x13 );	
+		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_11x13 );	
 		break;	
 	case DISPLAY_FONT_MEDIUM:			
 	case DISPLAY_FONT_DEFAULT:
 	default:
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_15x17 );	
+		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );	
 		break;		
 	case DISPLAY_FONT_LARGE:	
-		SSD1306_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
+		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_24x28 );
 		break;		
 	case DISPLAY_FONT_SEGMENT:			
-		if (Display.Height == 32) SSD1306_SetFont( &Display, &Font_Tarable7Seg_16x32 );
-		else SSD1306_SetFont( &Display, &Font_Tarable7Seg_32x64 );
+		if (Display.Height == 32) SSD13x6_SetFont( &Display, &Font_Tarable7Seg_16x32 );
+		else SSD13x6_SetFont( &Display, &Font_Tarable7Seg_32x64 );
 		break;		
 	}
 
@@ -298,15 +317,15 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 		break;
 	}	
 	
-	ESP_LOGD(TAG, "SSDD1306 displaying %s at %u with attribute %u", text, Anchor, attribute);
+	ESP_LOGD(TAG, "SSDD13x6 displaying %s at %u with attribute %u", text, Anchor, attribute);
 	
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
-		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
 	}	
 	
-	SSD1306_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
-	if (attribute & DISPLAY_UPDATE) SSD1306_Update( &Display );
+	SSD13x6_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
+	if (attribute & DISPLAY_UPDATE) SSD13x6_Update( &Display );
 	
 	va_end(args);
 }
@@ -319,7 +338,7 @@ static void draw_cbr(u8_t *data, int height) {
 	// force addressing mode by rows
 	if (AddressMode != AddressMode_Horizontal) {
 		AddressMode = AddressMode_Horizontal;
-		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
 	}
 	
 	// try to minimize I2C traffic which is very slow
@@ -341,9 +360,9 @@ static void draw_cbr(u8_t *data, int height) {
 		
 		// now update the display by "byte rows"
 		if (first--) {
-			SSD1306_SetColumnAddress( &Display, first, last );
-			SSD1306_SetPageAddress( &Display, r, r);
-			SSD1306_WriteRawData( &Display, Display.Framebuffer + r*Display.Width + first, last - first + 1);
+			SSD13x6_SetColumnAddress( &Display, first, last );
+			SSD13x6_SetPageAddress( &Display, r, r);
+			SSD13x6_WriteRawData( &Display, Display.Framebuffer + r*Display.Width + first, last - first + 1);
 		}
 	}	
 #else
@@ -354,15 +373,15 @@ static void draw_cbr(u8_t *data, int height) {
 		for (int r = 0; r < height / 8; r++)
 			Display.Framebuffer[c*Display.Height/8 + r] = BitReverseTable256[data[c*height/8 +r]];
 		
-	SSD1306_SetPageAddress( &Display, 0, height / 8 - 1);
+	SSD13x6_SetPageAddress( &Display, 0, height / 8 - 1);
 	
 	// force addressing mode by columns
 	if (AddressMode != AddressMode_Vertical) {
 		AddressMode = AddressMode_Vertical;
-		SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
 	}
 	
-	SSD1306_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Height/8);
+	SSD13x6_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Height/8);
  #endif	
 }
 
@@ -386,7 +405,7 @@ static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
 		
 		if (AddressMode != AddressMode_Vertical) {
 			AddressMode = AddressMode_Vertical;
-			SSD1306_SetDisplayAddressMode( &Display, AddressMode );
+			SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
 		}	
 		
 		// copy the window and do row/col exchange
@@ -405,32 +424,32 @@ static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
 		}	
 	}
 		
-	SSD1306_SetColumnAddress( &Display, x1, x2);
-	SSD1306_SetPageAddress( &Display, y1/8, y2/8);
-	SSD1306_WriteRawData( &Display, data, (x2-x1 + 1) * ((y2-y1)/8 + 1));
+	SSD13x6_SetColumnAddress( &Display, x1, x2);
+	SSD13x6_SetPageAddress( &Display, y1/8, y2/8);
+	SSD13x6_WriteRawData( &Display, data, (x2-x1 + 1) * ((y2-y1)/8 + 1));
 }
 
 /****************************************************************************************
  * Brightness
  */
 static void brightness(u8_t level) {
-	SSD1306_DisplayOn( &Display ); 
-	SSD1306_SetContrast( &Display, (uint8_t) level);
+	SSD13x6_DisplayOn( &Display ); 
+	SSD13x6_SetContrast( &Display, (uint8_t) level);
 }
 
 /****************************************************************************************
  * Display On/Off
  */
 static void on(bool state) {
-	if (state) SSD1306_DisplayOn( &Display ); 
-	else SSD1306_DisplayOff( &Display ); 
+	if (state) SSD13x6_DisplayOn( &Display ); 
+	else SSD13x6_DisplayOff( &Display ); 
 }
 
 /****************************************************************************************
  * Update 
  */
 static void update(void) {
-	SSD1306_Update( &Display );
+	SSD13x6_Update( &Display );
 }
 
 

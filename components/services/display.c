@@ -27,7 +27,7 @@
 #include "display.h"
 
 // here we should include all possible drivers
-extern struct display_s SSD1306_display;
+extern struct display_s SSD13x6_display;
 
 struct display_s *display = NULL;
 
@@ -66,8 +66,8 @@ void display_init(char *welcome) {
 
 	if (item && *item) {
 		char * drivername=strstr(item,"driver");
-		if (!drivername  || (drivername && strcasestr(drivername,"SSD1306"))) {
-			display = &SSD1306_display;
+		if (!drivername  || (drivername && (strcasestr(drivername,"SSD1306") || strcasestr(drivername,"SSD1326")))) {
+			display = &SSD13x6_display;
 			if (display->init(item, welcome)) {
 				init = true;
 				ESP_LOGI(TAG, "Display initialization successful");
@@ -79,7 +79,7 @@ void display_init(char *welcome) {
 			ESP_LOGE(TAG,"Unknown display driver name in display config: %s",item);
 		}
 	} else {
-		ESP_LOGW(TAG, "no display");
+		ESP_LOGI(TAG, "no display");
 	}
 	
 	if (init) {

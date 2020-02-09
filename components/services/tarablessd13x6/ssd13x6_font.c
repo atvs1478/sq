@@ -9,11 +9,11 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include "ssd1306.h"
-#include "ssd1306_draw.h"
-#include "ssd1306_font.h"
+#include "ssd13x6.h"
+#include "ssd13x6_draw.h"
+#include "ssd13x6_font.h"
 
-static int RoundUpFontHeight( const struct SSD1306_FontDef* Font ) {
+static int RoundUpFontHeight( const struct SSD13x6_FontDef* Font ) {
     int Height = Font->Height;
 
     if ( ( Height % 8 ) != 0 ) {
@@ -23,11 +23,11 @@ static int RoundUpFontHeight( const struct SSD1306_FontDef* Font ) {
     return Height;
 }
 
-static const uint8_t* GetCharPtr( const struct SSD1306_FontDef* Font, char Character ) {
+static const uint8_t* GetCharPtr( const struct SSD13x6_FontDef* Font, char Character ) {
     return &Font->FontData[ ( Character - Font->StartChar ) * ( ( Font->Width * ( RoundUpFontHeight( Font ) / 8 ) ) + 1 ) ];
 }
 
-void SSD1306_FontDrawChar( struct SSD1306_Device* DisplayHandle, char Character, int x, int y, int Color ) {
+void SSD13x6_FontDrawChar( struct SSD13x6_Device* DisplayHandle, char Character, int x, int y, int Color ) {
     const uint8_t* GlyphData = NULL;
     int GlyphColumnLen = 0;
     int CharStartX =  0;
@@ -52,8 +52,8 @@ void SSD1306_FontDrawChar( struct SSD1306_Device* DisplayHandle, char Character,
         GlyphData++;
         GlyphColumnLen = RoundUpFontHeight( DisplayHandle->Font ) / 8;
         
-        CharWidth = SSD1306_FontGetCharWidth( DisplayHandle, Character );
-        CharHeight = SSD1306_FontGetHeight( DisplayHandle );
+        CharWidth = SSD13x6_FontGetCharWidth( DisplayHandle, Character );
+        CharHeight = SSD13x6_FontGetHeight( DisplayHandle );
 
         CharStartX = x;
         CharStartY = y;
@@ -89,7 +89,7 @@ void SSD1306_FontDrawChar( struct SSD1306_Device* DisplayHandle, char Character,
                 YBit = ( i + OffsetY ) & 0x07;
 
                 if ( GlyphData[ YByte ] & BIT( YBit ) ) {
-                    SSD1306_DrawPixel( DisplayHandle, x, y, Color );
+                    SSD13x6_DrawPixel( DisplayHandle, x, y, Color );
                 }            
             }
 
@@ -98,7 +98,7 @@ void SSD1306_FontDrawChar( struct SSD1306_Device* DisplayHandle, char Character,
     }
 }
 
-bool SSD1306_SetFont( struct SSD1306_Device* Display, const struct SSD1306_FontDef* Font ) {
+bool SSD13x6_SetFont( struct SSD13x6_Device* Display, const struct SSD13x6_FontDef* Font ) {
     NullCheck( Display, return false );
     NullCheck( Font, return false );
 
@@ -109,35 +109,35 @@ bool SSD1306_SetFont( struct SSD1306_Device* Display, const struct SSD1306_FontD
     return true;
 }
 
-void SSD1306_FontForceProportional( struct SSD1306_Device* Display, bool Force ) {
+void SSD13x6_FontForceProportional( struct SSD13x6_Device* Display, bool Force ) {
     NullCheck( Display, return );
     NullCheck( Display->Font, return );
 
     Display->FontForceProportional = Force;
 }
 
-void SSD1306_FontForceMonospace( struct SSD1306_Device* Display, bool Force ) {
+void SSD13x6_FontForceMonospace( struct SSD13x6_Device* Display, bool Force ) {
     NullCheck( Display, return );
     NullCheck( Display->Font, return );
 
     Display->FontForceMonospace = Force;
 }
 
-int SSD1306_FontGetWidth( struct SSD1306_Device* Display ) {
+int SSD13x6_FontGetWidth( struct SSD13x6_Device* Display ) {
     NullCheck( Display, return 0 );
     NullCheck( Display->Font, return 0 );
 
     return Display->Font->Width;
 }
 
-int SSD1306_FontGetHeight( struct SSD1306_Device* Display ) {
+int SSD13x6_FontGetHeight( struct SSD13x6_Device* Display ) {
     NullCheck( Display, return 0 );
     NullCheck( Display->Font, return 0 );
 
     return Display->Font->Height;
 }
 
-int SSD1306_FontGetCharWidth( struct SSD1306_Device* Display, char Character ) {
+int SSD13x6_FontGetCharWidth( struct SSD13x6_Device* Display, char Character ) {
     const uint8_t* CharPtr = NULL;
     int Width = 0;
 
@@ -161,28 +161,28 @@ int SSD1306_FontGetCharWidth( struct SSD1306_Device* Display, char Character ) {
     return Width;
 }
 
-int SSD1306_FontGetMaxCharsPerRow( struct SSD1306_Device* Display ) {
+int SSD13x6_FontGetMaxCharsPerRow( struct SSD13x6_Device* Display ) {
     NullCheck( Display, return 0 );
     NullCheck( Display->Font, return 0 );
 
     return Display->Width / Display->Font->Width;
 }
 
-int SSD1306_FontGetMaxCharsPerColumn( struct SSD1306_Device* Display ) {
+int SSD13x6_FontGetMaxCharsPerColumn( struct SSD13x6_Device* Display ) {
     NullCheck( Display, return 0 );
     NullCheck( Display->Font, return 0 );
 
     return Display->Height / Display->Font->Height;    
 }
 
-int SSD1306_FontGetCharHeight( struct SSD1306_Device* Display ) {
+int SSD13x6_FontGetCharHeight( struct SSD13x6_Device* Display ) {
     NullCheck( Display, return 0 );
     NullCheck( Display->Font, return 0 );
 
     return Display->Font->Height;
 }
 
-int SSD1306_FontMeasureString( struct SSD1306_Device* Display, const char* Text ) {
+int SSD13x6_FontMeasureString( struct SSD13x6_Device* Display, const char* Text ) {
     int Width = 0;
     int Len = 0;
 
@@ -192,14 +192,14 @@ int SSD1306_FontMeasureString( struct SSD1306_Device* Display, const char* Text 
 
     for ( Len = strlen( Text ); Len >= 0; Len--, Text++ ) {
         if ( *Text >= Display->Font->StartChar && *Text <= Display->Font->EndChar ) {
-            Width+= SSD1306_FontGetCharWidth( Display, *Text );
+            Width+= SSD13x6_FontGetCharWidth( Display, *Text );
         }
     }
 
     return Width;
 }
 
-void SSD1306_FontDrawString( struct SSD1306_Device* Display, int x, int y, const char* Text, int Color ) {
+void SSD13x6_FontDrawString( struct SSD13x6_Device* Display, int x, int y, const char* Text, int Color ) {
     int Len = 0;
     int i = 0;
 
@@ -208,25 +208,25 @@ void SSD1306_FontDrawString( struct SSD1306_Device* Display, int x, int y, const
     NullCheck( Text, return );
 
     for ( Len = strlen( Text ), i = 0; i < Len; i++ ) {
-        SSD1306_FontDrawChar( Display, *Text, x, y, Color );
+        SSD13x6_FontDrawChar( Display, *Text, x, y, Color );
 
-        x+= SSD1306_FontGetCharWidth( Display, *Text );
+        x+= SSD13x6_FontGetCharWidth( Display, *Text );
         Text++;
     }
 }
 
-void SSD1306_FontDrawAnchoredString( struct SSD1306_Device* Display, TextAnchor Anchor, const char* Text, int Color ) {
+void SSD13x6_FontDrawAnchoredString( struct SSD13x6_Device* Display, TextAnchor Anchor, const char* Text, int Color ) {
     int x = 0;
     int y = 0;
 
     NullCheck( Display, return );
     NullCheck( Text, return );
 
-    SSD1306_FontGetAnchoredStringCoords( Display, &x, &y, Anchor, Text );
-    SSD1306_FontDrawString( Display, x, y, Text, Color );
+    SSD13x6_FontGetAnchoredStringCoords( Display, &x, &y, Anchor, Text );
+    SSD13x6_FontDrawString( Display, x, y, Text, Color );
 }
 
-void SSD1306_FontGetAnchoredStringCoords( struct SSD1306_Device* Display, int* OutX, int* OutY, TextAnchor Anchor, const char* Text ) {
+void SSD13x6_FontGetAnchoredStringCoords( struct SSD13x6_Device* Display, int* OutX, int* OutY, TextAnchor Anchor, const char* Text ) {
     int StringWidth = 0;
     int StringHeight = 0;
 
@@ -235,8 +235,8 @@ void SSD1306_FontGetAnchoredStringCoords( struct SSD1306_Device* Display, int* O
     NullCheck( OutY, return );
     NullCheck( Text, return );
 
-    StringWidth = SSD1306_FontMeasureString( Display, Text );
-    StringHeight = SSD1306_FontGetCharHeight( Display );
+    StringWidth = SSD13x6_FontMeasureString( Display, Text );
+    StringHeight = SSD13x6_FontGetCharHeight( Display );
 
     switch ( Anchor ) {
         case TextAnchor_East: {

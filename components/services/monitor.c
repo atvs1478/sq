@@ -26,11 +26,7 @@
 static const char *TAG = "monitor";
 
 static TimerHandle_t monitor_timer;
-#ifdef JACK_GPIO
-static int jack_gpio = JACK_GPIO;
-#else
 static int jack_gpio = -1;
-#endif
 
 void (*jack_handler_svc)(bool inserted);
 bool jack_inserted_svc(void);
@@ -68,12 +64,14 @@ bool jack_inserted_svc (void) {
 /****************************************************************************************
  * 
  */
+#ifdef SPKFAULT_GPIO 
 static void spkfault_handler_default(void *id, button_event_e event, button_press_e mode, bool long_press) {
 	ESP_LOGD(TAG, "Speaker status %s", event == BUTTON_PRESSED ? "faulty" : "normal");
 	if (event == BUTTON_PRESSED) led_on(LED_RED);
 	else led_off(LED_RED);
 	if (spkfault_handler_svc) (*spkfault_handler_svc)(event == BUTTON_PRESSED);
 }
+#endif
 
 /****************************************************************************************
  * 
@@ -117,16 +115,17 @@ void set_jack_gpio(int gpio, char *value) {
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
 
-	// if JACK_GPIO is compiled-time defined set it there
-	if (jack_gpio != -1) {
-#if JACK_GPIO_LEVEL == 1		
-		set_jack_gpio(JACK_GPIO, "jack_h");	
+#ifdef CONFIG_JACK_GPIO
+	jack_gpio = CONFIG_JACK_GPIO;
+#if CONFIG_JACK_GPIO_LEVEL == 1		
+	set_jack_gpio(CONFIG_JACK_GPIO, "jack_h");	
 #else
-		set_jack_gpio(JACK_GPIO, "jack_l");	
+	set_jack_gpio(CONFIG_JACK_GPIO, "jack_l");	
 #endif
-	} else {
-		parse_set_GPIO(set_jack_gpio);
-	}	
+#endif
+#ifndef CONFIG_JACK_LOCKED
+	parse_set_GPIO(set_jack_gpio);
+#endif	
 
 #ifdef SPKFAULT_GPIO
 	gpio_pad_select_gpio(SPKFAULT_GPIO);

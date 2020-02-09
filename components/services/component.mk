@@ -7,6 +7,6 @@
 # please read the SDK documents if you need to do this.
 #
 
-COMPONENT_SRCDIRS := . tarablessd1306 tarablessd1306/fonts tarablessd1306/ifaces
+COMPONENT_SRCDIRS := . tarablessd13x6 tarablessd13x6/fonts tarablessd13x6/ifaces
 COMPONENT_ADD_INCLUDEDIRS := .
-COMPONENT_ADD_INCLUDEDIRS += ./tarablessd1306 
+COMPONENT_ADD_INCLUDEDIRS += ./tarablessd13x6 

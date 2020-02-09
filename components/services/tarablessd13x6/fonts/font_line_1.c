@@ -1,4 +1,4 @@
-#include <ssd1306_font.h>
+#include <ssd13x6_font.h>
 
 //WARNING: This Font Require X-GLCD Lib.
 //         You can not use it with MikroE GLCD Lib.
@@ -214,7 +214,7 @@ static const uint8_t Square721_BT11x14[] = {
         0x06, 0x00, 0x00, 0xE8, 0x03, 0xB0, 0x04, 0xA0, 0x04, 0xA0, 0x04, 0xE0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   // Code for char è
         };
 
-const struct SSD1306_FontDef Font_line_1 = {
+const struct SSD13x6_FontDef Font_line_1 = {
     Square721_BT11x14,
     11,
     14,

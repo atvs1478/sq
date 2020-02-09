@@ -22,6 +22,8 @@ extern void monitor_svc_init(void);
 extern void led_svc_init(void);
 
 int i2c_system_port = I2C_SYSTEM_PORT;
+int spi_system_host = SPI_SYSTEM_HOST;
+int spi_system_dc_gpio = -1;
 
 static const char *TAG = "services";
 
@@ -48,22 +50,20 @@ void set_power_gpio(int gpio, char *value) {
  * 
  */
 void services_init(void) {
-	char *nvs_item;
-	
 	gpio_install_isr_service(0);
 	
-#ifdef CONFIG_SQUEEZEAMP
+#ifdef CONFIG_I2C_LOCKED
 	if (i2c_system_port == 0) {
 		i2c_system_port = 1;
-		ESP_LOGE(TAG, "can't use i2c port 0 on SqueezeAMP");
+		ESP_LOGE(TAG, "Port 0 is reserved for internal DAC use");
 	}
 #endif
 
 	// set potential power GPIO
 	parse_set_GPIO(set_power_gpio);
 
+	// shared I2C bus 
 	const i2c_config_t * i2c_config = config_i2c_get(&i2c_system_port);
-
 	ESP_LOGI(TAG,"Configuring I2C sda:%d scl:%d port:%u speed:%u", i2c_config->sda_io_num, i2c_config->scl_io_num, i2c_system_port, i2c_config->master.clk_speed);
 
 	if (i2c_config->sda_io_num != -1 && i2c_config->scl_io_num != -1) {
@@ -72,11 +72,26 @@ void services_init(void) {
 	} else {
 		ESP_LOGW(TAG, "no I2C configured");
 	}	
+		
+	const spi_bus_config_t * spi_config = config_spi_get((spi_host_device_t*) &spi_system_host);
+	ESP_LOGI(TAG,"Configuring SPI data:%d clk:%d host:%u d/c:%d", spi_config->mosi_io_num, spi_config->sclk_io_num, spi_system_host, spi_system_dc_gpio);
+	
+	if (spi_config->mosi_io_num != -1 && spi_config->sclk_io_num != -1) {
+		spi_bus_initialize( spi_system_host, spi_config, 1 );
+		if (spi_system_dc_gpio != 1) {
+			gpio_set_direction( spi_system_dc_gpio, GPIO_MODE_OUTPUT );
+			gpio_set_level( spi_system_dc_gpio, 0 );
+		} else {
+			ESP_LOGW(TAG, "No D/C GPIO set, SPI display will not work");
+		}	
+	} else {
+		ESP_LOGW(TAG, "no SPI configured");
+	}	
 
-	ESP_LOGD(TAG,"Configuring LEDs");
+	ESP_LOGD(TAG,"Configuring LEDs green:%d red:%d", CONFIG_LED_GREEN_GPIO, CONFIG_LED_RED_GPIO);
 	led_svc_init();
-	led_config(LED_GREEN, LED_GREEN_GPIO, 0);
-	led_config(LED_RED, LED_RED_GPIO, 0);
+	led_config(LED_GREEN, CONFIG_LED_GREEN_GPIO, 0);
+	led_config(LED_RED, CONFIG_LED_RED_GPIO, 0);
 
 	battery_svc_init();
 	monitor_svc_init();

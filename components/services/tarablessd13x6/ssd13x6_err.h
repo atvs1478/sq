@@ -1,15 +1,15 @@
-#ifndef _SSD1306_ERR_H_
-#define _SSD1306_ERR_H_
+#ifndef _SSD13x6_ERR_H_
+#define _SSD13x6_ERR_H_
 
 #include <esp_log.h>
 
-#define SSD1306_DoAbort( )
+#define SSD13x6_DoAbort( )
 
 #if ! defined NullCheck
     #define NullCheck( ptr, retexpr ) { \
         if ( ptr == NULL ) { \
             ESP_LOGE( __FUNCTION__, "%s == NULL", #ptr ); \
-            SSD1306_DoAbort( ); \
+            SSD13x6_DoAbort( ); \
             retexpr; \
         } \
     }
@@ -20,7 +20,7 @@
         esp_err_t __err_rc = ( expr ); \
         if ( __err_rc != ESP_OK ) { \
             ESP_LOGE( __FUNCTION__, "%s != ESP_OK, result: %d", #expr, __err_rc ); \
-            SSD1306_DoAbort( ); \
+            SSD13x6_DoAbort( ); \
             retexpr; \
         } \
     }
@@ -30,7 +30,7 @@
     #define CheckBounds( expr, retexpr ) { \
         if ( expr ) { \
             ESP_LOGE( __FUNCTION__, "Line %d: %s", __LINE__, #expr ); \
-            SSD1306_DoAbort( ); \
+            SSD13x6_DoAbort( ); \
             retexpr; \
         } \
     }

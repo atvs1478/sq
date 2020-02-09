@@ -119,8 +119,8 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{
     i2c_cmd_link_delete(i2c_cmd);
 
 	// configure I2S pins & install driver	
-	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = 33, .ws_io_num = 25, 
-														.data_out_num = 32, .data_in_num = -1 //Not used 
+	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
+														.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO,
 								};
 	i2s_driver_install(i2s_num, i2s_config, 0, NULL);
 	i2s_set_pin(i2s_num, &i2s_pin_config);

@@ -13,10 +13,10 @@
 #include <math.h>
 #include <esp_attr.h>
 
-#include "ssd1306.h"
-#include "ssd1306_draw.h"
+#include "ssd13x6.h"
+#include "ssd13x6_draw.h"
 
-__attribute__( ( always_inline ) ) static inline bool IsPixelVisible( struct SSD1306_Device* DeviceHandle, int x, int y )  {
+__attribute__( ( always_inline ) ) static inline bool IsPixelVisible( struct SSD13x6_Device* DeviceHandle, int x, int y )  {
     bool Result = (
         ( x >= 0 ) &&
         ( x < DeviceHandle->Width ) &&
@@ -24,7 +24,7 @@ __attribute__( ( always_inline ) ) static inline bool IsPixelVisible( struct SSD
         ( y < DeviceHandle->Height )
     ) ? true : false;
 
-#if CONFIG_SSD1306_CLIPDEBUG > 0
+#if CONFIG_SSD13x6_CLIPDEBUG > 0
     if ( Result == false ) {
         ClipDebug( x, y );
     }
@@ -40,7 +40,7 @@ __attribute__( ( always_inline ) ) static inline void SwapInt( int* a, int* b ) 
     *a = Temp;
 }
 
-inline void IRAM_ATTR SSD1306_DrawPixelFast( struct SSD1306_Device* DeviceHandle, int X, int Y, int Color ) {
+inline void IRAM_ATTR SSD13x6_DrawPixelFast( struct SSD13x6_Device* DeviceHandle, int X, int Y, int Color ) {
     uint32_t YBit = ( Y & 0x07 );
     uint8_t* FBOffset = NULL;
 
@@ -61,15 +61,15 @@ inline void IRAM_ATTR SSD1306_DrawPixelFast( struct SSD1306_Device* DeviceHandle
     }
 }
 
-void IRAM_ATTR SSD1306_DrawPixel( struct SSD1306_Device* DeviceHandle, int x, int y, int Color ) {
+void IRAM_ATTR SSD13x6_DrawPixel( struct SSD13x6_Device* DeviceHandle, int x, int y, int Color ) {
     NullCheck( DeviceHandle, return );
 
     if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
-        SSD1306_DrawPixelFast( DeviceHandle, x, y, Color );
+        SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
     }
 }
 
-void IRAM_ATTR SSD1306_DrawHLine( struct SSD1306_Device* DeviceHandle, int x, int y, int Width, int Color ) {
+void IRAM_ATTR SSD13x6_DrawHLine( struct SSD13x6_Device* DeviceHandle, int x, int y, int Width, int Color ) {
     int XEnd = x + Width;
 
     NullCheck( DeviceHandle, return );
@@ -77,14 +77,14 @@ void IRAM_ATTR SSD1306_DrawHLine( struct SSD1306_Device* DeviceHandle, int x, in
 
     for ( ; x <= XEnd; x++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
-            SSD1306_DrawPixelFast( DeviceHandle, x, y, Color );
+            SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
         } else {
             break;
         }
     }
 }
 
-void IRAM_ATTR SSD1306_DrawVLine( struct SSD1306_Device* DeviceHandle, int x, int y, int Height, int Color ) {
+void IRAM_ATTR SSD13x6_DrawVLine( struct SSD13x6_Device* DeviceHandle, int x, int y, int Height, int Color ) {
     int YEnd = y + Height;
 
     NullCheck( DeviceHandle, return );
@@ -92,14 +92,14 @@ void IRAM_ATTR SSD1306_DrawVLine( struct SSD1306_Device* DeviceHandle, int x, in
 
     for ( ; y <= YEnd; y++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
-            SSD1306_DrawPixel( DeviceHandle, x, y, Color );
+            SSD13x6_DrawPixel( DeviceHandle, x, y, Color );
         } else {
             break;
         }
     }
 }
 
-static inline void IRAM_ATTR DrawWideLine( struct SSD1306_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
+static inline void IRAM_ATTR DrawWideLine( struct SSD13x6_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
     int dx = ( x1 - x0 );
     int dy = ( y1 - y0 );
     int Error = 0;
@@ -116,7 +116,7 @@ static inline void IRAM_ATTR DrawWideLine( struct SSD1306_Device* DeviceHandle, 
 
     for ( ; x <= x1; x++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
-            SSD1306_DrawPixelFast( DeviceHandle, x, y, Color );
+            SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
         }
 
         if ( Error > 0 ) {
@@ -128,7 +128,7 @@ static inline void IRAM_ATTR DrawWideLine( struct SSD1306_Device* DeviceHandle, 
     }
 }
 
-static inline void IRAM_ATTR DrawTallLine( struct SSD1306_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
+static inline void IRAM_ATTR DrawTallLine( struct SSD13x6_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
     int dx = ( x1 - x0 );
     int dy = ( y1 - y0 );
     int Error = 0;
@@ -145,7 +145,7 @@ static inline void IRAM_ATTR DrawTallLine( struct SSD1306_Device* DeviceHandle, 
 
     for ( ; y < y1; y++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
-            SSD1306_DrawPixelFast( DeviceHandle, x, y, Color );
+            SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
         }
 
         if ( Error > 0 ) {
@@ -157,14 +157,14 @@ static inline void IRAM_ATTR DrawTallLine( struct SSD1306_Device* DeviceHandle, 
     }
 }
 
-void IRAM_ATTR SSD1306_DrawLine( struct SSD1306_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
+void IRAM_ATTR SSD13x6_DrawLine( struct SSD13x6_Device* DeviceHandle, int x0, int y0, int x1, int y1, int Color ) {
     NullCheck( DeviceHandle, return );
     NullCheck( DeviceHandle->Framebuffer, return );
 
     if ( x0 == x1 ) {
-        SSD1306_DrawVLine( DeviceHandle, x0, y0, ( y1 - y0 ), Color );
+        SSD13x6_DrawVLine( DeviceHandle, x0, y0, ( y1 - y0 ), Color );
     } else if ( y0 == y1 ) {
-        SSD1306_DrawHLine( DeviceHandle, x0, y0, ( x1 - x0 ), Color );
+        SSD13x6_DrawHLine( DeviceHandle, x0, y0, ( x1 - x0 ), Color );
     } else {
         if ( abs( x1 - x0 ) > abs( y1 - y0 ) ) {
             /* Wide ( run > rise ) */
@@ -186,7 +186,7 @@ void IRAM_ATTR SSD1306_DrawLine( struct SSD1306_Device* DeviceHandle, int x0, in
     }
 }
 
-void IRAM_ATTR SSD1306_DrawBox( struct SSD1306_Device* DeviceHandle, int x1, int y1, int x2, int y2, int Color, bool Fill ) {
+void IRAM_ATTR SSD13x6_DrawBox( struct SSD13x6_Device* DeviceHandle, int x1, int y1, int x2, int y2, int Color, bool Fill ) {
     int Width = ( x2 - x1 );
     int Height = ( y2 - y1 );
 
@@ -195,25 +195,25 @@ void IRAM_ATTR SSD1306_DrawBox( struct SSD1306_Device* DeviceHandle, int x1, int
 
     if ( Fill == false ) {
         /* Top side */
-        SSD1306_DrawHLine( DeviceHandle, x1, y1, Width, Color );
+        SSD13x6_DrawHLine( DeviceHandle, x1, y1, Width, Color );
 
         /* Bottom side */
-        SSD1306_DrawHLine( DeviceHandle, x1, y1 + Height, Width, Color );
+        SSD13x6_DrawHLine( DeviceHandle, x1, y1 + Height, Width, Color );
 
         /* Left side */
-        SSD1306_DrawVLine( DeviceHandle, x1, y1, Height, Color );
+        SSD13x6_DrawVLine( DeviceHandle, x1, y1, Height, Color );
 
         /* Right side */
-        SSD1306_DrawVLine( DeviceHandle, x1 + Width, y1, Height, Color );
+        SSD13x6_DrawVLine( DeviceHandle, x1 + Width, y1, Height, Color );
     } else {
         /* Fill the box by drawing horizontal lines */
         for ( ; y1 <= y2; y1++ ) {
-            SSD1306_DrawHLine( DeviceHandle, x1, y1, Width, Color );
+            SSD13x6_DrawHLine( DeviceHandle, x1, y1, Width, Color );
         }
     }
 }
 
-void SSD1306_Clear( struct SSD1306_Device* DeviceHandle, int Color ) {
+void SSD13x6_Clear( struct SSD13x6_Device* DeviceHandle, int Color ) {
     NullCheck( DeviceHandle, return );
     NullCheck( DeviceHandle->Framebuffer, return );
 

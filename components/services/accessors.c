@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include <driver/i2c.h>
+#include "driver/i2c.h"
+#include "driver/spi_master.h"
 #include "config.h"
 #include "accessors.h"
 #include "globdefs.h"
@@ -57,6 +58,31 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 	}
 	if(i2c_port) *i2c_port=i2c_system_port;
 	return &i2c;
+}
+
+/****************************************************************************************
+ * 
+ */
+const spi_bus_config_t * config_spi_get(spi_host_device_t * spi_host) {
+	char *nvs_item, *p;
+	static spi_bus_config_t spi = {
+		.mosi_io_num = -1,
+        .sclk_io_num = -1,
+        .miso_io_num = -1,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1
+    };
+
+	nvs_item = config_alloc_get(NVS_TYPE_STR, "spi_config");
+	if (nvs_item) {
+		if ((p = strcasestr(nvs_item, "data")) != NULL) spi.mosi_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "clk")) != NULL) spi.sclk_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "d/c")) != NULL) spi_system_dc_gpio = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(nvs_item, "host")) != NULL) spi_system_host = atoi(strchr(p, '=') + 1);
+		free(nvs_item);
+	}
+	if(spi_host) *spi_host = spi_system_host;
+	return &spi;
 }
 
 /****************************************************************************************
