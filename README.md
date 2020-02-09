@@ -87,9 +87,8 @@ You can set the Green and Red status led as well with their respective active st
 Syntax is:
 
 ```
-<gpio_1>=Vcc|GND|amp|jack[:0|1]|green[:0|1]|red[:0|1][,<gpio_n>=Vcc|GND|amp|jack[:0|1]|green[:0|1]|red[:0|1]
+<gpio>=Vcc|GND|amp|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
-NB: jack_h is for jack inserted sets GPIO to 1 and jack_l is for 0
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
