@@ -37,7 +37,7 @@ sda=<gpio>,scl=<gpio>,port=0|1
 ### SPI
 The NVS parameter "spi_config" set the spi's gpio used for generic purpose (e.g. display). Leave it blank to disable SPI usage. The DC parameter is needed for displays. Syntax is
 ```
-data=<gpio>,clk=<gpio>[,dc=<gpio>][,host=0|1|2]
+data=<gpio>,clk=<gpio>[,dc=<gpio>][,host=1|2]
 ```
 ### DAC/I2S
 The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
