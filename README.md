@@ -63,7 +63,7 @@ SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,HFlip][,VFlip][driver=SSD1306|SSD1
 ```
 - VFlip and HFlip are optional can be used to change display orientation
 
-Currently 128x32/64 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this][https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
+Currently 128x32/64 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this](https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
 
 The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay and Bluetooth. Syntax is
 ```
