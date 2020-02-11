@@ -19,6 +19,7 @@
 
 #include <ctype.h>
 #include "squeezelite.h"
+#include "slimproto.h"
 #include "display.h"
 
 #pragma pack(push, 1)
@@ -84,6 +85,7 @@ static struct scroller_s {
 #define ANIM_SCREEN_2     0x08 
 
 static u8_t ANIC_resp = ANIM_NONE;
+static u8_t SETD_width;
 
 #define SCROLL_STACK_SIZE	(3*1024)
 #define LINELEN				40
@@ -150,6 +152,7 @@ bool sb_display_init(void) {
 	// need to force height to 32 maximum
 	display_width = display->width;
 	display_height = min(display->height, 32);
+	SETD_width = display->width;
 	
 	// create scroll management task
 	display_mutex = xSemaphoreCreateMutex();
@@ -195,6 +198,23 @@ static void send_server(void) {
 		ANIC_resp = ANIM_NONE;
 	}	
 	
+	if (SETD_width) {
+		struct SETD_header pkt_header;
+		
+		LOG_INFO("sending width %u", SETD_width);	
+		
+		memset(&pkt_header, 0, sizeof(pkt_header));
+		memcpy(&pkt_header.opcode, "SETD", 4);
+
+		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
+		pkt_header.length = htonl(sizeof(pkt_header) +  2 - 8);
+
+		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
+		send_packet(&SETD_width, 2);
+
+		SETD_width = 0;
+	}	
+	
 	if (slimp_loop_chain) (*slimp_loop_chain)();
 }
 
@@ -215,24 +235,25 @@ static bool handler(u8_t *data, int len){
 	bool res = true;
 	
 	// don't do anything if we dont own the display (no lock needed)
-	if (output.external && output.state >= OUTPUT_STOPPED) return true;
-
-	if (!strncmp((char*) data, "vfdc", 4)) {
-		vfdc_handler(data, len);
-	} else if (!strncmp((char*) data, "grfe", 4)) {
-		grfe_handler(data, len);
-	} else if (!strncmp((char*) data, "grfb", 4)) {
-		grfb_handler(data, len);
-	} else if (!strncmp((char*) data, "grfs", 4)) {
-		grfs_handler(data, len);		
-	} else if (!strncmp((char*) data, "grfg", 4)) {
-		grfg_handler(data, len);
-	} else {
-		res = false;
-	}
+	if (!output.external || output.state < OUTPUT_STOPPED) {
+		if (!strncmp((char*) data, "vfdc", 4)) {
+			vfdc_handler(data, len);
+		} else if (!strncmp((char*) data, "grfe", 4)) {
+			grfe_handler(data, len);
+		} else if (!strncmp((char*) data, "grfb", 4)) {
+			grfb_handler(data, len);
+		} else if (!strncmp((char*) data, "grfs", 4)) {
+			grfs_handler(data, len);		
+		} else if (!strncmp((char*) data, "grfg", 4)) {
+			grfg_handler(data, len);
+		} else {
+			res = false;
+		}
+	}	
 	
 	// chain protocol handlers (bitwise or is fine)
 	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
+	
 	return res;
 }
 

@@ -124,12 +124,13 @@ static bool init(char *config, char *welcome) {
 		
 		ESP_LOGI(TAG, "Display is I2C on port %u", address);
 	} else if (strstr(config, "SPI") && spi_system_host != -1) {
-		int CS_pin = -1;
+		int CS_pin = -1, speed = 0;
 		
-		if ((p = strcasestr(config, "CS")) != NULL) CS_pin = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "cs")) != NULL) CS_pin = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "speed")) != NULL) speed = atoi(strchr(p, '=') + 1);
 		
 		SSD13x6_SPIMasterInitDefault( spi_system_host, spi_system_dc_gpio );
-        SSD13x6_SPIMasterAttachDisplayDefault( &Display, model, width, height, CS_pin, -1 );
+        SSD13x6_SPIMasterAttachDisplayDefault( &Display, model, width, height, CS_pin, -1, speed );
 		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 		SSD13x6_display.width = width;
 		SSD13x6_display.height = height;

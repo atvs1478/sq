@@ -82,7 +82,7 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 			.sda_pullup_en = GPIO_PULLUP_ENABLE,
 			.scl_io_num = 32,
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 100000,
+			.master.clk_speed = 250000,
 		};
 		
 	i2c_param_config(i2c_port, &i2c_config);

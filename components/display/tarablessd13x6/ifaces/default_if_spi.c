@@ -33,7 +33,7 @@ bool SSD13x6_SPIMasterInitDefault( int SPI, int DC ) {
     return true;
 }
 
-bool SSD13x6_SPIMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle, int Model, int Width, int Height, int CSPin, int RSTPin ) {
+bool SSD13x6_SPIMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle, int Model, int Width, int Height, int CSPin, int RSTPin, int Speed ) {
     spi_device_interface_config_t SPIDeviceConfig;
     spi_device_handle_t SPIDeviceHandle;
 
@@ -46,7 +46,7 @@ bool SSD13x6_SPIMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle,
 
     memset( &SPIDeviceConfig, 0, sizeof( spi_device_interface_config_t ) );
 
-    SPIDeviceConfig.clock_speed_hz = SPI_MASTER_FREQ_8M;
+    SPIDeviceConfig.clock_speed_hz = Speed > 0 ? Speed : SPI_MASTER_FREQ_8M;
     SPIDeviceConfig.spics_io_num = CSPin;
     SPIDeviceConfig.queue_size = 1;
 
