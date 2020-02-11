@@ -54,7 +54,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 const char str_na[]="N/A";
 #define STR_OR_NA(s) s?s:str_na
 /* @brief tag used for ESP serial console messages */
-static const char TAG[] = "http_server";
+static const char TAG[] = "httpd_handlers";
 /* @brief task handle for the http server */
 
 SemaphoreHandle_t http_server_config_mutex = NULL;
@@ -558,7 +558,7 @@ esp_err_t config_post_handler(httpd_req_t *req){
 
     char * root_str = cJSON_Print(root);
 	if(root_str!=NULL){
-		ESP_LOGE(TAG, "Processing config item: \n%s", root_str);
+		ESP_LOGD(TAG, "Processing config item: \n%s", root_str);
 		free(root_str);
 	}
 

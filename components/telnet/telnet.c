@@ -362,6 +362,7 @@ static void handleLogBuffer(int partnerSocket, UBaseType_t count){
 static void doTelnet(int partnerSocket) {
 	//ESP_LOGD(tag, ">> doTelnet");
   static const telnet_telopt_t my_telopts[] = {
+
     { TELNET_TELOPT_ECHO,      TELNET_WILL, TELNET_DONT },
     { TELNET_TELOPT_TTYPE,     TELNET_WILL, TELNET_DONT },
     { TELNET_TELOPT_COMPRESS2, TELNET_WONT, TELNET_DO   },

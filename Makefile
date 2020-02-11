@@ -15,5 +15,5 @@
 PROJECT_NAME?=squeezelite
 include $(IDF_PATH)/make/project.mk 
 
-CFLAGS += -Wno-error=format-overflow -Wno-error=stringop-truncation
+# for future gcc version, this could be needed: CPPFLAGS+= -Wno-error=format-overflow -Wno-error=stringop-truncation
 CPPFLAGS+= -Wno-error=maybe-uninitialized
