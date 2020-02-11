@@ -8,7 +8,7 @@
 		- pthread_create_name
 		- stack size
 		- s16_t, s32_t, s64_t and u64_t
-		- PLAYER_ID
+		- PLAYER_ID / custom_player_id
 	can overload (use #define)
 		- exit
 		- gettime_ms
