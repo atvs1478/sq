@@ -89,7 +89,7 @@ static struct {
  * 
  */
 static bool init(char *config, char *welcome) {
-	bool res = false;
+	bool res = true;
 	int width = -1, height = -1, model = SSD1306;
 	char *p;
 	
@@ -98,14 +98,16 @@ static bool init(char *config, char *welcome) {
 	// no time for smart parsing - this is for tinkerers
 	if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
 	if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
-	if ((p = strcasestr(config, "ssd1326")) != NULL) model = SSD1326;
+	
+	if (strcasestr(config, "ssd1326")) model = SSD1326;
+	else if (strcasestr(config, "sh1106")) model = SH1106;
 	
 	if (width == -1 || height == -1) {
 		ESP_LOGW(TAG, "No display configured %s [%d x %d]", config, width, height);
 		return false;
 	}	
 
-	if (strstr(config, "I2C")) {
+	if (strstr(config, "I2C") && i2c_system_port != -1) {
 		int address = I2C_ADDRESS;
 				
 		if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
@@ -117,10 +119,11 @@ static bool init(char *config, char *welcome) {
 		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 		SSD13x6_display.width = width;
 		SSD13x6_display.height = height;
+		
 		text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
+		
 		ESP_LOGI(TAG, "Display is I2C on port %u", address);
-		res = true;
-	} else if (strstr(config, "SPI")) {
+	} else if (strstr(config, "SPI") && spi_system_host != -1) {
 		int CS_pin = -1;
 		
 		if ((p = strcasestr(config, "CS")) != NULL) CS_pin = atoi(strchr(p, '=') + 1);
@@ -130,11 +133,14 @@ static bool init(char *config, char *welcome) {
 		SSD13x6_SetFont( &Display, &Font_droid_sans_fallback_15x17 );
 		SSD13x6_display.width = width;
 		SSD13x6_display.height = height;
+		
 		text(DISPLAY_FONT_MEDIUM, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, welcome);
-		ESP_LOGI(TAG, "Display is SPI host %u with CS:%d", spi_system_host, CS_pin);
+		
+		ESP_LOGI(TAG, "Display is SPI host %u with cs:%d", spi_system_host, CS_pin);
 		
 	} else {
-		ESP_LOGE(TAG, "Unknown display type");
+		res = false;
+		ESP_LOGW(TAG, "Unknown display type or no serial interface configured");
 	}
 
 	return res;
@@ -198,7 +204,7 @@ static bool set_font(int num, enum display_font_e font, int space) {
  */
 static bool line(int num, int x, int attribute, char *text) {
 	int width;
-	
+
 	// counting 1..n
 	num--;
 	
@@ -219,10 +225,11 @@ static bool line(int num, int x, int attribute, char *text) {
 	
 	// erase if requested
 	if (attribute & DISPLAY_CLEAR) {
+		int y_min = max(0, lines[num].y), y_max = max(0, lines[num].y + lines[num].font->Height);
 		for (int c = (attribute & DISPLAY_ONLY_EOL) ? x : 0; c < Display.Width; c++) 
-			for (int y = lines[num].y; y < lines[num].y + lines[num].font->Height; y++)
+			for (int y = y_min; y < y_max; y++)
 				SSD13x6_DrawPixelFast( &Display, c, y, SSD_COLOR_BLACK );
-	}	
+	}
 		
 	SSD13x6_FontDrawString( &Display, x, lines[num].y, text, SSD_COLOR_WHITE );
 	
@@ -368,18 +375,31 @@ static void draw_cbr(u8_t *data, int height) {
 #else
 	if (!height) height = Display->Height;
 
-	// copy data in frame buffer	
-	for (int c = 0; c < Display.Width; c++)
-		for (int r = 0; r < height / 8; r++)
-			Display.Framebuffer[c*Display.Height/8 + r] = BitReverseTable256[data[c*height/8 +r]];
-		
 	SSD13x6_SetPageAddress( &Display, 0, height / 8 - 1);
 	
-	// force addressing mode by columns
-	if (AddressMode != AddressMode_Vertical) {
-		AddressMode = AddressMode_Vertical;
-		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
-	}
+	// force addressing mode by columns (if we can)
+	if (SSD13x6_GetCaps( &Display ) & CAPS_ADDRESS_VERTICAL) {
+		// just copy data in frame buffer with bit-reverse	
+		for (int c = 0; c < Display.Width; c++)
+			for (int r = 0; r < height / 8; r++)
+				Display.Framebuffer[c*Display.Height/8 + r] = BitReverseTable256[data[c*height/8 +r]];
+
+		if (AddressMode != AddressMode_Vertical) {
+			AddressMode = AddressMode_Vertical;
+			SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
+		}
+	} else {	
+		// need to do rwo/col swap and bit-reverse
+		int rows = (height ? height : Display.Height) / 8;
+		for (int r = 0; r < rows; r++) {
+			uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
+			for (int c = 0; c < Display.Width; c++) {
+				*optr++ = BitReverseTable256[*iptr];;
+				iptr += rows;
+			}	
+		}
+		ESP_LOGW(TAG, "Can't set addressing mode to vertical, swapping");
+	}	
 	
 	SSD13x6_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Height/8);
  #endif	

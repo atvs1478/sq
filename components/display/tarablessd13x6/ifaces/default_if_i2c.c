@@ -70,6 +70,7 @@ bool SSD13x6_I2CMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle,
         ESP_ERROR_CHECK_NONFATAL( gpio_set_level( RSTPin, 1 ), return false );
     }
 	
+	memset( DeviceHandle, 0, sizeof( struct SSD13x6_Device ) );	
 	DeviceHandle->Model = Model;
 	
     return SSD13x6_Init_I2C( DeviceHandle,

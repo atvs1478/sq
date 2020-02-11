@@ -12,6 +12,10 @@
 
 #define SSD_ALWAYS_INLINE __attribute__( ( always_inline ) )
 
+#define CAPS_COLUMN_RANGE		0x01
+#define CAPS_PAGE_RANGE			0x02
+#define CAPS_ADDRESS_VERTICAL	0x04
+
 #if ! defined BIT
 #define BIT( n ) ( 1 << n )
 #endif
@@ -52,7 +56,7 @@ struct SSD13x6_Device {
     int Width;
     int Height;
 
-	enum { SSD1306, SSD1326 } Model;
+	enum { SSD1306, SSD1326, SH1106 } Model;
 	uint8_t ReMap;
     uint8_t* Framebuffer;
     int FramebufferSize;
@@ -88,6 +92,7 @@ void SSD13x6_SetPageAddress( struct SSD13x6_Device* DeviceHandle, uint8_t Start,
 bool SSD13x6_HWReset( struct SSD13x6_Device* DeviceHandle );
 bool SSD13x6_Init_I2C( struct SSD13x6_Device* DeviceHandle, int Width, int Height, int I2CAddress, int ResetPin, WriteCommandProc WriteCommand, WriteDataProc WriteData, ResetProc Reset );
 bool SSD13x6_Init_SPI( struct SSD13x6_Device* DeviceHandle, int Width, int Height, int ResetPin, int CSPin, spi_device_handle_t SPIHandle, WriteCommandProc WriteCommand, WriteDataProc WriteData, ResetProc Reset );
+int  SSD13x6_GetCaps( struct SSD13x6_Device* DeviceHandle );
 
 void SSD13x6_WriteRawData( struct SSD13x6_Device* DeviceHandle, uint8_t* Data, size_t DataLength );
 

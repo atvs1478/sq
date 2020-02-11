@@ -36,7 +36,7 @@ static const char *TAG = "display";
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
-#define DISPLAYER_STACK_SIZE 	2048
+#define DISPLAYER_STACK_SIZE 	(3*1024)
 #define SCROLLABLE_SIZE			384
 #define HEADER_SIZE				64
 #define	DEFAULT_SLEEP			3600
@@ -66,14 +66,14 @@ void display_init(char *welcome) {
 
 	if (item && *item) {
 		char * drivername=strstr(item,"driver");
-		if (!drivername  || (drivername && (strcasestr(drivername,"SSD1306") || strcasestr(drivername,"SSD1326")))) {
+		if (!drivername  || (drivername && (strcasestr(drivername,"SSD1306") || strcasestr(drivername,"SSD1326") || strcasestr(drivername,"SH1106")))) {
 			display = &SSD13x6_display;
 			if (display->init(item, welcome)) {
 				init = true;
 				ESP_LOGI(TAG, "Display initialization successful");
 			} else {
 				display = NULL;
-				ESP_LOGE(TAG, "Display initialization failed");
+				ESP_LOGW(TAG, "Display initialization failed");
 			}
 		} else {
 			ESP_LOGE(TAG,"Unknown display driver name in display config: %s",item);

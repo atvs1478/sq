@@ -85,7 +85,7 @@ static struct scroller_s {
 
 static u8_t ANIC_resp = ANIM_NONE;
 
-#define SCROLL_STACK_SIZE	2048
+#define SCROLL_STACK_SIZE	(3*1024)
 #define LINELEN				40
 
 static log_level loglevel = lINFO;

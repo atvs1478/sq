@@ -56,9 +56,10 @@ bool SSD13x6_SPIMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle,
     }
 
     ESP_ERROR_CHECK_NONFATAL( spi_bus_add_device( SPIHost, &SPIDeviceConfig, &SPIDeviceHandle ), return false );
-	
+
+	memset( DeviceHandle, 0, sizeof( struct SSD13x6_Device ) );	
 	DeviceHandle->Model = Model;
-	
+		
     return SSD13x6_Init_SPI( DeviceHandle,
         Width,
         Height,
@@ -72,19 +73,19 @@ bool SSD13x6_SPIMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle,
 }
 
 static bool SPIDefaultWriteBytes( spi_device_handle_t SPIHandle, int WriteMode, const uint8_t* Data, size_t DataLength ) {
-    spi_transaction_t SPITransaction;
+    spi_transaction_t SPITransaction = { 0 };
 
     NullCheck( SPIHandle, return false );
     NullCheck( Data, return false );
 
     if ( DataLength > 0 ) {
-        memset( &SPITransaction, 0, sizeof( spi_transaction_t ) );
-
-        SPITransaction.length = DataLength * 8;
-        SPITransaction.tx_buffer = Data;
-
-        gpio_set_level( DCPin, WriteMode );
-        ESP_ERROR_CHECK_NONFATAL( spi_device_transmit( SPIHandle, &SPITransaction ), return false );
+		gpio_set_level( DCPin, WriteMode );
+		
+		SPITransaction.length = DataLength * 8;
+		SPITransaction.tx_buffer = Data;
+            
+		// only do polling as we don't have contention on SPI (otherwise DMA for transfers > 16 bytes)		
+		ESP_ERROR_CHECK_NONFATAL( spi_device_polling_transmit(SPIHandle, &SPITransaction), return false );
     }
 
     return true;
