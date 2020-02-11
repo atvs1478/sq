@@ -58,8 +58,8 @@ bck=<gpio>,ws=<gpio>,do=<gpio>
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
-I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip]
-SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,HFlip][,VFlip]
+I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
+SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
 ```
 - VFlip and HFlip are optional can be used to change display orientation
 
@@ -71,7 +71,7 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
-Currently only 128x32 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) are supported
+Currently 128x32/64 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this][https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
 
 ### Set GPIO
 The parameter "set_GPIO" is use to set assign GPIO to various functions.
