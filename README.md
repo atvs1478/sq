@@ -18,9 +18,9 @@ GND - GND
 FLT - GND  
 DMP - GND  
 SCL - GND  
-BCK - (see below)  
-DIN - (see below)  
-LCK - (see below)
+BCK - (BCK - see below)  
+DIN - (DO - see below)  
+LCK - (WS - see below)
 FMT - GND  
 XMT - 3.3V 
 
