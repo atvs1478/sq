@@ -40,127 +40,46 @@
 #include "platform_esp32.h"
 
 
-#define TELNET_STACK_SIZE 8048
+/************************************
+ * Globals
+ */
 
+#define TELNET_STACK_SIZE 8048
+#define TELNET_RX_BUF 1024
+
+const static char tag[] = "telnet";
+static int uart_fd=0;
 RingbufHandle_t buf_handle;
 SemaphoreHandle_t xSemaphore = NULL;
 static size_t send_chunk=300;
 static size_t log_buf_size=2000;      //32-bit aligned size
 static bool bIsEnabled=false;
-const static char tag[] = "telnet";
-
-int _log_vprintf(const char *fmt, va_list args);
-void telnet_esp32_listenForClients();
-int telnet_esp32_vprintf(const char *fmt, va_list va);
-
-static void telnetTask(void *data);
-
-
-static int uart_fd=0;
-
-
-// The global tnHandle ... since we are only processing ONE telnet
-// client at a time, this can be a global static.
+static int partnerSocket=0;
 static telnet_t *tnHandle;
-static void handleLogBuffer(int partnerSocket, UBaseType_t bytes);
+
+/************************************
+ * Forward declarations
+ */
+static void telnet_task(void *data);
+static ssize_t stdout_read(int fd, void* data, size_t size);
+static int stdout_open(const char * path, int flags, int mode);
+static int stdout_close(int fd);
+static int stdout_fstat(int fd, struct stat * st);
+static ssize_t stdout_write(int fd, const void * data, size_t size);
+static char *eventToString(telnet_event_type_t type);
+static void handle_telnet_conn();
+static void process_logs( UBaseType_t bytes);
 
 struct telnetUserData {
 	int sockfd;
+	telnet_t *tnHandle;
+	char * rxbuf;
 };
 
 
-
-static void telnetTask(void *data) {
-	ESP_LOGD(tag, ">> telnetTask");
-	telnet_esp32_listenForClients();
-	ESP_LOGD(tag, "<< telnetTask");
-	vTaskDelete(NULL);
-}
-
-void start_telnet(void * pvParameter){
-	static bool isStarted=false;
-	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
-	
-	if(!isStarted && bIsEnabled) {
-		xTaskCreateStatic( (TaskFunction_t) &telnetTask, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, xTaskBuffer);
-		isStarted=true;
-	}
-}
-
-static ssize_t stdout_write(int fd, const void * data, size_t size) {
-	if (xSemaphoreTake(xSemaphore, (TickType_t) 10) == pdTRUE) {
-		// #1 Write to ringbuffer
-		if (buf_handle == NULL) {
-			printf("%s() ABORT. file handle _log_remote_fp is NULL\n",
-					__FUNCTION__);
-		} else {
-			//Send an item
-			UBaseType_t res = xRingbufferSend(buf_handle, data, size,
-					pdMS_TO_TICKS(100));
-			if (res != pdTRUE) {
-				// flush some entries
-				handleLogBuffer(0, size);
-				res = xRingbufferSend(buf_handle, data, size,
-						pdMS_TO_TICKS(100));
-				if (res != pdTRUE) {
-
-					printf("%s() ABORT. Unable to store log entry in buffer\n",
-							__FUNCTION__);
-				}
-			}
-		}
-		xSemaphoreGive(xSemaphore);
-	} else {
-		// We could not obtain the semaphore and can therefore not access
-		// the shared resource safely.
-	}
-	return write(uart_fd, data, size);
-}
-
-static ssize_t stdout_read(int fd, void* data, size_t size) {
-	return read(fd, data, size);
-}
-
-static int stdout_open(const char * path, int flags, int mode) {
-	return 0;
-}
-
-static int stdout_close(int fd) {
-	return 0;
-}
-
-static int stdout_fstat(int fd, struct stat * st) {
-	st->st_mode = S_IFCHR;
-	return 0;
-}
-
-
-void kchal_stdout_register() {
-	const esp_vfs_t vfs = {
-		.flags = ESP_VFS_FLAG_DEFAULT,
-		.write = &stdout_write,
-		.open = &stdout_open,
-		.fstat = &stdout_fstat,
-		.close = &stdout_close,
-		.read = &stdout_read,
-	};
-	uart_fd=open("/dev/uart/0", O_RDWR);
-	ESP_ERROR_CHECK(esp_vfs_register("/dev/pkspstdout", &vfs, NULL));
-	freopen("/dev/pkspstdout", "w", stdout);
-	freopen("/dev/pkspstdout", "w", stderr);
-	//printf("8bkc_hal_stdout_register: Custom stdout/stderr handler installed.\n");
-}
-/*********************************
- * Telnet Support
- */
-
-
 void init_telnet(){
-
 	char *val= get_nvs_value_alloc(NVS_TYPE_STR, "telnet_enable");
-
-	if (!val || !strcasestr("YX",val) ) {
+	if (!val || strlen(val) == 0 || !strcasestr("YX",val) ) {
 		ESP_LOGI(tag,"Telnet support disabled");
 		if(val) free(val);
 		return;
@@ -177,28 +96,79 @@ void init_telnet(){
 		free(val);
 		log_buf_size=log_buf_size>0?log_buf_size:4000;
 	}
-	bIsEnabled=true;
-
 	// Create the semaphore to guard a shared resource.
 	vSemaphoreCreateBinary( xSemaphore );
 
-	// First thing we need to do here is to redirect the output to our telnet handler
-	//Allocate ring buffer data structure and storage area into external RAM
+	// Redirect the output to our telnet handler as soon as possible
 	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)heap_caps_malloc(sizeof(StaticRingbuffer_t), MALLOC_CAP_SPIRAM);
 	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM);
-
-	//Create a ring buffer with manually allocated memory
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
-
 	if (buf_handle == NULL) {
 		ESP_LOGE(tag,"Failed to create ring buffer for telnet!");
 		return;
 	}
 
 	ESP_LOGI(tag, "***Redirecting log output to telnet");
-	//esp_log_set_vprintf(&_log_vprintf);
-	kchal_stdout_register();
+	const esp_vfs_t vfs = {
+			.flags = ESP_VFS_FLAG_DEFAULT,
+			.write = &stdout_write,
+			.open = &stdout_open,
+			.fstat = &stdout_fstat,
+			.close = &stdout_close,
+			.read = &stdout_read,
+		};
+	uart_fd=open("/dev/uart/0", O_RDWR);
+	ESP_ERROR_CHECK(esp_vfs_register("/dev/pkspstdout", &vfs, NULL));
+	freopen("/dev/pkspstdout", "w", stdout);
+	freopen("/dev/pkspstdout", "w", stderr);
+	bIsEnabled=true;
 }
+void start_telnet(void * pvParameter){
+	static bool isStarted=false;
+	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
+	
+	if(!isStarted && bIsEnabled) {
+		xTaskCreateStatic( (TaskFunction_t) &telnet_task, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, xTaskBuffer);
+		isStarted=true;
+	}
+}
+static void telnet_task(void *data) {
+	int serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	struct sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverAddr.sin_port = htons(23);
+
+	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+	if (rc < 0) {
+		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
+		return;
+	}
+
+	rc = listen(serverSocket, 5);
+	if (rc < 0) {
+		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
+		return;
+	}
+
+	while(1) {
+		socklen_t len = sizeof(serverAddr);
+		rc = accept(serverSocket, (struct sockaddr *)&serverAddr, &len);
+		if (rc < 0 ){
+			ESP_LOGE(tag, "accept: %d (%s)", errno, strerror(errno));
+			return;
+		}
+		else {
+			partnerSocket = rc;
+			ESP_LOGD(tag, "We have a new client connection!");
+			handle_telnet_conn();
+			ESP_LOGD(tag, "Telnet connection terminated");
+		}
+	}
+	vTaskDelete(NULL);
+}
+
 /**
  * Convert a telnet event type to its string representation.
  */
@@ -238,49 +208,33 @@ static char *eventToString(telnet_event_type_t type) {
 	return "Unknown type";
 } // eventToString
 
-
-/**
- * Send data to the telnet partner.
- */
-void telnet_esp32_sendData(uint8_t *buffer, size_t size) {
-	if (tnHandle != NULL) {
-		telnet_send(tnHandle, (char *)buffer, size);
-	}
-} // telnet_esp32_sendData
-
-
-/**
- * Send a vprintf formatted output to the telnet partner.
- */
-int telnet_esp32_vprintf(const char *fmt, va_list va) {
-	if (tnHandle == NULL) {
-		return 0;
-	}
-	return telnet_vprintf(tnHandle, fmt, va);
-} // telnet_esp32_vprintf
-
 /**
  * Telnet handler.
  */
-void processReceivedData(const char * buffer, size_t size){
+void process_received_data(const char * buffer, size_t size){
 	//ESP_LOGD(tag, "received data, len=%d", event->data.size);
 
 	char * command = malloc(size+1);
-	memcpy(command,buffer,size);
-	command[size]='\0';
-	// todo: implement conditional remote echo
-	//telnet_esp32_sendData((uint8_t *)command, size);
-	if(command[0]!='\r' && command[0]!='\n'){
-		// some telnet clients will send data and crlf in two separate buffers
-		printf(command);
-		printf("\r\n");
-		run_command((char *)command);
+	const char * c=buffer;
 
+	// scrub from any escape command
+	if(*c == '\e'){
+		while(*(c++) !='n'){
+			--size;
+		};
+		--size;
+	}
+	memcpy(command,c,size);
+	command[size]='\0';
+	if(command[0]!='\r' && command[0]!='\n'){
+		// echo the command buffer out to uart and run
+		write(uart_fd, command, size);
+		run_command((char *)command);
 	}
 	free(command);
 
 }
-static void telnetHandler(
+static void handle_telnet_events(
 		telnet_t *thisTelnet,
 		telnet_event_t *event,
 		void *userData) {
@@ -295,23 +249,33 @@ static void telnetHandler(
 		break;
 
 	case TELNET_EV_DATA:
-		 processReceivedData(event->data.buffer, event->data.size);
+		 process_received_data(event->data.buffer, event->data.size);
 		break;
+	case TELNET_EV_TTYPE:
+		printf("telnet event: %s\n", eventToString(event->type));
+		telnet_ttype_send(telnetUserData->tnHandle);
+		break;
+
+
 
 	default:
 		printf("telnet event: %s\n", eventToString(event->type));
 		break;
 	} // End of switch event type
-} // myTelnetHandler
+} // myhandle_telnet_events
 
 
-static void handleLogBuffer(int partnerSocket, UBaseType_t count){
+static void process_logs(UBaseType_t count){
     //Receive an item from no-split ring buffer
 	size_t item_size;
     UBaseType_t uxItemsWaiting;
     UBaseType_t uxBytesToSend=count;
 
 	vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, NULL, &uxItemsWaiting);
+	if(count == 0){
+		// this sends the entire buffer to the remote client
+		uxBytesToSend = uxItemsWaiting;
+	}
 	if( partnerSocket ==0 && (uxItemsWaiting*100 / log_buf_size) <75){
 		// We still have some room in the ringbuffer and there's no telnet
 		// connection yet, so bail out for now.
@@ -321,14 +285,12 @@ static void handleLogBuffer(int partnerSocket, UBaseType_t count){
 
 	while(uxBytesToSend>0){
 		char *item = (char *)xRingbufferReceiveUpTo(buf_handle, &item_size, pdMS_TO_TICKS(50), uxBytesToSend);
-		//Check received data
 
+		//Check received data
 		if (item != NULL) {
 			uxBytesToSend-=item_size;
-			if(partnerSocket!=0)
-				telnet_esp32_sendData((uint8_t *)item, item_size);
-			else{
-				//printf("%s() flushing %u bytes from log buffer\n", __FUNCTION__, item_size);
+			if(partnerSocket!=0){
+				telnet_send_text(tnHandle, item, item_size);
 			}
 			//Return Item
 			vRingbufferReturnItem(buf_handle, (void *)item);
@@ -339,81 +301,95 @@ static void handleLogBuffer(int partnerSocket, UBaseType_t count){
 	}
 }
 
-static void doTelnet(int partnerSocket) {
-	//ESP_LOGD(tag, ">> doTelnet");
+static void handle_telnet_conn() {
+
   static const telnet_telopt_t my_telopts[] = {
-    { TELNET_TELOPT_ECHO,      TELNET_WILL, TELNET_DONT },
+    { TELNET_TELOPT_ECHO,      TELNET_WONT, TELNET_DO },
     { TELNET_TELOPT_TTYPE,     TELNET_WILL, TELNET_DONT },
     { TELNET_TELOPT_COMPRESS2, TELNET_WONT, TELNET_DO   },
     { TELNET_TELOPT_ZMP,       TELNET_WONT, TELNET_DO   },
     { TELNET_TELOPT_MSSP,      TELNET_WONT, TELNET_DO   },
     { TELNET_TELOPT_BINARY,    TELNET_WILL, TELNET_DO   },
     { TELNET_TELOPT_NAWS,      TELNET_WILL, TELNET_DONT },
+	{TELNET_TELOPT_LINEMODE,   TELNET_WONT, TELNET_DO },
     { -1, 0, 0 }
   };
   struct telnetUserData *pTelnetUserData = (struct telnetUserData *)malloc(sizeof(struct telnetUserData));
+  tnHandle = telnet_init(my_telopts, handle_telnet_events, 0, pTelnetUserData);
+
+  pTelnetUserData->rxbuf = (char *) heap_caps_malloc(TELNET_RX_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  pTelnetUserData->tnHandle = tnHandle;
   pTelnetUserData->sockfd = partnerSocket;
 
+  // flush all the log buffer on connect
+  process_logs(0);
 
-  tnHandle = telnet_init(my_telopts, telnetHandler, 0, pTelnetUserData);
-
-  uint8_t buffer[1024];
   while(1) {
   	//ESP_LOGD(tag, "waiting for data");
-  	ssize_t len = recv(partnerSocket, (char *)buffer, sizeof(buffer), MSG_DONTWAIT);
+  	ssize_t len = recv(partnerSocket, pTelnetUserData->rxbuf, TELNET_RX_BUF, MSG_DONTWAIT);
   	if (len >0 ) {
-		//ESP_LOGD(tag, "received %d bytes", len);
-		telnet_recv(tnHandle, (char *)buffer, len);
+		telnet_recv(tnHandle, pTelnetUserData->rxbuf, len);
   	}
   	else if (errno != EAGAIN && errno !=EWOULDBLOCK ){
   	  telnet_free(tnHandle);
   	  tnHandle = NULL;
+  	  free(pTelnetUserData->rxbuf);
+  	  pTelnetUserData->rxbuf=NULL;
   	  free(pTelnetUserData);
+  	  partnerSocket = 0;
   	  return;
   	}
-  	handleLogBuffer(partnerSocket,  send_chunk);
+  	process_logs(send_chunk);
 
 	taskYIELD();
   }
 
-} // doTelnet
+} // handle_telnet_conn
 
-/**
- * Listen for telnet clients and handle them.
- */
-void telnet_esp32_listenForClients() {
-	//ESP_LOGD(tag, ">> telnet_listenForClients");
-	int serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+// ******************* stdout/stderr Redirection to ringbuffer
+static ssize_t stdout_write(int fd, const void * data, size_t size) {
+	if (xSemaphoreTake(xSemaphore, (TickType_t) 10) == pdTRUE) {
+		// #1 Write to ringbuffer
+		if (buf_handle == NULL) {
+			printf("%s() ABORT. file handle _log_remote_fp is NULL\n",
+					__FUNCTION__);
+		} else {
+			//Send an item
+			UBaseType_t res = xRingbufferSend(buf_handle, data, size,
+					pdMS_TO_TICKS(100));
+			if (res != pdTRUE) {
+				// flush some entries
+				process_logs(size);
+				res = xRingbufferSend(buf_handle, data, size,
+						pdMS_TO_TICKS(100));
+				if (res != pdTRUE) {
 
-	struct sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serverAddr.sin_port = htons(23);
-
-	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-	if (rc < 0) {
-		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
-		return;
-	}
-
-	rc = listen(serverSocket, 5);
-	if (rc < 0) {
-		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
-		return;
-	}
-
-	while(1) {
-		socklen_t len = sizeof(serverAddr);
-		rc = accept(serverSocket, (struct sockaddr *)&serverAddr, &len);
-		if (rc < 0 ){
-			ESP_LOGE(tag, "accept: %d (%s)", errno, strerror(errno));
-			return;
+					printf("%s() ABORT. Unable to store log entry in buffer\n",
+							__FUNCTION__);
+				}
+			}
 		}
-		else {
-			int partnerSocket = rc;
-			ESP_LOGD(tag, "We have a new client connection!");
-			doTelnet(partnerSocket);
-			ESP_LOGD(tag, "Telnet connection terminated");
-		}
+		xSemaphoreGive(xSemaphore);
+	} else {
+		// We could not obtain the semaphore and can therefore not access
+		// the shared resource safely.
 	}
-} // listenForNewClient
+	return write(uart_fd, data, size);
+}
+
+static ssize_t stdout_read(int fd, void* data, size_t size) {
+	return read(fd, data, size);
+}
+
+static int stdout_open(const char * path, int flags, int mode) {
+	return 0;
+}
+
+static int stdout_close(int fd) {
+	return 0;
+}
+
+static int stdout_fstat(int fd, struct stat * st) {
+	st->st_mode = S_IFCHR;
+	return 0;
+}
