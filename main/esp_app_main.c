@@ -281,8 +281,8 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
 	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
 	
-	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","rotary_config");
-	config_set_default(NVS_TYPE_STR, "rotary_config", "", 0);
+	ESP_LOGD(TAG,"Registering default Audio control board type %s, value %s", "rotary_config", CONFIG_ROTARY_ENCODER);
+	config_set_default(NVS_TYPE_STR, "rotary_config", CONFIG_ROTARY_ENCODER, 0);
 
 	char number_buffer[101] = {};
 	snprintf(number_buffer,sizeof(number_buffer)-1,"%u",OTA_FLASH_ERASE_BLOCK);
@@ -303,15 +303,27 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
 	config_set_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);
 
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", STR(CONFIG_DISPLAY_CONFIG));
-	config_set_default(NVS_TYPE_STR, "display_config", STR(CONFIG_DISPLAY_CONFIG), 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "display_config", CONFIG_DISPLAY_CONFIG);
+	config_set_default(NVS_TYPE_STR, "display_config", CONFIG_DISPLAY_CONFIG, 0);
 	
-	ESP_LOGD(TAG,"Registering default value for key %s", "i2c_config");
-	config_set_default(NVS_TYPE_STR, "i2c_config", "", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "i2c_config", CONFIG_I2C_CONFIG);
+	config_set_default(NVS_TYPE_STR, "i2c_config", CONFIG_I2C_CONFIG, 0);
 	
-	ESP_LOGD(TAG,"Registering default value for key %s", "set_GPIO");
-	config_set_default(NVS_TYPE_STR, "set_GPIO", "", 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "spi_config", CONFIG_SPI_CONFIG);
+	config_set_default(NVS_TYPE_STR, "spi_config", CONFIG_SPI_CONFIG, 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "set_GPIO", CONFIG_SET_GPIO);
+	config_set_default(NVS_TYPE_STR, "set_GPIO", CONFIG_SET_GPIO, 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "spdif_config");
+	config_set_default(NVS_TYPE_STR, "spdif_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "dac_config");
+	config_set_default(NVS_TYPE_STR, "dac_config", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "bat_config");
+	config_set_default(NVS_TYPE_STR, "bat_config", "", 0);
+			
 	ESP_LOGD(TAG,"Registering default value for key %s", "metadata_config");
 	config_set_default(NVS_TYPE_STR, "metadata_config", "", 0);
 	
@@ -326,12 +338,6 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
-	
-	ESP_LOGD(TAG,"Registering default value for key %s", "spdif_config");
-	config_set_default(NVS_TYPE_STR, "spdif_config", "", 0);
-	
-	ESP_LOGD(TAG,"Registering default value for key %s", "dac_config");
-	config_set_default(NVS_TYPE_STR, "dac_config", "", 0);
 	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }

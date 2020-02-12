@@ -18,9 +18,9 @@ GND - GND
 FLT - GND  
 DMP - GND  
 SCL - GND  
-BCK - (see below)  
-DIN - (see below)  
-LCK - (see below)
+BCK - (BCK - see below)  
+DIN - (DO - see below)  
+LCK - (WS - see below)
 FMT - GND  
 XMT - 3.3V 
 
@@ -30,32 +30,41 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
 
 ### I2C
-The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Syntax is
+The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Default speed is 400000. Syntax is
 ```
-bck=<gpio>,ws=<gpio>,do=<gpio>
+sda=<gpio>,scl=<gpio>[,port=0|1][,speed=<speed>]
+```
+### SPI
+The NVS parameter "spi_config" set the spi's gpio used for generic purpose (e.g. display). Leave it blank to disable SPI usage. The DC parameter is needed for displays. Syntax is
+```
+data=<gpio>,clk=<gpio>[,dc=<gpio>][,host=1|2]
 ```
 ### DAC/I2S
-The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can also define these at compile time but nvs parameter takes precedence. Note that on SqueezeAMP and A1S, these are forced at runtime, so this parameter does not matter. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
+The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can define the defaults at compile time but nvs parameter takes precedence except for SqueezeAMP and A1S where these are forced at runtime. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
-sda=<gpio>,scl=<gpio>,port=0|1
+bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
 
 SPDIF is made available by re-using i2s interface in a non-standard way, so although only one pin (DO) is needed, the controller must be fully initialized, so the bit clock (bck) and word clock (ws) must be set as well. As i2s and SPDIF are mutually exclusive, you can reuse the same IO if your hardware allows so.
 
-Note that on SqueezeAMP, these are automatically defined, so this parameter does not matter.
+You can define the defaults at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 
 Leave it blank to disable SPDIF usage, you can also define them at compile time using "make menuconfig". Syntax is 
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
-## Display
+### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
-I2C|SPI,width=<pixels>,height=<pixels>[,address=<i2c_address>][,HFlip][,VFlip]
+I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
+SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
 ```
 - VFlip and HFlip are optional can be used to change display orientation
+- Default speed is 8000000 (8MHz)
+
+Currently 128x32/64 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this](https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
 
 The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay and Bluetooth. Syntax is
 ```
@@ -65,22 +74,23 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
-Currently only 128x32 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) are supported
-
 ### Set GPIO
-The parameter "set_GPIO" is use to set assign GPIO to various functions.
+The parameter "set_GPIO" is use to assign GPIO to various functions.
 
 GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
 
-This parameter can use used as well to assign a GPIO that will be set to 1 when playback starts and wil be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
+The \<amp\> parameter can use used to assign a GPIO that will be set to 1 when playback starts. It will be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
 
-Finally, if you have an audio jack that supports insertion (set to GND when inserted), you can specify whch GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
+If you have an audio jack that supports insertion (use :0 or :1 to set the level when inserted), you can specify which GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
+
+You can set the Green and Red status led as well with their respective active state (:0 or :1)
 
 Syntax is:
 
 ```
-<gpio_1>=Vcc|GND|amp|jack[,<gpio_n>=Vcc|GND|amp|jack]
+<gpio>=Vcc|GND|amp|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
+You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
@@ -175,6 +185,12 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "longshifted":{"pressed":"BCTRLS_LEFT"}}
 ]
 ```
+### Battery / ADC
+The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
+```
+channel=0..7,scale=<scale>
+```
+NB: Set parameter to empty to disable battery reading
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  

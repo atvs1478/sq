@@ -53,6 +53,7 @@ sure that using rate_delay would fix that
 #include "monitor.h"
 #include "config.h"
 #include "accessors.h"
+#include "globdefs.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
 #define UNLOCK mutex_unlock(outputbuf->mutex)
@@ -111,16 +112,6 @@ static void *output_thread_i2s(void *arg);
 static void *output_thread_i2s_stats(void *arg);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 static void (*jack_handler_chain)(bool inserted);
-
-// force all GPIOs to what we need
-#undef 	CONFIG_I2S_NUM
-#define CONFIG_I2S_NUM		0
-
-#ifdef CONFIG_SQUEEZEAMP
-#undef	CONFIG_SPDIF_DO_IO
-#define	CONFIG_SPDIF_DO_IO	15
-#elif defined CONFIG_A1S
-#endif
 
 #define I2C_PORT	0
 
@@ -212,13 +203,9 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 
 	if (strcasestr(device, "spdif")) {
 		spdif = true;	
-		
-#ifdef CONFIG_SQUEEZEAMP
-		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = 33, .ws_io_num = 25, 
-															  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 };
-#else
 		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_SPDIF_BCK_IO, .ws_io_num = CONFIG_SPDIF_WS_IO, 
 															  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 };
+#ifndef CONFIG_SPDIF_LOCKED															  
 		char *nvs_item = config_alloc_get(NVS_TYPE_STR, "spdif_config");
 		if (nvs_item) {
 			if ((p = strcasestr(nvs_item, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
@@ -226,13 +213,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 			if ((p = strcasestr(nvs_item, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
 			free(nvs_item);
 		} 
+#endif		
 		
 		if (i2s_pin_config.bck_io_num == -1 || i2s_pin_config.ws_io_num == -1 || i2s_pin_config.data_out_num == -1) {
 			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
 																		   i2s_pin_config.ws_io_num, 
 																		   i2s_pin_config.data_out_num);
 		}
-#endif	
 									
 		i2s_config.sample_rate = output.current_sample_rate * 2;
 		i2s_config.bits_per_sample = 32;
@@ -249,14 +236,12 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
 		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 	} else {
-#ifdef CONFIG_SQUEEZEAMP
+#if CONFIG_SPDIF_DO_IO != -1
 		gpio_pad_select_gpio(CONFIG_SPDIF_DO_IO);
 		gpio_set_direction(CONFIG_SPDIF_DO_IO, GPIO_MODE_OUTPUT);
 		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
-		adac = &dac_tas57xx;
-#elif defined(CONFIG_A1S)
-		adac = &dac_a1s;
-#endif	
+#endif
+
 		i2s_config.sample_rate = output.current_sample_rate;
 		i2s_config.bits_per_sample = bytes_per_frame * 8 / 2;
 		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
@@ -265,8 +250,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;	
 		
 		// finally let DAC driver initialize I2C and I2S
-		adac->init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
-	}
+		if (dac_tas57xx.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_tas57xx;
+		else if (dac_a1s.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_a1s;
+		else {
+			dac_external.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
+			adac = &dac_external;
+		}
+	}	
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 
 			spdif ? "S/PDIF" : "normal", 

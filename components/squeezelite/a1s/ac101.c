@@ -73,7 +73,6 @@ static int i2c_port;
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {	 
 	esp_err_t res;
 	
-	ESP_LOGI(TAG, "Initializing AC101");
 	i2c_port = i2c_port_num;
 
 	// configure i2c
@@ -83,22 +82,26 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 			.sda_pullup_en = GPIO_PULLUP_ENABLE,
 			.scl_io_num = 32,
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 100000,
+			.master.clk_speed = 250000,
 		};
 		
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
-	ESP_LOGI(TAG, "DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
+	
+	res = i2c_read_reg(CHIP_AUDIO_RS);
+	
+	if (!res) {
+		ESP_LOGW(TAG, "No AC101 detected");
+		i2c_driver_delete(i2c_port);
+		return 0;		
+	}
+	
+	ESP_LOGI(TAG, "AC101 DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
 	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
 	// huh?
-	 vTaskDelay(100 / portTICK_PERIOD_MS); 
+	vTaskDelay(100 / portTICK_PERIOD_MS); 
 	
-	if (ESP_OK != res) {
-		ESP_LOGE(TAG, "AC101 reset failed! %d", res);
-		return false;
-	} 
-			
 	// enable the PLL from BCLK source
 	i2c_write_reg(PLL_CTRL1, BIN(0000,0001,0100,1111));			// F=1,M=1,PLL,INT=31 (medium)				
 	i2c_write_reg(PLL_CTRL2, BIN(1000,0110,0000,0000));			// PLL, F=96,N_i=1024-96,F=0,N_f=0*0.2;
@@ -138,8 +141,8 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 #endif	
 	
 	// configure I2S pins & install driver	
-	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = 27, .ws_io_num = 26, 
-															.data_out_num = 25, .data_in_num = 35 //Not used 
+	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
+															.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO
 								};
 	i2s_driver_install(i2s_num, i2s_config, 0, NULL);
 	i2s_set_pin(i2s_num, &i2s_pin_config);

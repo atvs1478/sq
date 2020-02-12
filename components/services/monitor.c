@@ -21,17 +21,18 @@
 #include "globdefs.h"
 #include "config.h"
 #include "accessors.h"
-#include "accessors.h"
+
 #define MONITOR_TIMER	(10*1000)
 
 static const char *TAG = "monitor";
 
 static TimerHandle_t monitor_timer;
-#ifdef JACK_GPIO
-static int jack_gpio = JACK_GPIO;
-#else
-static int jack_gpio = -1;
-#endif
+
+static struct {
+	int gpio;
+	int active;
+} 	jack = { CONFIG_JACK_GPIO, 0 },
+	spkfault = { CONFIG_SPKFAULT_GPIO, 0 };
 
 void (*jack_handler_svc)(bool inserted);
 bool jack_inserted_svc(void);
@@ -62,8 +63,7 @@ static void jack_handler_default(void *id, button_event_e event, button_press_e 
  * 
  */
 bool jack_inserted_svc (void) {
-	if (jack_gpio != -1) return button_is_pressed(jack_gpio, NULL);
-	else return false;
+	return button_is_pressed(jack.gpio, NULL);
 }
 
 /****************************************************************************************
@@ -80,63 +80,64 @@ static void spkfault_handler_default(void *id, button_event_e event, button_pres
  * 
  */
 bool spkfault_svc (void) {
-#ifdef SPKFAULT_GPIO
-	return !gpio_get_level(SPKFAULT_GPIO);
-#else
-	return false;
-#endif
+	return button_is_pressed(spkfault.gpio, NULL);
 }
 
 /****************************************************************************************
  * 
  */
 void set_jack_gpio(int gpio, char *value) {
-	bool low = false;
-	
-	if (!strcasecmp(value, "jack_l")) {
-		jack_gpio = gpio;	
-		low = true;
-	} else if (!strcasecmp(value, "jack_h")) {
-		jack_gpio = gpio;	
+	if (strcasestr(value, "jack")) {
+		char *p;
+		jack.gpio = gpio;	
+		if ((p = strchr(value, ':')) != NULL) jack.active = atoi(p + 1);
 	}	
-	
-	if (jack_gpio != -1) {
-		gpio_pad_select_gpio(jack_gpio);
-		gpio_set_direction(jack_gpio, GPIO_MODE_INPUT);
-		gpio_set_pull_mode(jack_gpio, low ? GPIO_PULLUP_ONLY : GPIO_PULLDOWN_ONLY);
-		
-		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", low ? "low" : "high", gpio);					 
-		
-		// re-use button management for jack handler, it's a GPIO after all
-		button_create(NULL, jack_gpio, low ? BUTTON_LOW : BUTTON_HIGH, false, 250, jack_handler_default, 0, -1);
+}
+
+/****************************************************************************************
+ * 
+ */
+void set_spkfault_gpio(int gpio, char *value) {
+	if (strcasestr(value, "spkfault")) {
+		char *p;
+		spkfault.gpio = gpio;	
+		if ((p = strchr(value, ':')) != NULL) spkfault.active = atoi(p + 1);
 	}	
- }
+}
 
 /****************************************************************************************
  * 
  */
 void monitor_svc_init(void) {
 	ESP_LOGI(TAG, "Initializing monitoring");
-
-	// if JACK_GPIO is compiled-time defined set it there
-	if (jack_gpio != -1) {
-#if JACK_GPIO_LEVEL == 1		
-		set_jack_gpio(JACK_GPIO, "jack_h");	
-#else
-		set_jack_gpio(JACK_GPIO, "jack_l");	
-#endif
-	} else {
-		parse_set_GPIO(set_jack_gpio);
-	}	
-
-#ifdef SPKFAULT_GPIO
-	gpio_pad_select_gpio(SPKFAULT_GPIO);
-	gpio_set_direction(SPKFAULT_GPIO, GPIO_MODE_INPUT);
-	gpio_set_pull_mode(SPKFAULT_GPIO, GPIO_PULLUP_ONLY); 
 	
-	// re-use button management for speaker fault handler, it's a GPIO after all
-	button_create(NULL, SPKFAULT_GPIO, BUTTON_LOW, true, 0, spkfault_handler_default, 0, -1);
+#ifdef CONFIG_JACK_GPIO_LEVEL
+	jack.active = CONFIG_JACK_GPIO_LEVEL;
 #endif
+
+#ifndef CONFIG_JACK_LOCKED
+	parse_set_GPIO(set_jack_gpio);
+#endif	
+
+	// re-use button management for jack handler, it's a GPIO after all
+	if (jack.gpio != -1) {
+		ESP_LOGI(TAG,"Adding jack (%s) detection GPIO %d", jack.active ? "high" : "low", jack.gpio);					 
+		button_create(NULL, jack.gpio, jack.active ? BUTTON_HIGH : BUTTON_LOW, false, 250, jack_handler_default, 0, -1);
+	}	
+	
+#ifdef CONFIG_SPKFAULT_GPIO_LEVEL
+	spkfault.active = CONFIG_SPKFAULT_GPIO_LEVEL;
+#endif	
+
+#ifndef CONFIG_SPKFAULT_LOCKED
+	parse_set_GPIO(set_spkfault_gpio);
+#endif
+
+	// re-use button management for speaker fault handler, it's a GPIO after all
+	if (spkfault.gpio != -1) {
+		ESP_LOGI(TAG,"Adding speaker fault (%s) detection GPIO %d", spkfault.active ? "high" : "low", spkfault.gpio);					 
+		button_create(NULL, spkfault.gpio, spkfault.active ? BUTTON_HIGH : BUTTON_LOW, false, 0, spkfault_handler_default, 0, -1);
+	}	
 
 	// do we want stats
 	char *p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
@@ -145,5 +146,4 @@ void monitor_svc_init(void) {
 		xTimerStart(monitor_timer, portMAX_DELAY);
 	}	
 	free(p);
-	
 }

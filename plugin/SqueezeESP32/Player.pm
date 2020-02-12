@@ -7,6 +7,7 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
 my $prefs = preferences('plugin.squeezeesp32');
+my $log   = logger('plugin.squeezeesp32');
 
 sub model { 'squeezeesp32' }
 sub modelName { 'SqueezeESP32' }
@@ -23,10 +24,11 @@ sub playerSettingsFrame {
 	# New SETD command 0xfe for display width
 	if ($id == 0xfe) { 
 		$value = (unpack('CC', $$data_ref))[1];
-		if ($value > 10 && $value < 200) {
+		if ($value > 100 && $value < 400) {
 			$client->display->widthOverride(1, $value);
 			$client->update;
 		} 
+		$log->info("Setting player width $value for ", $client->name);
 	}
 	
 	$client->SUPER::playerSettingsFrame($data_ref);

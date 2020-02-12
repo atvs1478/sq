@@ -21,99 +21,106 @@ menu "Squeezelite-ESP32"
         	help
         		Set logging level info|debug|sdebug 	
 	endmenu
-    menu "Audio CODEC libraries"
-    config INCLUDE_FLAC
-        bool "FLAC"
-        default 1
-        help
-            Include FLAC library for flc decoding.
-    config INCLUDE_FAAD
-        bool "FAAD"
-        default 1
-        help
-            Include FAAD library for aac decoding.
-    config INCLUDE_MAD
-        bool "MAD"
-        default 1
-        help
-            Include mad library for mp3 decoding.
-	config INCLUDE_VORBIS
-        bool "VORBIS"
-        default 1
-        help
-            Include vorbis/ogg library for ogg/vorbis decoding.			
-	config INCLUDE_ALAC
-        bool "ALAC"
-        default 1
-        help
-            Include alac library for alac decoding.			
-	config INCLUDE_OPUS
-        bool "OPUS"
-        default 1
-        help
-            Include opus library for opus decoding.						
-	   
-    endmenu
-	menu "Audio Output"
+	config JACK_LOCKED
+		bool
+	config BAT_LOCKED	
+		bool
+	config I2C_LOCKED
+		bool
+	config SPDIF_LOCKED
+		bool		
+	config LED_LOCKED
+		bool				
+	config SPKFAULT_LOCKED
+		bool				
+    menu "Audio Output"
 		choice OUTPUT_TYPE
-	        prompt "Output Type"
+			prompt "Output Type"
 	        default BASIC_I2C_BT
 	        help
 	            Type of hardware platform
 	        config SQUEEZEAMP 
-	            bool "SqueezeAMP (TAS575x & Bluetooth)"
+				bool "SqueezeAMP"
+				select JACK_LOCKED
+				select BAT_LOCKED
+				select I2C_LOCKED
+				select SPDIF_LOCKED
+				select LED_LOCKED
+				select SPKFAULT_LOCKED
 			config A1S
 	            bool "ESP32-A1S module"				
+				select I2C_LOCKED
 	        config BASIC_I2C_BT
 	            bool "Generic I2S & Bluetooth"
 	    endchoice
 	  	
 		menu "DAC I2S settings" 
-			depends on BASIC_I2C_BT
-	    	config I2S_NUM         
+			visible if BASIC_I2C_BT
+			config I2S_NUM         
 		        int "I2S channel (0 or 1). "
 		        default 0
 		        help
 		            I2S dma channel to use.  
 		    config I2S_BCK_IO         
 		        int "I2S Bit clock GPIO number. "
-		        default 33
+				default 33 if !A1S
+		        default 27 if A1S
 		        help
 		            I2S Bit Clock gpio pin to use.  
 		    config I2S_WS_IO         
 		        int "I2S Word Select GPIO number. "
-		        default 25
+		        default 25 if !A1S
+				default 26 if A1S
 		        help
 		            I2S Word Select gpio pin to use.
 		    config I2S_DO_IO         
-		        int "I2S Data I/O GPIO number. "
-		        default 32
+		        int "I2S Data Output GPIO number. "
+		        default 32 if !A1S
+				default 25 if A1S
 		        help
-		            I2S data I/O gpio pin to use.
+		            I2S data output gpio pin to use.
+			config I2S_DI_IO         
+		        int "I2S Data Input GPIO number. "
+		        default -1 if !A1S
+				default 35 if A1S
+		        help
+		            I2S data input gpio pin to use (not used mostly, leave it to -1).					
+					
 		endmenu
 		
 		menu "SPDIF settings" 
-		    depends on BASIC_I2C_BT || A1S
-			config SDIF_NUM         
-		        int "SDPIF/I2S channel (0 or 1)"
-		        default 0
+			visible if BASIC_I2C_BT
+		    config SDIF_NUM         
+		        int "I2S channel for SDPIF (0 or 1)"
+		        default 0 
 		        help
 		            I2S dma channel to use.  
 		    config SPDIF_BCK_IO         
-		        int "SDPIF/I2S Bit clock GPIO number"
-		        default -1
+		        int "SDPIF Bit clock GPIO number"
+				default I2S_BCK_IO
 		        help
-		            Must be set even if you don't use SPDIF  
+		            Must be set as SPDIF re-uses I2S but only needs DO (recommendation: set it to I2S Bit clock value)
 		    config SPDIF_WS_IO         
-		        int "SPDIF/I2S Word Select GPIO number"
-		        default -1
+		        int "SPDIF Word Select GPIO number"
+				default I2S_WS_IO
 		        help
-		            Must be set even if you don't use SPDIF  
+		            Must be set as SPDIF re-uses I2S but only needs DO (recommendation: set it to I2S Word select value)
 		    config SPDIF_DO_IO         
-		        int "I2S Data I/O GPIO number"
-		        default -1
-		        help
-		            Must be set even if you don't use SPDIF  
+		        int "SPDIF Data I/O GPIO number"
+		        default 15 if SQUEEZEAMP
+				default I2S_DO_IO if !A1S
+				default -1 if A1S
+				help
+		            I2S data output IO use to simulate SPDIF
+		endmenu
+		
+		menu "SPDIF settings" 
+			visible if A1S
+		    config SPDIF_DO_IO         
+		        int "SPDIF Data I/O GPIO number"
+				default -1
+				help
+		            I2S data output IO use to simulate SPDIF
 		endmenu
 				
 		menu "A2DP settings"
@@ -179,11 +186,8 @@ menu "Squeezelite-ESP32"
 			default ""
 			help
 				Set parameters for display screen, leave empty for no screen
-				I2C,width=<size>,height=<size>
-				SPI,width=<size>,height=<size>,select=<gpio>
-		config DISPLAY_I2C_SPEED
-			int "I2C bus speed"
-				default 250000
+				I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip]
+				SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,HFlip][,VFlip]
 	endmenu	
 	
 	menu "Various I/O"
@@ -192,26 +196,96 @@ menu "Squeezelite-ESP32"
 			default ""
 			help
 				Set parameters of shared I2C interface
-				sda=<gpio>,scl=<gpio>,speed=<num>,port=<0|1>
+				sda=<gpio>,scl=<gpio>[,speed=<num>][,port=<0|1>]
+		config SPI_CONFIG
+			string "SPI system configuration"
+			default ""
+			help
+				Set parameters of shared SPI interface
+				data=<gpio>,clk=<gpio>[,d/c=<num>][,host=<0|1|2>]				
+		config SET_GPIO				
+			string "Special GPIO configuration"
+			default ""
+			help
+				Set parameters of shared GPIO with special values. 
+				<gpio_1>=Vcc|GND|amp|jack[:0|1][,<gpio_n>=Vcc|GND|amp|jack[:0|1]]
+				'amp'  => GPIO that is set when playback starts 
+				'jack' => GPIO used for audio jack detection
+				'green', 'red' => GPIO for status LED
+				'[:0|1] means set the active value for that GPIO can be low or high
+		config ROTARY_ENCODER
+			string "Rotary Encoder configuration"
+			default ""
+			help
+				Set GPIO for rotary encoder (quadrature phase). See README on SqueezeESP32 project's GitHub for more details
+				A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]				
+	endmenu
+	menu "LED configuration"
+		visible if !SQUEEZEAMP
 		config LED_GREEN_GPIO
 			int "Green led GPIO"
-			default -1
+			default -1 if !SQUEEZEAMP
+			default 12 if SQUEEZEAMP
 			help
 				Set to -1 for no LED
+		config LED_GREEN_GPIO_LEVEL
+			int "Green led ON level"
+			depends on LED_GREEN_GPIO != -1
+			default 0 if SQUEEZEAMP
+			default 1 if !SQUEEZEAMP
 		config LED_RED_GPIO				
 			int "Red led GPIO"
-			default -1
+			default -1 if !SQUEEZEAMP
+			default 13 if SQUEEZEAMP
 			help
 				Set to -1 for no LED
-		config JACK_GPIO				
+		config LED_RED_GPIO_LEVEL
+			int "Red led ON level"
+			depends on LED_RED_GPIO != -1
+			default 0 if SQUEEZEAMP
+			default 1 if !SQUEEZEAMP
+	endmenu
+    menu "Audio JACK"	
+		visible if !SQUEEZEAMP
+		config JACK_GPIO		
 			int "Jack insertion GPIO"
-			default -1
+			default -1 if !SQUEEZEAMP
+			default 34 if SQUEEZEAMP
 			help
-				GPIO to detect speaker jack insertion. Set to -1 for no detection
+				GPIO to detect speaker jack insertion. Set to -1 for no detection. 
 		config JACK_GPIO_LEVEL
 			depends on JACK_GPIO != -1
 			int "Level when inserted (0/1)"
-		        default 0
+			default 0
+	endmenu	
+	menu "Speaker Fault"	
+		visible if !SQUEEZEAMP
+		config SPKFAULT_GPIO		
+			int "Speaker fault GPIO"
+			default -1 if !SQUEEZEAMP
+			default 2 if SQUEEZEAMP
+			help
+				GPIO to detect speaker fault condition. Set to -1 for no detection. 
+		config SPKFAULT_GPIO_LEVEL
+			depends on SPKFAULT_GPIO != -1
+			int "Level when fault (0/1)"
+			default 0
+	endmenu	
+	menu "Battery measure"	
+		visible if !SQUEEZEAMP
+		config BAT_CHANNEL	
+			int "Set channel (0..7)"
+			default -1 if !SQUEEZEAMP
+			default 7 if SQUEEZEAMP
+			help
+				Read a value every 10s on ADC1 on set Channel
+		config BAT_SCALE	
+			string "Set scaling factor"
+			depends on BAT_CHANNEL != -1
+			default "" if !SQUEEZEAMP
+			default "20.24" if SQUEEZEAMP
+			help
+				Set the scaling factor for this 12 bits ADC
 	endmenu	
 	
 endmenu
