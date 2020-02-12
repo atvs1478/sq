@@ -230,9 +230,9 @@ static bool SSD13x6_Init( struct SSD13x6_Device* DeviceHandle, int Width, int He
 			SSD13x6_WriteCommand( DeviceHandle, 0x8D );
 			SSD13x6_WriteCommand( DeviceHandle, 0x14 ); 
 			
-			// COM pins HW config (alternative:EN, remap:DIS) - some display might need something difference
+			// COM pins HW config (alternative:EN if 64, DIS if 32, remap:DIS) - some display might need something difference
 			SSD13x6_WriteCommand( DeviceHandle, 0xDA );
-			SSD13x6_WriteCommand( DeviceHandle, (1 << 4) | (0 < 5) );
+			SSD13x6_WriteCommand( DeviceHandle, ((Height == 64 ? 1 : 0) << 4) | (0 < 5) );
 
 		} else {
 			// charge pump regulator, do direct init
@@ -256,9 +256,6 @@ static bool SSD13x6_Init( struct SSD13x6_Device* DeviceHandle, int Width, int He
 		// no gray scale
 		DeviceHandle->ReMap |= 0x10;
 		SSD132x_ReMap( DeviceHandle );
-		
-		SSD13x6_SetHFlip( DeviceHandle, false );
-		SSD13x6_SetVFlip( DeviceHandle, false );
 	}
 
 	SSD13x6_SetMuxRatio( DeviceHandle, Height - 1 );
