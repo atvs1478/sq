@@ -404,6 +404,26 @@ static int erase_namespace(int argc, char **argv)
     return 0;
 }
 
+static int erase_wifi_manager(int argc, char **argv)
+{
+    nvs_handle nvs;
+	esp_err_t err = nvs_open("config", NVS_READWRITE, &nvs);
+	if (err == ESP_OK) {
+		err = nvs_erase_all(nvs);
+		if (err == ESP_OK) {
+			err = nvs_commit(nvs);
+		}
+	}
+	nvs_close(nvs);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "wifi manager configuration was not erase. %s", esp_err_to_name(err));
+		return 1;
+	}
+	else {
+		ESP_LOGW(TAG, "Wifi manager configuration was erased");
+	}
+	return 0;
+}
 
 
 static int list(const char *part, const char *name, const char *str_type)
@@ -502,6 +522,13 @@ void register_nvs()
         .func = &erase_namespace,
         .argtable = &erase_all_args
     };
+    const esp_console_cmd_t erase_wifimanager_cmd = {
+        .command = "nvs_erase_wifi_manager",
+        .help = "Erases wifi_manager's config",
+        .hint = NULL,
+        .func = &erase_wifi_manager,
+        .argtable = NULL
+    };
 
 
     const esp_console_cmd_t list_entries_cmd = {
@@ -519,6 +546,8 @@ void register_nvs()
     ESP_ERROR_CHECK(esp_console_cmd_register(&get_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_namespace_cmd));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&erase_wifimanager_cmd));
+
 }
 #ifdef __cplusplus
 extern }
