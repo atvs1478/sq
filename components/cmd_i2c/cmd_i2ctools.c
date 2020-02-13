@@ -419,7 +419,7 @@ static int do_i2c_set_display(int argc, char **argv)
 	}
 
 	if(!name) name = strdup("I2C");
-	if(!driver) driver = strdup("SSD136");
+	if(!driver) driver = strdup("SSD1306");
 
 	bool rotate = i2cdisp_args.rotate->count>0;
 
