@@ -8,8 +8,7 @@
 #
 COMPONENT_EMBED_FILES := style.css code.js index.html bootstrap.min.css.gz jquery.min.js.gz popper.min.js.gz bootstrap.min.js.gz
 
-#CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG 
-CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_DEBUG \
+CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_INFO \
 	-I$(COMPONENT_PATH)/../tools			
 COMPONENT_ADD_INCLUDEDIRS := .
 COMPONENT_ADD_INCLUDEDIRS += $(COMPONENT_PATH)/../tools

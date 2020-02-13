@@ -18,7 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "config.h"
 #include "nvs_utilities.h"
 

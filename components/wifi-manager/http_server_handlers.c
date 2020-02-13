@@ -254,7 +254,7 @@ session_context_t* get_session_context(httpd_req_t *req){
 	}
 	session_context_t *ctx_data = (session_context_t*)req->sess_ctx;
 	ctx_data->sess_ip_address = http_alloc_get_socket_address(req, 0, &ctx_data->port);
-	ESP_LOGI_LOC(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
+	ESP_LOGD_LOC(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
 	return (session_context_t *)req->sess_ctx;
 }
 
@@ -382,7 +382,7 @@ esp_err_t root_get_handler(httpd_req_t *req){
 
 esp_err_t resource_filehandler(httpd_req_t *req){
     char filepath[FILE_PATH_MAX];
-   ESP_LOGI_LOC(TAG, "serving [%s]", req->uri);
+   ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
 
    const char *filename = get_path_from_uri(filepath, req->uri, sizeof(filepath));
 
@@ -437,7 +437,7 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 	   httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File does not exist");
 	   return ESP_FAIL;
    }
-   ESP_LOGI_LOC(TAG, "Resource sending complete");
+   ESP_LOGD_LOC(TAG, "Resource sending complete");
    return ESP_OK;
 
 }
@@ -589,7 +589,7 @@ esp_err_t config_post_handler(httpd_req_t *req){
 			err = ESP_FAIL;
 		}
 		if(err == ESP_OK){
-			ESP_LOGI_LOC(TAG,"Found config value name [%s]", prev_item->string);
+			ESP_LOGD_LOC(TAG,"Found config value name [%s]", prev_item->string);
 			nvs_type_t item_type=  config_get_item_type(prev_item);
 			if(item_type!=0){
 				void * val = config_safe_alloc_get_entry_value(item_type, prev_item);
@@ -614,7 +614,7 @@ esp_err_t config_post_handler(httpd_req_t *req){
 							err = ESP_FAIL;
 						}
 						else {
-							ESP_LOGI_LOC(TAG,"Successfully set value for [%s]",prev_item->string);
+							ESP_LOGD_LOC(TAG,"Successfully set value for [%s]",prev_item->string);
 						}
 					}
 					free(val);

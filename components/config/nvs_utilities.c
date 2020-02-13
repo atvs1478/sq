@@ -1,4 +1,3 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "nvs_utilities.h"
 
 #include <stdio.h>

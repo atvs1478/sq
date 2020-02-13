@@ -60,7 +60,6 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "lwip/priv/tcp_priv.h"
 #include "lwip/priv/tcpip_priv.h"
 #include "esp_vfs.h"
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 
 
 #ifdef __cplusplus

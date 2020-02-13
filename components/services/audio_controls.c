@@ -18,7 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
