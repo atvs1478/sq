@@ -41,6 +41,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <stdio.h>
 #include <stdlib.h>
 #include "cJSON.h"
+#include "config.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -323,7 +324,10 @@ static const char* get_path_from_uri(char *dest, const char *uri, size_t destsiz
 /* Set HTTP response content type according to file extension */
 static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename)
 {
-    if (IS_FILE_EXT(filename, ".pdf")) {
+    if(strlen(filename) ==0){
+    	// for root page, etc.
+    	return httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+    } else if (IS_FILE_EXT(filename, ".pdf")) {
         return httpd_resp_set_type(req, "application/pdf");
     } else if (IS_FILE_EXT(filename, ".html")) {
         return httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
@@ -340,6 +344,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
     } else if (IS_FILE_EXT(filename, ".json")) {
         return httpd_resp_set_type(req, HTTPD_TYPE_JSON);
     }
+
     /* This is a limited set only */
     /* For any other type always set as plain text */
     return httpd_resp_set_type(req, "text/plain");
@@ -360,6 +365,7 @@ static esp_err_t set_content_type_from_req(httpd_req_t *req)
 	   httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Browsing files forbidden.");
 	   return ESP_FAIL;
    }
+   set_content_type_from_file(req, filename);
    return ESP_OK;
 }
 
@@ -548,6 +554,11 @@ esp_err_t config_post_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
+	err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
+
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
     cJSON *root = cJSON_Parse(buf);
     if(root == NULL){
@@ -637,7 +648,6 @@ esp_err_t config_post_handler(httpd_req_t *req){
 
 
 	if(err==ESP_OK){
-		set_content_type_from_req(req);
 		httpd_resp_sendstr(req, "{ \"result\" : \"OK\" }");
 	}
     cJSON_Delete(root);
@@ -660,11 +670,16 @@ esp_err_t connect_post_handler(httpd_req_t *req){
     char * ssid=NULL;
     char * password=NULL;
     char * host_name=NULL;
-	set_content_type_from_req(req);
+
 	esp_err_t err = post_handler_buff_receive(req);
 	if(err!=ESP_OK){
 		return err;
 	}
+	err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
+
 	char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
     if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
@@ -724,7 +739,10 @@ esp_err_t connect_delete_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-	set_content_type_from_req(req);
+	esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
 	httpd_resp_send(req, (const char *)success, strlen(success));
 	wifi_manager_disconnect_async();
 
@@ -737,7 +755,11 @@ esp_err_t reboot_ota_post_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-	set_content_type_from_req(req);
+    esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
+
 	httpd_resp_send(req, (const char *)success, strlen(success));
 	wifi_manager_reboot(OTA);
     return ESP_OK;
@@ -749,7 +771,10 @@ esp_err_t reboot_post_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-	set_content_type_from_req(req);
+    esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
 	httpd_resp_send(req, (const char *)success, strlen(success));
 	wifi_manager_reboot(RESTART);
 	return ESP_OK;
@@ -761,12 +786,91 @@ esp_err_t recovery_post_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-	set_content_type_from_req(req);
+    esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
 	httpd_resp_send(req, (const char *)success, strlen(success));
 	wifi_manager_reboot(RECOVERY);
 	return ESP_OK;
 }
 
+#if RECOVERY_APPLICATION
+esp_err_t flash_post_handler(httpd_req_t *req){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    char success[]="File uploaded. Flashing started.";
+    if(!is_user_authenticated(req)){
+    	// todo:  redirect to login page
+    	// return ESP_OK;
+    }
+    esp_err_t err = httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	if(err != ESP_OK){
+		return err;
+	}
+	char * binary_buffer = malloc(req->content_len);
+	if(binary_buffer == NULL){
+        ESP_LOGE(TAG, "File too large : %d bytes", req->content_len);
+        /* Respond with 400 Bad Request */
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                            "Binary file too large. Unable to allocate memory!");
+        return ESP_FAIL;
+	}
+	ESP_LOGI(TAG, "Receiving ota binary file");
+	/* Retrieve the pointer to scratch buffer for temporary storage */
+	char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+
+	char *head=binary_buffer;
+	int received;
+
+	/* Content length of the request gives
+	 * the size of the file being uploaded */
+	int remaining = req->content_len;
+
+	while (remaining > 0) {
+
+		ESP_LOGI(TAG, "Remaining size : %d", remaining);
+		/* Receive the file part by part into a buffer */
+		if ((received = httpd_req_recv(req, buf, MIN(remaining, SCRATCH_BUFSIZE))) <= 0) {
+			if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+				/* Retry if timeout occurred */
+				continue;
+			}
+			FREE_RESET(binary_buffer);
+			ESP_LOGE(TAG, "File reception failed!");
+			/* Respond with 500 Internal Server Error */
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive file");
+			err = ESP_FAIL;
+			goto bail_out;
+		}
+
+		/* Write buffer content to file on storage */
+		if (received ) {
+			memcpy(head,buf,received );
+			head+=received;
+		}
+
+		/* Keep track of remaining size of
+		 * the file left to be uploaded */
+		remaining -= received;
+	}
+
+	/* Close file upon upload completion */
+	ESP_LOGI(TAG, "File reception complete. Invoking OTA process.");
+	err = start_ota(NULL, binary_buffer, req->content_len);
+	if(err!=ESP_OK){
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA processing failed");
+		goto bail_out;
+	}
+
+	//todo:  handle this in ajax.  For now, just send the root page
+	httpd_resp_send(req, (const char *)success, strlen(success));
+
+bail_out:
+
+	return err;
+}
+
+#endif
 char * get_ap_ip_address(){
 	static char ap_ip_address[IP4ADDR_STRLEN_MAX]={};
 
@@ -869,7 +973,7 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
     char *req_host = alloc_get_http_header(req, "Host");
 
     user_agent = alloc_get_http_header(req,"User-Agent");
-    if((useragentiscaptivenetwork = strcasestr(user_agent,"CaptiveNetworkSupport"))==true){
+    if((useragentiscaptivenetwork = (user_agent!=NULL  && strcasestr(user_agent,"CaptiveNetworkSupport"))==true)){
     	ESP_LOGW_LOC(TAG,"Found user agent that supports captive networks! [%s]",user_agent);
     }
 
@@ -941,7 +1045,10 @@ esp_err_t status_get_handler(httpd_req_t *req){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-	set_content_type_from_req(req);
+    esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
 
 	if(wifi_manager_lock_json_buffer(( TickType_t ) 10)) {
 		char *buff = wifi_manager_alloc_get_ip_info_json();

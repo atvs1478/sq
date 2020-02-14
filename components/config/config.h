@@ -12,7 +12,9 @@ extern "C" {
 #endif
 #define DECLARE_SET_DEFAULT(t) void config_set_default_## t (const char *key, t  value);
 #define DECLARE_GET_NUM(t) esp_err_t config_get_## t (const char *key, t *  value);
-
+#ifndef FREE_RESET
+#define FREE_RESET(p) if(p!=NULL) { free(p); p=NULL; }
+#endif
 
 DECLARE_SET_DEFAULT(uint8_t);
 DECLARE_SET_DEFAULT(uint16_t);

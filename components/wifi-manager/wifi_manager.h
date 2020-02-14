@@ -48,7 +48,6 @@ extern "C" {
 
 #if RECOVERY_APPLICATION==1
 #elif RECOVERY_APPLICATION==0
-#pragma message "compiling for squeezelite."
 #else
 #error "unknown configuration"
 #endif

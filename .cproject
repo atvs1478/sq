@@ -199,12 +199,6 @@
             			
             <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291" moduleId="org.eclipse.cdt.core.settings" name="recovery_windows">
                 				
-                <macros>
-                    					
-                    <stringMacro name="RECOVERY_APPLICATION" type="VALUE_TEXT" value="1"/>
-                    				
-                </macros>
-                				
                 <externalSettings/>
                 				
                 <extensions>
@@ -239,7 +233,7 @@
                             							
                             <targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1831977109" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
                             							
-                            <builder arguments="&quot;c:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot;  EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=${RECOVERY_APPLICATION}'" buildPath="${workspace_loc:/squeezelite-esp32}" command="python" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="cdt.managedbuild.builder.gnu.cross"/>
+                            <builder arguments="&quot;c:/msys32/opt/esp-idf/tools/windows/eclipse_make.py&quot;" buildPath="${workspace_loc:/squeezelite-esp32}" command="python" enabledIncrementalBuild="true" id="cdt.managedbuild.builder.gnu.cross.1069921467" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="optimal" stopOnErr="false" superClass="cdt.managedbuild.builder.gnu.cross"/>
                             							
                             <tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.1302011176" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
                                 								

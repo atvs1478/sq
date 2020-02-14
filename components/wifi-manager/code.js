@@ -367,7 +367,31 @@ $(document).ready(function(){
         console.log('sent config JSON with headers:', JSON.stringify(headers));
         console.log('sent config JSON with data:', JSON.stringify(data));
     });
-
+    $("#fwUpload").on("click", function() {
+    	
+        var upload_path = "/flash.json";
+        var fileInput = document.getElementById("flashfilename").files;
+        if (fileInput.length == 0) {
+            alert("No file selected!");
+        } else {
+            var file = fileInput[0];
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (xhttp.readyState == 4) {
+                    if (xhttp.status == 200) {
+                    	showMessage(xhttp.responseText, 'INFO')
+                    } else if (xhttp.status == 0) {
+                    	showMessage("Upload connection was closed abruptly!", 'ERROR');
+                    } else {
+                    	showMessage(xhttp.status + " Error!\n" + xhttp.responseText, 'ERROR');
+                    }
+                }
+            };
+            xhttp.open("POST", upload_path, true);
+            xhttp.send(file);    	
+        }
+    	enableStatusTimer = true;
+    });
     $("#flash").on("click", function() {
         var data = { 'timestamp': Date.now() };
         if (blockFlashButton) return;
@@ -732,6 +756,8 @@ function checkStatus(){
                 $("footer.footer").addClass('sl');
                 $("#boot-button").html('Recovery');
                 $("#boot-form").attr('action', '/recovery.json');
+                $('#uploaddiv"]').hide();
+                
                 enableStatusTimer = false;
             }
         }
@@ -874,3 +900,6 @@ function showMessage(message, severity) {
 function inRange(x, min, max) {
     return ((x-min)*(x-max) <= 0);
 }
+
+    
+    

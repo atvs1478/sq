@@ -27,6 +27,9 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.1476804786/appendC
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/BATCH_BUILD/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/BATCH_BUILD/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/EXTRA_CPPFLAGS/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/EXTRA_CPPFLAGS/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=0
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/value=C\:/msys32/opt/esp-idf
@@ -44,6 +47,9 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.16039962
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/BATCH_BUILD/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/BATCH_BUILD/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/EXTRA_CPPFLAGS/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/EXTRA_CPPFLAGS/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=1
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/value=C\:/msys32/opt/esp-idf
@@ -61,6 +67,9 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.16039962
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/EXTRA_CPPFLAGS/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/EXTRA_CPPFLAGS/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=1
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.839256934/IDF_PATH/value=/var/opt/esp-idf/
@@ -78,6 +87,9 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.83925693
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/EXTRA_CPPFLAGS/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/EXTRA_CPPFLAGS/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=0
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/IDF_PATH/value=/var/opt/esp-idf/

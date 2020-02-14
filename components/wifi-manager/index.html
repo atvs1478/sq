@@ -345,21 +345,20 @@
                     </table>
                     <h2>Firmware URL:</h2>
                     <textarea id="fwurl" maxlength="350"></textarea>
-                   <!-- 
-                    <br />OR<br />
-                    <div class="input-group mb-3" id="upload">
+                    <div class="buttons">
+                    	<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
+                    </div>
+                     <br />OR<br />
+                    <div class="input-group mb-3" id="uploaddiv">
                         <div class="custom-file">
-                            <input type="file" class="custom-file-input" id="inputGroupFile01">
-                            <label class="custom-file-label" for="inputGroupFile01"></label>
+                            <input type="file" class="custom-file-input" id="flashfilename">
+                            <label class="custom-file-label" for="flashfilename"></label>
                         </div>
                         <div class="input-group-append">
                             <span class="input-group-text" id="fwUpload">Upload</span>
                         </div>
                     </div>
-                   -->
-                    <div class="buttons">
-                    	<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
-                    </div>
+                    
                     <div id="otadiv">
                         <div class="progress" id="progress">
                             <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width:0%">

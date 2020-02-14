@@ -17,6 +17,7 @@
 #include "esp_system.h"
 #include "esp_sleep.h"
 #include "esp_spi_flash.h"
+#include "squeezelite-ota.h"
 #include "driver/rtc_io.h"
 #include "driver/uart.h"
 #include "argtable3/argtable3.h"
@@ -27,7 +28,7 @@
 #include "sdkconfig.h"
 
 static const char * TAG = "ota";
-extern esp_err_t start_ota(const char * bin_url);
+
 static struct {
     struct arg_str *url;
     struct arg_end *end;
@@ -45,7 +46,7 @@ static int perform_ota_update(int argc, char **argv)
 
     esp_err_t err=ESP_OK;
     ESP_LOGI(TAG, "Starting ota: %s", url);
-    start_ota(url);
+    start_ota(url, NULL, 0);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "%s", esp_err_to_name(err));

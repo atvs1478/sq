@@ -88,6 +88,9 @@ esp_err_t connect_delete_handler(httpd_req_t *req);
 esp_err_t reboot_ota_post_handler(httpd_req_t *req);
 esp_err_t reboot_post_handler(httpd_req_t *req);
 esp_err_t recovery_post_handler(httpd_req_t *req);
+#if RECOVERY_APPLICATION
+esp_err_t flash_post_handler(httpd_req_t *req);
+#endif
 esp_err_t status_get_handler(httpd_req_t *req);
 esp_err_t ap_scan_handler(httpd_req_t *req);
 esp_err_t redirect_ev_handler(httpd_req_t *req);

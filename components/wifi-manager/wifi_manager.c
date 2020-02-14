@@ -66,6 +66,7 @@ Contains the freeRTOS task and all necessary support
 #include "globdefs.h"
 
 #ifndef RECOVERY_APPLICATION
+#pragma warning "Defaulting to squeezelite build"
 #define RECOVERY_APPLICATION 0
 #endif
 
@@ -1470,7 +1471,7 @@ void wifi_manager( void * pvParameters ){
 				break;
 			case  ORDER_RESTART_OTA_URL:
 				ESP_LOGD(TAG,   "Calling start_ota.");
-				start_ota(msg.param);
+				start_ota(msg.param, NULL, 0);
 				free(msg.param);
 				break;
 

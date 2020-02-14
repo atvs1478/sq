@@ -9,6 +9,7 @@
 #include "esp_attr.h"
 #include "esp_image_format.h"
 #include "esp_ota_ops.h"
+#include "sys/param.h"
 
 #if RECOVERY_APPLICATION
 #define CODE_RAM_LOCATION
@@ -35,7 +36,7 @@
 // tasks
 #define OTA_TASK_PRIOTITY 6
 
-esp_err_t start_ota(const char * bin_url);
+esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length);
 const char * ota_get_status();
 uint8_t ota_get_pct_complete();
 
