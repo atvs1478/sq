@@ -365,7 +365,6 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 	_scale_and_pack_frames(obuf + oframes * bytes_per_frame, optr, out_frames, gainL, gainR, output.format);
 #endif	
 
-	// send data to visu
 	output_visu_export((s16_t*) (obuf + oframes * bytes_per_frame), out_frames, output.current_sample_rate, silence);
 
 	oframes += out_frames;
