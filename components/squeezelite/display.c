@@ -729,8 +729,13 @@ static void visu_handler( u8_t *data, int len) {
 		visu.bar_border = (visu.width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
 		
 		// give up if not enough space
-		if (visu.bar_width < 0)	visu.mode = VISU_BLANK;
-		else vTaskResume(displayer.task);
+		if (visu.bar_width < 0)	{
+			visu.mode = VISU_BLANK;
+		} else {
+			// de-activate scroller if we are taking main screen
+			if (visu.row < SB_HEIGHT) scroller.active = false;
+			vTaskResume(displayer.task);
+		}	
 		visu.wake = 0;
 		
 		// reset bars maximum
