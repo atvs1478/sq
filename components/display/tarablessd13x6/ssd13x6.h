@@ -58,7 +58,7 @@ struct SSD13x6_Device {
 
 	enum { SSD1306, SSD1326, SH1106 } Model;
 	uint8_t ReMap;
-    uint8_t* Framebuffer;
+    uint8_t* Framebuffer, *Shadowbuffer;
     int FramebufferSize;
 
     WriteCommandProc WriteCommand;

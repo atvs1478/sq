@@ -68,6 +68,8 @@ void output_init_embedded(log_level level, char *device, unsigned output_buf_siz
 		output_init_i2s(level, device, output_buf_size, params, rates, rate_delay, idle);
 	}	
 	
+	output_visu_init(level);
+	
 	LOG_INFO("init completed.");
 }	
 
@@ -75,6 +77,7 @@ void output_close_embedded(void) {
 	LOG_INFO("close output");
 	if (close_cb) (*close_cb)();		
 	output_close_common();
+	output_visu_close();
 }
 
 void set_volume(unsigned left, unsigned right) { 

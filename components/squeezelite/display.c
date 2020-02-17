@@ -18,6 +18,8 @@
  */
 
 #include <ctype.h>
+#include <math.h>
+#include "esp_dsp.h"
 #include "squeezelite.h"
 #include "slimproto.h"
 #include "display.h"
@@ -54,6 +56,21 @@ struct grfg_packet {
 	u16_t  width;		// # of pixels of scrollable
 };
 
+struct visu_packet {
+	char  opcode[4];
+	u8_t which;
+	u8_t count;
+	union {
+		u32_t width;
+		u32_t full_bars;
+	};	
+	u32_t height;
+	s32_t col;
+	s32_t row;	
+	u32_t border;
+	u32_t small_bars;	
+};
+
 struct ANIC_header {
 	char  opcode[4];
 	u32_t length;
@@ -64,19 +81,58 @@ struct ANIC_header {
 
 extern struct outputstate output;
 
+static struct {
+	TaskHandle_t task;
+	SemaphoreHandle_t mutex;
+} displayer;	
+
+#define LONG_WAKE 		(10*1000)
+#define SB_HEIGHT		32
+
+// lenght are number of frames, i.e. 2 channels of 16 bits
+#define	FFT_LEN_BIT	6		
+#define	FFT_LEN		(1 << FFT_LEN_BIT)
+#define RMS_LEN_BIT	6
+#define RMS_LEN		(1 << RMS_LEN_BIT)
+
+// actually this is 2x the displayed BW
+#define DISPLAY_BW	32000
+
 static struct scroller_s {
 	// copy of grfs content
-	u8_t  screen, direction;	
-	u32_t pause, speed;		
-	u16_t by, mode, full_width, window_width;		
-	u16_t max, size;
+	u8_t  screen;	
+	u32_t pause, speed;
+	int wake;	
+	u16_t mode;	
+	s16_t by;
 	// scroller management & sharing between grfg and scrolling task
-	TaskHandle_t task;
-	u8_t *scroll_frame, *back_frame;
-	bool active, updated;
-	u8_t *scroll_ptr;
-	int scroll_len, scroll_step;
+	bool active, first;
+	int scrolled;
+	struct {
+		u8_t *frame;
+		u32_t width;
+		u32_t max, size;
+	} scroll;
+	struct {
+		u8_t *frame;
+		u32_t width;
+	} back;
+	u8_t *frame;
+	u32_t width;
 } scroller;
+
+#define MAX_BARS	32
+static EXT_RAM_ATTR struct {
+	int bar_gap, bar_width, bar_border;
+	struct {
+		int current;
+		int max;
+	} bars[MAX_BARS];
+	int n, col, row, height, width, border;
+	enum { VISU_BLANK, VISU_VUMETER, VISU_SPECTRUM, VISU_WAVEFORM } mode;
+	int speed, wake;	
+	float fft[FFT_LEN*2], samples[FFT_LEN*2], hanning[FFT_LEN];
+} visu;
 
 #define ANIM_NONE		  0x00
 #define ANIM_TRANSITION   0x01 // A transition animation has finished
@@ -91,11 +147,11 @@ static u8_t SETD_width;
 #define LINELEN				40
 
 static log_level loglevel = lINFO;
-static SemaphoreHandle_t display_mutex;
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static void (*slimp_loop_chain)(void);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
 static int display_width, display_height;
+static bool display_dirty = true;
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -107,7 +163,9 @@ static void grfe_handler( u8_t *data, int len);
 static void grfb_handler(u8_t *data, int len);
 static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
-static void scroll_task(void* arg);
+static void visu_handler( u8_t *data, int len);
+
+static void displayer_task(void* arg);
 
 /* scrolling undocumented information
 	grfs	
@@ -151,17 +209,24 @@ bool sb_display_init(void) {
 	
 	// need to force height to 32 maximum
 	display_width = display->width;
-	display_height = min(display->height, 32);
+	display_height = min(display->height, SB_HEIGHT);
 	SETD_width = display->width;
-	
+
+	// create visu configuration
+	visu.bar_gap = 1;
+	visu.speed = 100;
+	dsps_fft2r_init_fc32(visu.fft, FFT_LEN);
+	dsps_wind_hann_f32(visu.hanning, FFT_LEN);
+		
 	// create scroll management task
-	display_mutex = xSemaphoreCreateMutex();
-	scroller.task = xTaskCreateStatic( (TaskFunction_t) scroll_task, "scroll_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+	displayer.mutex = xSemaphoreCreateMutex();
+	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller
-	scroller.max = (display_width * display_height / 8) * 10;
-	scroller.scroll_frame = malloc(scroller.max);
-	scroller.back_frame = malloc(display_width * display_height / 8);
+	scroller.scroll.max = (display_width * display_height / 8) * 10;
+	scroller.scroll.frame = malloc(scroller.scroll.max);
+	scroller.back.frame = malloc(display_width * display_height / 8);
+	scroller.frame = malloc(display_width * display_height / 8);
 
 	// chain handlers
 	slimp_handler_chain = slimp_handler;
@@ -225,6 +290,8 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	char msg[32];
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
 	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+	SETD_width = display->width;
+	display_dirty = true;
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
 
@@ -246,6 +313,8 @@ static bool handler(u8_t *data, int len){
 			grfs_handler(data, len);		
 		} else if (!strncmp((char*) data, "grfg", 4)) {
 			grfg_handler(data, len);
+		} else if (!strncmp((char*) data, "visu", 4)) {
+			visu_handler(data, len);
 		} else {
 			res = false;
 		}
@@ -374,12 +443,27 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
  * Process graphic display data
  */
 static void grfe_handler( u8_t *data, int len) {
-	xSemaphoreTake(display_mutex, portMAX_DELAY);
+		
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	
 	scroller.active = false;
-	display->draw_cbr(data + sizeof(struct grfe_packet), display_height);
 	
-	xSemaphoreGive(display_mutex);
+	// if we are displaying visu on a small screen, do not do screen update
+	if (visu.mode && !visu.col && visu.row < SB_HEIGHT) {
+		xSemaphoreGive(displayer.mutex);
+		return;
+	}	
+	
+	// did we have something that might have write on the bottom of a SB_HEIGHT+ display
+	if (display_dirty) {
+		display->clear(true);
+		display_dirty = false;
+	}	
+	
+	display->draw_cbr(data + sizeof(struct grfe_packet), display_width, display_height);
+	display->update();
+	
+	xSemaphoreGive(displayer.mutex);
 	
 	LOG_DEBUG("grfe frame %u", len);
 }	
@@ -415,36 +499,46 @@ static void grfs_handler(u8_t *data, int len) {
 				htonl(pkt->pause),		// in ms	
 				htonl(pkt->speed),		// in ms
 				htons(pkt->by),			// # of pixel of scroll step
-				htons(pkt->mode),			// 0=continuous, 1=once and stop, 2=once and end
-				htons(pkt->width),		// total width of animation
+				htons(pkt->mode),		// 0=continuous, 1=once and stop, 2=once and end
+				htons(pkt->width),		// last column of animation that contains a "full" screen
 				htons(pkt->offset)		// offset if multiple packets are sent
 	);
 	
 	// new grfs frame, build scroller info
 	if (!offset) {	
 		// use the display as a general lock
-		xSemaphoreTake(display_mutex, portMAX_DELAY);
+		xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 		// copy & set scroll parameters
 		scroller.screen = pkt->screen;
-		scroller.direction = pkt->direction;
 		scroller.pause = htonl(pkt->pause);
 		scroller.speed = htonl(pkt->speed);
-		scroller.by = htons(pkt->by);
 		scroller.mode = htons(pkt->mode);
-		scroller.full_width = htons(pkt->width);
-		scroller.updated = scroller.active = true;
+		scroller.scroll.width = htons(pkt->width);
+		scroller.first = true;
+		
+		// background excludes space taken by visu (if any)
+		scroller.back.width = display_width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
 
-		xSemaphoreGive(display_mutex);
+		// set scroller steps & beginning
+		if (pkt->direction == 1) {
+			scroller.scrolled = 0;
+			scroller.by = htons(pkt->by);
+		} else {
+			scroller.scrolled = scroller.scroll.width;
+			scroller.by = -htons(pkt->by);
+		}	
+
+		xSemaphoreGive(displayer.mutex);
 	}	
 
 	// copy scroll frame data (no semaphore needed)
-	if (scroller.size + size < scroller.max) {
-		memcpy(scroller.scroll_frame + offset, data + sizeof(struct grfs_packet), size);
-		scroller.size = offset + size;
-		LOG_INFO("scroller current size %u", scroller.size);
+	if (scroller.scroll.size + size < scroller.scroll.max) {
+		memcpy(scroller.scroll.frame + offset, data + sizeof(struct grfs_packet), size);
+		scroller.scroll.size = offset + size;
+		LOG_INFO("scroller current size %u", scroller.scroll.size);
 	} else {
-		LOG_INFO("scroller too larger %u/%u", scroller.size + size, scroller.max);
+		LOG_INFO("scroller too larger %u/%u", scroller.scroll.size + size, scroller.scroll.max);
 	}	
 }
 
@@ -456,109 +550,273 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
 	
-	memcpy(scroller.back_frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
-	scroller.window_width = htons(pkt->width);
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	
-	xSemaphoreTake(display_mutex, portMAX_DELAY);
-
-	// can't be in grfs as we need full size & scroll_width
-	if (scroller.updated) {
-		scroller.scroll_len = display_width * display_height / 8 - (display_width - scroller.window_width) * display_height / 8;
-		if (scroller.direction == 1) {
-			scroller.scroll_ptr = scroller.scroll_frame; 
-			scroller.scroll_step = scroller.by * display_height / 8;
-		} else	{
-			scroller.scroll_ptr = scroller.scroll_frame + scroller.size - scroller.scroll_len;
-			scroller.scroll_step = -scroller.by * display_height / 8;
-		}
+	// size of scrollable area (less than background)
+	scroller.width = htons(pkt->width);
+	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
-		scroller.updated = false;	
-	}	
+	// update display asynchronously (frames are oganized by columns)
+	memcpy(scroller.frame, scroller.back.frame, scroller.back.width * display_height / 8);
+	for (int i = 0; i < scroller.width * display_height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * display_height / 8 + i];
+	display->draw_cbr(scroller.frame, scroller.back.width, display_height);
+	display->update();
+		
+	// now we can active scrolling, but only if we are not on a small screen
+	if (!visu.mode || visu.col || visu.row >= SB_HEIGHT) scroller.active = true;
+		
+	// if we just got a content update, let the scroller manage the screen
+	LOG_DEBUG("resuming scrolling task");
+			
+	xSemaphoreGive(displayer.mutex);
 	
-	if (!scroller.active) {
-		// this is a background update and scroller has been finished, so need to update here
-		u8_t *frame = malloc(display_width * display_height / 8);
-		memcpy(frame, scroller.back_frame, display_width * display_height / 8);
-		for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
-		display->draw_cbr(frame, display_height);		
-		free(frame);
-		LOG_DEBUG("direct drawing");
-	}	
-	else {
-		// if we just got a content update, let the scroller manage the screen
-		LOG_DEBUG("resuming scrolling task");
-		vTaskResume(scroller.task);
-	}
-	
-	xSemaphoreGive(display_mutex);
+	// resume task once we have background, not in grfs
+	vTaskResume(displayer.task);
 }
 
 /****************************************************************************************
- * Scroll task
+ * Update visualization bars
  */
-static void scroll_task(void *args) {
-	u8_t *frame = NULL;
-	int len = display_width * display_height / 8;
+static void visu_update(void) {
+	if (pthread_mutex_trylock(&visu_export.mutex)) return;
+				
+	// not enough samples
+	if (visu_export.level < (visu.mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running) {
+		pthread_mutex_unlock(&visu_export.mutex);
+		return;
+	}
 	
-	while (1) {
-		xSemaphoreTake(display_mutex, portMAX_DELAY);
-		
-		// suspend ourselves if nothing to do, grfg will wake us up
-		if (!scroller.active)  {
-			xSemaphoreGive(display_mutex);
-			vTaskSuspend(NULL);
-			xSemaphoreTake(display_mutex, portMAX_DELAY);
-		}	
-		
-		// lock screen & active status
-		frame = malloc(display_width * display_height / 8);
-				
-		// scroll required amount of columns (within the window)
-		while (scroller.direction == 1 ? (scroller.scroll_ptr <= scroller.scroll_frame + scroller.size - scroller.scroll_step - len) :
-									     (scroller.scroll_ptr + scroller.scroll_step >= scroller.scroll_frame) ) {
-			
-			// don't do anything if we have aborted
-			if (!scroller.active) break;
+	// reset bars for all cases first	
+	for (int i = visu.n; --i >= 0;) visu.bars[i].current = 0;
+	
+	if (visu_export.running && visu_export.running) {
 					
-			// scroll required amount of columns (within the window)
-			memcpy(frame, scroller.back_frame, display_width * display_height / 8);
-			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
-			scroller.scroll_ptr += scroller.scroll_step;
-			display->draw_cbr(frame, display_height);		
+		if (visu.mode == VISU_VUMETER) {
+			s16_t *iptr = visu_export.buffer;
 			
-			xSemaphoreGive(display_mutex);
-	        vTaskDelay(scroller.speed / portTICK_PERIOD_MS);
-     
-			xSemaphoreTake(display_mutex, portMAX_DELAY);
-		}
+			// calculate sum(X²), try to not overflow at the expense of some precision
+			for (int i = RMS_LEN; --i >= 0;) {
+				visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+				iptr++;
+				visu.bars[1].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+				iptr++;
+			}	
 		
-		// done with scrolling cycle reset scroller ptr
-		scroller.scroll_ptr = scroller.scroll_frame + (scroller.direction == 2 ? scroller.size - scroller.scroll_len : 0);
-				
-		// scrolling done, update screen and see if we need to continue
-		if (scroller.active) {
-			memcpy(frame, scroller.back_frame, len);
-			for (int i = 0; i < scroller.scroll_len; i++) frame[i] |= scroller.scroll_ptr[i];
-			display->draw_cbr(frame, display_height);
-			free(frame);
-
-			// see if we need to pause or if we are done 				
-			if (scroller.mode) {
-				scroller.active = false;
-				xSemaphoreGive(display_mutex);
-				// can't call directly send_packet from slimproto as it's not re-entrant
-				ANIC_resp = ANIM_SCROLL_ONCE | ANIM_SCREEN_1;
-				LOG_INFO("scroll-once terminated");
-			} else {
-				xSemaphoreGive(display_mutex);
-				vTaskDelay(scroller.pause / portTICK_PERIOD_MS);
-				LOG_DEBUG("scroll cycle done, pausing for %u (ms)", scroller.pause);
+			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
+			for (int i = visu.n; --i >= 0;) {	 
+				visu.bars[i].current = 32 * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> 1)) - 0.2543f);
+				if (visu.bars[i].current > 31) visu.bars[i].current = 31;
+				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
 		} else {
-			free(frame);
-			xSemaphoreGive(display_mutex);
-			LOG_INFO("scroll aborted");
+			// on xtensa/esp32 the floating point FFT takes 1/2 cycles of the fixed point
+			for (int i = 0 ; i < FFT_LEN ; i++) {
+				// don't normalize here, but we are due INT16_MAX and FFT_LEN / 2 / 2
+				visu.samples[i * 2 + 0] = (float) (visu_export.buffer[2*i] + visu_export.buffer[2*i + 1]) * visu.hanning[i];
+				visu.samples[i * 2 + 1] = 0;
+			}
+
+			// actual FFT that might be less cycle than all the crap below		
+			dsps_fft2r_fc32_ae32(visu.samples, FFT_LEN);
+			dsps_bit_rev_fc32_ansi(visu.samples, FFT_LEN);
+			
+			// now arrange the result with the number of bar and sampling rate (don't want DC)
+			for (int i = 1, j = 1; i <= visu.n && j < (FFT_LEN / 2); i++) {
+				float power, count;
+
+				// find the next point in FFT (this is real signal, so only half matters)
+				for (count = 0, power = 0; j * visu.n * visu_export.rate < i * (FFT_LEN / 2) * DISPLAY_BW && j < (FFT_LEN / 2); j++, count += 1) {
+					power += visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1];
+				}
+				// due to sample rate, we have reached the end of the available spectrum
+				if (j >= (FFT_LEN / 2)) {
+					// normalize accumulated data
+					if (count) power /= count * 2.;
+				} else if (count) {
+					// how much of what remains do we need to add
+					float ratio = j - (float) (i * DISPLAY_BW * (FFT_LEN / 2)) / (float) (visu.n * visu_export.rate);
+					power += (visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1]) * ratio;
+					
+					// normalize accumulated data
+					power /= (count + ratio) * 2;
+				} else {
+					// no data for that band (sampling rate too high), just assume same as previous one
+					power = (visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1]) / 2.;
+				}	
+			
+				// convert to dB and bars, same back-off
+				if (power) visu.bars[i-1].current = 32 * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
+				if (visu.bars[i-1].current > 31) visu.bars[i-1].current = 31;
+				else if (visu.bars[i-1].current < 0) visu.bars[i-1].current = 0;
+			}	
+		}
+	} 
+		
+	// we took what we want, we can release the buffer
+	visu_export.level = 0;
+	pthread_mutex_unlock(&visu_export.mutex);
+
+	display->clear(false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+	
+	for (int i = visu.n; --i >= 0;) {
+		int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
+		int y1 = visu.row + visu.height - 1;
+			
+		if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
+		else if (visu.bars[i].max) visu.bars[i].max--;
+			
+		for (int j = 0; j <= visu.bars[i].current; j += 2) 
+			display->draw_line( x1, y1 - j, x1 + visu.bar_width - 1, y1 - j);
+			
+		if (visu.bars[i].max > 2) {
+			display->draw_line( x1, y1 - visu.bars[i].max, x1 + visu.bar_width - 1, y1 - visu.bars[i].max);			
+			display->draw_line( x1, y1 - visu.bars[i].max + 1, x1 + visu.bar_width - 1, y1 - visu.bars[i].max + 1);			
 		}	
+	}
+}
+
+/****************************************************************************************
+ * Visu packet handler
+ */
+static void visu_handler( u8_t *data, int len) {
+	struct visu_packet *pkt = (struct visu_packet*) data;
+	int bars = 0;
+
+	LOG_DEBUG("visu %u with %u parameters", pkt->which, pkt->count);
+		
+	/* 
+	 If width is specified, then respect all coordinates, otherwise we try to 
+	 use the bottom part of the display and if it is a small display, we overwrite
+	 text
+	*/ 
+	
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+	visu.mode = pkt->which;
+	
+	// little trick to clean the taller screens when switching visu 
+	if (visu.row >= SB_HEIGHT) display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	
+	if (visu.mode) {
+		pkt->width = htonl(pkt->width);
+		pkt->height = htonl(pkt->height);
+		pkt->row = htonl(pkt->row);
+		pkt->col = htonl(pkt->col);
+	
+		if (pkt->width > 0 && pkt->count >= 4) {
+			// small visu, then go were we are told to
+			visu.width = pkt->width;
+			visu.height = pkt->height ? pkt->height : SB_HEIGHT;
+			visu.col = pkt->col < 0 ? display->width + pkt->col : pkt->col;
+			visu.row = pkt->row < 0 ? display->height + pkt->row : pkt->row;
+			visu.border =  htonl(pkt->border);
+			bars = htonl(pkt->small_bars);
+		} else {
+			// full screen visu, try to use bottom screen if available
+			visu.width = display->width;
+			visu.height = display->height > SB_HEIGHT ? display->height - SB_HEIGHT : display->height;
+			visu.col = visu.border = 0;
+			visu.row = display->height - visu.height;			
+			// already in CPU order
+			bars = pkt->full_bars;
+		}
+		
+		// try to adapt to what we have
+		visu.n = visu.mode == VISU_VUMETER ? 2 : (bars ? bars : MAX_BARS);
+		do {
+			visu.bar_width = (visu.width - visu.border - visu.bar_gap * (visu.n - 1)) / visu.n;
+			if (visu.bar_width > 0) break;
+		} while (--visu.n);	
+		visu.bar_border = (visu.width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
+		
+		// give up if not enough space
+		if (visu.bar_width < 0)	visu.mode = VISU_BLANK;
+		else vTaskResume(displayer.task);
+		visu.wake = 0;
+		
+		// reset bars maximum
+		for (int i = visu.n; --i >= 0;) visu.bars[i].max = 0;
+				
+		display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+		
+		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row);
+	} else {
+		LOG_INFO("Stopping visualizer");
+	}	
+	
+	xSemaphoreGive(displayer.mutex);
+}	
+
+/****************************************************************************************
+ * Scroll task
+ *  - with the addition of the visualizer, it's a bit a 2-headed beast not easy to 
+ * maintain, so som better separation between the visu and scroll is probably needed
+  */
+static void displayer_task(void *args) {
+	int sleep;
+	
+	while (1) {
+		xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+		
+		// suspend ourselves if nothing to do, grfg or visu will wake us up
+		if (!scroller.active && !visu.mode)  {
+			xSemaphoreGive(displayer.mutex);
+			vTaskSuspend(NULL);
+			xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+			scroller.wake = visu.wake = 0;
+		}	
+		
+		// go for long sleep when either item is disabled
+		if (!visu.mode) visu.wake = LONG_WAKE;
+		if (!scroller.active) scroller.wake = LONG_WAKE;
+								
+		// scroll required amount of columns (within the window)
+		if (scroller.active && scroller.wake <= 0) {
+			// by default go for the long sleep, will change below if required
+			scroller.wake = LONG_WAKE;
+			
+			// do we have more to scroll (scroll.width is the last column from which we havea  full zone)
+			if (scroller.by > 0 ? (scroller.scrolled <= scroller.scroll.width) : (scroller.scrolled >= 0)) {
+				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * display_height / 8);
+				for (int i = 0; i < scroller.width * display_height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * display_height / 8 + i];
+				scroller.scrolled += scroller.by;
+				display->draw_cbr(scroller.frame, scroller.width, display_height);	
+				
+				// short sleep & don't need background update
+				scroller.wake = scroller.speed;
+			} else if (scroller.first || !scroller.mode) {
+				// at least one round done
+				scroller.first = false;
+				
+				// see if we need to pause or if we are done 				
+				if (scroller.mode) {
+					// can't call directly send_packet from slimproto as it's not re-entrant
+					ANIC_resp = ANIM_SCROLL_ONCE | ANIM_SCREEN_1;
+					LOG_INFO("scroll-once terminated");
+				} else {
+					scroller.wake = scroller.pause;
+					LOG_DEBUG("scroll cycle done, pausing for %u (ms)", scroller.pause);
+				}
+								
+				// need to reset pointers for next scroll
+				scroller.scrolled = scroller.by < 0 ? scroller.scroll.width : 0;
+			} 
+		}
+
+		// update visu if active
+		if (visu.mode && visu.wake <= 0) {
+			visu_update();
+			visu.wake = 100;
+		}
+		
+		display->update();
+		
+		// release semaphore and sleep what's needed
+		xSemaphoreGive(displayer.mutex);
+		
+		sleep = min(visu.wake, scroller.wake);
+		vTaskDelay(sleep / portTICK_PERIOD_MS);
+		scroller.wake -= sleep;
+		visu.wake -= sleep;
 	}	
 }	
 			

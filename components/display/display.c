@@ -117,7 +117,7 @@ static void displayer_task(void *args) {
 			if (displayer.state == DISPLAYER_IDLE) display->line(2, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
 			vTaskSuspend(NULL);
 			scroll_sleep = 0;
-			display->clear();
+			display->clear(true);
 			display->line(1, DISPLAY_LEFT, DISPLAY_UPDATE, displayer.header);
 		} else if (displayer.refresh) {
 			// little trick when switching master while in IDLE and missing it

@@ -51,8 +51,9 @@ enum displayer_time_e 	{ DISPLAYER_ELAPSED, DISPLAYER_REMAINING };
 // don't change anything there w/o changing all drivers init code
 extern struct display_s {
 	int width, height;
+	bool dirty;
 	bool (*init)(char *config, char *welcome);
-	void (*clear)(void);
+	void (*clear)(bool full, ...);
 	bool (*set_font)(int num, enum display_font_e font, int space);
 	void (*on)(bool state);
 	void (*brightness)(uint8_t level);
@@ -60,8 +61,10 @@ extern struct display_s {
 	bool (*line)(int num, int x, int attribute, char *text);
 	int (*stretch)(int num, char *string, int max);
 	void (*update)(void);
-	void (*draw)(int x1, int y1, int x2, int y2, bool by_column, uint8_t *data);
-	void (*draw_cbr)(uint8_t *data, int height);		// height is the # of columns in data, as oppoosed to display height (0 = display height) 
+	void (*draw_raw)(int x1, int y1, int x2, int y2, bool by_column, bool MSb, uint8_t *data);
+	void (*draw_cbr)(uint8_t *data, int width, int height);		// width and height is the # of rows/columns in data, as opposed to display height (0 = display width, 0 = display height) 
+	void (*draw_line)(int x1, int y1, int x2, int y2);
+	void (*draw_box)( int x1, int y1, int x2, int y2, bool fill);
 } *display;
 
 void displayer_scroll(char *string, int speed);

@@ -146,4 +146,10 @@ void monitor_svc_init(void) {
 		xTimerStart(monitor_timer, portMAX_DELAY);
 	}	
 	free(p);
+	
+	ESP_LOGI(TAG, "Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
+			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+			heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
