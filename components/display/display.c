@@ -301,16 +301,19 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 		displayer.string[0] = '\0';
 		displayer.elapsed = displayer.duration = 0;
 		displayer.offset = displayer.boundary = 0;
+		display_bus(&displayer, DISPLAY_BUS_TAKE);
 		vTaskResume(displayer.task);
 		break;
 	}	
 	case DISPLAYER_SUSPEND:		
 		// task will display the line 2 from beginning and suspend
 		displayer.state = DISPLAYER_IDLE;
+		display_bus(&displayer, DISPLAY_BUS_GIVE);
 		break;		
 	case DISPLAYER_SHUTDOWN:
 		// let the task self-suspend (we might be doing i2c_write)
 		displayer.state = DISPLAYER_DOWN;
+		display_bus(&displayer, DISPLAY_BUS_GIVE);
 		break;
 	case DISPLAYER_TIMER_RUN:
 		if (!displayer.timer) {

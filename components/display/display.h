@@ -28,6 +28,9 @@
  So it can conflict with other display direct writes that have been made during
  sleep. Note that if DISPLAY_SHUTDOWN has been called meanwhile, it (almost) 
  never happens
+ The display_bus() shall be subscribed by other displayers so that at least
+ when this one (the main) wants to take control over display, it can signal
+ that to others
 */ 
   
 #define DISPLAY_CLEAR 		0x01
@@ -66,6 +69,9 @@ extern struct display_s {
 	void (*draw_line)(int x1, int y1, int x2, int y2);
 	void (*draw_box)( int x1, int y1, int x2, int y2, bool fill);
 } *display;
+
+enum display_bus_cmd_e { DISPLAY_BUS_TAKE, DISPLAY_BUS_GIVE };
+bool (*display_bus)(void *from, enum display_bus_cmd_e cmd);
 
 void displayer_scroll(char *string, int speed);
 void displayer_control(enum displayer_cmd_e cmd, ...);

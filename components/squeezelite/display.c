@@ -84,7 +84,10 @@ extern struct outputstate output;
 static struct {
 	TaskHandle_t task;
 	SemaphoreHandle_t mutex;
-} displayer;	
+	int width, height;
+	bool dirty;
+	bool owned;
+} displayer = { .dirty = true, .owned = true };	
 
 #define LONG_WAKE 		(10*1000)
 #define SB_HEIGHT		32
@@ -147,25 +150,27 @@ static u8_t SETD_width;
 #define LINELEN				40
 
 static log_level loglevel = lINFO;
+
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static void (*slimp_loop_chain)(void);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
-static int display_width, display_height;
-static bool display_dirty = true;
+static bool (*display_bus_chain)(void *from, enum display_bus_cmd_e cmd);
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static void server(in_addr_t ip, u16_t hport, u16_t cport);
 static void send_server(void);
 static bool handler(u8_t *data, int len);
+static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd);
 static void vfdc_handler( u8_t *_data, int bytes_read);
 static void grfe_handler( u8_t *data, int len);
 static void grfb_handler(u8_t *data, int len);
 static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
-static void visu_handler( u8_t *data, int len);
+static void visu_handler(u8_t *data, int len);
 
 static void displayer_task(void* arg);
+
 
 /* scrolling undocumented information
 	grfs	
@@ -208,8 +213,8 @@ bool sb_display_init(void) {
 	}	
 	
 	// need to force height to 32 maximum
-	display_width = display->width;
-	display_height = min(display->height, SB_HEIGHT);
+	displayer.width = display->width;
+	displayer.height = min(display->height, SB_HEIGHT);
 	SETD_width = display->width;
 
 	// create visu configuration
@@ -223,10 +228,10 @@ bool sb_display_init(void) {
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller
-	scroller.scroll.max = (display_width * display_height / 8) * 10;
+	scroller.scroll.max = (displayer.width * displayer.height / 8) * 10;
 	scroller.scroll.frame = malloc(scroller.scroll.max);
-	scroller.back.frame = malloc(display_width * display_height / 8);
-	scroller.frame = malloc(display_width * display_height / 8);
+	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
+	scroller.frame = malloc(displayer.width * displayer.height / 8);
 
 	// chain handlers
 	slimp_handler_chain = slimp_handler;
@@ -238,8 +243,38 @@ bool sb_display_init(void) {
 	notify_chain = server_notify;
 	server_notify = server;
 	
+	display_bus_chain = display_bus;
+	display_bus = display_bus_handler;
+	
 	return true;
 }
+
+/****************************************************************************************
+ * Receive display bus commands
+ */
+static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd) {
+	// don't answer to own requests
+	if (from == &displayer) return false ;
+	
+	LOG_INFO("Display bus command %d", cmd);
+	
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+	
+	switch (cmd) {
+	case DISPLAY_BUS_TAKE:
+		displayer.owned = false;
+		break;
+	case DISPLAY_BUS_GIVE:
+		displayer.owned = true;
+		break;
+	}
+	
+	xSemaphoreGive(displayer.mutex);
+	
+	if (display_bus_chain) return (*display_bus_chain)(from, cmd);
+	else return true;
+}
+
 
 /****************************************************************************************
  * Send message to server (ANIC at that time)
@@ -289,9 +324,9 @@ static void send_server(void) {
 static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	char msg[32];
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
-	display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
+	if (displayer.owned) display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
 	SETD_width = display->width;
-	display_dirty = true;
+	displayer.dirty = true;
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
 
@@ -301,24 +336,21 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 static bool handler(u8_t *data, int len){
 	bool res = true;
 	
-	// don't do anything if we dont own the display (no lock needed)
-	if (!output.external || output.state < OUTPUT_STOPPED) {
-		if (!strncmp((char*) data, "vfdc", 4)) {
-			vfdc_handler(data, len);
-		} else if (!strncmp((char*) data, "grfe", 4)) {
-			grfe_handler(data, len);
-		} else if (!strncmp((char*) data, "grfb", 4)) {
-			grfb_handler(data, len);
-		} else if (!strncmp((char*) data, "grfs", 4)) {
-			grfs_handler(data, len);		
-		} else if (!strncmp((char*) data, "grfg", 4)) {
-			grfg_handler(data, len);
-		} else if (!strncmp((char*) data, "visu", 4)) {
-			visu_handler(data, len);
-		} else {
-			res = false;
-		}
-	}	
+	if (!strncmp((char*) data, "vfdc", 4)) {
+		vfdc_handler(data, len);
+	} else if (!strncmp((char*) data, "grfe", 4)) {
+		grfe_handler(data, len);
+	} else if (!strncmp((char*) data, "grfb", 4)) {
+		grfb_handler(data, len);
+	} else if (!strncmp((char*) data, "grfs", 4)) {
+		grfs_handler(data, len);		
+	} else if (!strncmp((char*) data, "grfg", 4)) {
+		grfg_handler(data, len);
+	} else if (!strncmp((char*) data, "visu", 4)) {
+		visu_handler(data, len);
+	} else {
+		res = false;
+	}
 	
 	// chain protocol handlers (bitwise or is fine)
 	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
@@ -448,20 +480,23 @@ static void grfe_handler( u8_t *data, int len) {
 	
 	scroller.active = false;
 	
-	// if we are displaying visu on a small screen, do not do screen update
+	// we are not in control or we are displaying visu on a small screen, do not do screen update
 	if (visu.mode && !visu.col && visu.row < SB_HEIGHT) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
 	
-	// did we have something that might have write on the bottom of a SB_HEIGHT+ display
-	if (display_dirty) {
-		display->clear(true);
-		display_dirty = false;
-	}	
+	if (displayer.owned) {
+		// did we have something that might have write on the bottom of a SB_HEIGHT+ display
+		if (displayer.dirty) {
+			display->clear(true);
+			displayer.dirty = false;
+		}	
 	
-	display->draw_cbr(data + sizeof(struct grfe_packet), display_width, display_height);
-	display->update();
+		// draw new frame
+		display->draw_cbr(data + sizeof(struct grfe_packet), displayer.width, displayer.height);
+		display->update();
+	}	
 	
 	xSemaphoreGive(displayer.mutex);
 	
@@ -518,7 +553,7 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.first = true;
 		
 		// background excludes space taken by visu (if any)
-		scroller.back.width = display_width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
+		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
 
 		// set scroller steps & beginning
 		if (pkt->direction == 1) {
@@ -557,10 +592,14 @@ static void grfg_handler(u8_t *data, int len) {
 	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
 	// update display asynchronously (frames are oganized by columns)
-	memcpy(scroller.frame, scroller.back.frame, scroller.back.width * display_height / 8);
-	for (int i = 0; i < scroller.width * display_height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * display_height / 8 + i];
-	display->draw_cbr(scroller.frame, scroller.back.width, display_height);
-	display->update();
+	memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
+	for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
+	
+	// can only write if we really own display
+	if (displayer.owned) {
+		display->draw_cbr(scroller.frame, scroller.back.width, displayer.height);
+		display->update();
+	}	
 		
 	// now we can active scrolling, but only if we are not on a small screen
 	if (!visu.mode || visu.col || visu.row >= SB_HEIGHT) scroller.active = true;
@@ -578,6 +617,7 @@ static void grfg_handler(u8_t *data, int len) {
  * Update visualization bars
  */
 static void visu_update(void) {
+	// no need to protect against no woning the display as we are playing	
 	if (pthread_mutex_trylock(&visu_export.mutex)) return;
 				
 	// not enough samples
@@ -731,6 +771,7 @@ static void visu_handler( u8_t *data, int len) {
 		// give up if not enough space
 		if (visu.bar_width < 0)	{
 			visu.mode = VISU_BLANK;
+			LOG_WARN("Not enough room for displaying visu");
 		} else {
 			// de-activate scroller if we are taking main screen
 			if (visu.row < SB_HEIGHT) scroller.active = false;
@@ -781,10 +822,10 @@ static void displayer_task(void *args) {
 			
 			// do we have more to scroll (scroll.width is the last column from which we havea  full zone)
 			if (scroller.by > 0 ? (scroller.scrolled <= scroller.scroll.width) : (scroller.scrolled >= 0)) {
-				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * display_height / 8);
-				for (int i = 0; i < scroller.width * display_height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * display_height / 8 + i];
+				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
+				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 				scroller.scrolled += scroller.by;
-				display->draw_cbr(scroller.frame, scroller.width, display_height);	
+				if (displayer.owned) display->draw_cbr(scroller.frame, scroller.width, displayer.height);	
 				
 				// short sleep & don't need background update
 				scroller.wake = scroller.speed;
@@ -813,7 +854,8 @@ static void displayer_task(void *args) {
 			visu.wake = 100;
 		}
 		
-		display->update();
+		// need to make sure we own display
+		if (displayer.owned) display->update();
 		
 		// release semaphore and sleep what's needed
 		xSemaphoreGive(displayer.mutex);

@@ -167,8 +167,8 @@ static void clear(bool full, ...) {
 		va_end(args);
 	}
 	
+	SSD13x6_display.dirty = true;
 	if (commit)	update();		
-	else SSD13x6_display.dirty = true;
 }	
 
 /****************************************************************************************
@@ -247,9 +247,9 @@ static bool line(int num, int x, int attribute, char *text) {
 	ESP_LOGD(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
 	
 	// update whole display if requested
+	SSD13x6_display.dirty = true;
 	if (attribute & DISPLAY_UPDATE) update();
-	else SSD13x6_display.dirty = true;
-	
+		
 	return width + x < Display.Width;
 }
 
@@ -340,8 +340,9 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	ESP_LOGD(TAG, "SSDD13x6 displaying %s at %u with attribute %u", text, Anchor, attribute);
 	
 	SSD13x6_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
+	
+	SSD13x6_display.dirty = true;
 	if (attribute & DISPLAY_UPDATE) update();
-	else SSD13x6_display.dirty = true;
 	
 	va_end(args);
 }
