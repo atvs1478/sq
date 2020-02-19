@@ -640,7 +640,7 @@ static void visu_update(void) {
 		if (visu.mode == VISU_VUMETER) {
 			s16_t *iptr = visu_export.buffer;
 			
-			// calculate sum(X²), try to not overflow at the expense of some precision
+			// calculate sum(L²+R²), try to not overflow at the expense of some precision
 			for (int i = RMS_LEN; --i >= 0;) {
 				visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
 				iptr++;
