@@ -43,7 +43,7 @@
 #include "dmap_parser.h"
 #include "log_util.h"
 
-#define RTSP_STACK_SIZE 	(8*1024)
+#define RTSP_STACK_SIZE 	(9*1024)
 #define SEARCH_STACK_SIZE	(2*1048)
 
 typedef struct raop_ctx_s {
@@ -692,10 +692,10 @@ void abort_rtsp(raop_ctx_t *ctx) {
 
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
 		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-		
+
 		LOG_INFO("[%p]: Remote search thread aborted", ctx);
 	}	
-	
+
 	NFREE(ctx->rtsp.aeskey);
 	NFREE(ctx->rtsp.aesiv);
 	NFREE(ctx->rtsp.fmtp);
