@@ -13,6 +13,6 @@
 #recovery: CPPFLAGS+=-DRECOVERY_APPLICATION=1
 
 PROJECT_NAME?=squeezelite
-EXTRA_COMPONENT_DIRS := $(PROJECT_PATH)/esp-dsp
+EXTRA_COMPONENT_DIRS := $(PROJECT_PATH)/tagada/esp-dsp
 include $(IDF_PATH)/make/project.mk 
 CPPFLAGS+= -Wno-error=maybe-uninitialized
