@@ -51,6 +51,7 @@ void set_power_gpio(int gpio, char *value) {
  * 
  */
 void services_init(void) {
+	messaging_service_init();
 	gpio_install_isr_service(0);
 	
 #ifdef CONFIG_I2C_LOCKED

@@ -29,11 +29,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "config.h"
-
+#include "messaging.h"
 static const char TAG[] = "http_server";
 
 static httpd_handle_t _server = NULL;
 rest_server_context_t *rest_context = NULL;
+RingbufHandle_t messaging=NULL;
 
 void register_common_handlers(httpd_handle_t server){
 	httpd_uri_t res_get = { .uri = "/res/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
@@ -52,6 +53,8 @@ void register_regular_handlers(httpd_handle_t server){
 	httpd_register_uri_handler(server, &config_get);
 	httpd_uri_t status_get = { .uri = "/status.json", .method = HTTP_GET, .handler = status_get_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &status_get);
+	httpd_uri_t messages_get = { .uri = "/messages.json", .method = HTTP_GET, .handler = messages_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &messages_get);
 
 	httpd_uri_t config_post = { .uri = "/config.json", .method = HTTP_POST, .handler = config_post_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &config_post);
@@ -112,6 +115,7 @@ void register_regular_handlers(httpd_handle_t server){
 esp_err_t http_server_start()
 {
 	ESP_LOGI(TAG, "Initializing HTTP Server");
+	messaging = messaging_register_subscriber(10, "http_server");
     rest_context = calloc(1, sizeof(rest_server_context_t));
     if(rest_context==NULL){
     	ESP_LOGE(TAG,"No memory for http context");

@@ -28,6 +28,7 @@
 #include "esp_flash_encrypt.h"
 #include "esp_spi_flash.h"
 #include "sdkconfig.h"
+#include "messaging.h"
 
 #include "esp_ota_ops.h"
 extern const char * get_certificate();
@@ -75,8 +76,6 @@ static struct {
 struct timeval tv;
 static esp_http_client_config_t ota_config;
 
-extern void wifi_manager_refresh_ota_json();
-
 void _printMemStats(){
 	ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
 			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
@@ -84,22 +83,12 @@ void _printMemStats(){
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
-void triggerStatusJsonRefresh(bool bDelay,const char * status, ...){
+void sendMessaging(messaging_types type,char * fmt, ...){
     va_list args;
-    va_start(args, status);
-    vsnprintf(ota_status.status_text,sizeof(ota_status.status_text)-1,status, args);
+    va_start(args, fmt);
+    messaging_post_message(type, fmt, args);
     va_end(args);
     _printMemStats();
-	wifi_manager_refresh_ota_json();
-	if(bDelay){
-		ESP_LOGD(TAG,"Holding task...");
-	    vTaskDelay(200 / portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with refreshing the UI status
-		ESP_LOGD(TAG,"Done holding task...");
-	}
-	else {
-		ESP_LOGI(TAG,"%s",ota_status.status_text);
-		taskYIELD();
-	}
 }
 const char *  ota_get_status(){
 	if(!ota_status.bInitialized)
@@ -151,7 +140,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
 
-        if(ota_status.bOTAStarted) triggerStatusJsonRefresh(true,"Installing...");
+        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Installing...");
         ota_status.total_image_len=0;
 		ota_status.actual_image_len=0;
 		ota_status.lastpct=0;
@@ -193,7 +182,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 	memset(&ota_config, 0x00, sizeof(ota_config));
 	ota_status.bInitialized = true;
-	triggerStatusJsonRefresh(true,"Initializing...");
+	sendMessaging(MESSAGING_INFO,"Initializing...");
 	ota_status.ota_type= OTA_TYPE_INVALID;
 	if(p_ota_thread_parms->url !=NULL && strlen(p_ota_thread_parms->url)>0 ){
 		ota_status.ota_type= OTA_TYPE_HTTP;
@@ -294,7 +283,7 @@ esp_err_t _erase_last_boot_app_partition(esp_partition_t *ota_partition)
 		err=esp_partition_erase_range(ota_partition, i*single_pass_size, single_pass_size);
 		if(err!=ESP_OK) return err;
 		if(i%2) {
-			triggerStatusJsonRefresh(false,"Erasing flash (%u/%u)",i,num_passes);
+			sendMessaging(MESSAGING_INFO,"Erasing flash (%u/%u)",i,num_passes);
 		}
 		vTaskDelay(200/ portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with reducing WDT errors
 	}
@@ -302,7 +291,7 @@ esp_err_t _erase_last_boot_app_partition(esp_partition_t *ota_partition)
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);
 		if(err!=ESP_OK) return err;
 	}
-	triggerStatusJsonRefresh(true,"Erasing flash complete.");
+	sendMessaging(MESSAGING_INFO,"Erasing flash complete.");
 	taskYIELD();
 	return ESP_OK;
 }
@@ -394,7 +383,7 @@ void ota_task_cleanup(const char * message, ...){
 	if(message!=NULL){
 	    va_list args;
 	    va_start(args, message);
-		triggerStatusJsonRefresh(true,message, args);
+		sendMessaging(MESSAGING_ERROR,message, args);
 	    va_end(args);
 	    ESP_LOGE(TAG, "%s",ota_status.status_text);
 	}
@@ -438,7 +427,7 @@ void ota_task(void *pvParameter)
 
 	/* Locate and erase ota application partition */
 	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
-	triggerStatusJsonRefresh(true,"Erasing OTA partition");
+	sendMessaging(MESSAGING_INFO,"Erasing OTA partition");
 	esp_partition_t *ota_partition = _get_ota_partition(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	if(ota_partition == NULL){
 		ESP_LOGE(TAG,"Unable to locate OTA application partition. ");
@@ -460,7 +449,7 @@ void ota_task(void *pvParameter)
 
 	_printMemStats();
 	ota_status.bOTAStarted = true;
-	triggerStatusJsonRefresh(true,"Starting OTA...");
+	sendMessaging(MESSAGING_INFO,"Starting OTA...");
 	if (ota_status.ota_type == OTA_TYPE_HTTP){
 	    ota_http_client = esp_http_client_init(&ota_config);
 	    if (ota_http_client == NULL) {
@@ -554,7 +543,7 @@ void ota_task(void *pvParameter)
 				gettimeofday(&tv, NULL);
 				uint32_t elapsed_ms= (tv.tv_sec-ota_status.OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status.OTA_start.tv_usec)/1000;
 				ESP_LOGI(TAG,"OTA progress : %d/%d (%d pct), %d KB/s", ota_status.actual_image_len, ota_status.total_image_len, ota_status.newpct, elapsed_ms>0?ota_status.actual_image_len*1000/elapsed_ms/1024:0);
-				triggerStatusJsonRefresh(true,ota_status.ota_type == OTA_TYPE_HTTP?"Downloading & writing update.":"Writing binary file.");
+				sendMessaging(MESSAGING_INFO,ota_status.ota_type == OTA_TYPE_HTTP?"Downloading & writing update.":"Writing binary file.");
 				ota_status.lastpct=ota_status.newpct;
 			}
 			taskYIELD();
@@ -581,7 +570,7 @@ void ota_task(void *pvParameter)
     err = esp_ota_set_boot_partition(ota_partition);
     if (err == ESP_OK) {
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
-    	triggerStatusJsonRefresh(true,"Success!");
+    	sendMessaging(MESSAGING_INFO,"Success!");
     	vTaskDelay(1500/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
         esp_restart();
     } else {

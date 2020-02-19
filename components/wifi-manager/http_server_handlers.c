@@ -49,6 +49,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "sys/param.h"
 #include "esp_vfs.h"
 #include "lwip/ip_addr.h"
+#include "messaging.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 #define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
@@ -59,7 +60,7 @@ static const char TAG[] = "httpd_handlers";
 /* @brief task handle for the http server */
 
 SemaphoreHandle_t http_server_config_mutex = NULL;
-
+extern RingbufHandle_t messaging;
 #define AUTH_TOKEN_SIZE 50
 typedef struct session_context {
     char * auth_token;
@@ -1039,6 +1040,31 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 esp_err_t redirect_ev_handler(httpd_req_t *req){
 	return redirect_processor(req,0);
 }
+
+esp_err_t messages_get_handler(httpd_req_t *req){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
+    	// todo:  redirect to login page
+    	// return ESP_OK;
+    }
+    esp_err_t err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
+
+	cJSON * json_messages=  messaging_retrieve_messages(messaging);
+	if(json_messages!=NULL){
+		char * json_text= cJSON_Print(json_messages);
+		httpd_resp_send(req, (const char *)json_text, strlen(json_text));
+		cJSON_free(json_messages);
+		free(json_text);
+	}
+	else {
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to retrieve messages");
+	}
+	return ESP_OK;
+}
+
 esp_err_t status_get_handler(httpd_req_t *req){
     ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     if(!is_user_authenticated(req)){

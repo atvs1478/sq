@@ -646,12 +646,24 @@ function refreshAPHTML(data){
 
     $( "#wifi-list" ).html(h)
 }
-
+function getMessages() {
+    $.getJSON("/messages.json", function(data) {
+        data.forEach(function(msg) {
+        });
+        
+    })
+    .fail(function(xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+        if (thrownError != '') showMessage(thrownError, 'ERROR');
+    });
+}
 function checkStatus(){
     RepeatCheckStatusInterval();
     if (!enableStatusTimer) return;
     if (blockAjax) return;
     blockAjax = true;
+    getMessages();
     $.getJSON( "/status.json", function( data ) {
         if (data.hasOwnProperty('ssid') && data['ssid'] != ""){
             if (data["ssid"] === selectedSSID){
@@ -880,6 +892,7 @@ function getConfig() {
         blockAjax = false;
     });
 }
+
 
 function showMessage(message, severity) {
     if (severity == 'INFO') {

@@ -32,7 +32,7 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.16039962
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=0
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/operation=replace
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/value=C\:/msys32/opt/esp-idf
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/IDF_PATH/value=c\:/msys32/opt/esp-idf
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/PATH/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291.395881736/PATH/value=C\:\\msys32\\usr\\bin;C\:\\msys32\\mingw32\\bin;C\:\\msys32\\opt\\xtensa-esp32-elf\\bin\\
@@ -52,10 +52,10 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.16039962
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/EXTRA_CPPFLAGS/value=-DRECOVERY_APPLICATION\=1
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/operation=replace
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/value=C\:/msys32/opt/esp-idf
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/IDF_PATH/value=c\:/msys32/opt/esp-idf
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PATH/operation=replace
-environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PATH/value=C\:\\msys32\\opt\\openocd-esp32\\bin;c\:\\msys32\\opt\\xtensa-esp32-elf\\bin\\;c\:\\msys32\\mingw32\\bin;C\:\\msys32\\usr\\bin;c\:\\Python27;C\:\\msys32\\usr\\bin\\vendor_perl;C\:\\msys32\\usr\\bin\\core_perl
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PATH/value=c\:\\msys32\\opt\\openocd-esp32\\bin;c\:\\msys32\\opt\\xtensa-esp32-elf\\bin\\;c\:\\msys32\\mingw32\\bin;C\:\\msys32\\usr\\bin;c\:\\Python27;C\:\\msys32\\usr\\bin\\vendor_perl;C\:\\msys32\\usr\\bin\\core_perl
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PROJECT_NAME/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PROJECT_NAME/operation=replace
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348.1603996291/PROJECT_NAME/value=recovery
@@ -102,6 +102,9 @@ environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/operation=append
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/PROJECT_VER/value=custom
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/WIN_IDF_PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/WIN_IDF_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/WIN_IDF_PATH/value=c\:/msys32/opt/esp-idf
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/append=true
 environment/project/cdt.managedbuild.toolchain.gnu.cross.base.293933348/appendContributed=true
 environment/project/cdt.managedbuild.toolchain.gnu.cygwin.base.58932738.859326707/BATCH_BUILD/delimiter=;
