@@ -38,25 +38,26 @@ static const char *TAG = "display";
 
 // handlers
 static bool init(char *config, char *welcome);
-static void clear(void);
+static void clear(bool full, ...);
 static bool set_font(int num, enum display_font_e font, int space);
 static void text(enum display_font_e font, enum display_pos_e pos, int attribute, char *text, ...);
 static bool line(int num, int x, int attribute, char *text);
 static int stretch(int num, char *string, int max);
-static void draw_cbr(u8_t *data, int height);
-static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data);
+static void draw_cbr(u8_t *data, int width, int height);
+static void draw_raw(int x1, int y1, int x2, int y2, bool by_column, bool MSb, u8_t *data);
+static void draw_line(int x1, int y1, int x2, int y2);
+static void draw_box( int x1, int y1, int x2, int y2, bool fill);
 static void brightness(u8_t level);
 static void on(bool state);
 static void update(void);
 
 // display structure for others to use
-struct display_s SSD13x6_display = { 0, 0, 
+struct display_s SSD13x6_display = { 0, 0, true,
 									init, clear, set_font, on, brightness, 
-									text, line, stretch, update, draw, draw_cbr, NULL };
+									text, line, stretch, update, draw_raw, draw_cbr, draw_line, draw_box };
 
 // SSD13x6 specific function
 static struct SSD13x6_Device Display;
-static SSD13x6_AddressMode AddressMode = AddressMode_Invalid;
 
 static const unsigned char BitReverseTable256[] = 
 {
@@ -150,9 +151,24 @@ static bool init(char *config, char *welcome) {
 /****************************************************************************************
  * 
  */
-static void clear(void) {
-	SSD13x6_Clear( &Display, SSD_COLOR_BLACK );
-	SSD13x6_Update( &Display );
+static void clear(bool full, ...) {
+	bool commit = true;
+	
+	if (full) {
+		SSD13x6_Clear( &Display, SSD_COLOR_BLACK ); 
+	} else {
+		va_list args;
+		va_start(args, full);
+		commit = va_arg(args, int);
+		int x1 = va_arg(args, int), y1 = va_arg(args, int), x2 = va_arg(args, int), y2 = va_arg(args, int);
+		if (x2 < 0) x2 = display->width - 1;
+		if (y2 < 0) y2 = display->height - 1;
+		SSD13x6_ClearWindow( &Display, x1, y1, x2, y2, SSD_COLOR_BLACK );
+		va_end(args);
+	}
+	
+	SSD13x6_display.dirty = true;
+	if (commit)	update();		
 }	
 
 /****************************************************************************************
@@ -209,12 +225,6 @@ static bool line(int num, int x, int attribute, char *text) {
 	// counting 1..n
 	num--;
 	
-	// always horizontal mode for text display
-	if (AddressMode != AddressMode_Horizontal) {
-		AddressMode = AddressMode_Horizontal;
-		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
-	}	
-	
 	SSD13x6_SetFont( &Display, lines[num].font );	
 	if (attribute & DISPLAY_MONOSPACE) SSD13x6_FontForceMonospace( &Display, true );
 	
@@ -237,8 +247,9 @@ static bool line(int num, int x, int attribute, char *text) {
 	ESP_LOGD(TAG, "displaying %s line %u (x:%d, attr:%u)", text, num+1, x, attribute);
 	
 	// update whole display if requested
-	if (attribute & DISPLAY_UPDATE) SSD13x6_Update( &Display );
-	
+	SSD13x6_display.dirty = true;
+	if (attribute & DISPLAY_UPDATE) update();
+		
 	return width + x < Display.Width;
 }
 
@@ -278,12 +289,13 @@ static int stretch(int num, char *string, int max) {
 static void text(enum display_font_e font, enum display_pos_e pos, int attribute, char *text, ...) {
 	va_list args;
 
-	va_start(args, text);
 	TextAnchor Anchor = TextAnchor_Center;	
 	
 	if (attribute & DISPLAY_CLEAR) SSD13x6_Clear( &Display, SSD_COLOR_BLACK );
 	
 	if (!text) return;
+	
+	va_start(args, text);
 	
 	switch(font) {
 	case DISPLAY_FONT_LINE_1:	
@@ -327,127 +339,83 @@ static void text(enum display_font_e font, enum display_pos_e pos, int attribute
 	
 	ESP_LOGD(TAG, "SSDD13x6 displaying %s at %u with attribute %u", text, Anchor, attribute);
 	
-	if (AddressMode != AddressMode_Horizontal) {
-		AddressMode = AddressMode_Horizontal;
-		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
-	}	
-	
 	SSD13x6_FontDrawAnchoredString( &Display, Anchor, text, SSD_COLOR_WHITE );
-	if (attribute & DISPLAY_UPDATE) SSD13x6_Update( &Display );
+	
+	SSD13x6_display.dirty = true;
+	if (attribute & DISPLAY_UPDATE) update();
 	
 	va_end(args);
 }
 
 /****************************************************************************************
- * Process graphic display data from column-oriented bytes, MSbit first
+ * Process graphic display data from column-oriented data (MSbit first)
  */
-static void draw_cbr(u8_t *data, int height) {
-#ifndef FULL_REFRESH
-	// force addressing mode by rows
-	if (AddressMode != AddressMode_Horizontal) {
-		AddressMode = AddressMode_Horizontal;
-		SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
+static void draw_cbr(u8_t *data, int width, int height) {
+	if (!height) height = Display.Height;
+	if (!width) width = Display.Width;
+
+	// need to do row/col swap and bit-reverse
+	int rows = height / 8;
+	for (int r = 0; r < rows; r++) {
+		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
+		for (int c = width; --c >= 0;) {
+			*optr++ = BitReverseTable256[*iptr];;
+			iptr += rows;
+		}	
 	}
 	
-	// try to minimize I2C traffic which is very slow
-	int rows = (height ? height : Display.Height) / 8;
-	for (int r = 0; r < rows; r++) {
-		uint8_t first = 0, last;	
-		uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
-		
-		// row/col swap, frame buffer comparison and bit-reversing
-		for (int c = 0; c < Display.Width; c++) {
-			u8_t byte = BitReverseTable256[*iptr];
-			if (byte != *optr) {
-				if (!first) first = c + 1;
-				last = c ;
-			}	
-			*optr++ = byte;
-			iptr += rows;
-		}
-		
-		// now update the display by "byte rows"
-		if (first--) {
-			SSD13x6_SetColumnAddress( &Display, first, last );
-			SSD13x6_SetPageAddress( &Display, r, r);
-			SSD13x6_WriteRawData( &Display, Display.Framebuffer + r*Display.Width + first, last - first + 1);
-		}
-	}	
-#else
-	if (!height) height = Display->Height;
-
-	SSD13x6_SetPageAddress( &Display, 0, height / 8 - 1);
-	
-	// force addressing mode by columns (if we can)
-	if (SSD13x6_GetCaps( &Display ) & CAPS_ADDRESS_VERTICAL) {
-		// just copy data in frame buffer with bit-reverse	
-		for (int c = 0; c < Display.Width; c++)
-			for (int r = 0; r < height / 8; r++)
-				Display.Framebuffer[c*Display.Height/8 + r] = BitReverseTable256[data[c*height/8 +r]];
-
-		if (AddressMode != AddressMode_Vertical) {
-			AddressMode = AddressMode_Vertical;
-			SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
-		}
-	} else {	
-		// need to do rwo/col swap and bit-reverse
-		int rows = (height ? height : Display.Height) / 8;
-		for (int r = 0; r < rows; r++) {
-			uint8_t *optr = Display.Framebuffer + r*Display.Width, *iptr = data + r;
-			for (int c = 0; c < Display.Width; c++) {
-				*optr++ = BitReverseTable256[*iptr];;
-				iptr += rows;
-			}	
-		}
-		ESP_LOGW(TAG, "Can't set addressing mode to vertical, swapping");
-	}	
-	
-	SSD13x6_WriteRawData(&Display, Display.Framebuffer, Display.Width * Display.Height/8);
- #endif	
+	SSD13x6_display.dirty = true;
 }
 
 /****************************************************************************************
  * Process graphic display data MSBit first
  * WARNING: this has not been tested yet
  */
-static void draw(int x1, int y1, int x2, int y2, bool by_column, u8_t *data) {
-	
-	if (y1 % 8 || y2 % 8) {
-		ESP_LOGW(TAG, "must write rows on byte boundaries (%u,%u) to (%u,%u)", x1, y1, x2, y2);
-		return;
-	}
-	
+static void draw_raw(int x1, int y1, int x2, int y2, bool by_column, bool MSb, u8_t *data) {
 	// default end point to display size
 	if (x2 == -1) x2 = Display.Width - 1;
 	if (y2 == -1) y2 = Display.Height - 1;
 	
-	// set addressing mode to match data
-	if (by_column) {
-		
-		if (AddressMode != AddressMode_Vertical) {
-			AddressMode = AddressMode_Vertical;
-			SSD13x6_SetDisplayAddressMode( &Display, AddressMode );
-		}	
-		
-		// copy the window and do row/col exchange
-		for (int r = y1/8; r <=  y2/8; r++) {
-			uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r;
-			for (int c = x1; c <= x2; c++) {
-				*optr++ = *iptr;
-				iptr += (y2-y1)/8 + 1;
+	display->dirty = true;
+	
+	//	not a boundary draw
+	if (y1 % 8 || y2 % 8 || x1 % 8 | x2 % 8) {
+		ESP_LOGW(TAG, "can't write on non cols/rows boundaries for now");
+	} else {	
+		// set addressing mode to match data
+		if (by_column) {
+			// copy the window and do row/col exchange
+			for (int r = y1/8; r <=  y2/8; r++) {
+				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r;
+				for (int c = x1; c <= x2; c++) {
+					*optr++ = MSb ? BitReverseTable256[*iptr] : *iptr;
+					iptr += (y2-y1)/8 + 1;
 			}	
-		}	
-	} else {
-		// just copy the window inside the frame buffer
-		for (int r = y1/8; r <= y2/8; r++) {
-			uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r*(x2-x1+1);
-			for (int c = x1; c <= x2; c++) *optr++ = *iptr++;
-		}	
-	}
-		
-	SSD13x6_SetColumnAddress( &Display, x1, x2);
-	SSD13x6_SetPageAddress( &Display, y1/8, y2/8);
-	SSD13x6_WriteRawData( &Display, data, (x2-x1 + 1) * ((y2-y1)/8 + 1));
+			}	
+		} else {
+			// just copy the window inside the frame buffer
+			for (int r = y1/8; r <= y2/8; r++) {
+				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r*(x2-x1+1);
+				for (int c = x1; c <= x2; c++) *optr++ = *iptr++;
+			}	
+		}
+	}	
+}
+
+/****************************************************************************************
+ * Draw line
+ */
+static void draw_line( int x1, int y1, int x2, int y2) {
+	SSD13x6_DrawLine( &Display, x1, y1, x2, y2, SSD_COLOR_WHITE );
+	SSD13x6_display.dirty = true;
+}
+
+/****************************************************************************************
+ * Draw Box
+ */
+static void draw_box( int x1, int y1, int x2, int y2, bool fill) {
+	SSD13x6_DrawBox( &Display, x1, y1, x2, y2, SSD_COLOR_WHITE, fill );
+	SSD13x6_display.dirty = true;
 }
 
 /****************************************************************************************
@@ -470,7 +438,8 @@ static void on(bool state) {
  * Update 
  */
 static void update(void) {
-	SSD13x6_Update( &Display );
+	if (SSD13x6_display.dirty) SSD13x6_Update( &Display );
+	SSD13x6_display.dirty = false;
 }
 
 

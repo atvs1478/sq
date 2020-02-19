@@ -15,7 +15,7 @@
 PROJECT_NAME?=squeezelite
 CPPFLAGS+= -Wno-error=maybe-uninitialized \
 	-I$(PROJECT_PATH)/main
-
+EXTRA_COMPONENT_DIRS := esp-dsp
 include $(IDF_PATH)/make/project.mk 
 
 # for future gcc version, this could be needed: CPPFLAGS+= -Wno-error=format-overflow -Wno-error=stringop-truncation

@@ -55,7 +55,7 @@ typedef struct raop_ctx_s {
 	short unsigned port;    // RTSP port for AirPlay
 	int sock;               // socket of the above
 	struct in_addr peer;	// IP of the iDevice (airplay sender)
-	bool running;
+	bool running, abort;
 #ifdef WIN32
 	pthread_t thread, search_thread;
 #else
@@ -83,6 +83,7 @@ typedef struct raop_ctx_s {
 		TaskHandle_t thread, joiner;
 		StaticTask_t *xTaskBuffer;
 		StackType_t xStack[SEARCH_STACK_SIZE] __attribute__ ((aligned (4)));;
+		SemaphoreHandle_t destroy_mutex;
 #endif
 	} active_remote;
 	void *owner;
@@ -93,6 +94,7 @@ extern log_level	raop_loglevel;
 static log_level 	*loglevel = &raop_loglevel;
 
 static void*	rtsp_thread(void *arg);
+static void		abort_rtsp(raop_ctx_t *ctx);
 static bool 	handle_rtsp(raop_ctx_t *ctx, int sock);
 
 static char*	rsa_apply(unsigned char *input, int inlen, int *outlen, int mode);
@@ -199,6 +201,12 @@ struct raop_ctx_s *raop_create(struct in_addr host, char *name,
 }
 
 /*----------------------------------------------------------------------------*/
+void raop_abort(struct raop_ctx_s *ctx) {
+	LOG_INFO("[%p]: aborting RTSP session at next select() wakeup", ctx);
+	ctx->abort = true;
+}	
+
+/*----------------------------------------------------------------------------*/
 void raop_delete(struct raop_ctx_s *ctx) {
 #ifdef WIN32
 	int sock;
@@ -270,7 +278,7 @@ if (!ctx) return;
 }
 
 /*----------------------------------------------------------------------------*/
-void raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
+bool raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 	struct sockaddr_in addr;
 	int sock;
 	char *command = NULL;
@@ -323,7 +331,7 @@ void raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 	// no command to send to remote or no remote found yet
 	if (!command || !ctx->active_remote.port) {
 		NFREE(command);
-		return;
+		return false;
 	}
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -354,6 +362,8 @@ void raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 
 	free(command);
 	closesocket(sock);
+	
+	return true;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -373,6 +383,7 @@ static void *rtsp_thread(void *arg) {
 
 			sock = accept(ctx->sock, (struct sockaddr*) &peer, &addrlen);
 			ctx->peer.s_addr = peer.sin_addr.s_addr;
+			ctx->abort = false;
 
 			if (sock != -1 && ctx->running) {
 				LOG_INFO("got RTSP connection %u", sock);
@@ -383,12 +394,13 @@ static void *rtsp_thread(void *arg) {
 		FD_SET(sock, &rfds);
 
 		n = select(sock + 1, &rfds, NULL, NULL, &timeout);
-
-		if (!n) continue;
+		
+		if (!n && !ctx->abort) continue;
 
 		if (n > 0) res = handle_rtsp(ctx, sock);
 
-		if (n < 0 || !res) {
+		if (n < 0 || !res || ctx->abort) {
+			abort_rtsp(ctx);
 			closesocket(sock);
 			LOG_INFO("RTSP close %u", sock);
 			sock = -1;
@@ -460,27 +472,6 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		NFREE(ctx->rtsp.aeskey);
 		NFREE(ctx->rtsp.aesiv);
 		NFREE(ctx->rtsp.fmtp);
-		
-		// LMS might has taken over the player, leaving us with a running RTP session (should not happen)
-		if (ctx->rtp) {
-			LOG_WARN("[%p]: closing unfinished RTP session", ctx);
-			rtp_end(ctx->rtp);
-		}	
-
-		// same, should not happen unless we have missed a teardown ...
-		if (ctx->active_remote.running) {
-			ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
-			ctx->active_remote.running = false;
-			
-			vTaskResume(ctx->active_remote.thread);
-			ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-			vTaskDelete(ctx->active_remote.thread);
-
-			heap_caps_free(ctx->active_remote.xTaskBuffer);
-			memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-
-			LOG_WARN("[%p]: closing unfinished mDNS search", ctx);
-		}
 
 		if ((p = strcasestr(body, "rsaaeskey")) != NULL) {
 			unsigned char *aeskey;
@@ -522,6 +513,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		pthread_create(&ctx->search_thread, NULL, &search_remote, ctx);
 #else
 		ctx->active_remote.running = true;
+		ctx->active_remote.destroy_mutex = xSemaphoreCreateMutex();		
 		ctx->active_remote.xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 		ctx->active_remote.thread = xTaskCreateStatic( (TaskFunction_t) search_remote, "search_remote", SEARCH_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->active_remote.xStack, ctx->active_remote.xTaskBuffer);
 #endif		
@@ -600,11 +592,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
 		ctx->active_remote.running = false;
 
-		// task might not need to be resumed anyway
-		vTaskResume(ctx->active_remote.thread);
-		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
 		vTaskDelete(ctx->active_remote.thread);
-
+		vSemaphoreDelete(ctx->active_remote.thread);
+		
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
 		
 		LOG_INFO("[%p]: mDNS search task terminated", ctx);
@@ -682,6 +673,35 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 }
 
 /*----------------------------------------------------------------------------*/
+void abort_rtsp(raop_ctx_t *ctx) {
+	// first stop RTP process
+	if (ctx->rtp) {
+		rtp_end(ctx->rtp);
+		ctx->rtp = NULL;
+		LOG_INFO("[%p]: RTP thread aborted", ctx);
+	}	
+
+	if (ctx->active_remote.running) {
+		// need to make sure no search is on-going and reclaim task memory
+		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
+		ctx->active_remote.running = false;
+
+		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
+		vTaskDelete(ctx->active_remote.thread);
+		vSemaphoreDelete(ctx->active_remote.thread);
+
+		heap_caps_free(ctx->active_remote.xTaskBuffer);
+		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
+		
+		LOG_INFO("[%p]: Remote search thread aborted", ctx);
+	}	
+	
+	NFREE(ctx->rtsp.aeskey);
+	NFREE(ctx->rtsp.aesiv);
+	NFREE(ctx->rtsp.fmtp);
+}	
+
+/*----------------------------------------------------------------------------*/
 #ifdef WIN32
 bool search_remote_cb(mDNSservice_t *slist, void *cookie, bool *stop) {
 	mDNSservice_t *s;
@@ -746,20 +766,10 @@ static void* search_remote(void *args) {
 		mdns_query_results_free(results);
 	}
 
-	/*
-	for some reason which is beyond me, if that tasks gives the semaphore 
-	before the RTSP tasks waits for it, then freeRTOS crashes in queue 
-	management caused by LWIP stack once the RTSP socket is closed. I have 
-	no clue why, but so we'll suspend the tasks as soon as we're done with 
-	search and wait for the resume then give the semaphore
-	*/
-	// PS: I know this is not fully race-condition free
-	if (ctx->active_remote.running) vTaskSuspend(NULL);
-	xTaskNotifyGive(ctx->active_remote.joiner);
-
-	// now our context will be deleted
+	// can't use xNotifyGive as it seems LWIP is using it as well
+	xSemaphoreGive(ctx->active_remote.destroy_mutex);
 	vTaskSuspend(NULL);
-
+	
 	return NULL;
  }
 #endif

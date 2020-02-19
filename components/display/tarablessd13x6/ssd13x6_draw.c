@@ -16,6 +16,9 @@
 #include "ssd13x6.h"
 #include "ssd13x6_draw.h"
 
+#undef NullCheck
+#define NullCheck(X,Y)
+
 __attribute__( ( always_inline ) ) static inline bool IsPixelVisible( struct SSD13x6_Device* DeviceHandle, int x, int y )  {
     bool Result = (
         ( x >= 0 ) &&
@@ -75,7 +78,7 @@ void IRAM_ATTR SSD13x6_DrawHLine( struct SSD13x6_Device* DeviceHandle, int x, in
     NullCheck( DeviceHandle, return );
     NullCheck( DeviceHandle->Framebuffer, return );
 
-    for ( ; x <= XEnd; x++ ) {
+    for ( ; x < XEnd; x++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
             SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
         } else {
@@ -90,7 +93,7 @@ void IRAM_ATTR SSD13x6_DrawVLine( struct SSD13x6_Device* DeviceHandle, int x, in
     NullCheck( DeviceHandle, return );
     NullCheck( DeviceHandle->Framebuffer, return );
 
-    for ( ; y <= YEnd; y++ ) {
+    for ( ; y < YEnd; y++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
             SSD13x6_DrawPixel( DeviceHandle, x, y, Color );
         } else {
@@ -114,7 +117,7 @@ static inline void IRAM_ATTR DrawWideLine( struct SSD13x6_Device* DeviceHandle, 
 
     Error = ( dy * 2 ) - dx;
 
-    for ( ; x <= x1; x++ ) {
+    for ( ; x < x1; x++ ) {
         if ( IsPixelVisible( DeviceHandle, x, y ) == true ) {
             SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color );
         }
@@ -218,4 +221,33 @@ void SSD13x6_Clear( struct SSD13x6_Device* DeviceHandle, int Color ) {
     NullCheck( DeviceHandle->Framebuffer, return );
 
     memset( DeviceHandle->Framebuffer, Color, DeviceHandle->FramebufferSize );
+}
+
+void SSD13x6_ClearWindow( struct SSD13x6_Device* DeviceHandle, int x1, int y1, int x2, int y2, int Color ) {
+    NullCheck( DeviceHandle, return );
+    NullCheck( DeviceHandle->Framebuffer, return );
+	
+/*	
+	int xr = ((x1 - 1) / 8) + 1 ) * 8;
+	int xl = (x2 / 8) * 8;
+	
+	for (int y = y1; y <= y2; y++) {
+		for (int x = x1; x < xr; x++) SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color);
+		if (xl > xr) memset( DeviceHandle->Framebuffer + (y / 8) * DeviceHandle->Width + xr, 0, xl - xr );
+		for (int x = xl; x <= x2; x++) SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color);
+	}
+	
+	return;
+*/	
+		
+	// cheap optimization on boundaries
+	if (x1 == 0 && x2 == DeviceHandle->Width - 1 && y1 % 8 == 0 && (y2 + 1) % 8 == 0) {
+		memset( DeviceHandle->Framebuffer + (y1 / 8) * DeviceHandle->Width, 0, (y2 - y1 + 1) / 8 * DeviceHandle->Width );
+	} else {
+		for (int y = y1; y <= y2; y++) {
+			for (int x = x1; x <= x2; x++) {
+				SSD13x6_DrawPixelFast( DeviceHandle, x, y, Color);
+			}		
+		}	
+	}	
 }

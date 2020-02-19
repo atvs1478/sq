@@ -15,6 +15,8 @@
 
 #include "ssd13x6.h"
 
+#define SHADOW_BUFFER
+
 // used by both but different
 static uint8_t SSDCmd_Set_Display_Start_Line;
 static uint8_t SSDCmd_Set_Display_Offset;
@@ -111,8 +113,32 @@ void SSD13x6_SetDisplayAddressMode( struct SSD13x6_Device* DeviceHandle, SSD13x6
 }
 
 void SSD13x6_Update( struct SSD13x6_Device* DeviceHandle ) {
+#ifdef SHADOW_BUFFER
+	// not sure the compiler does not have to redo all calculation in for loops, so local it is
+	int width = DeviceHandle->Width, rows = DeviceHandle->Height / 8;
+	uint8_t *optr = DeviceHandle->Shadowbuffer, *iptr = DeviceHandle->Framebuffer;
+	
+	// by row, find first and last columns that have been updated
+	for (int r = 0; r < rows; r++) {
+		uint8_t first = 0, last;	
+		for (int c = 0; c < width; c++) {
+			if (*iptr != *optr) {
+				if (!first) first = c + 1;
+				last = c ;
+			}	
+			*optr++ = *iptr++;
+		}
+		
+		// now update the display by "byte rows"
+		if (first--) {
+			SSD13x6_SetColumnAddress( DeviceHandle, first, last );
+			SSD13x6_SetPageAddress( DeviceHandle, r, r);
+			SSD13x6_WriteData( DeviceHandle, DeviceHandle->Shadowbuffer + r*width + first, last - first + 1);
+		}
+	}	
+#else	
 	if (DeviceHandle->Model == SH1106) {
-		// SH1106 requires a page-by-page update and ahs no end Page/Column
+		// SH1106 requires a page-by-page update and has no end Page/Column
 		for (int i = 0; i < DeviceHandle->Height / 8 ; i++) {
 			SSD13x6_SetPageAddress( DeviceHandle, i, 0);
 			SSD13x6_SetColumnAddress( DeviceHandle, 0, 0);			
@@ -124,6 +150,7 @@ void SSD13x6_Update( struct SSD13x6_Device* DeviceHandle ) {
 		SSD13x6_SetPageAddress( DeviceHandle, 0, DeviceHandle->Height / 8 - 1);
 		SSD13x6_WriteData( DeviceHandle, DeviceHandle->Framebuffer, DeviceHandle->FramebufferSize );
 	}	
+#endif	
 }
 
 void SSD13x6_WriteRawData( struct SSD13x6_Device* DeviceHandle, uint8_t* Data, size_t DataLength ) {
@@ -213,6 +240,11 @@ bool SSD13x6_HWReset( struct SSD13x6_Device* DeviceHandle ) {
 static bool SSD13x6_Init( struct SSD13x6_Device* DeviceHandle, int Width, int Height ) {
     DeviceHandle->Width = Width;
     DeviceHandle->Height = Height;
+	
+#ifdef SHADOW_BUFFER
+	DeviceHandle->Shadowbuffer = heap_caps_malloc( DeviceHandle->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+	memset( DeviceHandle->Shadowbuffer, 0xFF, DeviceHandle->FramebufferSize );
+#endif	
 	
 	SSD13x6_HWReset( DeviceHandle );
 	SSD13x6_DisplayOff( DeviceHandle );
@@ -308,7 +340,11 @@ bool SSD13x6_Init_SPI( struct SSD13x6_Device* DeviceHandle, int Width, int Heigh
     DeviceHandle->CSPin = CSPin;
 	
 	DeviceHandle->FramebufferSize = ( Width * Height ) / 8;
+#ifdef SHADOW_BUFFER	
+	DeviceHandle->Framebuffer = calloc( 1, DeviceHandle->FramebufferSize );
+#else	
     DeviceHandle->Framebuffer = heap_caps_calloc( 1, DeviceHandle->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+#endif
     NullCheck( DeviceHandle->Framebuffer, return false );
 	
     return SSD13x6_Init( DeviceHandle, Width, Height );

@@ -117,7 +117,7 @@ static void displayer_task(void *args) {
 			if (displayer.state == DISPLAYER_IDLE) display->line(2, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
 			vTaskSuspend(NULL);
 			scroll_sleep = 0;
-			display->clear();
+			display->clear(true);
 			display->line(1, DISPLAY_LEFT, DISPLAY_UPDATE, displayer.header);
 		} else if (displayer.refresh) {
 			// little trick when switching master while in IDLE and missing it
@@ -301,16 +301,19 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 		displayer.string[0] = '\0';
 		displayer.elapsed = displayer.duration = 0;
 		displayer.offset = displayer.boundary = 0;
+		display_bus(&displayer, DISPLAY_BUS_TAKE);
 		vTaskResume(displayer.task);
 		break;
 	}	
 	case DISPLAYER_SUSPEND:		
 		// task will display the line 2 from beginning and suspend
 		displayer.state = DISPLAYER_IDLE;
+		display_bus(&displayer, DISPLAY_BUS_GIVE);
 		break;		
 	case DISPLAYER_SHUTDOWN:
 		// let the task self-suspend (we might be doing i2c_write)
 		displayer.state = DISPLAYER_DOWN;
+		display_bus(&displayer, DISPLAY_BUS_GIVE);
 		break;
 	case DISPLAYER_TIMER_RUN:
 		if (!displayer.timer) {

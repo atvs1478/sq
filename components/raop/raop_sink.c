@@ -178,6 +178,7 @@ void raop_sink_init(raop_cmd_vcb_t cmd_cb, raop_data_cb_t data_cb) {
 void raop_disconnect(void) {
 	LOG_INFO("forced disconnection");
 	displayer_control(DISPLAYER_SHUTDOWN);
-	raop_cmd(raop, RAOP_STOP, NULL);
+	// in case we can't communicate with AirPlay controller, abort session 
+	if (!raop_cmd(raop, RAOP_STOP, NULL)) raop_abort(raop);
 	actrls_unset();
 }

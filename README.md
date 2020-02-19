@@ -314,4 +314,10 @@ See squeezlite command line, but keys options are
 	- LINKALL (mandatory)
 	- NO_FAAD unless you want to us faad, which currently overloads the CPU
 	- TREMOR_ONLY (mandatory)
+- When initially cloning the repo, make sure you do it recursively. For example: 
+	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
+- If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
+	-  git submodule update --init --recursive
+
+
 

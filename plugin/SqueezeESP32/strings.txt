@@ -4,8 +4,22 @@ WELCOME_TO_SQUEEZEESP32
 PLUGIN_SQUEEZEESP32
 	EN	SqueezeESP32
 	
+PLUGIN_SQUEEZEESP32_BANNER
+	EN	WARNING
+	
+PLUGIN_SQUEEZEESP32_BANNER_TEXT
+	EN	You need to restart LMS for these parameters to be taken into account
+	
 PLUGIN_SQUEEZEESP32_DESC
 	EN	Adds a new player id (100) to enable display with SqueezeESP32
 	
 PLUGIN_SQUEEZEESP32_WIDTH
 	EN	Screen width
+	
+PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE
+	EN	Spectrum scale
+
+PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC
+	EN	Sets the scale factor % of spectrum visualizer by halves for better representation. 
+	EN	For example, 50 means that 50% of spectrum is displayed in 1/2 of the screen, so it's linear...
+	EN	But 25 means that only 25% of spectrum is displayed in 1/2 of the screen, so it's a sort of log

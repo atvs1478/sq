@@ -27,6 +27,7 @@
 struct raop_ctx_s* raop_create(struct in_addr host, char *name, unsigned char mac[6], int latency,
 							     raop_cmd_cb_t cmd_cb, raop_data_cb_t data_cb);
 void  		  raop_delete(struct raop_ctx_s *ctx);
-void		  raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param);
+void		  raop_abort(struct raop_ctx_s *ctx);
+bool		  raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param);
 
 #endif

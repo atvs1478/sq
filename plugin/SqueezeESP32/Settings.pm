@@ -6,7 +6,7 @@ use strict;
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 
-my $log = logger('plugin.SqueezeESP32');
+my $log = logger('plugin.squeezeesp32');
 
 sub name {
 	return 'PLUGIN_SQUEEZEESP32';
@@ -17,7 +17,7 @@ sub page {
 }
 
 sub prefs {
-	return (preferences('plugin.SqueezeESP32'), qw(width));
+	return (preferences('plugin.squeezeesp32'), qw(width spectrum_scale));
 }
 
 sub handler {

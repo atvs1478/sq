@@ -39,6 +39,7 @@ extern "C" {
 #define SSD_COLOR_XOR 2
 
 void SSD13x6_Clear( struct SSD13x6_Device* DeviceHandle, int Color );
+void SSD13x6_ClearWindow( struct SSD13x6_Device* DeviceHandle, int x1, int y1, int x2, int y2, int Color );
 void SSD13x6_DrawPixel( struct SSD13x6_Device* DeviceHandle, int X, int Y, int Color );
 void SSD13x6_DrawPixelFast( struct SSD13x6_Device* DeviceHandle, int X, int Y, int Color );
 void SSD13x6_DrawHLine( struct SSD13x6_Device* DeviceHandle, int x, int y, int Width, int Color );

@@ -690,46 +690,47 @@ static void slimproto_run() {
 			UNLOCK_D;
 			
 			LOCK_O;
-			status.output_full = _buf_used(outputbuf);
-			status.output_size = outputbuf->size;
-			status.frames_played = output.frames_played_dmp;
-			status.current_sample_rate = output.current_sample_rate;
-			status.updated = output.updated;
-			status.device_frames = output.device_frames;
-						
-			if (output.track_started) {
-				_sendSTMs = true;
-				output.track_started = false;
-				status.stream_start = output.track_start_time;
-			}
+			if (!output.external) {
+				status.output_full = _buf_used(outputbuf);
+				status.output_size = outputbuf->size;
+				status.frames_played = output.frames_played_dmp;
+				status.current_sample_rate = output.current_sample_rate;
+				status.updated = output.updated;
+				status.device_frames = output.device_frames;
+									
+				if (output.track_started) {
+					_sendSTMs = true;
+					output.track_started = false;
+					status.stream_start = output.track_start_time;
+				}
 #if PORTAUDIO
-			if (output.pa_reopen) {
-				_pa_open();
-				output.pa_reopen = false;
-			}
+				if (output.pa_reopen) {
+					_pa_open();
+					output.pa_reopen = false;
+				}
 #endif
-			if (_start_output && (output.state == OUTPUT_STOPPED || output.state == OUTPUT_OFF)) {
-				output.state = OUTPUT_BUFFER;
-			}
-			if (!output.external && output.state == OUTPUT_RUNNING && !sentSTMu && status.output_full == 0 && status.stream_state <= DISCONNECT &&
-				_decode_state == DECODE_STOPPED) {
+				if (_start_output && (output.state == OUTPUT_STOPPED || output.state == OUTPUT_OFF)) {
+					output.state = OUTPUT_BUFFER;
+				}
+				if (output.state == OUTPUT_RUNNING && !sentSTMu && status.output_full == 0 && status.stream_state <= DISCONNECT &&
+					_decode_state == DECODE_STOPPED) {
 
-				_sendSTMu = true;
-				sentSTMu = true;
-				LOG_DEBUG("output underrun");
-				output.state = OUTPUT_STOPPED;
-				output.stop_time = now;
-			}
-			if (output.state == OUTPUT_RUNNING && !sentSTMo && status.output_full == 0 && status.stream_state == STREAMING_HTTP) {
-
-				_sendSTMo = true;
-				sentSTMo = true;
-			}
+					_sendSTMu = true;
+					sentSTMu = true;
+					LOG_DEBUG("output underrun");
+					output.state = OUTPUT_STOPPED;
+					output.stop_time = now;
+				}
+				if (output.state == OUTPUT_RUNNING && !sentSTMo && status.output_full == 0 && status.stream_state == STREAMING_HTTP) {
+					_sendSTMo = true;
+					sentSTMo = true;
+				}
+			}	
 			if (output.state == OUTPUT_STOPPED && output.idle_to && (now - output.stop_time > output.idle_to)) {
 				output.state = OUTPUT_OFF;
 				LOG_DEBUG("output timeout");
-			}
-			if (!output.external && output.state == OUTPUT_RUNNING && now - status.last > 1000) {
+			}			
+			if (output.state == OUTPUT_RUNNING && now - status.last > 1000) {
 				_sendSTMt = true;
 				status.last = now;
 			}

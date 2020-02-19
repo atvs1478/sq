@@ -3,6 +3,11 @@
 # Espressif IoT Development Framework (ESP-IDF) Project Configuration
 #
 
+# DSP
+CONFIG_DSP_OPTIMIZED=y
+CONFIG_DSP_OPTIMIZATION=1
+CONFIG_DSP_MAX_FFT_SIZE_512=y
+
 # SqueezeAMP defaults
 CONFIG_JACK_LOCKED=y
 CONFIG_BAT_LOCKED=y

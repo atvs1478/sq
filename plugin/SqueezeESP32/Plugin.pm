@@ -10,6 +10,7 @@ my $prefs = preferences('plugin.squeezeesp32');
 
 $prefs->init({ 
 	width => 128, 
+	spectrum_scale => 50,
 });
 
 my $log = Slim::Utils::Log->addLogCategory({

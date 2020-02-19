@@ -46,7 +46,7 @@ static bool enable_airplay;
 #define SYNC_NB				5
 
 static raop_event_t	raop_state;
-static bool raop_expect_stop = false;
+
 static struct {
 	bool enabled, start;
 	s32_t error[SYNC_NB];
@@ -123,9 +123,8 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		LOG_INFO("BT sink started");
 		break;
 	case BT_SINK_AUDIO_STOPPED:	
-		// do we still need that?
 		if (output.external == DECODE_BT) {
-			output.state = OUTPUT_OFF;
+			if (output.state > OUTPUT_STOPPED) output.state = OUTPUT_STOPPED;
 			LOG_INFO("BT sink stopped");
 		}	
 		break;
@@ -136,6 +135,7 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 	case BT_SINK_STOP:		
 		_buf_flush(outputbuf);
 		output.state = OUTPUT_STOPPED;
+		output.stop_time = gettime_ms();
 		LOG_INFO("BT sink stopped");
 		break;
 	case BT_SINK_PAUSE:		
@@ -253,18 +253,14 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			output.next_sample_rate = output.current_sample_rate = RAOP_SAMPLE_RATE;
 			break;
 		case RAOP_STOP:
-			LOG_INFO("Stop", NULL);
-			output.state = OUTPUT_OFF;
-			output.frames_played = 0;
-			raop_state = event;
-			break;
 		case RAOP_FLUSH:
-			LOG_INFO("Flush", NULL);
-			raop_expect_stop = true;
+			if (event == RAOP_FLUSH) { LOG_INFO("Flush", NULL); }
+			else { LOG_INFO("Stop", NULL); }
 			raop_state = event;
 			_buf_flush(outputbuf);		
-			output.state = OUTPUT_STOPPED;
+			if (output.state > OUTPUT_STOPPED) output.state = OUTPUT_STOPPED;
 			output.frames_played = 0;
+			output.stop_time = gettime_ms();
 			break;
 		case RAOP_PLAY: {
 			LOG_INFO("Play", NULL);
