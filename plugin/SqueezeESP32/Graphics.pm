@@ -16,7 +16,7 @@ my $VISUALIZER_SPECTRUM_ANALYZER = 2;
 my $VISUALIZER_WAVEFORM = 3;
 
 my $width = $prefs->get('width') || 128;
-my $spectrum_scale = $prefs->get('spectrum_scale') || 0.5;
+my $spectrum_scale = $prefs->get('spectrum_scale') || 50;
 
 my @modes = (
 	# mode 0
