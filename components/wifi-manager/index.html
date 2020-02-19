@@ -4,20 +4,20 @@
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <!-- TODO delete -->
-        <link rel="stylesheet" href="/res/test/bootstrap.min.css">
         <link rel="stylesheet" href="/res/bootstrap.css">
+        <link rel="stylesheet" href="/res/test/bootstrap.min.css"> <!-- TODO delete -->
         <link rel="stylesheet" href="/res/style.css">
+        <link rel="stylesheet" href="style.css"> <!-- TODO delete -->
         <script src="/res/jquery.js"></script>
         <script src="/res/popper.js"></script>
         <script src="/res/bootstrap.js"></script>
 
-        <!-- TODO delete -->
-        <script src="/res/test/jquery.min.js"></script>
-        <script src="/res/test/popper.min.js"></script>
-        <script src="/res/test/bootstrap.min.js"></script>
+        <script src="/res/test/jquery.min.js"></script> <!-- TODO delete -->
+        <script src="/res/test/popper.min.js"></script> <!-- TODO delete -->
+        <script src="/res/test/bootstrap.min.js"></script> <!-- TODO delete -->
 
         <script src="/res/code.js"></script>
+        <script src="code.js"></script> <!-- TODO delete -->
 
 
         <title>esp32-wifi-manager</title>
@@ -346,19 +346,16 @@
                     <h2>Firmware URL:</h2>
                     <textarea id="fwurl" maxlength="350"></textarea>
                     <div class="buttons">
-                    	<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
+                        <input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
                     </div>
-                     <br />OR<br />
-                    <div class="input-group mb-3" id="uploaddiv">
-                        <div class="custom-file">
-                            <input type="file" class="custom-file-input" id="flashfilename">
-                            <label class="custom-file-label" for="flashfilename"></label>
-                        </div>
-                        <div class="input-group-append">
-                            <span class="input-group-text" id="fwUpload">Upload</span>
+                    <p>OR</p>
+                    <div class="form-group">
+                        <input type="file" class="form-control-file" id="flashfilename" aria-describedby="fileHelp">
+                        <div class="buttons">
+                            <button type="button" class="btn btn-danger" id="fwUpload">Upload!</button>
                         </div>
                     </div>
-                    
+
                     <div id="otadiv">
                         <div class="progress" id="progress">
                             <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width:0%">

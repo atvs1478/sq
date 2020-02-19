@@ -431,13 +431,13 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_js_gz_end - bootstrap_js_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_js_gz_start, file_size);
-		}
+	}
 	else if(strstr(filename, "bootstrap.css")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_css_gz_end - bootstrap_css_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_css_gz_start, file_size);
-		}
+    }
 	else {
 	   ESP_LOGE_LOC(TAG, "Unknown resource [%s] from path [%s] ", filename,filepath);
 	   /* Respond with 404 Not Found */

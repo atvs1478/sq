@@ -368,7 +368,6 @@ $(document).ready(function(){
         console.log('sent config JSON with data:', JSON.stringify(data));
     });
     $("#fwUpload").on("click", function() {
-    	
         var upload_path = "/flash.json";
         var fileInput = document.getElementById("flashfilename").files;
         if (fileInput.length == 0) {
