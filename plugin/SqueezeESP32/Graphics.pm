@@ -16,6 +16,7 @@ my $VISUALIZER_SPECTRUM_ANALYZER = 2;
 my $VISUALIZER_WAVEFORM = 3;
 
 my $width = $prefs->get('width') || 128;
+my $spectrum_scale = $prefs->get('spectrum_scale') || 0.5;
 
 my @modes = (
 	# mode 0
@@ -55,7 +56,7 @@ my @modes = (
 	{ desc => ['VISUALIZER_SPECTRUM_ANALYZER_SMALL'],
 	  bar => 0, secs => 0,  width => $width, _width => -32,
 	  # extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), bars, left space)
-	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 32, 32, -32, 0, 2, 6] },	  
+	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 32, 32, -32, 0, 2, 6, $spectrum_scale] },	  
 	# mode 9	 
 	{ desc => ['VISUALIZER_VUMETER'],
 	  bar => 0, secs => 0,  width => $width,
@@ -64,7 +65,7 @@ my @modes = (
 	{ desc => ['VISUALIZER_SPECTRUM_ANALYZER'],
 	  bar => 0, secs => 0,  width => $width,
 	  # extra parameters (bars)
-	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16] },	  
+	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16, $spectrum_scale] },	  
 	# mode 11	 
 	{ desc => ['VISUALIZER_VUMETER', 'AND', 'ELAPSED'],
 	  bar => 0, secs => 1,  width => $width,
@@ -73,7 +74,7 @@ my @modes = (
 	{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'ELAPSED'],
 	  bar => 0, secs => 1,  width => $width,
 	  # extra parameters (bars)
-	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16] },	  
+	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16, $spectrum_scale] },	  
 	# mode 13	 
 	{ desc => ['VISUALIZER_VUMETER', 'AND', 'REMAINING'],
 	  bar => 0, secs => -1,  width => $width,
@@ -82,7 +83,7 @@ my @modes = (
 	{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'REMAINING'],
 	  bar => 0, secs => -1,  width => $width,
 	  # extra parameters (bars)
-	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16] },	  	  
+	  params => [$VISUALIZER_SPECTRUM_ANALYZER, 16, $spectrum_scale] },	  	  
 	  
 );
 
@@ -133,14 +134,6 @@ sub bytesPerColumn {
 
 sub displayHeight {
 	return 32;
-}
-
-sub updateWidth {
-	my ($display, $width) = @_;
-	
-	foreach my $mode (@{$display->modes}) {
-		$mode->{width} = $width + 1 + $mode->{_width} || 0;
-	}
 }
 
 sub vfdmodel {

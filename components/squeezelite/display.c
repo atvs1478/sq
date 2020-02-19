@@ -61,14 +61,20 @@ struct visu_packet {
 	u8_t which;
 	u8_t count;
 	union {
-		u32_t width;
-		u32_t full_bars;
+		struct {
+			u32_t bars;
+			u32_t spectrum_scale;
+		} full;	
+		struct {	
+			u32_t width;
+			u32_t height;
+			s32_t col;
+			s32_t row;	
+			u32_t border;
+			u32_t bars;
+			u32_t spectrum_scale;
+		};	
 	};	
-	u32_t height;
-	s32_t col;
-	s32_t row;	
-	u32_t border;
-	u32_t small_bars;	
 };
 
 struct ANIC_header {
@@ -98,8 +104,7 @@ static struct {
 #define RMS_LEN_BIT	6
 #define RMS_LEN		(1 << RMS_LEN_BIT)
 
-// actually this is 2x the displayed BW
-#define DISPLAY_BW	32000
+#define DISPLAY_BW	20000
 
 static struct scroller_s {
 	// copy of grfs content
@@ -128,9 +133,10 @@ static struct scroller_s {
 static EXT_RAM_ATTR struct {
 	int bar_gap, bar_width, bar_border;
 	struct {
-		int current;
-		int max;
+		int current, max;
+		int limit;
 	} bars[MAX_BARS];
+	float spectrum_scale;
 	int n, col, row, height, width, border;
 	enum { VISU_BLANK, VISU_VUMETER, VISU_SPECTRUM, VISU_WAVEFORM } mode;
 	int speed, wake;	
@@ -659,13 +665,14 @@ static void visu_update(void) {
 			// actual FFT that might be less cycle than all the crap below		
 			dsps_fft2r_fc32_ae32(visu.samples, FFT_LEN);
 			dsps_bit_rev_fc32_ansi(visu.samples, FFT_LEN);
+			float rate = visu_export.rate;
 			
 			// now arrange the result with the number of bar and sampling rate (don't want DC)
-			for (int i = 1, j = 1; i <= visu.n && j < (FFT_LEN / 2); i++) {
+			for (int i = 0, j = 1; i < visu.n && j < (FFT_LEN / 2); i++) {
 				float power, count;
 
 				// find the next point in FFT (this is real signal, so only half matters)
-				for (count = 0, power = 0; j * visu.n * visu_export.rate < i * (FFT_LEN / 2) * DISPLAY_BW && j < (FFT_LEN / 2); j++, count += 1) {
+				for (count = 0, power = 0; j * visu_export.rate < visu.bars[i].limit * FFT_LEN && j < FFT_LEN / 2; j++, count += 1) {
 					power += visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1];
 				}
 				// due to sample rate, we have reached the end of the available spectrum
@@ -674,7 +681,7 @@ static void visu_update(void) {
 					if (count) power /= count * 2.;
 				} else if (count) {
 					// how much of what remains do we need to add
-					float ratio = j - (float) (i * DISPLAY_BW * (FFT_LEN / 2)) / (float) (visu.n * visu_export.rate);
+					float ratio = j - (visu.bars[i].limit * FFT_LEN) / rate;
 					power += (visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1]) * ratio;
 					
 					// normalize accumulated data
@@ -685,9 +692,9 @@ static void visu_update(void) {
 				}	
 			
 				// convert to dB and bars, same back-off
-				if (power) visu.bars[i-1].current = 32 * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
-				if (visu.bars[i-1].current > 31) visu.bars[i-1].current = 31;
-				else if (visu.bars[i-1].current < 0) visu.bars[i-1].current = 0;
+				if (power) visu.bars[i].current = 32 * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
+				if (visu.bars[i].current > 31) visu.bars[i].current = 31;
+				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}	
 		}
 	} 
@@ -715,6 +722,22 @@ static void visu_update(void) {
 	}
 }
 
+
+/****************************************************************************************
+ * Visu packet handler
+ */
+void spectrum_limits(int min, int n, int pos) {
+	if (n / 2) {
+		int i;
+		float step = (DISPLAY_BW - min) * visu.spectrum_scale / (n/2);
+		visu.bars[pos].limit = min + step;
+		for (i = 1; i < n/2; i++) visu.bars[pos+i].limit = visu.bars[pos+i-1].limit + step;
+		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n/2, pos + n/2);
+	} else {
+		visu.bars[pos].limit = DISPLAY_BW;
+	}	
+}
+
 /****************************************************************************************
  * Visu packet handler
  */
@@ -737,31 +760,38 @@ static void visu_handler( u8_t *data, int len) {
 	if (visu.row >= SB_HEIGHT) display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 	
 	if (visu.mode) {
-		pkt->width = htonl(pkt->width);
-		pkt->height = htonl(pkt->height);
-		pkt->row = htonl(pkt->row);
-		pkt->col = htonl(pkt->col);
-	
-		if (pkt->width > 0 && pkt->count >= 4) {
+		if (pkt->count >= 4) {
 			// small visu, then go were we are told to
-			visu.width = pkt->width;
+			pkt->height = htonl(pkt->height);
+			pkt->row = htonl(pkt->row);
+			pkt->col = htonl(pkt->col);
+
+			visu.width = htonl(pkt->width);
 			visu.height = pkt->height ? pkt->height : SB_HEIGHT;
 			visu.col = pkt->col < 0 ? display->width + pkt->col : pkt->col;
 			visu.row = pkt->row < 0 ? display->height + pkt->row : pkt->row;
 			visu.border =  htonl(pkt->border);
-			bars = htonl(pkt->small_bars);
+			bars = htonl(pkt->bars);
+			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
 		} else {
 			// full screen visu, try to use bottom screen if available
 			visu.width = display->width;
 			visu.height = display->height > SB_HEIGHT ? display->height - SB_HEIGHT : display->height;
 			visu.col = visu.border = 0;
 			visu.row = display->height - visu.height;			
-			// already in CPU order
-			bars = pkt->full_bars;
+			bars = htonl(pkt->full.bars);
+			visu.spectrum_scale = htonl(pkt->full.spectrum_scale) / 100.;
 		}
 		
 		// try to adapt to what we have
-		visu.n = visu.mode == VISU_VUMETER ? 2 : (bars ? bars : MAX_BARS);
+		if (visu.mode == VISU_SPECTRUM) {
+			visu.n = bars ? bars : MAX_BARS;
+			if (visu.spectrum_scale <= 0 || visu.spectrum_scale > 0.5) visu.spectrum_scale = 0.5;
+			spectrum_limits(0, visu.n, 0);
+		} else {
+			visu.n = 2;
+		}	
+		
 		do {
 			visu.bar_width = (visu.width - visu.border - visu.bar_gap * (visu.n - 1)) / visu.n;
 			if (visu.bar_width > 0) break;
@@ -784,7 +814,7 @@ static void visu_handler( u8_t *data, int len) {
 				
 		display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 		
-		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row);
+		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u,s:%.02f)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row, visu.spectrum_scale);
 	} else {
 		LOG_INFO("Stopping visualizer");
 	}	

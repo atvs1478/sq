@@ -17,13 +17,14 @@ sub page {
 }
 
 sub prefs {
-	return (preferences('plugin.SqueezeESP32'), qw(width));
+	return (preferences('plugin.SqueezeESP32'), qw(width spectrum_scale));
 }
 
 sub handler {
 	my ($class, $client, $params, $callback, @args) = @_;
 	
 	$callback->($client, $params, $class->SUPER::handler($client, $params), @args);
+	$client->update();
 }
 
 	

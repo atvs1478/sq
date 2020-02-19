@@ -9,3 +9,11 @@ PLUGIN_SQUEEZEESP32_DESC
 	
 PLUGIN_SQUEEZEESP32_WIDTH
 	EN	Screen width
+	
+PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE
+	EN	Spectrum scale
+
+PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC
+	EN	Sets the scale factor % of spectrum visualizer by halves for better representation. 
+	EN	For example, 50 means that 50% of spectrum is displayed in 1/2 of the screen, so it's linear...
+	EN	But 25 means that only 25% of spectrum is displayed in 1/2 of the screen, so it's a sort of log

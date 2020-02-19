@@ -6,6 +6,11 @@
 		<input type="text" class="stdedit" name="pref_width" id="pref_width" value="[% prefs.pref_width %]" size="3">
 	[% END %]
 	
+	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE" desc="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC" %]
+		<input type="number" min="10" max= "50" step="5" class="stdedit" name="pref_spectrum_scale" id="pref_spectrum_scale" value="[% prefs.pref_spectrum_scale %]" size="3">
+	[% END %]
+	
+	
 	</div>
 
 [% PROCESS settings/footer.html %]
