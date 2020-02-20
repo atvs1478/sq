@@ -276,6 +276,7 @@ static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd) {
 	
 	xSemaphoreGive(displayer.mutex);
 	
+	// chain to rest of "bus"
 	if (display_bus_chain) return (*display_bus_chain)(from, cmd);
 	else return true;
 }
