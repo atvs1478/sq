@@ -177,7 +177,6 @@ static void visu_handler(u8_t *data, int len);
 
 static void displayer_task(void* arg);
 
-
 /* scrolling undocumented information
 	grfs	
 		B: screen number
