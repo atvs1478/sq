@@ -44,6 +44,7 @@ bool spkfault_svc(void);
  * 
  */
 static void task_stats( void ) {
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY 
 	static struct {
 		TaskStatus_t *tasks;
 		uint32_t total, n;
@@ -62,7 +63,7 @@ static void task_stats( void ) {
 	for(int i = 0, n = 0; i < current.n; i++ ) {
 		for (int j = 0; j < previous.n; j++) {
 			if (current.tasks[i].xTaskNumber == previous.tasks[j].xTaskNumber) {
-				n += sprintf(scratch + n, "%16s %2u%% s:%5u)", current.tasks[i].pcTaskName, 
+				n += sprintf(scratch + n, "%16s %2u%% s:%5u", current.tasks[i].pcTaskName, 
 																		   100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed, 
 																		   current.tasks[i].usStackHighWaterMark);
 				if (i % 3 == 2 || i == current.n - 1) {
@@ -85,6 +86,7 @@ static void task_stats( void ) {
 	
 	if (previous.tasks) free(previous.tasks);
 	previous = current;
+#endif	
 }
  
 /****************************************************************************************
