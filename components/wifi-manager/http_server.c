@@ -336,7 +336,7 @@ void http_server_netconn_serve(struct netconn *conn) {
 			netbuf_data(inbuf, (void**)&rcvbuf, &rcvlen);
 			dump_net_buffer(rcvbuf, rcvlen);
 			if (buflen + rcvlen > bufsize) {
-				bufsize += 2048;
+				bufsize += rcvlen - bufsize < 2048 ? 2048 : rcvlen - bufsize;
 				buf = realloc(buf, bufsize);
 			}
 			memcpy(buf + buflen, rcvbuf, rcvlen);

@@ -43,7 +43,7 @@
 #include "dmap_parser.h"
 #include "log_util.h"
 
-#define RTSP_STACK_SIZE 	(9*1024)
+#define RTSP_STACK_SIZE 	(8*1024)
 #define SEARCH_STACK_SIZE	(2*1048)
 
 typedef struct raop_ctx_s {

@@ -728,10 +728,9 @@ static void visu_update(void) {
  */
 void spectrum_limits(int min, int n, int pos) {
 	if (n / 2) {
-		int i;
-		float step = (DISPLAY_BW - min) * visu.spectrum_scale / (n/2);
+		int step = ((DISPLAY_BW - min) * visu.spectrum_scale * 2) / n;
 		visu.bars[pos].limit = min + step;
-		for (i = 1; i < n/2; i++) visu.bars[pos+i].limit = visu.bars[pos+i-1].limit + step;
+		for (int i = 1; i < n/2; i++) visu.bars[pos+i].limit = visu.bars[pos+i-1].limit + step;
 		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n/2, pos + n/2);
 	} else {
 		visu.bars[pos].limit = DISPLAY_BW;
