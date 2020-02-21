@@ -211,7 +211,7 @@ $(document).ready(function(){
         }
 
 
-        showMessage('please wait for the ESP32 to reboot', 'WARNING');
+        showMessage('please wait for the ESP32 to reboot', 'MESSAGING_WARNING');
         $.ajax({
             url: '/config.json',
             dataType: 'text',
@@ -224,7 +224,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             },
             complete: function(response) {
                 //var returnedResponse = JSON.parse(response.responseText);
@@ -241,7 +241,7 @@ $(document).ready(function(){
                     error: function (xhr, ajaxOptions, thrownError) {
                         console.log(xhr.status);
                         console.log(thrownError);
-                        if (thrownError != '') showMessage(thrownError, 'ERROR');
+                        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
                     },
                     complete: function(response) {
                     	console.log('reboot call completed');
@@ -273,7 +273,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', autoexec1);
@@ -306,7 +306,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -361,7 +361,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -378,11 +378,11 @@ $(document).ready(function(){
             xhttp.onreadystatechange = function() {
                 if (xhttp.readyState == 4) {
                     if (xhttp.status == 200) {
-                    	showMessage(xhttp.responseText, 'INFO')
+                    	showMessage(xhttp.responseText, 'MESSAGING_INFO')
                     } else if (xhttp.status == 0) {
-                    	showMessage("Upload connection was closed abruptly!", 'ERROR');
+                    	showMessage("Upload connection was closed abruptly!", 'MESSAGING_ERROR');
                     } else {
-                    	showMessage(xhttp.status + " Error!\n" + xhttp.responseText, 'ERROR');
+                    	showMessage(xhttp.status + " Error!\n" + xhttp.responseText, 'MESSAGING_ERROR');
                     }
                 }
             };
@@ -414,7 +414,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         enableStatusTimer = true;
@@ -597,7 +597,7 @@ function performConnect(conntype){
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);
             console.log(thrownError);
-            if (thrownError != '') showMessage(thrownError, 'ERROR');
+            if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         }
     });
 
@@ -645,18 +645,44 @@ function refreshAPHTML(data){
 
     $( "#wifi-list" ).html(h)
 }
+
 function getMessages() {
-    $.getJSON("/messages.json", function(data) {
-        data.forEach(function(msg) {
-        	message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
-        });
-        
-    })
-    .fail(function(xhr, ajaxOptions, thrownError) {
-        console.log(xhr.status);
-        console.log(thrownError);
-        if (thrownError != '') showMessage(thrownError, 'ERROR');
-    });
+	   $.getJSON("/messages.json", function(data) {
+	        data.forEach(function(msg) {
+				var msg_age = msg["current_time"] - msg["sent_time"];
+	        	switch (msg["class"]) {
+	        		case "MESSAGING_CLASS_OTA":
+	        			//message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
+	        			var ota_data = JSON.parse(msg["message"]);
+	        			if (ota_data.hasOwnProperty('ota_pct') && ota_data['ota_pct'] != 0){
+	        	            otapct = ota_data['ota_pct'];
+	        	            $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
+	        	            $('.progress-bar').html(otapct+'%');
+	        	        }
+	        	        if (ota_data.hasOwnProperty('ota_dsc') && ota_data['ota_dsc'] != ''){
+	        	            otadsc = ota_data['ota_dsc'];
+	        	            $("span#flash-status").html(otadsc);
+	        	            if (otadsc.match(/Error:/) || otapct > 95) {
+	        	                blockFlashButton = false;
+	        	                enableStatusTimer = true;
+	        	            }
+	        	        }        			
+	        			break;
+	        		case "MESSAGING_CLASS_SYSTEM":
+	        			showMessage(msg["message"], msg["type"],msg_age);
+	        			lastMsg = msg;
+	        			break;
+				default:
+					break;
+				}	
+	        });
+	        
+	    })
+	    .fail(function(xhr, ajaxOptions, thrownError) {
+	        console.log(xhr.status);
+	        console.log(thrownError);
+	        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
+	    });
 }
 function checkStatus(){
     RepeatCheckStatusInterval();
@@ -780,29 +806,10 @@ function checkStatus(){
             ver = data['version'];
             $("span#foot-fw").html("fw: <strong>"+ver+"</strong>, mode: <strong>"+pname+"</strong>");
         }
-        if (data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
-            otapct = data['ota_pct'];
-            $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
-            $('.progress-bar').html(otapct+'%');
-        }
-        if (data.hasOwnProperty('ota_dsc') && data['ota_dsc'] != ''){
-            otadsc = data['ota_dsc'];
-            $("span#flash-status").html(otadsc);
-            if (otadsc.match(/Error:/) || otapct > 95) {
-                blockFlashButton = false;
-                enableStatusTimer = true;
-            }
-        } else {
+         else {
             $("span#flash-status").html('');
         }
-        if (data.hasOwnProperty('message') && data['message'] != ''){
-            var msg = data['message'].text;
-            var severity = data['message'].severity;
-            if (msg != lastMsg) {
-                showMessage(msg, severity);
-                lastMsg = msg;
-            }
-        }
+       
         if (data.hasOwnProperty('Voltage')) {
             var voltage = data['Voltage'];
             var layer;
@@ -832,7 +839,7 @@ function checkStatus(){
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
         console.log(thrownError);
-        if (thrownError != '') showMessage(thrownError, 'ERROR');
+        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         blockAjax = false;
     });
 }
@@ -888,20 +895,25 @@ function getConfig() {
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
         console.log(thrownError);
-        if (thrownError != '') showMessage(thrownError, 'ERROR');
+        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         blockAjax = false;
     });
 }
 
 
-function showMessage(message, severity) {
-    if (severity == 'INFO') {
+function showMessage(message, severity, age=0) {
+	
+	if (severity == 'MESSAGING_INFO') {
         $('#message').css('background', '#6af');
-    } else if (severity == 'WARNING') {
+    } else if (severity == 'MESSAGING_WARNING') {
         $('#message').css('background', '#ff0');
+    } else if (severity == 'MESSAGING_ERROR' ) {
+        $('#message').css('background', '#f00');
     } else {
         $('#message').css('background', '#f00');
     }
+    	
+    	
     $('#message').html(message);
     $("#content").fadeTo("slow", 0.3, function() {
         $("#message").show(500).delay(5000).hide(500, function() {

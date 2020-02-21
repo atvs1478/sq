@@ -128,7 +128,7 @@ cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle){
 	size_t item_size;
     UBaseType_t uxItemsWaiting;
     vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, NULL, &uxItemsWaiting);
-	if(uxItemsWaiting>0){
+	for(int i = 0;i<uxItemsWaiting;i++){
 		message = (single_message_t *)xRingbufferReceive(buf_handle, &item_size, pdMS_TO_TICKS(50));
 		//Check received data
 		if (message== NULL) {
@@ -179,7 +179,7 @@ esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_m
 	}
 	vRingbufferGetInfo(subscriber->buf_handle,NULL,NULL,NULL,NULL,&uxItemsWaiting);
 	if(uxItemsWaiting>=subscriber->max_count){
-		ESP_LOGW(tag,"messaged dropped for %s",str_or_unknown(subscriber->subscriber_name));
+		ESP_LOGD(tag,"messaged dropped for %s",str_or_unknown(subscriber->subscriber_name));
 		single_message_t * dummy = (single_message_t *)xRingbufferReceive(subscriber->buf_handle, &item_size, pdMS_TO_TICKS(50));
 		if (dummy== NULL) {
 			ESP_LOGE(tag,"receive from buffer failed");
