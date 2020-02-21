@@ -1105,6 +1105,5 @@ esp_err_t err_handler(httpd_req_t *req, httpd_err_code_t error){
     	err = redirect_processor(req,error);
     }
 
-
 	return err;
 }
