@@ -648,6 +648,7 @@ function refreshAPHTML(data){
 function getMessages() {
     $.getJSON("/messages.json", function(data) {
         data.forEach(function(msg) {
+        	message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
         });
         
     })

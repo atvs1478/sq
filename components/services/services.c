@@ -16,6 +16,7 @@
 #include "monitor.h"
 #include "globdefs.h"
 #include "accessors.h"
+#include "messaging.h"
 
 extern void battery_svc_init(void);
 extern void monitor_svc_init(void);
@@ -52,6 +53,7 @@ void set_power_gpio(int gpio, char *value) {
  */
 void services_init(void) {
 	messaging_service_init();
+	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM, "Initializing services");
 	gpio_install_isr_service(0);
 	
 #ifdef CONFIG_I2C_LOCKED

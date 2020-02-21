@@ -51,7 +51,7 @@
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
-
+const char unknown_string_placeholder[] = "unknown";
 EventGroupHandle_t wifi_event_group;
 
 bool bypass_wifi_manager=false;
@@ -69,7 +69,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 // as an exception _init function don't need include
 extern void services_init(void);
 extern void	display_init(char *welcome);
-
+const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
 	ESP_LOGI(TAG, "I have a connection!");

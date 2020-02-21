@@ -75,7 +75,7 @@ Contains the freeRTOS task and all necessary support
 #endif
 
 #define STR_OR_BLANK(p) p==NULL?"":p
-#define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
+
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
@@ -89,7 +89,7 @@ char *ip_info_json = NULL;
 char * release_url=NULL;
 cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
-static update_reason_code_t last_update_reason_code=0;
+
 
 static int32_t total_connected_time=0;
 static int64_t last_connected=0;
@@ -207,9 +207,6 @@ void set_host_name(){
 bool isGroupBitSet(uint8_t bit){
 	EventBits_t uxBits= xEventGroupGetBits(wifi_manager_event_group);
 	return (uxBits & bit);
-}
-void wifi_manager_refresh_ota_json(){
-	wifi_manager_send_message(EVENT_REFRESH_OTA, NULL);
 }
 
 void wifi_manager_scan_async(){
@@ -455,8 +452,6 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
 	cJSON_AddNumberToObject(root,"recovery",	RECOVERY_APPLICATION	);
-	cJSON_AddItemToObject(root, "ota_dsc", cJSON_CreateString(ota_get_status()));
-	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
 	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));
 	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
@@ -485,12 +480,6 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	ip_info_cjson = wifi_manager_get_basic_info(&ip_info_cjson);
 
-	if(update_reason_code == UPDATE_OTA) {
-		update_reason_code = last_update_reason_code;
-	}
-	else {
-		last_update_reason_code = update_reason_code;
-	}
 	cJSON_AddNumberToObject(ip_info_cjson, "urc", update_reason_code);
 	if(config){
 		cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
@@ -1144,12 +1133,6 @@ void wifi_manager( void * pvParameters ){
 					ESP_LOGD(TAG,  "Done Invoking SCAN DONE callback");
 				}
 				break;
-			case EVENT_REFRESH_OTA:
-				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-					wifi_manager_generate_ip_info_json( UPDATE_OTA );
-					wifi_manager_unlock_json_buffer();
-				}
-				break;
 
 			case ORDER_START_WIFI_SCAN:
 				ESP_LOGD(TAG,   "MESSAGE: ORDER_START_WIFI_SCAN");
@@ -1445,7 +1428,7 @@ void wifi_manager( void * pvParameters ){
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 				break;
 			case UPDATE_CONNECTION_OK:
-				/* refresh JSON with the new ota data */
+				/* refresh JSON */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					/* generate the connection info with success */
 					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );

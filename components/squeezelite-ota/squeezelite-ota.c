@@ -83,25 +83,35 @@ void _printMemStats(){
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
-void sendMessaging(messaging_types type,char * fmt, ...){
-    va_list args;
-    va_start(args, fmt);
-    messaging_post_message(type, fmt, args);
-    va_end(args);
-    _printMemStats();
-}
-const char *  ota_get_status(){
-	if(!ota_status.bInitialized)
-		{
-			memset(ota_status.status_text, 0x00,sizeof(ota_status.status_text));
-			ota_status.bInitialized = true;
-		}
-	return ota_status.status_text;
-}
 uint8_t  ota_get_pct_complete(){
 	return ota_status.total_image_len==0?0:
 			(uint8_t)((float)ota_status.actual_image_len/(float)ota_status.total_image_len*100.0f);
 }
+
+void sendMessaging(messaging_types type,const char * fmt, ...){
+    va_list args;
+    cJSON * msg = cJSON_CreateObject();
+    size_t str_len=0;
+    char * msg_str=NULL;
+
+    va_start(args, fmt);
+    str_len = vsnprintf(NULL,0,fmt,args);
+    if(str_len>0){
+    	msg_str = malloc(str_len);
+    	vsnprintf(msg_str,str_len,fmt,args);
+    }
+    va_end(args);
+
+    cJSON_AddStringToObject(msg,"ota_dsc",msg_str);
+    free(msg_str);
+    cJSON_AddNumberToObject(msg,"ota_pct",	ota_get_pct_complete()	);
+    char * json_msg = cJSON_PrintUnformatted(msg);
+	messaging_post_message(type, MESSAGING_CLASS_OTA, json_msg);
+	free(json_msg);
+	cJSON_free(msg);
+    _printMemStats();
+}
+
 
 static void __attribute__((noreturn)) task_fatal_error(void)
 {
@@ -206,7 +216,7 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		ota_config.skip_cert_common_name_check = false;
 		ota_config.url = strdup(ota_status.current_url);
 		ota_config.max_redirection_count = 3;
-		ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+		ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 		//ota_write_data = malloc(ota_config.buffer_size+1);
 		if(ota_write_data== NULL){
 			ESP_LOGE(TAG,"Error allocating the ota buffer");
@@ -324,7 +334,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     }
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
-    	char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    	char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     	//char * local_buff = malloc(ota_config.buffer_size+1);
     	if(local_buff==NULL){
     		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");

@@ -11,3 +11,5 @@ CFLAGS += -fstack-usage\
 	-I$(PROJECT_PATH)/components/tools	\
 	-I$(PROJECT_PATH)/components/codecs/inc/alac \
 	-I$(PROJECT_PATH)/main/	
+COMPONENT_ADD_INCLUDEDIRS := .
+COMPONENT_SRCDIRS := . 

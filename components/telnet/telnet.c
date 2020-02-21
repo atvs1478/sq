@@ -69,7 +69,7 @@ static ssize_t stdout_write(int fd, const void * data, size_t size);
 static char *eventToString(telnet_event_type_t type);
 static void handle_telnet_conn();
 static void process_logs( UBaseType_t bytes);
-
+static bool bMirrorToUART=false;
 struct telnetUserData {
 	int sockfd;
 	telnet_t *tnHandle;
@@ -79,11 +79,14 @@ struct telnetUserData {
 
 void init_telnet(){
 	char *val= get_nvs_value_alloc(NVS_TYPE_STR, "telnet_enable");
-	if (!val || strlen(val) == 0 || !strcasestr("YX",val) ) {
+	if (!val || strlen(val) == 0 || !strcasestr("YXD",val) ) {
 		ESP_LOGI(tag,"Telnet support disabled");
 		if(val) free(val);
 		return;
 	}
+	bMirrorToUART = strcasestr("D",val)!=NULL;
+
+	FREE_AND_NULL(val);
 	val=get_nvs_value_alloc(NVS_TYPE_STR, "telnet_block");
 	if(val){
 		send_chunk=atol(val);
@@ -100,8 +103,8 @@ void init_telnet(){
 	vSemaphoreCreateBinary( xSemaphore );
 
 	// Redirect the output to our telnet handler as soon as possible
-	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)heap_caps_malloc(sizeof(StaticRingbuffer_t), MALLOC_CAP_SPIRAM);
-	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM);
+	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)heap_caps_malloc(sizeof(StaticRingbuffer_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
 	if (buf_handle == NULL) {
 		ESP_LOGE(tag,"Failed to create ring buffer for telnet!");
@@ -117,7 +120,9 @@ void init_telnet(){
 			.close = &stdout_close,
 			.read = &stdout_read,
 		};
-	uart_fd=open("/dev/uart/0", O_RDWR);
+	if(bMirrorToUART){
+		uart_fd=open("/dev/uart/0", O_RDWR);
+	}
 	ESP_ERROR_CHECK(esp_vfs_register("/dev/pkspstdout", &vfs, NULL));
 	freopen("/dev/pkspstdout", "w", stdout);
 	freopen("/dev/pkspstdout", "w", stderr);
@@ -125,7 +130,7 @@ void init_telnet(){
 }
 void start_telnet(void * pvParameter){
 	static bool isStarted=false;
-	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
 	
 	if(!isStarted && bIsEnabled) {
@@ -228,7 +233,9 @@ void process_received_data(const char * buffer, size_t size){
 	command[size]='\0';
 	if(command[0]!='\r' && command[0]!='\n'){
 		// echo the command buffer out to uart and run
-		write(uart_fd, command, size);
+		if(bMirrorToUART){
+			write(uart_fd, command, size);
+		}
 		run_command((char *)command);
 	}
 	free(command);
@@ -317,7 +324,7 @@ static void handle_telnet_conn() {
   struct telnetUserData *pTelnetUserData = (struct telnetUserData *)malloc(sizeof(struct telnetUserData));
   tnHandle = telnet_init(my_telopts, handle_telnet_events, 0, pTelnetUserData);
 
-  pTelnetUserData->rxbuf = (char *) heap_caps_malloc(TELNET_RX_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  pTelnetUserData->rxbuf = (char *) heap_caps_malloc(TELNET_RX_BUF, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   pTelnetUserData->tnHandle = tnHandle;
   pTelnetUserData->sockfd = partnerSocket;
 
@@ -374,7 +381,7 @@ static ssize_t stdout_write(int fd, const void * data, size_t size) {
 		// We could not obtain the semaphore and can therefore not access
 		// the shared resource safely.
 	}
-	return write(uart_fd, data, size);
+	return bMirrorToUART?write(uart_fd, data, size):true;
 }
 
 static ssize_t stdout_read(int fd, void* data, size_t size) {

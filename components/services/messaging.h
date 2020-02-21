@@ -7,19 +7,24 @@ typedef enum {
 	MESSAGING_WARNING,
 	MESSAGING_ERROR
 } messaging_types;
-typedef struct {
-	void  * next;
-	char subscriber_name[21];
-	RingbufHandle_t buf_handle;
-} messaging_list_t;
+typedef enum {
+	MESSAGING_CLASS_OTA,
+	MESSAGING_CLASS_SYSTEM
+} messaging_classes;
+
+typedef struct messaging_list_t *messaging_handle_t;
 
 typedef struct {
 	time_t sent_time;
 	messaging_types type;
-	char message[101];
+	messaging_classes msg_class;
+	char message[151];
 } single_message_t;
 
 cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle);
-RingbufHandle_t messaging_register_subscriber(uint8_t max_count, char * name);
-
-void messaging_post_message(messaging_types type, char * fmt, ...);
+messaging_handle_t messaging_register_subscriber(uint8_t max_count, char * name);
+esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_message_t * message, size_t message_size);
+void messaging_post_message(messaging_types type,messaging_classes msg_class, char * fmt, ...);
+cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle);
+single_message_t *  messaging_retrieve_message(RingbufHandle_t buf_handle);
+void messaging_service_init();

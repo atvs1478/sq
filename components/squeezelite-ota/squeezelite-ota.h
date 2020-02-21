@@ -37,7 +37,5 @@
 #define OTA_TASK_PRIOTITY 6
 
 esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length);
-const char * ota_get_status();
-uint8_t ota_get_pct_complete();
 
 

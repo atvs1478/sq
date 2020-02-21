@@ -50,9 +50,9 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_vfs.h"
 #include "lwip/ip_addr.h"
 #include "messaging.h"
+#include "platform_esp32.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
-#define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
 const char str_na[]="N/A";
 #define STR_OR_NA(s) s?s:str_na
 /* @brief tag used for ESP serial console messages */
