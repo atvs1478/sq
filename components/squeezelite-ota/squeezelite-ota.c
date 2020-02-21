@@ -95,7 +95,7 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     char * msg_str=NULL;
 
     va_start(args, fmt);
-    str_len = vsnprintf(NULL,0,fmt,args);
+    str_len = vsnprintf(NULL,0,fmt,args)+1;
     if(str_len>0){
     	msg_str = malloc(str_len);
     	vsnprintf(msg_str,str_len,fmt,args);
