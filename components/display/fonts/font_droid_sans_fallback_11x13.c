@@ -1,4 +1,4 @@
-#include <ssd13x6_font.h>
+#include <gds_font.h>
 
 //WARNING: This Font Require X-GLCD Lib.
 //         You can not use it with MikroE GLCD Lib.
@@ -237,7 +237,7 @@ static const uint8_t Droid_Sans_Fallback11x13[ ] = {
     0x05, 0x00, 0x10, 0xE4, 0x11, 0x00, 0x0E, 0x00, 0x02, 0xE4, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Code for char ÿ
 };
 
-const struct SSD13x6_FontDef Font_droid_sans_fallback_11x13 = {
+const struct GDS_FontDef Font_droid_sans_fallback_11x13 = {
     Droid_Sans_Fallback11x13,
     11,
     13,

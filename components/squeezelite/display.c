@@ -23,6 +23,9 @@
 #include "squeezelite.h"
 #include "slimproto.h"
 #include "display.h"
+#include "gds.h"
+#include "gds_text.h"
+#include "gds_draw.h"
 
 #pragma pack(push, 1)
 
@@ -84,8 +87,6 @@ struct ANIC_header {
 };
 
 #pragma pack(pop)
-
-extern struct outputstate output;
 
 static struct {
 	TaskHandle_t task;
@@ -212,15 +213,15 @@ bool sb_display_init(void) {
 	static EXT_RAM_ATTR StackType_t xStack[SCROLL_STACK_SIZE] __attribute__ ((aligned (4)));
 	
 	// no display, just make sure we won't have requests
-	if (!display || display->height == 0 || display->width == 0) {
+	if (!display || GDS_GetWidth(display) <= 0 || GDS_GetHeight(display) <= 0) {
 		LOG_INFO("no display for LMS");
 		return false;
 	}	
 	
 	// need to force height to 32 maximum
-	displayer.width = display->width;
-	displayer.height = min(display->height, SB_HEIGHT);
-	SETD_width = display->width;
+	displayer.width = GDS_GetWidth(display);
+	displayer.height = min(GDS_GetHeight(display), SB_HEIGHT);
+	SETD_width = displayer.width;
 
 	// create visu configuration
 	visu.bar_gap = 1;
@@ -330,8 +331,8 @@ static void send_server(void) {
 static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	char msg[32];
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
-	if (displayer.owned) display->text(DISPLAY_FONT_DEFAULT, DISPLAY_CENTERED, DISPLAY_CLEAR | DISPLAY_UPDATE, msg);
-	SETD_width = display->width;
+	if (displayer.owned) GDS_TextPos(display, GDS_FONT_DEFAULT, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg);
+	SETD_width = displayer.width;
 	displayer.dirty = true;
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
@@ -426,8 +427,8 @@ static void show_display_buffer(char *ddram) {
 
 	LOG_DEBUG("\n\t%.40s\n\t%.40s", line1, line2);
 
-	display->line(1, DISPLAY_LEFT, DISPLAY_CLEAR, line1);	
-	display->line(2, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, line2);	
+	GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_CLEAR, line1);	
+	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, line2);	
 }
 
 /****************************************************************************************
@@ -495,13 +496,13 @@ static void grfe_handler( u8_t *data, int len) {
 	if (displayer.owned) {
 		// did we have something that might have write on the bottom of a SB_HEIGHT+ display
 		if (displayer.dirty) {
-			display->clear(true);
+			GDS_ClearExt(display, true);
 			displayer.dirty = false;
 		}	
 	
 		// draw new frame
-		display->draw_cbr(data + sizeof(struct grfe_packet), displayer.width, displayer.height);
-		display->update();
+		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), displayer.width, displayer.height);
+		GDS_Update(display);
 	}	
 	
 	xSemaphoreGive(displayer.mutex);
@@ -519,10 +520,10 @@ static void grfb_handler(u8_t *data, int len) {
 	
 	LOG_INFO("brightness %hu", pkt->brightness);
 	if (pkt->brightness < 0) {
-		display->on(false); 
+		GDS_DisplayOff(display); 
 	} else {
-		display->on(true);
-		display->brightness(pkt->brightness);
+		GDS_DisplayOn(display);
+		GDS_SetContrast(display, pkt->brightness);
 	}
 }
 
@@ -603,8 +604,8 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	// can only write if we really own display
 	if (displayer.owned) {
-		display->draw_cbr(scroller.frame, scroller.back.width, displayer.height);
-		display->update();
+		GDS_DrawBitmapCBR(display, scroller.frame, scroller.back.width, displayer.height);
+		GDS_Update(display);
 	}	
 		
 	// now we can active scrolling, but only if we are not on a small screen
@@ -703,7 +704,7 @@ static void visu_update(void) {
 	visu_export.level = 0;
 	pthread_mutex_unlock(&visu_export.mutex);
 
-	display->clear(false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+	GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 	
 	for (int i = visu.n; --i >= 0;) {
 		int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
@@ -713,11 +714,11 @@ static void visu_update(void) {
 		else if (visu.bars[i].max) visu.bars[i].max--;
 			
 		for (int j = 0; j <= visu.bars[i].current; j += 2) 
-			display->draw_line( x1, y1 - j, x1 + visu.bar_width - 1, y1 - j);
+			GDS_DrawLine(display, x1, y1 - j, x1 + visu.bar_width - 1, y1 - j, GDS_COLOR_WHITE);
 			
 		if (visu.bars[i].max > 2) {
-			display->draw_line( x1, y1 - visu.bars[i].max, x1 + visu.bar_width - 1, y1 - visu.bars[i].max);			
-			display->draw_line( x1, y1 - visu.bars[i].max + 1, x1 + visu.bar_width - 1, y1 - visu.bars[i].max + 1);			
+			GDS_DrawLine(display, x1, y1 - visu.bars[i].max, x1 + visu.bar_width - 1, y1 - visu.bars[i].max, GDS_COLOR_WHITE);			
+			GDS_DrawLine(display, x1, y1 - visu.bars[i].max + 1, x1 + visu.bar_width - 1, y1 - visu.bars[i].max + 1, GDS_COLOR_WHITE);			
 		}	
 	}
 }
@@ -756,7 +757,7 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT) display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 	
 	if (visu.mode) {
 		if (pkt->count >= 4) {
@@ -767,17 +768,17 @@ static void visu_handler( u8_t *data, int len) {
 
 			visu.width = htonl(pkt->width);
 			visu.height = pkt->height ? pkt->height : SB_HEIGHT;
-			visu.col = pkt->col < 0 ? display->width + pkt->col : pkt->col;
-			visu.row = pkt->row < 0 ? display->height + pkt->row : pkt->row;
+			visu.col = pkt->col < 0 ? displayer.width + pkt->col : pkt->col;
+			visu.row = pkt->row < 0 ? GDS_GetHeight(display) + pkt->row : pkt->row;
 			visu.border =  htonl(pkt->border);
 			bars = htonl(pkt->bars);
 			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
 		} else {
 			// full screen visu, try to use bottom screen if available
-			visu.width = display->width;
-			visu.height = display->height > SB_HEIGHT ? display->height - SB_HEIGHT : display->height;
+			visu.width = displayer.width;
+			visu.height = GDS_GetHeight(display) > SB_HEIGHT ? GDS_GetHeight(display) - SB_HEIGHT : GDS_GetHeight(display);
 			visu.col = visu.border = 0;
-			visu.row = display->height - visu.height;			
+			visu.row = GDS_GetHeight(display) - visu.height;			
 			bars = htonl(pkt->full.bars);
 			visu.spectrum_scale = htonl(pkt->full.spectrum_scale) / 100.;
 		}
@@ -811,7 +812,7 @@ static void visu_handler( u8_t *data, int len) {
 		// reset bars maximum
 		for (int i = visu.n; --i >= 0;) visu.bars[i].max = 0;
 				
-		display->clear(false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+		GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 		
 		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u,s:%.02f)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row, visu.spectrum_scale);
 	} else {
@@ -854,7 +855,7 @@ static void displayer_task(void *args) {
 				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 				scroller.scrolled += scroller.by;
-				if (displayer.owned) display->draw_cbr(scroller.frame, scroller.width, displayer.height);	
+				if (displayer.owned) GDS_DrawBitmapCBR(display, scroller.frame, scroller.width, displayer.height);	
 				
 				// short sleep & don't need background update
 				scroller.wake = scroller.speed;
@@ -884,7 +885,7 @@ static void displayer_task(void *args) {
 		}
 		
 		// need to make sure we own display
-		if (displayer.owned) display->update();
+		if (displayer.owned) GDS_Update(display);
 		
 		// release semaphore and sleep what's needed
 		xSemaphoreGive(displayer.mutex);

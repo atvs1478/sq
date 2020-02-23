@@ -11,18 +11,19 @@
 #include <string.h>
 #include <driver/i2c.h>
 #include <driver/gpio.h>
-#include "ssd13x6.h"
-#include "ssd13x6_default_if.h"
+#include "gds.h"
+#include "gds_err.h"
+#include "gds_private.h"
+#include "gds_default_if.h"
 
 static int I2CPortNumber;
 
-static const int SSD13x6_I2C_COMMAND_MODE = 0x80;
-static const int SSD13x6_I2C_DATA_MODE = 0x40;
+static const int GDS_I2C_COMMAND_MODE = 0x80;
+static const int GDS_I2C_DATA_MODE = 0x40;
 
 static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Data, size_t DataLength );
-static bool I2CDefaultWriteCommand( struct SSD13x6_Device* Display, SSDCmd Command );
-static bool I2CDefaultWriteData( struct SSD13x6_Device* Display, const uint8_t* Data, size_t DataLength );
-static bool I2CDefaultReset( struct SSD13x6_Device* Display );
+static bool I2CDefaultWriteCommand( struct GDS_Device* Device, uint8_t Command );
+static bool I2CDefaultWriteData( struct GDS_Device* Device, const uint8_t* Data, size_t DataLength );
 
 /*
  * Initializes the i2c master with the parameters specified
@@ -30,7 +31,7 @@ static bool I2CDefaultReset( struct SSD13x6_Device* Display );
  * 
  * Returns true on successful init of the i2c bus.
  */
-bool SSD13x6_I2CMasterInitDefault( int PortNumber, int SDA, int SCL ) {
+bool GDS_I2CInit( int PortNumber, int SDA, int SCL ) {
 	I2CPortNumber = PortNumber;
 	
 	if (SDA != -1 && SCL != -1) {
@@ -54,7 +55,7 @@ bool SSD13x6_I2CMasterInitDefault( int PortNumber, int SDA, int SCL ) {
  * Attaches a display to the I2C bus using default communication functions.
  * 
  * Params:
- * DisplayHandle: Pointer to your SSD13x6_Device object
+ * Device: Pointer to your GDS_Device object
  * Width: Width of display
  * Height: Height of display
  * I2CAddress: Address of your display
@@ -62,26 +63,24 @@ bool SSD13x6_I2CMasterInitDefault( int PortNumber, int SDA, int SCL ) {
  * 
  * Returns true on successful init of display.
  */
-bool SSD13x6_I2CMasterAttachDisplayDefault( struct SSD13x6_Device* DeviceHandle, int Model, int Width, int Height, int I2CAddress, int RSTPin ) {
-    NullCheck( DeviceHandle, return false );
+bool GDS_I2CAttachDevice( struct GDS_Device* Device, int Width, int Height, int I2CAddress, int RSTPin ) {
+    NullCheck( Device, return false );
 
-    if ( RSTPin >= 0 ) {
+    Device->WriteCommand = I2CDefaultWriteCommand;
+    Device->WriteData = I2CDefaultWriteData;
+    Device->Address = I2CAddress;
+    Device->RSTPin = RSTPin;
+	Device->IF = IF_I2C;
+	Device->Width = Width;
+	Device->Height = Height;
+	
+	if ( RSTPin >= 0 ) {
         ESP_ERROR_CHECK_NONFATAL( gpio_set_direction( RSTPin, GPIO_MODE_OUTPUT ), return false );
         ESP_ERROR_CHECK_NONFATAL( gpio_set_level( RSTPin, 1 ), return false );
+		GDS_Reset( Device );
     }
 	
-	memset( DeviceHandle, 0, sizeof( struct SSD13x6_Device ) );	
-	DeviceHandle->Model = Model;
-	
-    return SSD13x6_Init_I2C( DeviceHandle,
-        Width,
-        Height,
-        I2CAddress,
-        RSTPin,
-        I2CDefaultWriteCommand,
-        I2CDefaultWriteData,
-        I2CDefaultReset
-    );
+    return Device->Init( Device );
 }
 
 static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Data, size_t DataLength ) {
@@ -91,7 +90,7 @@ static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Da
     NullCheck( Data, return false );
 
     if ( ( CommandHandle = i2c_cmd_link_create( ) ) != NULL ) {
-        ModeByte = ( IsCommand == true ) ? SSD13x6_I2C_COMMAND_MODE: SSD13x6_I2C_DATA_MODE;
+        ModeByte = ( IsCommand == true ) ? GDS_I2C_COMMAND_MODE: GDS_I2C_DATA_MODE;
 
         ESP_ERROR_CHECK_NONFATAL( i2c_master_start( CommandHandle ), goto error );
         ESP_ERROR_CHECK_NONFATAL( i2c_master_write_byte( CommandHandle, ( Address << 1 ) | I2C_MASTER_WRITE, true ), goto error );
@@ -110,29 +109,16 @@ error:
 	return false;
 }
 
-static bool I2CDefaultWriteCommand( struct SSD13x6_Device* Display, SSDCmd Command ) {
+static bool I2CDefaultWriteCommand( struct GDS_Device* Device, uint8_t Command ) {
     uint8_t CommandByte = ( uint8_t ) Command;
-
-    NullCheck( Display, return false );
-    return I2CDefaultWriteBytes( Display->Address, true, ( const uint8_t* ) &CommandByte, 1 );
+	
+    NullCheck( Device, return false );
+    return I2CDefaultWriteBytes( Device->Address, true, ( const uint8_t* ) &CommandByte, 1 );
 }
 
-static bool I2CDefaultWriteData( struct SSD13x6_Device* Display, const uint8_t* Data, size_t DataLength ) {
-    NullCheck( Display, return false );
+static bool I2CDefaultWriteData( struct GDS_Device* Device, const uint8_t* Data, size_t DataLength ) {
+    NullCheck( Device, return false );
     NullCheck( Data, return false );
 
-    return I2CDefaultWriteBytes( Display->Address, false, Data, DataLength );
+    return I2CDefaultWriteBytes( Device->Address, false, Data, DataLength );
 }
-
-static bool I2CDefaultReset( struct SSD13x6_Device* Display ) {
-    NullCheck( Display, return false );
-
-    if ( Display->RSTPin >= 0 ) {
-        ESP_ERROR_CHECK_NONFATAL( gpio_set_level( Display->RSTPin, 0 ), return true );
-            vTaskDelay( pdMS_TO_TICKS( 100 ) );
-        ESP_ERROR_CHECK_NONFATAL( gpio_set_level( Display->RSTPin, 1 ), return true );
-    }
-
-    return true;
-}
-

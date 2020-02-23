@@ -415,11 +415,7 @@ static void *rtsp_thread(void *arg) {
 	if (sock != -1) closesocket(sock);
 
 #ifndef WIN32
-	if (!ctx->joiner) {
-		LOG_ERROR("We shall not be here %u! %x %x", ctx->running);
-	} else {
-		xTaskNotifyGive(ctx->joiner);
-	}	
+	xTaskNotifyGive(ctx->joiner);
 	vTaskSuspend(NULL);
 #endif
 
