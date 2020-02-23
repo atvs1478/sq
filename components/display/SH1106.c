@@ -130,7 +130,7 @@ static bool Init( struct GDS_Device* Device ) {
 static const struct GDS_Device SH1106 = {
 	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
 	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
-	.DrawPixel = GDS_DrawPixel, .DrawPixelFast = GDS_DrawPixelFast,
+	.DrawPixelFast = GDS_DrawPixelFast,
 	.Update = Update, .Init = Init,
 };	
 

@@ -44,13 +44,6 @@
 #define BIT( n ) ( 1 << n )
 #endif
 
-typedef enum {
-    AddressMode_Horizontal = 0,
-    AddressMode_Vertical,
-    AddressMode_Page,
-    AddressMode_Invalid
-} GDS_AddressMode;
-
 struct GDS_Device;
 struct GDS_FontDef;
 
@@ -106,7 +99,6 @@ struct GDS_Device {
 	void (*DisplayOn)( struct GDS_Device* Device );
 	void (*DisplayOff)( struct GDS_Device* Device );
 	void (*Update)( struct GDS_Device* Device );
-	void (*DrawPixel)( struct GDS_Device* Device, int X, int Y, int Color );
 	void (*DrawPixelFast)( struct GDS_Device* Device, int X, int Y, int Color );
 	void (*SetHFlip)( struct GDS_Device* Device, bool On );
 	void (*SetVFlip)( struct GDS_Device* Device, bool On );
@@ -118,13 +110,37 @@ struct GDS_Device {
 
 bool GDS_Reset( struct GDS_Device* Device );
 
-/*
-inline void IRAM_ATTR 	GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
-void IRAM_ATTR 			GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color );
-inline void IRAM_ATTR 	GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color );
-void IRAM_ATTR 			GDS_DrawPixel4( struct GDS_Device* Device, int x, int y, int Color );
-*/
 void IRAM_ATTR 	GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
-void IRAM_ATTR 			GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color );
 void IRAM_ATTR 	GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color );
-void IRAM_ATTR 			GDS_DrawPixel4( struct GDS_Device* Device, int x, int y, int Color );
+
+inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
+    bool Result = (
+        ( x >= 0 ) &&
+        ( x < Device->Width ) &&
+        ( y >= 0 ) &&
+        ( y < Device->Height )
+    ) ? true : false;
+
+#if CONFIG_GDS_CLIPDEBUG > 0
+    if ( Result == false ) {
+        ClipDebug( x, y );
+    }
+#endif
+
+    return Result;
+}
+
+inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color ) {
+    if ( IsPixelVisible( Device, x, y ) == true ) {
+        Device->DrawPixelFast( Device, x, y, Color );
+    }
+}
+
+inline void IRAM_ATTR GDS_DrawPixel4( struct GDS_Device* Device, int x, int y, int Color ) {
+    if ( IsPixelVisible( Device, x, y ) == true ) {
+        Device->DrawPixelFast( Device, x, y, Color );
+    }
+}
+
+
+

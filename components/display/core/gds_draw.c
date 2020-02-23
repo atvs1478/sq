@@ -38,23 +38,6 @@ static const unsigned char BitReverseTable256[] =
   0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF
 };
 
-__attribute__( ( always_inline ) ) static inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
-    bool Result = (
-        ( x >= 0 ) &&
-        ( x < Device->Width ) &&
-        ( y >= 0 ) &&
-        ( y < Device->Height )
-    ) ? true : false;
-
-#if CONFIG_GDS_CLIPDEBUG > 0
-    if ( Result == false ) {
-        ClipDebug( x, y );
-    }
-#endif
-
-    return Result;
-}
-
 __attribute__( ( always_inline ) ) static inline void SwapInt( int* a, int* b ) {
     int Temp = *b;
 
@@ -83,12 +66,6 @@ inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y
     }
 }
 
-void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color ) {
-    if ( IsPixelVisible( Device, x, y ) == true ) {
-        Device->DrawPixelFast( Device, x, y, Color );
-    }
-}
-
 inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
     uint32_t YBit = ( Y & 0x07 );
     uint8_t* FBOffset = NULL;
@@ -110,12 +87,6 @@ inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int 
     }
 }
 
-void IRAM_ATTR GDS_DrawPixel4( struct GDS_Device* Device, int x, int y, int Color ) {
-    if ( IsPixelVisible( Device, x, y ) == true ) {
-        Device->DrawPixelFast( Device, x, y, Color );
-    }
-}
-
 void IRAM_ATTR GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width, int Color ) {
     int XEnd = x + Width;
 
@@ -128,11 +99,11 @@ void IRAM_ATTR GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width
 	else if (y >= Device->Height) x = Device->Height - 1;
 
     for ( ; x < XEnd; x++ ) {
-    //    if ( IsPixelVisible( Device, x, y ) == true ) {
+        if ( IsPixelVisible( Device, x, y ) == true ) {
             Device->DrawPixelFast( Device, x, y, Color );
-      //  } else {
-       //     break;
-       // }
+        } else {
+            break;
+        }
     }
 }
 
@@ -143,7 +114,7 @@ void IRAM_ATTR GDS_DrawVLine( struct GDS_Device* Device, int x, int y, int Heigh
 
     for ( ; y < YEnd; y++ ) {
         if ( IsPixelVisible( Device, x, y ) == true ) {
-            Device->DrawPixel( Device, x, y, Color );
+            GDS_DrawPixel( Device, x, y, Color );
         } else {
             break;
         }
