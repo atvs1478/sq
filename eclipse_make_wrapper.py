@@ -29,7 +29,7 @@ def check_path(path):
     except KeyError:
         pass
     paths[path] = path
-    winpath =re.sub(r'\\n$',winpath,' ',1)
+    winpath =path
     
     if not os.path.exists(winpath):
           # cache as failed, replace with success if it works

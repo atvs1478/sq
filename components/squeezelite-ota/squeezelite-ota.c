@@ -41,10 +41,9 @@ extern const char * get_certificate();
 #endif
 
 static const char *TAG = "squeezelite-ota";
-char * ota_write_data = NULL;
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
-#define BUFFSIZE 4096
+#define BUFFSIZE 8192
 #define HASH_LEN 32 /* SHA-256 digest length */
 typedef struct  {
 	char * url;
@@ -62,7 +61,7 @@ static struct {
 	uint32_t total_image_len;
 	uint32_t remain_image_len;
 	ota_type_t ota_type;
-	char * bin;
+	char * ota_write_data;
 	bool bOTAStarted;
 	uint8_t lastpct;
 	uint8_t newpct;
@@ -222,16 +221,16 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		ota_config.url = strdup(p_ota_thread_parms->url);
 		ota_config.max_redirection_count = 3;
 
-		ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-		//ota_write_data = malloc(ota_config.buffer_size+1);
-		if(ota_write_data== NULL){
+		ota_status.ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
+		if(ota_status.ota_write_data== NULL){
 			ESP_LOGE(TAG,"Error allocating the ota buffer");
 			return ESP_ERR_NO_MEM;
 		}
 
 		break;
 	case OTA_TYPE_BUFFER:
-		ota_status.bin = p_ota_thread_parms->bin;
+		ota_status.ota_write_data = p_ota_thread_parms->bin;
 		ota_status.total_image_len = p_ota_thread_parms->length;
 
 		break;
@@ -342,7 +341,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     }
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
-    	ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
+    	//ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
     	char local_buff_var[501]={};
     	//char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     	//char * local_buff = malloc(ota_config.buffer_size+1);
@@ -404,8 +403,9 @@ void ota_task_cleanup(const char * message, ...){
 		sendMessaging(MESSAGING_ERROR,message, args);
 	    va_end(args);
 	}
-	FREE_RESET(ota_status.bin);
-	FREE_RESET(ota_write_data);
+	if(ota_status.ota_type == OTA_TYPE_HTTP){
+		FREE_RESET(ota_status.ota_write_data);
+	}
 	if(ota_http_client!=NULL) {
 		esp_http_client_cleanup(ota_http_client);
 		ota_http_client=NULL;
@@ -479,7 +479,6 @@ void ota_task(void *pvParameter)
 	    }
 	}
 	else {
-		ota_write_data = ota_status.bin;
 		gettimeofday(&ota_status.OTA_start, NULL);
 	}
 	_printMemStats();
@@ -493,7 +492,8 @@ void ota_task(void *pvParameter)
     	ota_status.remain_image_len =ota_status.total_image_len -ota_status.actual_image_len;
 
         if (ota_status.ota_type == OTA_TYPE_HTTP){
-        	data_read = esp_http_client_read(ota_http_client, ota_write_data, buffer_size);
+        	ESP_LOGW(TAG,"Reading data from http client");
+        	data_read = esp_http_client_read(ota_http_client, ota_status.ota_write_data, buffer_size);
         }
         else {
         	if(ota_status.remain_image_len >buffer_size){
@@ -510,7 +510,7 @@ void ota_task(void *pvParameter)
                 esp_app_desc_t new_app_info;
                 if (data_read > sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
                     // check current version with downloading
-                    memcpy(&new_app_info, &ota_write_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
+                    memcpy(&new_app_info, &ota_status.ota_write_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
                     ESP_LOGI(TAG, "New firmware version: %s", new_app_info.version);
 
                     esp_app_desc_t running_app_info;
@@ -541,7 +541,7 @@ void ota_task(void *pvParameter)
                     return;
                 }
             }
-            err = esp_ota_write( update_handle, (const void *)ota_write_data, data_read);
+            err = esp_ota_write( update_handle, (const void *)ota_status.ota_write_data, data_read);
             if (err != ESP_OK) {
                 ota_task_cleanup("Error: OTA Partition write failure. (%s)",esp_err_to_name(err));
                 return;
@@ -549,7 +549,7 @@ void ota_task(void *pvParameter)
             ota_status.actual_image_len += data_read;
             if(ota_status.ota_type == OTA_TYPE_BUFFER){
             	// position the ota buffer in the next buffer chunk
-            	ota_write_data+= data_read;
+            	ota_status.ota_write_data+= data_read;
             }
             ESP_LOGD(TAG, "Written image length %d", ota_status.actual_image_len);
 			if(ota_get_pct_complete()%5 == 0) ota_status.newpct = ota_get_pct_complete();
