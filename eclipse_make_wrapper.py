@@ -12,7 +12,7 @@ import glob
 from test import test_cmd_line
 
 #UNIX_PATH_RE = re.compile(r'(([a-zA-Z]{1}[:]{1}){0,1}[/\\][^\s\'\"\t\[\(]+)+')
-UNIX_PATH_RE = re.compile(r'(([a-zA-Z]{1}[:]{1}){0,1}[/\\][^\s\'\"\t\[\(]+(?![^\\/]*$)[/\\]?)')
+UNIX_PATH_RE = re.compile(r'(([a-zA-Z]{1}[:]{1}){0,1}[/\\][^\s\'\"\t\[\(]+(?![^\\/\n]*$)[/\\]?)')
 INCLUDE_PATH_RE = re.compile(r'-I[\s"]{0,}(.+?)["]{0,}(?=\s-\S)')
 INCLUDE_PATH_ADJ_RE = re.compile(r'^([/]opt[/]esp-idf[/]){1}(.*)')
 INCLUDE_PATH_ADJ2_RE = re.compile(r'^([/]c[/]){1}(.*)')
@@ -29,7 +29,8 @@ def check_path(path):
     except KeyError:
         pass
     paths[path] = path
-    winpath =path
+    winpath =re.sub(r'\\n$',winpath,' ',1)
+    
     if not os.path.exists(winpath):
           # cache as failed, replace with success if it works
         if re.match(INCLUDE_PATH_ADJ2_RE, path) is not None:
