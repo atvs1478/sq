@@ -1,4 +1,4 @@
-#include <ssd13x6_font.h>
+#include <gds_font.h>
 
 //WARNING: This Font Require X-GLCD Lib.
 //         You can not use it with MikroE GLCD Lib.
@@ -237,7 +237,7 @@ static const uint8_t Liberation_Mono9x15[ ] = {
     0x08, 0x00, 0x00, 0x30, 0x40, 0xC6, 0x41, 0x06, 0x67, 0x00, 0x18, 0x06, 0x07, 0xC6, 0x01, 0x30, 0x00, 0x00, 0x00  // Code for char ÿ
 };
 
-const struct SSD13x6_FontDef Font_liberation_mono_9x15 = {
+const struct GDS_FontDef Font_liberation_mono_9x15 = {
     Liberation_Mono9x15,
     9,
     15,

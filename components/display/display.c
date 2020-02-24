@@ -22,14 +22,15 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "esp_log.h"
+#include "globdefs.h"
 #include "config.h"
 #include "tools.h"
 #include "display.h"
-
-// here we should include all possible drivers
-extern struct display_s SSD13x6_display;
-
-struct display_s *display = NULL;
+#include "gds.h"
+#include "gds_default_if.h"
+#include "gds_draw.h"
+#include "gds_text.h"
+#include "gds_font.h"
 
 static const char *TAG = "display";
 
@@ -57,34 +58,74 @@ static EXT_RAM_ATTR struct {
 
 static void displayer_task(void *args);
 
+struct GDS_Device *display;
+struct GDS_Device* SSD1306_Detect(char *Driver, struct GDS_Device* Device);
+struct GDS_Device* SH1106_Detect(char *Driver, struct GDS_Device* Device);
+GDS_DetectFunc drivers[] = { SH1106_Detect, SSD1306_Detect, NULL };
+
 /****************************************************************************************
  * 
  */
 void display_init(char *welcome) {
 	bool init = false;
-	char *item = config_alloc_get(NVS_TYPE_STR, "display_config");
+	char *config = config_alloc_get(NVS_TYPE_STR, "display_config");
 
-	if (item && *item) {
-		char * drivername=strstr(item,"driver");
-		if (!drivername  || (drivername && (strcasestr(drivername,"SSD1306") || strcasestr(drivername,"SSD1326") || strcasestr(drivername,"SH1106")))) {
-			display = &SSD13x6_display;
-			if (display->init(item, welcome)) {
-				init = true;
-				ESP_LOGI(TAG, "Display initialization successful");
-			} else {
-				display = NULL;
-				ESP_LOGW(TAG, "Display initialization failed");
-			}
+	if (!config) {
+		ESP_LOGI(TAG, "no display");
+		return false;
+	}	
+	
+	int width = -1, height = -1;
+	char *p, *drivername = strstr(config, "driver");
+		
+	// query drivers to see if we have a match
+	ESP_LOGI(TAG, "Trying to configure display with %s", config);
+	display = GDS_AutoDetect(drivername ? drivername : "SSD1306", drivers);
+		
+	if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
+		
+	// so far so good
+	if (display && width > 0 && height > 0) {
+		// Detect driver interface
+		if (strstr(config, "I2C") && i2c_system_port != -1) {
+			int address = 0x3C;
+				
+			if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
+		
+			init = true;
+			GDS_I2CInit( i2c_system_port, -1, -1 ) ;
+			GDS_I2CAttachDevice( display, width, height, address, -1 );
+		
+			ESP_LOGI(TAG, "Display is I2C on port %u", address);
+		} else if (strstr(config, "SPI") && spi_system_host != -1) {
+			int CS_pin = -1, speed = 0;
+		
+			if ((p = strcasestr(config, "cs")) != NULL) CS_pin = atoi(strchr(p, '=') + 1);
+			if ((p = strcasestr(config, "speed")) != NULL) speed = atoi(strchr(p, '=') + 1);
+		
+			init = true;
+			GDS_SPIInit( spi_system_host, spi_system_dc_gpio );
+			GDS_SPIAttachDevice( display, width, height, CS_pin, -1, speed );
+				
+			ESP_LOGI(TAG, "Display is SPI host %u with cs:%d", spi_system_host, CS_pin);
 		} else {
-			ESP_LOGE(TAG,"Unknown display driver name in display config: %s",item);
+			display = NULL;
+			ESP_LOGI(TAG, "Unsupported display interface or serial link not configured");
 		}
 	} else {
-		ESP_LOGI(TAG, "no display");
-	}
+		display = NULL;
+		ESP_LOGW(TAG, "No display driver");
+	}	
 	
 	if (init) {
 		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 		static EXT_RAM_ATTR StackType_t xStack[DISPLAYER_STACK_SIZE] __attribute__ ((aligned (4)));
+		
+		GDS_SetHFlip(display, strcasestr(config, "HFlip") ? true : false);
+		GDS_SetVFlip(display, strcasestr(config, "VFlip") ? true : false);
+		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
+		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, welcome);
 
 		// start the task that will handle scrolling & counting
 		displayer.mutex = xSemaphoreCreateMutex();
@@ -94,13 +135,13 @@ void display_init(char *welcome) {
 		displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", DISPLAYER_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 		
 		// set lines for "fixed" text mode
-		display->set_font(1, DISPLAY_FONT_LINE_1, -3);
-		display->set_font(2, DISPLAY_FONT_LINE_2, -3);
+		GDS_TextSetFontAuto(display, 1, GDS_FONT_LINE_1, -3);
+		GDS_TextSetFontAuto(display, 2, GDS_FONT_LINE_2, -3);
 		
 		displayer.metadata_config = config_alloc_get(NVS_TYPE_STR, "metadata_config");
 	}
 	
-	if (item) free(item);
+	free(config);
 }
 
 /****************************************************************************************
@@ -114,14 +155,14 @@ static void displayer_task(void *args) {
 	while (1) {
 		// suspend ourselves if nothing to do
 		if (displayer.state < DISPLAYER_ACTIVE) {
-			if (displayer.state == DISPLAYER_IDLE) display->line(2, 0, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.string);
+			if (displayer.state == DISPLAYER_IDLE) GDS_TextLine(display, 2, 0, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, displayer.string);
 			vTaskSuspend(NULL);
 			scroll_sleep = 0;
-			display->clear(true);
-			display->line(1, DISPLAY_LEFT, DISPLAY_UPDATE, displayer.header);
+			GDS_ClearExt(display, true);
+			GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_UPDATE, displayer.header);
 		} else if (displayer.refresh) {
 			// little trick when switching master while in IDLE and missing it
-			display->line(1, DISPLAY_LEFT, DISPLAY_CLEAR | DISPLAY_UPDATE, displayer.header);	
+			GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, displayer.header);	
 			displayer.refresh = false;			
 		}
 		
@@ -140,7 +181,7 @@ static void displayer_task(void *args) {
 				xSemaphoreGive(displayer.mutex);				
 				
 				// now display using safe copies, can be lengthy
-				display->line(2, offset, DISPLAY_CLEAR | DISPLAY_UPDATE, string);
+				GDS_TextLine(display, 2, offset, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, string);
 				free(string);
 			} else {
 				scroll_sleep = DEFAULT_SLEEP;
@@ -160,7 +201,7 @@ static void displayer_task(void *args) {
 				xSemaphoreGive(displayer.mutex);				
 				if (displayer.elapsed < 3600) sprintf(counter, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
 				else sprintf(counter, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
-				display->line(1, DISPLAY_RIGHT, (DISPLAY_CLEAR | DISPLAY_ONLY_EOL) | DISPLAY_UPDATE, counter);
+				GDS_TextLine(display, 1, GDS_TEXT_RIGHT, (GDS_TEXT_CLEAR | GDS_TEXT_CLEAR_EOL) | GDS_TEXT_UPDATE, counter);
 				timer_sleep = 1000;
 			} else timer_sleep = max(1000 - elapsed, 0);	
 		} else timer_sleep = DEFAULT_SLEEP;
@@ -240,7 +281,7 @@ void displayer_metadata(char *artist, char *album, char *title) {
 	displayer.offset = 0;	
 	utf8_decode(displayer.string);
 	ESP_LOGI(TAG, "playing %s", displayer.string);
-	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
+	displayer.boundary = GDS_TextStretch(display, 2, displayer.string, SCROLLABLE_SIZE);
 		
 	xSemaphoreGive(displayer.mutex);
 }	
@@ -258,7 +299,7 @@ void displayer_scroll(char *string, int speed) {
 	displayer.offset = 0;	
 	strncpy(displayer.string, string, SCROLLABLE_SIZE);
 	displayer.string[SCROLLABLE_SIZE] = '\0';
-	displayer.boundary = display->stretch(2, displayer.string, SCROLLABLE_SIZE);
+	displayer.boundary = GDS_TextStretch(display, 2, displayer.string, SCROLLABLE_SIZE);
 		
 	xSemaphoreGive(displayer.mutex);
 }

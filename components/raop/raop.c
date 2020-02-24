@@ -55,7 +55,7 @@ typedef struct raop_ctx_s {
 	short unsigned port;    // RTSP port for AirPlay
 	int sock;               // socket of the above
 	struct in_addr peer;	// IP of the iDevice (airplay sender)
-	bool running, abort;
+	bool running;
 #ifdef WIN32
 	pthread_t thread, search_thread;
 #else
@@ -63,6 +63,11 @@ typedef struct raop_ctx_s {
 	StaticTask_t *xTaskBuffer;
 	StackType_t xStack[RTSP_STACK_SIZE] __attribute__ ((aligned (4)));
 #endif
+	/* 
+	 Compiler/Execution bug: if this bool is next to 'running', the rtsp_thread 
+	 loop sees 'running' being set to false from at first execution ...
+	*/ 
+	bool abort;
 	unsigned char mac[6];
 	int latency;
 	struct {
@@ -182,7 +187,7 @@ struct raop_ctx_s *raop_create(struct in_addr host, char *name,
 	ctx->port = ntohs(addr.sin_port);
 #endif
 	ctx->running = true;
-	memcpy(ctx->mac, mac, 6);
+		memcpy(ctx->mac, mac, 6);
 	snprintf(id, 64, "%02X%02X%02X%02X%02X%02X@%s",  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], name);
 #ifdef WIN32
 	// seems that Windows snprintf does not add NULL char if actual size > max
@@ -214,7 +219,7 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	socklen_t nlen = sizeof(struct sockaddr);
 #endif
 	
-if (!ctx) return;
+	if (!ctx) return;
 
 #ifdef WIN32
 	ctx->running = false;
@@ -406,7 +411,7 @@ static void *rtsp_thread(void *arg) {
 			sock = -1;
 		}
 	}
-
+	
 	if (sock != -1) closesocket(sock);
 
 #ifndef WIN32
@@ -692,10 +697,10 @@ void abort_rtsp(raop_ctx_t *ctx) {
 
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
 		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-		
+
 		LOG_INFO("[%p]: Remote search thread aborted", ctx);
 	}	
-	
+
 	NFREE(ctx->rtsp.aeskey);
 	NFREE(ctx->rtsp.aesiv);
 	NFREE(ctx->rtsp.fmtp);

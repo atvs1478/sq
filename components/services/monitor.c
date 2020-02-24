@@ -43,12 +43,63 @@ bool spkfault_svc(void);
 /****************************************************************************************
  * 
  */
+static void task_stats( void ) {
+#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY 
+	static struct {
+		TaskStatus_t *tasks;
+		uint32_t total, n;
+	} current, previous;
+	
+	current.n = uxTaskGetNumberOfTasks();
+	current.tasks = malloc( current.n * sizeof( TaskStatus_t ) );
+	current.n = uxTaskGetSystemState( current.tasks, current.n, &current.total );
+	
+	static EXT_RAM_ATTR char scratch[128+1];
+	*scratch = '\0';
+
+#ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+	uint32_t elapsed = current.total - previous.total;
+    
+	for(int i = 0, n = 0; i < current.n; i++ ) {
+		for (int j = 0; j < previous.n; j++) {
+			if (current.tasks[i].xTaskNumber == previous.tasks[j].xTaskNumber) {
+				n += sprintf(scratch + n, "%16s %2u%% s:%5u", current.tasks[i].pcTaskName, 
+																		   100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed, 
+																		   current.tasks[i].usStackHighWaterMark);
+				if (i % 3 == 2 || i == current.n - 1) {
+					ESP_LOGI(TAG, "%s", scratch);
+					n = 0;
+				}	
+				break;
+			}
+		}	
+	}	
+#else
+	for (int i = 0, n = 0; i < current.n; i ++) {
+		n += sprintf(scratch + n, "%16s s:%5u\t", current.tasks[i].pcTaskName, current.tasks[i].usStackHighWaterMark);
+		if (i % 3 == 2 || i == current.n - 1) {
+			ESP_LOGI(TAG, "%s", scratch);
+			n = 0;
+		}	
+	}
+#endif	
+	
+	if (previous.tasks) free(previous.tasks);
+	previous = current;
+#endif	
+}
+ 
+/****************************************************************************************
+ * 
+ */
 static void monitor_callback(TimerHandle_t xTimer) {
 	ESP_LOGI(TAG, "Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
 			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+			
+	task_stats();
 }
 
 /****************************************************************************************
