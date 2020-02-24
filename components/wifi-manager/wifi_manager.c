@@ -60,6 +60,7 @@ Contains the freeRTOS task and all necessary support
 #include "config.h"
 #include "trace.h"
 #include "cmd_system.h"
+#include "messaging.h"
 
 #include "http_server_handlers.h"
 #include "monitor.h"
@@ -850,20 +851,6 @@ void wifi_manager_connect_async(){
 	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_USER);
 }
 
-void set_status_message(message_severity_t severity, const char * message){
-	if(ip_info_cjson==NULL){
-		ip_info_cjson = wifi_manager_get_new_json(&ip_info_cjson);
-	}
-	if(ip_info_cjson==NULL){
-		ESP_LOGE(TAG,  "Error setting status message. Unable to allocate cJSON.");
-		return;
-	}
-	cJSON * item=cJSON_GetObjectItem(ip_info_cjson, "message");
-	item = wifi_manager_get_new_json(&item);
-	cJSON_AddItemToObject(item, "severity", cJSON_CreateString(severity==INFO?"INFO":severity==WARNING?"WARNING":severity==ERROR?"ERROR":"" ));
-	cJSON_AddItemToObject(item, "text", cJSON_CreateString(message));
-}
-
 
 char* wifi_manager_alloc_get_ip_info_json(){
 	return cJSON_PrintUnformatted(ip_info_cjson);
@@ -1142,6 +1129,7 @@ void wifi_manager( void * pvParameters ){
 					if(esp_wifi_scan_start(&scan_config, false)!=ESP_OK){
 						ESP_LOGW(TAG,  "Unable to start scan; wifi is trying to connect");
 //						set_status_message(WARNING, "Wifi Connecting. Cannot start scan.");
+						messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Wifi connecting. Cannot start scan.");
 					}
 					else {
 						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);

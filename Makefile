@@ -13,9 +13,8 @@
 #recovery: EXTRA_CPPFLAGS+=-DRECOVERY_APPLICATION=1
 
 PROJECT_NAME?=squeezelite
-EXTRA_CPPFLAGS+= -Wno-error=maybe-uninitialized \
-			-I$(PROJECT_PATH)/main
-
+EXTRA_CPPFLAGS+=  -I$(PROJECT_PATH)/main
+#/-Wno-error=maybe-uninitialized 
 include $(IDF_PATH)/make/project.mk 
 
 # for future gcc version, this could be needed: CPPFLAGS+= -Wno-error=format-overflow -Wno-error=stringop-truncation

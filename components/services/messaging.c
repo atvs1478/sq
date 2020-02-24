@@ -14,6 +14,7 @@
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
 #include "messaging.h"
+#include "trace.h"
 /************************************
  * Globals
  */
@@ -137,12 +138,12 @@ cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle){
 		else {
 			json_message = cJSON_CreateObject();
 			cJSON_AddStringToObject(json_message, "message", message->message);
+			vRingbufferReturnItem(buf_handle, (void *)message);
 			cJSON_AddStringToObject(json_message, "type", messaging_get_type_desc(message->type));
 			cJSON_AddStringToObject(json_message, "class", messaging_get_class_desc(message->msg_class));
 			cJSON_AddNumberToObject(json_message,"sent_time",message->sent_time);
 			cJSON_AddNumberToObject(json_message,"current_time",esp_timer_get_time() / 1000);
 			cJSON_AddItemToArray(json_messages,json_message);
-			vRingbufferReturnItem(buf_handle, (void *)message);
 		}
 	}
 	return json_messages;

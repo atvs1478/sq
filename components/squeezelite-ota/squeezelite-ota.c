@@ -29,8 +29,9 @@
 #include "esp_spi_flash.h"
 #include "sdkconfig.h"
 #include "messaging.h"
-
+#include "trace.h"
 #include "esp_ota_ops.h"
+
 extern const char * get_certificate();
 
 #ifdef CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_1
@@ -57,16 +58,12 @@ typedef enum  {
 	OTA_TYPE_INVALID
 } ota_type_t;
 static struct {
-	char status_text[81];
 	uint32_t actual_image_len;
 	uint32_t total_image_len;
 	uint32_t remain_image_len;
-	char * redirected_url;
-	char * current_url;
 	ota_type_t ota_type;
 	char * bin;
 	bool bOTAStarted;
-	bool bInitialized;
 	uint8_t lastpct;
 	uint8_t newpct;
 	struct timeval OTA_start;
@@ -99,10 +96,22 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     if(str_len>0){
     	msg_str = malloc(str_len);
     	vsnprintf(msg_str,str_len,fmt,args);
+        if(type == MESSAGING_WARNING){
+        	ESP_LOGW(TAG,"%s",msg_str);
+        }
+    	else if (type == MESSAGING_ERROR){
+    		ESP_LOGE(TAG,"%s",msg_str);
+    	}
+    	else
+    		ESP_LOGI(TAG,"%s",msg_str);
+    }
+    else {
+    	ESP_LOGW(TAG, "Sending empty string message");
     }
     va_end(args);
 
-    cJSON_AddStringToObject(msg,"ota_dsc",msg_str);
+
+    cJSON_AddStringToObject(msg,"ota_dsc",str_or_unknown(msg_str));
     free(msg_str);
     cJSON_AddNumberToObject(msg,"ota_pct",	ota_get_pct_complete()	);
     char * json_msg = cJSON_PrintUnformatted(msg);
@@ -150,7 +159,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
 
-        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Installing...");
+        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Connecting to URL...");
         ota_status.total_image_len=0;
 		ota_status.actual_image_len=0;
 		ota_status.lastpct=0;
@@ -165,9 +174,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     case HTTP_EVENT_ON_HEADER:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s",evt->header_key, evt->header_value);
 		if (strcasecmp(evt->header_key, "location") == 0) {
-			FREE_RESET(ota_status.redirected_url);
-        	ota_status.redirected_url=strdup(evt->header_value);
-        	ESP_LOGW(TAG,"OTA will redirect to url: %s",ota_status.redirected_url);
+        	ESP_LOGW(TAG,"OTA will redirect to url: %s",evt->header_value);
         }
         if (strcasecmp(evt->header_key, "content-length") == 0) {
         	ota_status.total_image_len = atol(evt->header_value);
@@ -191,7 +198,6 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 
 esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 	memset(&ota_config, 0x00, sizeof(ota_config));
-	ota_status.bInitialized = true;
 	sendMessaging(MESSAGING_INFO,"Initializing...");
 	ota_status.ota_type= OTA_TYPE_INVALID;
 	if(p_ota_thread_parms->url !=NULL && strlen(p_ota_thread_parms->url)>0 ){
@@ -208,14 +214,14 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 
 	switch (ota_status.ota_type) {
 	case OTA_TYPE_HTTP:
-		ota_status.current_url= p_ota_thread_parms->url;
 		ota_config.cert_pem =get_certificate();
 		ota_config.event_handler = _http_event_handler;
 		ota_config.buffer_size = BUFFSIZE;
-		ota_config.disable_auto_redirect=false;
+		ota_config.disable_auto_redirect=true;
 		ota_config.skip_cert_common_name_check = false;
-		ota_config.url = strdup(ota_status.current_url);
+		ota_config.url = strdup(p_ota_thread_parms->url);
 		ota_config.max_redirection_count = 3;
+
 		ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 		//ota_write_data = malloc(ota_config.buffer_size+1);
 		if(ota_write_data== NULL){
@@ -295,14 +301,14 @@ esp_err_t _erase_last_boot_app_partition(esp_partition_t *ota_partition)
 		if(i%2) {
 			sendMessaging(MESSAGING_INFO,"Erasing flash (%u/%u)",i,num_passes);
 		}
-		vTaskDelay(200/ portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with reducing WDT errors
+		//vTaskDelay(200/ portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with reducing WDT errors
 	}
 	if(remain_size>0){
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);
 		if(err!=ESP_OK) return err;
 	}
 	sendMessaging(MESSAGING_INFO,"Erasing flash complete.");
-	taskYIELD();
+
 	return ESP_OK;
 }
 
@@ -321,28 +327,32 @@ static bool process_again(int status_code)
 static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client, int status_code)
 {
     esp_err_t err=ESP_OK;
-    if (status_code == HttpStatus_MovedPermanently || status_code == HttpStatus_Found) {
+    if (status_code == HttpStatus_MovedPermanently || status_code == HttpStatus_Found ) {
     	ESP_LOGW(TAG, "Handling HTTP redirection. ");
         err = esp_http_client_set_redirection(http_client);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "URL redirection Failed. %s", esp_err_to_name(err));
             return err;
         }
+        ESP_LOGW(TAG, "Done Handling HTTP redirection. ");
+
     } else if (status_code == HttpStatus_Unauthorized) {
     	ESP_LOGW(TAG, "Handling Unauthorized. ");
         esp_http_client_add_auth(http_client);
     }
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
-    	char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    	ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
+    	char local_buff_var[501]={};
+    	//char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     	//char * local_buff = malloc(ota_config.buffer_size+1);
-    	if(local_buff==NULL){
-    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
-    		return ESP_ERR_NO_MEM;
-    	}
+//    	if(local_buff==NULL){
+//    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
+//    		return ESP_ERR_NO_MEM;
+//    	}
         while (1) {
-        	ESP_LOGD(TAG, "Reading data chunk. ");
-            int data_read = esp_http_client_read(http_client, local_buff, ota_config.buffer_size);
+        	ESP_LOGD(TAG, "Buffer successfully allocated. Reading data chunk. ");
+            int data_read = esp_http_client_read(http_client, local_buff_var, sizeof(local_buff_var));
             if (data_read < 0) {
                 ESP_LOGE(TAG, "Error: SSL data read error");
                 err= ESP_FAIL;
@@ -353,7 +363,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
             	break;
             }
         }
-        FREE_RESET(local_buff);
+        //FREE_RESET(local_buff);
     }
 
     return err;
@@ -379,8 +389,6 @@ static esp_err_t _http_connect(esp_http_client_handle_t http_client)
         status_code = esp_http_client_get_status_code(http_client);
         ESP_LOGD(TAG, "HTTP status code was %d",status_code);
 
-
-
         err = _http_handle_response_code(http_client, status_code);
         if (err != ESP_OK) {
             return err;
@@ -395,11 +403,7 @@ void ota_task_cleanup(const char * message, ...){
 	    va_start(args, message);
 		sendMessaging(MESSAGING_ERROR,message, args);
 	    va_end(args);
-	    ESP_LOGE(TAG, "%s",ota_status.status_text);
 	}
-
-	FREE_RESET(ota_status.redirected_url);
-	FREE_RESET(ota_status.current_url);
 	FREE_RESET(ota_status.bin);
 	FREE_RESET(ota_write_data);
 	if(ota_http_client!=NULL) {
@@ -603,7 +607,7 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
 
 	if(bin_url){
 		ota_thread_parms.url =strdup(bin_url);
-		ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,bin_url);
+		ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,ota_thread_parms.url);
 	}
 	else {
 		ota_thread_parms.bin = bin_buffer;
@@ -614,8 +618,7 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
     char * num_buffer=config_alloc_get(NVS_TYPE_STR, "ota_stack");
   	if(num_buffer!=NULL) {
   		stack_size= atol(num_buffer);
-  		free(num_buffer);
-  		num_buffer=NULL;
+  		FREE_AND_NULL(num_buffer);
   	}
   	else {
 		ESP_LOGW(TAG,"OTA stack size config not found");
@@ -624,8 +627,7 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
   	num_buffer=config_alloc_get(NVS_TYPE_STR, "ota_prio");
 	if(num_buffer!=NULL) {
 		task_priority= atol(num_buffer);
-		free(num_buffer);
-		num_buffer=NULL;
+		FREE_AND_NULL(num_buffer);
 	}
 	else {
 		ESP_LOGW(TAG,"OTA task priority not found");

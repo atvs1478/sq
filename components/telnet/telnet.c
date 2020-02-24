@@ -38,7 +38,7 @@
 #include "config.h"
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
-
+#include "trace.h"
 
 /************************************
  * Globals
@@ -148,12 +148,14 @@ static void telnet_task(void *data) {
 	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
 	if (rc < 0) {
 		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
+		close(serverSocket);
 		return;
 	}
 
 	rc = listen(serverSocket, 5);
 	if (rc < 0) {
 		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
+		close(serverSocket);
 		return;
 	}
 
@@ -171,6 +173,7 @@ static void telnet_task(void *data) {
 			ESP_LOGD(tag, "Telnet connection terminated");
 		}
 	}
+	close(serverSocket);
 	vTaskDelete(NULL);
 }
 

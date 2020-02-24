@@ -124,7 +124,7 @@ esp_err_t http_server_start()
     strlcpy(rest_context->base_path, "/res/", sizeof(rest_context->base_path));
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 25;
     config.max_open_sockets = 5;
     config.uri_match_fn = httpd_uri_match_wildcard;
     //todo:  use the endpoint below to configure session token?

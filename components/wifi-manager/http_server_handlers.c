@@ -51,6 +51,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "lwip/ip_addr.h"
 #include "messaging.h"
 #include "platform_esp32.h"
+#include "trace.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 const char str_na[]="N/A";
@@ -148,6 +149,7 @@ char * http_alloc_get_socket_address(httpd_req_t *req, u8_t local, in_port_t * p
 
 	int s = httpd_req_to_sockfd(req);
 	if(s == -1) {
+		free(ipstr);
 		return strdup("httpd_req_to_sockfd error");
 	}
 	ESP_LOGV_LOC(TAG,"httpd socket descriptor: %u", s);
@@ -239,24 +241,31 @@ bool is_captive_portal_host_name(httpd_req_t *req){
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
+	START_FREE_MEM_CHECK(ff);
 	session_context_t * context = (session_context_t *)ctx;
     if(context){
+    	ESP_LOGD(TAG, "Freeing up socket context");
     	FREE_AND_NULL(context->auth_token);
     	FREE_AND_NULL(context->sess_ip_address);
     	free(context);
+    	CHECK_RESET_FREE_MEM_CHECK(ff,"free_ctx");
     }
 }
 
 session_context_t* get_session_context(httpd_req_t *req){
+	START_FREE_MEM_CHECK(ff);
 	if (! req->sess_ctx) {
+		ESP_LOGD(TAG,"New connection context. Allocating session buffer");
 		req->sess_ctx = malloc(sizeof(session_context_t));
 		memset(req->sess_ctx,0x00,sizeof(session_context_t));
 		req->free_ctx = free_ctx_func;
 		// get the remote IP address only once per session
 	}
 	session_context_t *ctx_data = (session_context_t*)req->sess_ctx;
+	FREE_AND_NULL(ctx_data->sess_ip_address);
 	ctx_data->sess_ip_address = http_alloc_get_socket_address(req, 0, &ctx_data->port);
 	ESP_LOGD_LOC(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
+	CHECK_RESET_FREE_MEM_CHECK(ff,"get sess context");
 	return (session_context_t *)req->sess_ctx;
 }
 
@@ -1043,25 +1052,34 @@ esp_err_t redirect_ev_handler(httpd_req_t *req){
 
 esp_err_t messages_get_handler(httpd_req_t *req){
     ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    START_FREE_MEM_CHECK(before);
+    START_FREE_MEM_CHECK(all);
     if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
+    CHECK_RESET_FREE_MEM_CHECK(before, "after user auth");
     esp_err_t err = set_content_type_from_req(req);
 	if(err != ESP_OK){
 		return err;
 	}
-
+	CHECK_RESET_FREE_MEM_CHECK(before, "after set_content_type");
 	cJSON * json_messages=  messaging_retrieve_messages(messaging);
+	CHECK_RESET_FREE_MEM_CHECK(before, "after receiving messages");
 	if(json_messages!=NULL){
 		char * json_text= cJSON_Print(json_messages);
+		CHECK_RESET_FREE_MEM_CHECK(before, "after json print");
 		httpd_resp_send(req, (const char *)json_text, strlen(json_text));
-		cJSON_free(json_messages);
+		CHECK_RESET_FREE_MEM_CHECK(before, "after http send");
 		free(json_text);
+		CHECK_RESET_FREE_MEM_CHECK(before, "after free json message");
+		cJSON_free(json_messages);
+		CHECK_RESET_FREE_MEM_CHECK(before, "after free json");
 	}
 	else {
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to retrieve messages");
 	}
+	CHECK_RESET_FREE_MEM_CHECK(all, "before returning");
 	return ESP_OK;
 }
 

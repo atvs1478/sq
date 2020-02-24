@@ -31,28 +31,4 @@ extern  bool wait_for_wifi();
 extern void console_start();
 extern pthread_cond_t wifi_connect_suspend_cond;
 extern pthread_t wifi_connect_suspend_mutex;
-typedef enum {
-	INFO,
-	WARNING,
-	ERROR
-} message_severity_t;
-extern void set_status_message(message_severity_t severity, const char * message);
-#ifndef STR_OR_ALT
-#define STR_OR_ALT(str,alt) (str?str:alt)
-#endif
 
-extern const char unknown_string_placeholder[];
-extern const char * str_or_unknown(const char * str);
-
-#ifndef FREE_AND_NULL
-#define FREE_AND_NULL(x) if(x) { free(x); x=NULL; }
-#endif
-#ifndef QUOTE
-#define QUOTE(name) #name
-#endif
-#ifndef STR
-#define STR(macro)  QUOTE(macro)
-#endif
-#ifndef CASE_TO_STR
-#define CASE_TO_STR(x) case x: return STR(x); break;
-#endif
