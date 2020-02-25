@@ -492,7 +492,6 @@ void ota_task(void *pvParameter)
     	ota_status.remain_image_len =ota_status.total_image_len -ota_status.actual_image_len;
 
         if (ota_status.ota_type == OTA_TYPE_HTTP){
-        	ESP_LOGW(TAG,"Reading data from http client");
         	data_read = esp_http_client_read(ota_http_client, ota_status.ota_write_data, buffer_size);
         }
         else {
