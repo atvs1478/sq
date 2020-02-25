@@ -593,7 +593,7 @@ void ota_task(void *pvParameter)
     if (err == ESP_OK) {
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
     	sendMessaging(MESSAGING_INFO,"Success!");
-    	vTaskDelay(1500/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
+    	vTaskDelay(1000/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
         esp_restart();
     } else {
         ota_task_cleanup("Error: Unable to update boot partition [%s]",esp_err_to_name(err));
