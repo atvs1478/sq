@@ -93,7 +93,7 @@ struct GDS_Device {
     bool FontForceMonospace;
 
 	// various driver-specific method
-	// must provide
+	// must always provide 
 	bool (*Init)( struct GDS_Device* Device);
 	void (*SetContrast)( struct GDS_Device* Device, uint8_t Contrast );
 	void (*DisplayOn)( struct GDS_Device* Device );
@@ -101,8 +101,9 @@ struct GDS_Device {
 	void (*SetHFlip)( struct GDS_Device* Device, bool On );
 	void (*SetVFlip)( struct GDS_Device* Device, bool On );
 	void (*Update)( struct GDS_Device* Device );
-	// may provide for optimization
+	// must provide for depth other than 1 (vertical) and 4 (may provide for optimization)
 	void (*DrawPixelFast)( struct GDS_Device* Device, int X, int Y, int Color );
+	// may provide for optimization
 	void (*DrawRGB16)( struct GDS_Device* Device, int x, int y, int Width, int Height, int RGB_Mode, uint16_t **Image );
 	void (*ClearWindow)( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color );
 		    

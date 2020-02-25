@@ -61,9 +61,22 @@ void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2,
 	// driver can provide onw optimized clear window
 	if (Device->ClearWindow) {
 		Device->ClearWindow( Device, x1, y1, x2, y2, Color );
-	// cheap optimization on boundaries
-	if (x1 == 0 && x2 == Device->Width - 1 && y1 % 8 == 0 && (y2 + 1) % 8 == 0) {
-		memset( Device->Framebuffer + (y1 / 8) * Device->Width, 0, (y2 - y1 + 1) / 8 * Device->Width );
+	} else if (Device->Depth == 1) {
+		// single shot if we erase all screen
+		if (x2 - x1 == Device->Width - 1 && y2 - y1 == Device->Height - 1) {
+			memset( Device->Framebuffer, Color, Device->FramebufferSize );
+		} else {
+			uint8_t _Color = Color == GDS_COLOR_BLACK ? 0: 0xff;
+			uint8_t Width = Device->Width;
+			// try to do byte processing as much as possible
+			for (int c = x1; c <= x2; c++) {
+				int r = y1;
+				while (r & 0x07 && r <= y2) GDS_DrawPixelFast( Device, c, r++, Color);
+				for (; (r >> 3) < (y2 >> 3); r++) Device->Framebuffer[(r >> 3) * Width + c] = _Color;
+				// memset(Device->Framebuffer + (r >> 3) * Width, _Color, (y2 >> 3) - (r >> 3));
+				while (r <= y2) GDS_DrawPixelFast( Device, c, r++, Color);
+			}
+		}	
 	} else {
 		for (int y = y1; y <= y2; y++) {
 			for (int x = x1; x <= x2; x++) {
