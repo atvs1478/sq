@@ -164,7 +164,7 @@ void set_led_gpio(int gpio, char *value) {
 		green.gpio = gpio;
 		if ((p = strchr(value, ':')) != NULL) green.active = atoi(p + 1);
 	} else 	if (strcasestr(value, "red")) {
-		red.active = gpio;
+		red.gpio = gpio;
 		if ((p = strchr(value, ':')) != NULL) red.active = atoi(p + 1);
 	}	
 }

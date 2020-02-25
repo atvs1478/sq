@@ -4,16 +4,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define GDS_COLOR_BLACK 0
-#define GDS_COLOR_WHITE 1
+enum { 	GDS_COLOR_L0 = 0, GDS_COLOR_L1, GDS_COLOR_L2, GDS_COLOR_L3, GDS_COLOR_L4, GDS_COLOR_L5, GDS_COLOR_L6, GDS_COLOR_L7, 
+		GDS_COLOR_L8, GDS_COLOR_L9, GDS_COLOR_L10, GDS_COLOR_L11, GDS_COLOR_L12, GDS_COLOR_L13, GDS_COLOR_L14, GDS_COLOR_L15,
+};
+		
+#define GDS_COLOR_BLACK GDS_COLOR_L0
+#define GDS_COLOR_WHITE GDS_COLOR_L15
 #define GDS_COLOR_XOR 2
 
 struct GDS_Device;
 struct GDS_FontDef;
 
-typedef struct GDS_Device* (*GDS_DetectFunc)(char *Driver, struct GDS_Device *Device);
+typedef struct GDS_Device* GDS_DetectFunc(char *Driver, struct GDS_Device *Device);
 
-struct GDS_Device*	GDS_AutoDetect( char *Driver, GDS_DetectFunc[] );
+struct GDS_Device*	GDS_AutoDetect( char *Driver, GDS_DetectFunc* DetectFunc[] );
 
 void 	GDS_SetContrast( struct GDS_Device* Device, uint8_t Contrast );
 void 	GDS_DisplayOn( struct GDS_Device* Device );

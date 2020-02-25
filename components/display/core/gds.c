@@ -21,7 +21,7 @@ static struct GDS_Device Display;
 
 static char TAG[] = "gds";
 
-struct GDS_Device*	GDS_AutoDetect( char *Driver, GDS_DetectFunc DetectFunc[] ) {
+struct GDS_Device*	GDS_AutoDetect( char *Driver, GDS_DetectFunc* DetectFunc[] ) {
 	for (int i = 0; DetectFunc[i]; i++) {
 		if (DetectFunc[i](Driver, &Display)) {
 			ESP_LOGD(TAG, "Detected driver %p", &Display);
@@ -54,19 +54,25 @@ void GDS_ClearExt(struct GDS_Device* Device, bool full, ...) {
 
 void GDS_Clear( struct GDS_Device* Device, int Color ) {
     memset( Device->Framebuffer, Color, Device->FramebufferSize );
+	Device->Dirty = true;
 }
 
 void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color ) {
+	// driver can provide onw optimized clear window
+	if (Device->ClearWindow) {
+		Device->ClearWindow( Device, x1, y1, x2, y2, Color );
 	// cheap optimization on boundaries
 	if (x1 == 0 && x2 == Device->Width - 1 && y1 % 8 == 0 && (y2 + 1) % 8 == 0) {
 		memset( Device->Framebuffer + (y1 / 8) * Device->Width, 0, (y2 - y1 + 1) / 8 * Device->Width );
 	} else {
 		for (int y = y1; y <= y2; y++) {
 			for (int x = x1; x <= x2; x++) {
-				Device->DrawPixelFast( Device, x, y, Color);
+				GDS_DrawPixelFast( Device, x, y, Color);
 			}		
 		}	
 	}	
+	
+	Device->Dirty = true;
 }
 
 void GDS_Update( struct GDS_Device* Device ) {

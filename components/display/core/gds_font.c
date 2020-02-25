@@ -9,10 +9,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include "gds.h"
-#include "gds_draw.h"
-#include "gds_font.h"
 #include "gds_private.h"
+#include "gds.h"
+#include "gds_font.h"
+#include "gds_draw.h"
 #include "gds_err.h"
 
 static int RoundUpFontHeight( const struct GDS_FontDef* Font ) {

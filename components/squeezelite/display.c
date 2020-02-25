@@ -233,8 +233,8 @@ bool sb_display_init(void) {
 	displayer.mutex = xSemaphoreCreateMutex();
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
-	// size scroller
-	scroller.scroll.max = (displayer.width * displayer.height / 8) * 10;
+	// size scroller (width + current screen)
+	scroller.scroll.max = (displayer.width * displayer.height / 8) * (10 + 1);
 	scroller.scroll.frame = malloc(scroller.scroll.max);
 	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
 	scroller.frame = malloc(displayer.width * displayer.height / 8);
@@ -501,7 +501,7 @@ static void grfe_handler( u8_t *data, int len) {
 		}	
 	
 		// draw new frame
-		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), displayer.width, displayer.height);
+		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), displayer.width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
 	
@@ -580,7 +580,8 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.scroll.size = offset + size;
 		LOG_INFO("scroller current size %u", scroller.scroll.size);
 	} else {
-		LOG_INFO("scroller too larger %u/%u", scroller.scroll.size + size, scroller.scroll.max);
+		LOG_INFO("scroller too larger %u/%u/%u", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
+		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8);
 	}	
 }
 
@@ -598,13 +599,13 @@ static void grfg_handler(u8_t *data, int len) {
 	scroller.width = htons(pkt->width);
 	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
-	// update display asynchronously (frames are oganized by columns)
+	// update display asynchronously (frames are organized by columns)
 	memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 	for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 	
 	// can only write if we really own display
 	if (displayer.owned) {
-		GDS_DrawBitmapCBR(display, scroller.frame, scroller.back.width, displayer.height);
+		GDS_DrawBitmapCBR(display, scroller.frame, scroller.back.width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
 		
@@ -855,7 +856,7 @@ static void displayer_task(void *args) {
 				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 				scroller.scrolled += scroller.by;
-				if (displayer.owned) GDS_DrawBitmapCBR(display, scroller.frame, scroller.width, displayer.height);	
+				if (displayer.owned) GDS_DrawBitmapCBR(display, scroller.frame, scroller.width, displayer.height, GDS_COLOR_WHITE);	
 				
 				// short sleep & don't need background update
 				scroller.wake = scroller.speed;

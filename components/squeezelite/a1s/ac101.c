@@ -71,7 +71,7 @@ static int i2c_port;
  * init
  */
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {	 
-	esp_err_t res;
+	esp_err_t res = ESP_OK;
 	
 	i2c_port = i2c_port_num;
 
@@ -144,8 +144,8 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
 															.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO
 								};
-	i2s_driver_install(i2s_num, i2s_config, 0, NULL);
-	i2s_set_pin(i2s_num, &i2s_pin_config);
+	res |= i2s_driver_install(i2s_num, i2s_config, 0, NULL);
+	res |= i2s_set_pin(i2s_num, &i2s_pin_config);
 	
 	// enable earphone & speaker
 	i2c_write_reg(SPKOUT_CTRL, 0x0220);
@@ -156,9 +156,9 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	ac101_set_spk_volume(100);
 	ac101_set_earph_volume(100);
 	
-	ESP_LOGI(TAG, "DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+	ESP_LOGI(TAG, "DAC using I2S bck:%d, ws:%d, do:%d", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 
-	return true;
+	return (res == ESP_OK);
 }	
 
 /****************************************************************************************
