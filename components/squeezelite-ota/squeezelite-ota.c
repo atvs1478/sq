@@ -40,10 +40,11 @@ extern const char * get_certificate();
 #define OTA_CORE 1
 #endif
 
+
 static const char *TAG = "squeezelite-ota";
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
-#define BUFFSIZE 8192
+#define BUFFSIZE 2048
 #define HASH_LEN 32 /* SHA-256 digest length */
 typedef struct  {
 	char * url;
@@ -63,6 +64,7 @@ static struct {
 	ota_type_t ota_type;
 	char * ota_write_data;
 	bool bOTAStarted;
+	size_t buffer_size;
 	uint8_t lastpct;
 	uint8_t newpct;
 	struct timeval OTA_start;
@@ -210,18 +212,19 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		ESP_LOGE(TAG,"HTTP OTA called without a url or a binary buffer");
 		return ESP_ERR_INVALID_ARG;
 	}
-
+	ota_status.buffer_size = BUFFSIZE;
 	switch (ota_status.ota_type) {
 	case OTA_TYPE_HTTP:
 		ota_config.cert_pem =get_certificate();
 		ota_config.event_handler = _http_event_handler;
-		ota_config.buffer_size = BUFFSIZE;
+		ota_config.buffer_size = ota_status.buffer_size;
 		ota_config.disable_auto_redirect=true;
 		ota_config.skip_cert_common_name_check = false;
 		ota_config.url = strdup(p_ota_thread_parms->url);
 		ota_config.max_redirection_count = 3;
 
-		ota_status.ota_write_data = heap_caps_malloc(ota_config.buffer_size+1 , MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
+		ota_status.ota_write_data = heap_caps_malloc(ota_status.buffer_size+1 , (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
 
 		if(ota_status.ota_write_data== NULL){
 			ESP_LOGE(TAG,"Error allocating the ota buffer");
@@ -300,7 +303,7 @@ esp_err_t _erase_last_boot_app_partition(esp_partition_t *ota_partition)
 		if(i%2) {
 			sendMessaging(MESSAGING_INFO,"Erasing flash (%u/%u)",i,num_passes);
 		}
-		//vTaskDelay(200/ portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with reducing WDT errors
+		vTaskDelay(100/ portTICK_PERIOD_MS);  // wait here for a short amount of time.  This will help with reducing WDT errors
 	}
 	if(remain_size>0){
 		err=esp_partition_erase_range(ota_partition, ota_partition->size-remain_size, remain_size);
@@ -342,16 +345,15 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
     	//ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
-    	char local_buff_var[501]={};
-    	//char * local_buff = heap_caps_malloc(ota_config.buffer_size+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    	//char * local_buff = malloc(ota_config.buffer_size+1);
-//    	if(local_buff==NULL){
-//    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
-//    		return ESP_ERR_NO_MEM;
-//    	}
+    	char * local_buff = heap_caps_malloc(ota_status.buffer_size+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+
+    	if(local_buff==NULL){
+    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
+    		return ESP_ERR_NO_MEM;
+    	}
         while (1) {
         	ESP_LOGD(TAG, "Buffer successfully allocated. Reading data chunk. ");
-            int data_read = esp_http_client_read(http_client, local_buff_var, sizeof(local_buff_var));
+            int data_read = esp_http_client_read(http_client, local_buff, ota_status.buffer_size);
             if (data_read < 0) {
                 ESP_LOGE(TAG, "Error: SSL data read error");
                 err= ESP_FAIL;
@@ -362,7 +364,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
             	break;
             }
         }
-        //FREE_RESET(local_buff);
+        FREE_RESET(local_buff);
     }
 
     return err;
@@ -487,12 +489,17 @@ void ota_task(void *pvParameter)
     /*deal with all receive packet*/
     bool image_header_was_checked = false;
     int data_read = 0;
+    if (ota_status.ota_type == OTA_TYPE_HTTP && ota_status.total_image_len > ota_partition->size){
+    	ota_task_cleanup("Error: Image size too large to fit in partition.");
+        return;
+	}
 
     while (1) {
     	ota_status.remain_image_len =ota_status.total_image_len -ota_status.actual_image_len;
 
         if (ota_status.ota_type == OTA_TYPE_HTTP){
-        	data_read = esp_http_client_read(ota_http_client, ota_status.ota_write_data, buffer_size);
+
+        	data_read = esp_http_client_read(ota_http_client, ota_status.ota_write_data, ota_status.buffer_size);
         }
         else {
         	if(ota_status.remain_image_len >buffer_size){
@@ -507,7 +514,7 @@ void ota_task(void *pvParameter)
         } else if (data_read > 0) {
         	if (image_header_was_checked == false) {
                 esp_app_desc_t new_app_info;
-                if (data_read > sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
+                if (data_read >= IMAGE_HEADER_SIZE) {
                     // check current version with downloading
                     memcpy(&new_app_info, &ota_status.ota_write_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
                     ESP_LOGI(TAG, "New firmware version: %s", new_app_info.version);
@@ -535,11 +542,13 @@ void ota_task(void *pvParameter)
                         return;
                     }
 					ESP_LOGD(TAG, "esp_ota_begin succeeded");
-                } else {
-                    ota_task_cleanup("Error: Binary file too large for the current partition");
-                    return;
                 }
+                else {
+					ota_task_cleanup("Error: Increase ota http buffer.");
+					return;
+				}
             }
+
             err = esp_ota_write( update_handle, (const void *)ota_status.ota_write_data, data_read);
             if (err != ESP_OK) {
                 ota_task_cleanup("Error: OTA Partition write failure. (%s)",esp_err_to_name(err));
