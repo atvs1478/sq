@@ -50,7 +50,7 @@
 const static char tag[] = "telnet";
 static int uart_fd=0;
 RingbufHandle_t buf_handle;
-SemaphoreHandle_t xSemaphore = NULL;
+//static SemaphoreHandle_t xSemaphore = NULL;
 static size_t send_chunk=300;
 static size_t log_buf_size=2000;      //32-bit aligned size
 static bool bIsEnabled=false;
@@ -68,7 +68,7 @@ static int stdout_fstat(int fd, struct stat * st);
 static ssize_t stdout_write(int fd, const void * data, size_t size);
 static char *eventToString(telnet_event_type_t type);
 static void handle_telnet_conn();
-static void process_logs( UBaseType_t bytes);
+static void process_logs( UBaseType_t bytes, bool is_write_op);
 static bool bMirrorToUART=false;
 struct telnetUserData {
 	int sockfd;
@@ -76,7 +76,9 @@ struct telnetUserData {
 	char * rxbuf;
 };
 
-
+bool is_serial_suppressed(){
+	return !bIsEnabled || !bMirrorToUART ;
+}
 void init_telnet(){
 	char *val= get_nvs_value_alloc(NVS_TYPE_STR, "telnet_enable");
 	if (!val || strlen(val) == 0 || !strcasestr("YXD",val) ) {
@@ -100,11 +102,12 @@ void init_telnet(){
 		log_buf_size=log_buf_size>0?log_buf_size:4000;
 	}
 	// Create the semaphore to guard a shared resource.
-	vSemaphoreCreateBinary( xSemaphore );
+	//vSemaphoreCreateBinary( xSemaphore );
 
 	// Redirect the output to our telnet handler as soon as possible
-	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)heap_caps_malloc(sizeof(StaticRingbuffer_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)malloc(sizeof(StaticRingbuffer_t) );
+	// All non-split ring buffer must have their memory alignment set to 32 bits.
+	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT );
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
 	if (buf_handle == NULL) {
 		ESP_LOGE(tag,"Failed to create ring buffer for telnet!");
@@ -119,7 +122,9 @@ void init_telnet(){
 			.fstat = &stdout_fstat,
 			.close = &stdout_close,
 			.read = &stdout_read,
+
 		};
+
 	if(bMirrorToUART){
 		uart_fd=open("/dev/uart/0", O_RDWR);
 	}
@@ -130,11 +135,11 @@ void init_telnet(){
 }
 void start_telnet(void * pvParameter){
 	static bool isStarted=false;
-	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-	StackType_t *xStack = malloc(TELNET_STACK_SIZE);
+	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+	StackType_t *xStack = heap_caps_malloc(TELNET_STACK_SIZE,(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
 	
 	if(!isStarted && bIsEnabled) {
-		xTaskCreateStatic( (TaskFunction_t) &telnet_task, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, xTaskBuffer);
+		xTaskCreateStatic( (TaskFunction_t) &telnet_task, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_MAIN_PRIO , xStack, xTaskBuffer);
 		isStarted=true;
 	}
 }
@@ -275,22 +280,22 @@ static void handle_telnet_events(
 } // myhandle_telnet_events
 
 
-static void process_logs(UBaseType_t count){
+static void process_logs( UBaseType_t bytes, bool is_write_op){
     //Receive an item from no-split ring buffer
 	size_t item_size;
-    UBaseType_t uxItemsWaiting;
-    UBaseType_t uxBytesToSend=count;
+	UBaseType_t uxItemsWaiting;
+	UBaseType_t uxBytesToSend=bytes;
 
-	vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, NULL, &uxItemsWaiting);
-	if(count == 0){
-		// this sends the entire buffer to the remote client
-		uxBytesToSend = uxItemsWaiting;
-	}
-	if( partnerSocket ==0 && (uxItemsWaiting*100 / log_buf_size) <75){
-		// We still have some room in the ringbuffer and there's no telnet
-		// connection yet, so bail out for now.
-		//printf("%s() Log buffer used %u of %u bytes used\n", __FUNCTION__, uxItemsWaiting, log_buf_size);
+    vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, NULL, &uxItemsWaiting);
+	bool is_space_available = ((log_buf_size-uxItemsWaiting)>=bytes && log_buf_size>uxItemsWaiting);
+	if( is_space_available && (is_write_op || partnerSocket == 0) ){
+		// there's still some room left in the buffer, and we're either
+		// processing a write operation or telnet isn't connected yet.
 		return;
+	}
+	if(is_write_op && !is_space_available && uxBytesToSend==0){
+		// flush at least the size of a full chunk
+		uxBytesToSend = send_chunk;
 	}
 
 	while(uxBytesToSend>0){
@@ -327,12 +332,12 @@ static void handle_telnet_conn() {
   struct telnetUserData *pTelnetUserData = (struct telnetUserData *)malloc(sizeof(struct telnetUserData));
   tnHandle = telnet_init(my_telopts, handle_telnet_events, 0, pTelnetUserData);
 
-  pTelnetUserData->rxbuf = (char *) heap_caps_malloc(TELNET_RX_BUF, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  pTelnetUserData->rxbuf = (char *) heap_caps_malloc(TELNET_RX_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   pTelnetUserData->tnHandle = tnHandle;
   pTelnetUserData->sockfd = partnerSocket;
 
   // flush all the log buffer on connect
-  process_logs(0);
+  process_logs(log_buf_size, false);
 
   while(1) {
   	//ESP_LOGD(tag, "waiting for data");
@@ -349,7 +354,7 @@ static void handle_telnet_conn() {
   	  partnerSocket = 0;
   	  return;
   	}
-  	process_logs(send_chunk);
+  	process_logs(send_chunk, false);
 
 	taskYIELD();
   }
@@ -358,37 +363,24 @@ static void handle_telnet_conn() {
 
 // ******************* stdout/stderr Redirection to ringbuffer
 static ssize_t stdout_write(int fd, const void * data, size_t size) {
-	if (xSemaphoreTake(xSemaphore, (TickType_t) 10) == pdTRUE) {
-		// #1 Write to ringbuffer
-		if (buf_handle == NULL) {
-			printf("%s() ABORT. file handle _log_remote_fp is NULL\n",
-					__FUNCTION__);
-		} else {
-			//Send an item
-			UBaseType_t res = xRingbufferSend(buf_handle, data, size,
-					pdMS_TO_TICKS(100));
-			if (res != pdTRUE) {
-				// flush some entries
-				process_logs(size);
-				res = xRingbufferSend(buf_handle, data, size,
-						pdMS_TO_TICKS(100));
-				if (res != pdTRUE) {
-
-					printf("%s() ABORT. Unable to store log entry in buffer\n",
-							__FUNCTION__);
-				}
-			}
-		}
-		xSemaphoreGive(xSemaphore);
+	// #1 Write to ringbuffer
+	if (buf_handle == NULL) {
+		printf("%s() ABORT. file handle _log_remote_fp is NULL\n",
+				__FUNCTION__);
 	} else {
-		// We could not obtain the semaphore and can therefore not access
-		// the shared resource safely.
+		// flush the buffer if needed
+		process_logs(size, true);
+		//Send an item
+		UBaseType_t res = xRingbufferSend(buf_handle, data, size, pdMS_TO_TICKS(10));
+		assert(res == pdTRUE);
+
 	}
-	return bMirrorToUART?write(uart_fd, data, size):true;
+	return bMirrorToUART?write(uart_fd, data, size):size;
 }
 
 static ssize_t stdout_read(int fd, void* data, size_t size) {
-	return read(fd, data, size);
+	//return read(fd, data, size);
+	return 0;
 }
 
 static int stdout_open(const char * path, int flags, int mode) {

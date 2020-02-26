@@ -67,3 +67,6 @@ libs/
 /_*
 sdkconfig
 squeezelite-esp32-jsonblob.zip
+/flash_cmd.txt
+/writeSequeezeEsp.bat
+/writeSequeezeEsp.sh

@@ -25,6 +25,7 @@
 #include "cmd_decl.h"
 #include "console.h"
 #include "wifi_manager.h"
+#include "telnet.h"
 
 #include "cmd_squeezelite.h"
 #include "config.h"
@@ -156,8 +157,19 @@ void initialize_console() {
 
 void console_start() {
 
-	initialize_console();
-
+	if(!is_serial_suppressed()){
+		initialize_console();
+	}
+	else {
+		/* Initialize the console */
+		esp_console_config_t console_config = { .max_cmdline_args = 22,
+				.max_cmdline_length = 600,
+	#if CONFIG_LOG_COLORS
+				.hint_color = atoi(LOG_COLOR_CYAN)
+	#endif
+				};
+		ESP_ERROR_CHECK(esp_console_init(&console_config));
+	}
 	/* Register commands */
 	esp_console_register_help_command();
 	register_system();
@@ -171,54 +183,64 @@ void console_start() {
 #error "Unknown build configuration"
 #endif
 	register_i2ctools();
-	printf("\n"
-#if RECOVERY_APPLICATION
-			"****************************************************************\n"
-			"RECOVERY APPLICATION\n"
-			"This mode is used to flash Squeezelite into the OTA partition\n"
-			"****\n\n"
-#endif
-			"Type 'help' to get the list of commands.\n"
-			"Use UP/DOWN arrows to navigate through command history.\n"
-			"Press TAB when typing command name to auto-complete.\n"
-			"\n"
-#if !RECOVERY_APPLICATION
-			"To automatically execute lines at startup:\n"
-			"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
-			"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n"
-#endif
-			"\n"
-			"\n");
+	if(!is_serial_suppressed()){
+		printf("\n"
+	#if RECOVERY_APPLICATION
+				"****************************************************************\n"
+				"RECOVERY APPLICATION\n"
+				"This mode is used to flash Squeezelite into the OTA partition\n"
+				"****\n\n"
+	#endif
+				"Type 'help' to get the list of commands.\n"
+				"Use UP/DOWN arrows to navigate through command history.\n"
+				"Press TAB when typing command name to auto-complete.\n"
+				"\n"
+	#if !RECOVERY_APPLICATION
+				"To automatically execute lines at startup:\n"
+				"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
+				"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n"
+	#endif
+				"\n"
+				"\n");
 
-	/* Figure out if the terminal supports escape sequences */
-	int probe_status = linenoiseProbe();
-	if (probe_status) { /* zero indicates success */
-		printf("\n****************************\n"
-				"Your terminal application does not support escape sequences.\n"
-				"Line editing and history features are disabled.\n"
-				"On Windows, try using Putty instead.\n"
-				"****************************\n");
-		linenoiseSetDumbMode(1);
-#if CONFIG_LOG_COLORS
-		/* Since the terminal doesn't support escape sequences,
-		 * don't use color codes in the prompt.
-		 */
-		prompt = "squeezelite-esp32> ";
-#endif //CONFIG_LOG_COLORS
+		/* Figure out if the terminal supports escape sequences */
+		int probe_status = linenoiseProbe();
+		if (probe_status) { /* zero indicates success */
+			printf("\n****************************\n"
+					"Your terminal application does not support escape sequences.\n"
+					"Line editing and history features are disabled.\n"
+					"On Windows, try using Putty instead.\n"
+					"****************************\n");
+			linenoiseSetDumbMode(1);
+	#if CONFIG_LOG_COLORS
+			/* Since the terminal doesn't support escape sequences,
+			 * don't use color codes in the prompt.
+			 */
+			prompt = "squeezelite-esp32> ";
+	#endif //CONFIG_LOG_COLORS
 
+		}
+
+
+		esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+		cfg.thread_name= "console";
+		cfg.inherit_cfg = true;
+	#if RECOVERY_APPLICATION
+		cfg.stack_size = 4096 ;
+	#endif
+		esp_pthread_set_cfg(&cfg);
+		pthread_attr_t attr;
+		pthread_attr_init(&attr);
+
+		pthread_create(&thread_console, &attr, console_thread, NULL);
+		pthread_attr_destroy(&attr);
 	}
-    esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-    cfg.thread_name= "console";
-    cfg.inherit_cfg = true;
-#if RECOVERY_APPLICATION
-	cfg.stack_size = 4096 ;
+	else {
+#if !RECOVERY_APPLICATION
+		// process autoexec locally, as we're not going to start the console thread
+	process_autoexec();
 #endif
-    esp_pthread_set_cfg(&cfg);
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-
-	pthread_create(&thread_console, &attr, console_thread, NULL);
-	pthread_attr_destroy(&attr);
+	}
 }
 void run_command(char * line){
 	/* Try to run the command */
@@ -226,14 +248,14 @@ void run_command(char * line){
 	esp_err_t err = esp_console_run(line, &ret);
 
 	if (err == ESP_ERR_NOT_FOUND) {
-		ESP_LOGE(TAG,"Unrecognized command: %s\n", line);
+		ESP_LOGE(TAG,"Unrecognized command: %s", line);
 	} else if (err == ESP_ERR_INVALID_ARG) {
 		// command was empty
 	} else if (err == ESP_OK && ret != ESP_OK) {
-		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)\n", ret,
+		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)", ret,
 				esp_err_to_name(err));
 	} else if (err != ESP_OK) {
-		ESP_LOGE(TAG,"Internal error: %s\n", esp_err_to_name(err));
+		ESP_LOGE(TAG,"Internal error: %s", esp_err_to_name(err));
 	}
 }
 static void * console_thread() {
