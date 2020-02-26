@@ -14,6 +14,7 @@
 
 PROJECT_NAME?=squeezelite
 EXTRA_CPPFLAGS+=  -I$(PROJECT_PATH)/main
+EXTRA_COMPONENT_DIRS := esp-dsp
 #/-Wno-error=maybe-uninitialized 
 include $(IDF_PATH)/make/project.mk 
 
