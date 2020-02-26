@@ -637,7 +637,7 @@ static void visu_update(void) {
 	// reset bars for all cases first	
 	for (int i = visu.n; --i >= 0;) visu.bars[i].current = 0;
 	
-	if (visu_export.running && visu_export.running) {
+	if (visu_export.running) {
 					
 		if (visu.mode == VISU_VUMETER) {
 			s16_t *iptr = visu_export.buffer;
@@ -705,15 +705,20 @@ static void visu_update(void) {
 	visu_export.level = 0;
 	pthread_mutex_unlock(&visu_export.mutex);
 
-	GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
-	
+	// don't refresh screen if all max are 0 (we were are somewhat idle)
+	int clear = 0;
+	for (int i = visu.n; --i >= 0;) clear = max(clear, visu.bars[i].max);
+	if (clear) GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+
+	// there is much more optimization to be done here, like not redrawing bars unless needed
 	for (int i = visu.n; --i >= 0;) {
 		int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
 		int y1 = visu.row + visu.height - 1;
 			
 		if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
 		else if (visu.bars[i].max) visu.bars[i].max--;
-			
+		else if (!clear) continue;
+		
 		for (int j = 0; j <= visu.bars[i].current; j += 2) 
 			GDS_DrawLine(display, x1, y1 - j, x1 + visu.bar_width - 1, y1 - j, GDS_COLOR_WHITE);
 			

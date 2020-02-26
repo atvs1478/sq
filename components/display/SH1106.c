@@ -80,19 +80,25 @@ static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
 
 static bool Init( struct GDS_Device* Device ) {
 	Device->FramebufferSize = ( Device->Width * Device->Height ) / 8;	
+	
+// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy		
+#ifdef SHADOW_BUFFER	
 	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
     NullCheck( Device->Framebuffer, return false );
-		
-#ifdef SHADOW_BUFFER	
 #ifdef USE_IRAM
-	// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy
 	if (Device->IF == IF_SPI) Device->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 	else 
-#else
-	Device->Shadowbuffer = malloc( Device->FramebufferSize );	
 #endif
+	Device->Shadowbuffer = malloc( Device->FramebufferSize );	
 	NullCheck( Device->Shadowbuffer, return false );
 	memset(Device->Shadowbuffer, 0xFF, Device->FramebufferSize);
+#else	// not SHADOW_BUFFER
+#ifdef USE_IRAM
+	// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy
+	if (Device->IF == IF_SPI) Device->Framebuffer = heap_caps_calloc( 1, Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+	else 
+#endif
+	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
 #endif	
 		
 	// need to be off and disable display RAM

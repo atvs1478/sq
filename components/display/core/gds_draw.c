@@ -197,7 +197,9 @@ void GDS_DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int 
 	if (!Width) Width = Device->Width;
 	Height >>= 3;
 		
-	if (Device->Depth == 1) {
+	if (Device->DrawBitmapCBR) {
+		Device->DrawBitmapCBR( Device, Data, Width, Height, Color );
+	} else if (Device->Depth == 1) {
 		// need to do row/col swap and bit-reverse
 		for (int r = 0; r < Height; r++) {
 			uint8_t *optr = Device->Framebuffer + r*Device->Width, *iptr = Data + r;
@@ -276,84 +278,36 @@ void GDS_DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int 
 void GDS_DrawRGB16( struct GDS_Device* Device, int x, int y, int Width, int Height, int RGB_Mode, uint16_t **Image ) {
 	if (Device->DrawRGB16) {
 		Device->DrawRGB16( Device, x, y, Width, Height, RGB_Mode, Image );
-	} else if (Device->Depth == 4) {
-		for (int c = 0; c < Width; c++) {
-			for (int r = 0; r < Height; r++) {
-				int pixel = Image[r][c];
-				switch(RGB_Mode) {
-				case GDS_RGB565:
-					pixel = (((pixel & 0x1f) * 11 + (((pixel >> 5) & 0x3f)  * 59) / 2 + (pixel >> 11) * 30) / 100) >> 1;
-					break;
-				case GDS_RGB555:
-					pixel = (((pixel & 0x1f) * 11 + ((pixel >> 5) & 0x1f)  * 59 + (pixel >> 10) * 30) / 100) >> 1;
-					break;
-				case GDS_RGB444:
-					pixel = ((pixel & 0x0f) * 11 + ((pixel >> 4) & 0x0f)  * 59 + (pixel >> 8) * 30) / 100;
-					break;				
-				case GDS_RGB8_GRAY:
-					pixel = Image[r][c] >> 4;
-					break;				
-				}
-				GDS_DrawPixel( Device, c + x, r + y, pixel );
+	} else {
+		int Scale = Device->Depth < 5 ? 5 - Device->Depth : 0;
+		switch(RGB_Mode) {
+		case GDS_RGB565:
+			for (int c = 0; c < Width; c++) {
+				for (int r = 0; r < Height; r++) {
+					int pixel = Image[r][c];
+					pixel = ((pixel & 0x1f) * 11 + ((((pixel >> 5) & 0x3f)  * 59) >> 1) + (pixel >> 11) * 30) / 100;
+					GDS_DrawPixel( Device, c + x, r + y, pixel >> Scale);
+				}	
 			}	
-		}
-	} else if (Device->Depth == 1) {
-		for (int c = 0; c < Width; c++) {
-			for (int r = 0; r < Height; r++) {
-				int pixel = Image[r][c];
-				switch(RGB_Mode) {
-				case GDS_RGB565:
-					pixel = (((pixel & 0x1f) * 21 + (((pixel >> 5) & 0x3f)  * 71) / 2+ (pixel >> 11) * 7) / 100) >> 4;
-					break;
-				case GDS_RGB555:
-					pixel = (((pixel & 0x1f) * 21 + ((pixel >> 5) & 0x1f)  * 71 + (pixel >> 10) * 7) / 100) >> 4;
-					break;
-				case GDS_RGB444:
-					pixel = (((pixel & 0x0f) * 21 + ((pixel >> 4) & 0x0f)  * 71 + (pixel >> 8) * 7) / 100) >> 3;
-					break;		
-				case GDS_RGB8_GRAY:
-					pixel = Image[r][c] >> 7;					
-				}
-				GDS_DrawPixel( Device, c + x, r + y, pixel);
+			break;
+		case GDS_RGB555:
+			for (int c = 0; c < Width; c++) {
+				for (int r = 0; r < Height; r++) {
+					int pixel = Image[r][c];
+					pixel = ((pixel & 0x1f) * 11 + ((pixel >> 5) & 0x1f)  * 59 + (pixel >> 10) * 30) / 100;
+					GDS_DrawPixel( Device, c + x, r + y, pixel >> Scale);
+				}	
 			}	
+			break;
+		case GDS_RGB444:
+			for (int c = 0; c < Width; c++) {
+				for (int r = 0; r < Height; r++) {
+					int pixel = Image[r][c];
+					pixel = (pixel & 0x0f) * 11 + ((pixel >> 4) & 0x0f)  * 59 + (pixel >> 8) * 30;
+					GDS_DrawPixel( Device, c + x, r + y, pixel >> (Scale - 1));
+				}	
+			}	
+			break;				
 		}
 	}	 
 }	
-
-/****************************************************************************************
- * Process graphic display data MSBit first
- * WARNING: this has not been tested yet
- */
- /*
-static void DrawBitmap(int x1, int y1, int x2, int y2, bool by_column, bool MSb, u8_t *data) {
-	// default end point to display size
-	if (x2 == -1) x2 = Display.Width - 1;
-	if (y2 == -1) y2 = Display.Height - 1;
-	
-	display->dirty = true;
-	
-	//	not a boundary draw
-	// same comment about bit depth
-	if (y1 % 8 || y2 % 8 || x1 % 8 | x2 % 8) {
-		ESP_LOGW(TAG, "can't write on non cols/rows boundaries for now");
-	} else {	
-		// set addressing mode to match data
-		if (by_column) {
-			// copy the window and do row/col exchange
-			for (int r = y1/8; r <=  y2/8; r++) {
-				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r;
-				for (int c = x1; c <= x2; c++) {
-					*optr++ = MSb ? BitReverseTable256[*iptr] : *iptr;
-					iptr += (y2-y1)/8 + 1;
-			}	
-			}	
-		} else {
-			// just copy the window inside the frame buffer
-			for (int r = y1/8; r <= y2/8; r++) {
-				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r*(x2-x1+1);
-				for (int c = x1; c <= x2; c++) *optr++ = *iptr++;
-			}	
-		}
-	}	
-}
-*/

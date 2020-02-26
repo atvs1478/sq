@@ -40,7 +40,7 @@
 #define MAX_LINES	8
 
 #if ! defined BIT
-#define BIT( n ) ( 1 << n )
+#define BIT( n ) ( 1 << ( n ) )
 #endif
 
 struct GDS_Device;
@@ -103,6 +103,7 @@ struct GDS_Device {
 	void (*Update)( struct GDS_Device* Device );
 	// must provide for depth other than 1 (vertical) and 4 (may provide for optimization)
 	void (*DrawPixelFast)( struct GDS_Device* Device, int X, int Y, int Color );
+	void (*DrawBitmapCBR)(struct GDS_Device* Device, uint8_t *Data, int Width, int Height, int Color );
 	// may provide for optimization
 	void (*DrawRGB16)( struct GDS_Device* Device, int x, int y, int Width, int Height, int RGB_Mode, uint16_t **Image );
 	void (*ClearWindow)( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color );

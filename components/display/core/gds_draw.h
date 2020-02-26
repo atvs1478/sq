@@ -11,7 +11,7 @@ extern "C" {
 
 struct GDS_Device;
 
-enum { GDS_RGB565, GDS_RGB555, GDS_RGB444, GDS_RGB8_GRAY };
+enum { GDS_RGB565, GDS_RGB555, GDS_RGB444 };
 
 #ifndef _GDS_PRIVATE_H_
 void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
