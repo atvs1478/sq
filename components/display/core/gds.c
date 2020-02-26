@@ -60,6 +60,14 @@ void GDS_Clear( struct GDS_Device* Device, int Color ) {
 }
 
 void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color ) {
+	
+	for (int y = y1; y <= y2; y++) {
+			for (int x = x1; x <= x2; x++) {
+				GDS_DrawPixelFast( Device, x, y, Color);
+			}
+		}
+	return;
+	
 	// driver can provide own optimized clear window
 	if (Device->ClearWindow) {
 		Device->ClearWindow( Device, x1, y1, x2, y2, Color );
