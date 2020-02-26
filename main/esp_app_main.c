@@ -154,7 +154,7 @@ esp_err_t update_certificates(){
 	if ( (esp_err= nvs_get_str(handle, certs_version, NULL, &len)) == ESP_OK) {
 		str=(char *)malloc(len);
 		if ( (esp_err = nvs_get_str(handle,  certs_version, str, &len)) == ESP_OK) {
-			printf("String associated with key '%s' is %s \n", certs_version, str);
+			ESP_LOGI(TAG,"String associated with key '%s' is %s", certs_version, str);
 		}
 	}
 	if(str!=NULL){
@@ -341,10 +341,7 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
-void displayInitCallback(TimerHandle_t pxTimer){
-	ESP_LOGD(TAG,"Initializing display");
-	display_init("SqueezeESP32");
-}
+
 void app_main()
 {
 	char * fwurl = NULL;
@@ -360,17 +357,15 @@ void app_main()
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-	
 
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
 
-	ESP_LOGD(TAG,"Configuring services");
+	ESP_LOGI(TAG,"Configuring services");
 	services_init();
-	// initialize display in a timer thread to prevent locking up
-	// the main init sequence
-	TimerHandle_t display_init = xTimerCreate(    "DisplInit", 100,pdFALSE,NULL,displayInitCallback);
-	xTimerStart(display_init, portMAX_DELAY);
+
+	ESP_LOGI(TAG,"Initializing display");
+	display_init("SqueezeESP32");
 #if !RECOVERY_APPLICATION
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");
 	update_certificates();
@@ -404,10 +399,12 @@ void app_main()
 	led_blink(LED_GREEN, 250, 250);
 
 	if(bypass_wifi_manager){
-		ESP_LOGW(TAG,"\n\nwifi manager is disabled. Please use wifi commands to connect to your wifi access point.\n\n");
+		ESP_LOGW(TAG,"*******************************************************************************************");
+		ESP_LOGW(TAG,"* wifi manager is disabled. Please use wifi commands to connect to your wifi access point.");
+		ESP_LOGW(TAG,"*******************************************************************************************");
 	}
 	else {
-		ESP_LOGW(TAG,"\n\nwifi manager is ENABLED. Starting...\n\n");
+		ESP_LOGI(TAG,"Starting Wifi Manager");
 		wifi_manager_start();
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
