@@ -341,7 +341,10 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
-
+void displayInitCallback(TimerHandle_t pxTimer){
+	ESP_LOGD(TAG,"Initializing display");
+	display_init("SqueezeESP32");
+}
 void app_main()
 {
 	char * fwurl = NULL;
@@ -364,10 +367,10 @@ void app_main()
 
 	ESP_LOGD(TAG,"Configuring services");
 	services_init();
-
-	ESP_LOGD(TAG,"Initializing display");	
-	display_init("SqueezeESP32");
-
+	// initialize display in a timer thread to prevent locking up
+	// the main init sequence
+	TimerHandle_t display_init = xTimerCreate(    "DisplInit", 100,pdFALSE,NULL,displayInitCallback);
+	xTimerStart(display_init, portMAX_DELAY);
 #if !RECOVERY_APPLICATION
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");
 	update_certificates();
