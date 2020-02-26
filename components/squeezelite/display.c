@@ -500,8 +500,9 @@ static void grfe_handler( u8_t *data, int len) {
 			displayer.dirty = false;
 		}	
 	
-		// draw new frame
-		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), displayer.width, displayer.height, GDS_COLOR_WHITE);
+		// draw new frame, it might be less than full screen (small visu)
+		int width = ((len - sizeof(struct grfe_packet)) * 8) / displayer.height;
+		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
 	
@@ -561,7 +562,7 @@ static void grfs_handler(u8_t *data, int len) {
 		
 		// background excludes space taken by visu (if any)
 		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
-
+		
 		// set scroller steps & beginning
 		if (pkt->direction == 1) {
 			scroller.scrolled = 0;
@@ -779,6 +780,9 @@ static void visu_handler( u8_t *data, int len) {
 			visu.border =  htonl(pkt->border);
 			bars = htonl(pkt->bars);
 			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
+			
+			// might have a race condition with scroller message, so update width in case
+			if (scroller.active) scroller.back.width = displayer.width - visu.width;
 		} else {
 			// full screen visu, try to use bottom screen if available
 			visu.width = displayer.width;
