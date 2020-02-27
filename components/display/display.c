@@ -89,11 +89,12 @@ void display_init(char *welcome) {
 		// Detect driver interface
 		if (strstr(config, "I2C") && i2c_system_port != -1) {
 			int address = 0x3C;
+			int speed = 0;
 				
 			if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
 		
 			init = true;
-			GDS_I2CInit( i2c_system_port, -1, -1 ) ;
+			GDS_I2CInit( i2c_system_port, -1, -1, i2c_system_speed ) ;
 			GDS_I2CAttachDevice( display, width, height, address, -1 );
 		
 			ESP_LOGI(TAG, "Display is I2C on port %u", address);

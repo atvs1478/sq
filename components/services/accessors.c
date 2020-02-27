@@ -45,9 +45,11 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 		.sda_pullup_en = GPIO_PULLUP_ENABLE,
 		.scl_io_num = -1,
 		.scl_pullup_en = GPIO_PULLUP_ENABLE,
-		.master.clk_speed = 400000,
+		.master.clk_speed = 0,
 	};
 
+	i2c.master.clk_speed = i2c_system_speed;
+	
 	nvs_item = config_alloc_get(NVS_TYPE_STR, "i2c_config");
 	if (nvs_item) {
 		if ((p = strcasestr(nvs_item, "scl")) != NULL) i2c.scl_io_num = atoi(strchr(p, '=') + 1);
