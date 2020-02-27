@@ -40,7 +40,7 @@ extern const char * get_certificate();
 #define OTA_CORE 1
 #endif
 
-
+static const size_t bin_ota_chunk = 40000;
 static const char *TAG = "squeezelite-ota";
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
@@ -235,7 +235,7 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 	case OTA_TYPE_BUFFER:
 		ota_status.ota_write_data = p_ota_thread_parms->bin;
 		ota_status.total_image_len = p_ota_thread_parms->length;
-
+		ota_status.buffer_size = bin_ota_chunk;
 		break;
 	default:
 		return ESP_FAIL;
@@ -418,7 +418,6 @@ void ota_task_cleanup(const char * message, ...){
 void ota_task(void *pvParameter)
 {
 	esp_err_t err = ESP_OK;
-	size_t buffer_size = BUFFSIZE;
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -502,8 +501,8 @@ void ota_task(void *pvParameter)
         	data_read = esp_http_client_read(ota_http_client, ota_status.ota_write_data, ota_status.buffer_size);
         }
         else {
-        	if(ota_status.remain_image_len >buffer_size){
-        		data_read = buffer_size;
+        	if(ota_status.remain_image_len >ota_status.buffer_size){
+        		data_read = ota_status.buffer_size;
         	} else {
         		data_read = ota_status.remain_image_len;
         	}
