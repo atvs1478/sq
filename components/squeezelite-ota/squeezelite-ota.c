@@ -31,6 +31,7 @@
 #include "messaging.h"
 #include "trace.h"
 #include "esp_ota_ops.h"
+#include "display.h"
 
 extern const char * get_certificate();
 
@@ -40,7 +41,7 @@ extern const char * get_certificate();
 #define OTA_CORE 1
 #endif
 
-static const size_t bin_ota_chunk = 40000;
+static const size_t bin_ota_chunk = 4096*2;
 static const char *TAG = "squeezelite-ota";
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
@@ -85,7 +86,12 @@ uint8_t  ota_get_pct_complete(){
 	return ota_status.total_image_len==0?0:
 			(uint8_t)((float)ota_status.actual_image_len/(float)ota_status.total_image_len*100.0f);
 }
-
+static bool (*display_bus_chain)(void *from, enum display_bus_cmd_e cmd);
+static bool display_dummy_handler(void *from, enum display_bus_cmd_e cmd) {
+	// chain to rest of "bus"
+	if (display_bus_chain) return (*display_bus_chain)(from, cmd);
+	else return true;
+}
 void sendMessaging(messaging_types type,const char * fmt, ...){
     va_list args;
     cJSON * msg = cJSON_CreateObject();
@@ -111,7 +117,7 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     }
     va_end(args);
 
-
+    displayer_scroll(msg_str, 33);
     cJSON_AddStringToObject(msg,"ota_dsc",str_or_unknown(msg_str));
     free(msg_str);
     cJSON_AddNumberToObject(msg,"ota_pct",	ota_get_pct_complete()	);
@@ -121,7 +127,19 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
 	cJSON_free(msg);
     _printMemStats();
 }
-
+//esp_err_t decode_alloc_ota_message(single_message_t * message, char * ota_dsc, uint8_t * ota_pct ){
+//	if(!message || !message->message) return ESP_ERR_INVALID_ARG;
+//	cJSON * json = cJSON_Parse(message->message);
+//	if(!json) return ESP_FAIL;
+//	if(ota_dsc) {
+//		ota_dsc = strdup(cJSON_GetObjectItem(json, "ota_dsc")?cJSON_GetStringValue(cJSON_GetObjectItem(json, "ota_dsc")):"");
+//	}
+//	if(ota_pct){
+//		*ota_pct = cJSON_GetObjectItem(json, "ota_pct")?cJSON_GetObjectItem(json, "ota_pct")->valueint:0;
+//	}
+//	cJSON_free(json);
+//	return ESP_OK;
+//}
 
 static void __attribute__((noreturn)) task_fatal_error(void)
 {
@@ -413,11 +431,16 @@ void ota_task_cleanup(const char * message, ...){
 		ota_http_client=NULL;
 	}
 	ota_status.bOTAStarted = false;
+	displayer_control(DISPLAYER_SHUTDOWN);
 	task_fatal_error();
 }
+
+
 void ota_task(void *pvParameter)
 {
 	esp_err_t err = ESP_OK;
+	displayer_control(DISPLAYER_ACTIVATE, "Firmware update");
+	displayer_scroll("Initializing...", 33);
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -559,11 +582,14 @@ void ota_task(void *pvParameter)
             	ota_status.ota_write_data+= data_read;
             }
             ESP_LOGD(TAG, "Written image length %d", ota_status.actual_image_len);
+
 			if(ota_get_pct_complete()%5 == 0) ota_status.newpct = ota_get_pct_complete();
 			if(ota_status.lastpct!=ota_status.newpct ) {
+
 				gettimeofday(&tv, NULL);
 				uint32_t elapsed_ms= (tv.tv_sec-ota_status.OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status.OTA_start.tv_usec)/1000;
 				ESP_LOGI(TAG,"OTA progress : %d/%d (%d pct), %d KB/s", ota_status.actual_image_len, ota_status.total_image_len, ota_status.newpct, elapsed_ms>0?ota_status.actual_image_len*1000/elapsed_ms/1024:0);
+
 				sendMessaging(MESSAGING_INFO,ota_status.ota_type == OTA_TYPE_HTTP?"Downloading & writing update.":"Writing binary file.");
 				ota_status.lastpct=ota_status.newpct;
 			}
@@ -592,6 +618,7 @@ void ota_task(void *pvParameter)
     if (err == ESP_OK) {
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
     	sendMessaging(MESSAGING_INFO,"Success!");
+
     	vTaskDelay(1000/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
         esp_restart();
     } else {
@@ -604,6 +631,8 @@ void ota_task(void *pvParameter)
 
 esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t length){
 	int ret = 0;
+	display_bus_chain = display_bus;
+	display_bus = display_dummy_handler;
 	uint16_t stack_size, task_priority;
     if(ota_status.bOTAThreadStarted){
 		ESP_LOGE(TAG,"OTA Already started. ");
