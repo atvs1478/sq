@@ -233,8 +233,8 @@ bool sb_display_init(void) {
 	displayer.mutex = xSemaphoreCreateMutex();
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
-	// size scroller
-	scroller.scroll.max = (displayer.width * displayer.height / 8) * 10;
+	// size scroller (width + current screen)
+	scroller.scroll.max = (displayer.width * displayer.height / 8) * (10 + 1);
 	scroller.scroll.frame = malloc(scroller.scroll.max);
 	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
 	scroller.frame = malloc(displayer.width * displayer.height / 8);
@@ -500,8 +500,9 @@ static void grfe_handler( u8_t *data, int len) {
 			displayer.dirty = false;
 		}	
 	
-		// draw new frame
-		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), displayer.width, displayer.height);
+		// draw new frame, it might be less than full screen (small visu)
+		int width = ((len - sizeof(struct grfe_packet)) * 8) / displayer.height;
+		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
 	
@@ -561,7 +562,7 @@ static void grfs_handler(u8_t *data, int len) {
 		
 		// background excludes space taken by visu (if any)
 		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
-
+		
 		// set scroller steps & beginning
 		if (pkt->direction == 1) {
 			scroller.scrolled = 0;
@@ -580,7 +581,8 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.scroll.size = offset + size;
 		LOG_INFO("scroller current size %u", scroller.scroll.size);
 	} else {
-		LOG_INFO("scroller too larger %u/%u", scroller.scroll.size + size, scroller.scroll.max);
+		LOG_INFO("scroller too larger %u/%u/%u", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
+		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8);
 	}	
 }
 
@@ -598,13 +600,13 @@ static void grfg_handler(u8_t *data, int len) {
 	scroller.width = htons(pkt->width);
 	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
-	// update display asynchronously (frames are oganized by columns)
+	// update display asynchronously (frames are organized by columns)
 	memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 	for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 	
 	// can only write if we really own display
 	if (displayer.owned) {
-		GDS_DrawBitmapCBR(display, scroller.frame, scroller.back.width, displayer.height);
+		GDS_DrawBitmapCBR(display, scroller.frame, scroller.back.width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
 		
@@ -636,7 +638,7 @@ static void visu_update(void) {
 	// reset bars for all cases first	
 	for (int i = visu.n; --i >= 0;) visu.bars[i].current = 0;
 	
-	if (visu_export.running && visu_export.running) {
+	if (visu_export.running) {
 					
 		if (visu.mode == VISU_VUMETER) {
 			s16_t *iptr = visu_export.buffer;
@@ -704,15 +706,20 @@ static void visu_update(void) {
 	visu_export.level = 0;
 	pthread_mutex_unlock(&visu_export.mutex);
 
-	GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
-	
+	// don't refresh screen if all max are 0 (we were are somewhat idle)
+	int clear = 0;
+	for (int i = visu.n; --i >= 0;) clear = max(clear, visu.bars[i].max);
+	if (clear) GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+
+	// there is much more optimization to be done here, like not redrawing bars unless needed
 	for (int i = visu.n; --i >= 0;) {
 		int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
 		int y1 = visu.row + visu.height - 1;
 			
 		if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
 		else if (visu.bars[i].max) visu.bars[i].max--;
-			
+		else if (!clear) continue;
+		
 		for (int j = 0; j <= visu.bars[i].current; j += 2) 
 			GDS_DrawLine(display, x1, y1 - j, x1 + visu.bar_width - 1, y1 - j, GDS_COLOR_WHITE);
 			
@@ -773,6 +780,9 @@ static void visu_handler( u8_t *data, int len) {
 			visu.border =  htonl(pkt->border);
 			bars = htonl(pkt->bars);
 			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
+			
+			// might have a race condition with scroller message, so update width in case
+			if (scroller.active) scroller.back.width = displayer.width - visu.width;
 		} else {
 			// full screen visu, try to use bottom screen if available
 			visu.width = displayer.width;
@@ -855,7 +865,7 @@ static void displayer_task(void *args) {
 				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
 				scroller.scrolled += scroller.by;
-				if (displayer.owned) GDS_DrawBitmapCBR(display, scroller.frame, scroller.width, displayer.height);	
+				if (displayer.owned) GDS_DrawBitmapCBR(display, scroller.frame, scroller.width, displayer.height, GDS_COLOR_WHITE);	
 				
 				// short sleep & don't need background update
 				scroller.wake = scroller.speed;

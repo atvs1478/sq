@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _GDS_PRIVATE_H_
+#define _GDS_PRIVATE_H_
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -9,8 +10,6 @@
 #define GDS_CLIPDEBUG_NONE 0
 #define GDS_CLIPDEBUG_WARNING 1
 #define GDS_CLIPDEBUG_ERROR 2
-
-#define SHADOW_BUFFER
 
 #if CONFIG_GDS_CLIPDEBUG == GDS_CLIPDEBUG_NONE
     /*
@@ -41,7 +40,7 @@
 #define MAX_LINES	8
 
 #if ! defined BIT
-#define BIT( n ) ( 1 << n )
+#define BIT( n ) ( 1 << ( n ) )
 #endif
 
 struct GDS_Device;
@@ -94,24 +93,30 @@ struct GDS_Device {
     bool FontForceMonospace;
 
 	// various driver-specific method
+	// must always provide 
 	bool (*Init)( struct GDS_Device* Device);
 	void (*SetContrast)( struct GDS_Device* Device, uint8_t Contrast );
 	void (*DisplayOn)( struct GDS_Device* Device );
 	void (*DisplayOff)( struct GDS_Device* Device );
-	void (*Update)( struct GDS_Device* Device );
-	void (*DrawPixelFast)( struct GDS_Device* Device, int X, int Y, int Color );
 	void (*SetHFlip)( struct GDS_Device* Device, bool On );
 	void (*SetVFlip)( struct GDS_Device* Device, bool On );
-	    
+	void (*Update)( struct GDS_Device* Device );
+	// must provide for depth other than 1 (vertical) and 4 (may provide for optimization)
+	void (*DrawPixelFast)( struct GDS_Device* Device, int X, int Y, int Color );
+	void (*DrawBitmapCBR)(struct GDS_Device* Device, uint8_t *Data, int Width, int Height, int Color );
+	// may provide for optimization
+	void (*DrawRGB16)( struct GDS_Device* Device, int x, int y, int Width, int Height, int RGB_Mode, uint16_t **Image );
+	void (*ClearWindow)( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color );
+		    
 	// interface-specific methods	
     WriteCommandProc WriteCommand;
     WriteDataProc WriteData;
+
+	// 16 bytes for whatever the driver wants (should be aligned as it's 32 bits)	
+	uint32_t Private[4];
 };
 
 bool GDS_Reset( struct GDS_Device* Device );
-
-void IRAM_ATTR 	GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
-void IRAM_ATTR 	GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color );
 
 inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
     bool Result = (
@@ -130,17 +135,44 @@ inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
     return Result;
 }
 
+inline void IRAM_ATTR GDS_DrawPixel1Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
+    uint32_t YBit = ( Y & 0x07 );
+    uint8_t* FBOffset = NULL;
+
+    /* 
+     * We only need to modify the Y coordinate since the pitch
+     * of the screen is the same as the width.
+     * Dividing Y by 8 gives us which row the pixel is in but not
+     * the bit position.
+     */
+    Y>>= 3;
+
+    FBOffset = Device->Framebuffer + ( ( Y * Device->Width ) + X );
+
+    if ( Color == GDS_COLOR_XOR ) {
+        *FBOffset ^= BIT( YBit );
+    } else {
+        *FBOffset = ( Color == GDS_COLOR_WHITE ) ? *FBOffset | BIT( YBit ) : *FBOffset & ~BIT( YBit );
+    }
+}
+
+inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
+	uint8_t* FBOffset;
+
+    FBOffset = Device->Framebuffer + ( (Y * Device->Width >> 1) + (X >> 1));
+	*FBOffset = X & 0x01 ? (*FBOffset & 0x0f) | (Color << 4) : ((*FBOffset & 0xf0) | Color);
+}
+
+inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color ) {
+    if (Device->DrawPixelFast) Device->DrawPixelFast( Device, X, Y, Color );
+	else if (Device->Depth == 4) GDS_DrawPixel4Fast( Device, X, Y, Color);
+	else if (Device->Depth == 1) GDS_DrawPixel1Fast( Device, X, Y, Color);
+}	
+
 inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color ) {
     if ( IsPixelVisible( Device, x, y ) == true ) {
-        Device->DrawPixelFast( Device, x, y, Color );
+        GDS_DrawPixelFast( Device, x, y, Color );
     }
 }
 
-inline void IRAM_ATTR GDS_DrawPixel4( struct GDS_Device* Device, int x, int y, int Color ) {
-    if ( IsPixelVisible( Device, x, y ) == true ) {
-        Device->DrawPixelFast( Device, x, y, Color );
-    }
-}
-
-
-
+#endif

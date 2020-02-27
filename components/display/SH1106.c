@@ -17,6 +17,7 @@
 #include "gds_private.h"
 
 #define SHADOW_BUFFER
+#define USE_IRAM
 
 static char TAG[] = "SH1106";
 
@@ -79,14 +80,25 @@ static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
 
 static bool Init( struct GDS_Device* Device ) {
 	Device->FramebufferSize = ( Device->Width * Device->Height ) / 8;	
+	
+// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy		
+#ifdef SHADOW_BUFFER	
 	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
     NullCheck( Device->Framebuffer, return false );
-	
-#ifdef SHADOW_BUFFER	
-	if (Device->IF == IF_I2C) Device->Shadowbuffer = malloc( Device->FramebufferSize );
-	else Device->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+#ifdef USE_IRAM
+	if (Device->IF == IF_SPI) Device->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+	else 
+#endif
+	Device->Shadowbuffer = malloc( Device->FramebufferSize );	
 	NullCheck( Device->Shadowbuffer, return false );
 	memset(Device->Shadowbuffer, 0xFF, Device->FramebufferSize);
+#else	// not SHADOW_BUFFER
+#ifdef USE_IRAM
+	// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy
+	if (Device->IF == IF_SPI) Device->Framebuffer = heap_caps_calloc( 1, Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+	else 
+#endif
+	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
 #endif	
 		
 	// need to be off and disable display RAM
@@ -130,8 +142,9 @@ static bool Init( struct GDS_Device* Device ) {
 static const struct GDS_Device SH1106 = {
 	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
 	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
-	.DrawPixelFast = GDS_DrawPixelFast,
 	.Update = Update, .Init = Init,
+	//.DrawPixelFast = GDS_DrawPixelFast,
+	//.ClearWindow = ClearWindow,
 };	
 
 struct GDS_Device* SH1106_Detect(char *Driver, struct GDS_Device* Device) {
@@ -139,6 +152,7 @@ struct GDS_Device* SH1106_Detect(char *Driver, struct GDS_Device* Device) {
 	
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
 	*Device = SH1106;	
+	Device->Depth = 1;
 	ESP_LOGI(TAG, "SH1106 driver");
 	
 	return Device;

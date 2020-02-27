@@ -252,9 +252,9 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		// finally let DAC driver initialize I2C and I2S
 		if (dac_tas57xx.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_tas57xx;
 		else if (dac_a1s.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_a1s;
-		else {
-			dac_external.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config);
-			adac = &dac_external;
+		else if (!dac_external.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) {
+			LOG_WARN("DAC not configured and SPDIF not enabled, I2S will not continue");
+			return;
 		}
 	}	
 

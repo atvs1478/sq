@@ -58,10 +58,9 @@ static EXT_RAM_ATTR struct {
 
 static void displayer_task(void *args);
 
-struct GDS_Device *display;
-struct GDS_Device* SSD1306_Detect(char *Driver, struct GDS_Device* Device);
-struct GDS_Device* SH1106_Detect(char *Driver, struct GDS_Device* Device);
-GDS_DetectFunc drivers[] = { SH1106_Detect, SSD1306_Detect, NULL };
+struct GDS_Device *display;   
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, NULL };
 
 /****************************************************************************************
  * 
@@ -84,7 +83,7 @@ void display_init(char *welcome) {
 		
 	if ((p = strcasestr(config, "width")) != NULL) width = atoi(strchr(p, '=') + 1);
 	if ((p = strcasestr(config, "height")) != NULL) height = atoi(strchr(p, '=') + 1);
-		
+			
 	// so far so good
 	if (display && width > 0 && height > 0) {
 		// Detect driver interface

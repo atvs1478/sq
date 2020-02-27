@@ -89,7 +89,7 @@ const spi_bus_config_t * config_spi_get(spi_host_device_t * spi_host) {
  * 
  */
 void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
-	char *nvs_item, *p, type[4];
+	char *nvs_item, *p, type[16];
 	int gpio;
 	
 	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) == NULL) return;
@@ -97,7 +97,7 @@ void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
 	p = nvs_item;
 	
 	do {
-		if (sscanf(p, "%d=%3[^,]", &gpio, type) > 0) cb(gpio, type);
+		if (sscanf(p, "%d=%15[^,]", &gpio, type) > 0) cb(gpio, type);
 		p = strchr(p, ',');
 	} while (p++);
 	

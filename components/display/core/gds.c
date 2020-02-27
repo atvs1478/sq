@@ -21,7 +21,7 @@ static struct GDS_Device Display;
 
 static char TAG[] = "gds";
 
-struct GDS_Device*	GDS_AutoDetect( char *Driver, GDS_DetectFunc DetectFunc[] ) {
+struct GDS_Device* GDS_AutoDetect( char *Driver, GDS_DetectFunc* DetectFunc[] ) {
 	for (int i = 0; DetectFunc[i]; i++) {
 		if (DetectFunc[i](Driver, &Display)) {
 			ESP_LOGD(TAG, "Detected driver %p", &Display);
@@ -53,20 +53,67 @@ void GDS_ClearExt(struct GDS_Device* Device, bool full, ...) {
 }	
 
 void GDS_Clear( struct GDS_Device* Device, int Color ) {
+	if (Device->Depth == 1) Color = Color == GDS_COLOR_BLACK ? 0 : 0xff;
+	else if (Device->Depth == 4) Color = Color | (Color << 4);
     memset( Device->Framebuffer, Color, Device->FramebufferSize );
+	Device->Dirty = true;
 }
 
 void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color ) {
-	// cheap optimization on boundaries
-	if (x1 == 0 && x2 == Device->Width - 1 && y1 % 8 == 0 && (y2 + 1) % 8 == 0) {
-		memset( Device->Framebuffer + (y1 / 8) * Device->Width, 0, (y2 - y1 + 1) / 8 * Device->Width );
+	// driver can provide own optimized clear window
+	if (Device->ClearWindow) {
+		Device->ClearWindow( Device, x1, y1, x2, y2, Color );
+	} else if (Device->Depth == 1) {
+		// single shot if we erase all screen
+		if (x2 - x1 == Device->Width - 1 && y2 - y1 == Device->Height - 1) {
+			memset( Device->Framebuffer, Color == GDS_COLOR_BLACK ? 0 : 0xff, Device->FramebufferSize );
+		} else {
+			uint8_t _Color = Color == GDS_COLOR_BLACK ? 0: 0xff;
+			uint8_t Width = Device->Width;
+			// try to do byte processing as much as possible
+			for (int r = y1; r <= y2;) {
+				int c = x1;
+				// for a row that is not on a boundary, no optimization possible
+				while (r & 0x07 && r <= y2) {
+					for (c = x1; c <= x2; c++) GDS_DrawPixelFast( Device, c, r, Color);
+					r++;
+				}
+				// go fast if we have more than 8 lines to write
+				if (r + 8 < y2) {
+					memset(Device->Framebuffer + Width * r / 8 + x1, _Color, x2 - x1 + 1);
+					r += 8;
+				} else while (r <= y2) {
+					for (c = x1; c <= x2; c++) GDS_DrawPixelFast( Device, c, r, Color);
+					r++;
+				}
+			}
+		}
+	} if (Device->Depth == 4) {
+		if (x2 - x1 == Device->Width - 1 && y2 - y1 == Device->Height - 1) {
+			// we assume color is 0..15
+			memset( Device->Framebuffer, Color | (Color << 4), Device->FramebufferSize );
+		} else {
+			uint8_t _Color = Color | (Color << 4);
+			uint8_t Width = Device->Width;
+			// try to do byte processing as much as possible
+			for (int r = y1; r <= y2; r++) {
+				int c = x1;
+				if (c & 0x01) GDS_DrawPixelFast( Device, c++, r, Color);
+				int chunk = (x2 - c + 1) >> 1;
+				memset(Device->Framebuffer + ((r * Width + c)  >> 1), _Color, chunk);
+				if (c + chunk <= x2) GDS_DrawPixelFast( Device, x2, r, Color);
+			}
+		}	
 	} else {
 		for (int y = y1; y <= y2; y++) {
 			for (int x = x1; x <= x2; x++) {
-				Device->DrawPixelFast( Device, x, y, Color);
-			}		
-		}	
-	}	
+				GDS_DrawPixelFast( Device, x, y, Color);
+			}
+		}
+	}
+
+	// make sure diplay will do update
+	Device->Dirty = true;
 }
 
 void GDS_Update( struct GDS_Device* Device ) {
