@@ -93,7 +93,7 @@ void display_init(char *welcome) {
 			if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
 		
 			init = true;
-			GDS_I2CInit( i2c_system_port, -1, -1 ) ;
+			GDS_I2CInit( i2c_system_port, -1, -1, i2c_system_speed ) ;
 			GDS_I2CAttachDevice( display, width, height, address, -1 );
 		
 			ESP_LOGI(TAG, "Display is I2C on port %u", address);
@@ -274,8 +274,9 @@ void displayer_metadata(char *artist, char *album, char *title) {
 		strncpy(string, title ? title : "", SCROLLABLE_SIZE);
 	}
 	
-	// get optional scroll speed
+	// get optional scroll speed & pause
 	if ((p = strcasestr(displayer.metadata_config, "speed")) != NULL) sscanf(p, "%*[^=]=%d", &displayer.speed);
+	if ((p = strcasestr(displayer.metadata_config, "pause")) != NULL) sscanf(p, "%*[^=]=%d", &displayer.pause);
 	
 	displayer.offset = 0;	
 	utf8_decode(displayer.string);
