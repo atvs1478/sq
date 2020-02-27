@@ -30,7 +30,7 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
 
 ### I2C
-The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Default speed is 400000. Syntax is
+The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g. display). Leave it blank to disable I2C usage. Note that on SqueezeAMP, port must be 1. Default speed is 400000 but some display can do up to 800000 or more. Syntax is
 ```
 sda=<gpio>,scl=<gpio>[,port=0|1][,speed=<speed>]
 ```
@@ -62,15 +62,17 @@ I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver
 SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
 ```
 - VFlip and HFlip are optional can be used to change display orientation
-- Default speed is 8000000 (8MHz)
+- Default speed is 8000000 (8MHz) but SPI can work up to 26MHz or even 40MHz
 
 Currently 128x32/64 I2C display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this](https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
 
 The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay and Bluetooth. Syntax is
 ```
-[format=<display_content>][,speed=<speed>]
+[format=<display_content>][,speed=<speed>][,pause=<pause>]
 ```
 - 'speed' is the scrolling speed in ms (default is 33ms)
+
+- 'pause' is the pause time between scrolls in ms (default is 3600ms)
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
