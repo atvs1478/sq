@@ -115,7 +115,7 @@ static struct scroller_s {
 	u16_t mode;	
 	s16_t by;
 	// scroller management & sharing between grfg and scrolling task
-	bool active, first;
+	bool active, first, overflow;
 	int scrolled;
 	struct {
 		u8_t *frame;
@@ -234,7 +234,7 @@ bool sb_display_init(void) {
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller (width + current screen)
-	scroller.scroll.max = (displayer.width * displayer.height / 8) * (10 + 1);
+	scroller.scroll.max = (displayer.width * displayer.height / 8) * (15 + 1);
 	scroller.scroll.frame = malloc(scroller.scroll.max);
 	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
 	scroller.frame = malloc(displayer.width * displayer.height / 8);
@@ -559,6 +559,7 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.mode = htons(pkt->mode);
 		scroller.scroll.width = htons(pkt->width);
 		scroller.first = true;
+		scroller.overflow = false;
 		
 		// background excludes space taken by visu (if any)
 		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
@@ -576,13 +577,14 @@ static void grfs_handler(u8_t *data, int len) {
 	}	
 
 	// copy scroll frame data (no semaphore needed)
-	if (scroller.scroll.size + size < scroller.scroll.max) {
+	if (scroller.scroll.size + size < scroller.scroll.max && !scroller.overflow) {
 		memcpy(scroller.scroll.frame + offset, data + sizeof(struct grfs_packet), size);
 		scroller.scroll.size = offset + size;
-		LOG_INFO("scroller current size %u", scroller.scroll.size);
+		LOG_INFO("scroller current size %u (w:%u)", scroller.scroll.size, scroller.scroll.width);
 	} else {
-		LOG_INFO("scroller too larger %u/%u/%u", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
-		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8);
+		LOG_INFO("scroller too large %u/%u (w:%u)", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
+		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8) - scroller.back.width;
+		scroller.overflow = true;
 	}	
 }
 
@@ -860,7 +862,7 @@ static void displayer_task(void *args) {
 			// by default go for the long sleep, will change below if required
 			scroller.wake = LONG_WAKE;
 			
-			// do we have more to scroll (scroll.width is the last column from which we havea  full zone)
+			// do we have more to scroll (scroll.width is the last column from which we have a full zone)
 			if (scroller.by > 0 ? (scroller.scrolled <= scroller.scroll.width) : (scroller.scrolled >= 0)) {
 				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];
