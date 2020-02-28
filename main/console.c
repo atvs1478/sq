@@ -26,6 +26,11 @@
 #include "console.h"
 #include "wifi_manager.h"
 #include "telnet.h"
+#include "gds.h"
+#include "gds_default_if.h"
+#include "gds_draw.h"
+#include "gds_text.h"
+#include "gds_font.h"
 
 #include "cmd_squeezelite.h"
 #include "config.h"
@@ -239,6 +244,9 @@ void console_start() {
 #if !RECOVERY_APPLICATION
 		// process autoexec locally, as we're not going to start the console thread
 	process_autoexec();
+#else
+	GDS_ClearExt(display, true);
+	GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_UPDATE, "Recovery mode");
 #endif
 	}
 }

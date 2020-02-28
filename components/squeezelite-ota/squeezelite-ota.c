@@ -88,7 +88,8 @@ uint8_t  ota_get_pct_complete(){
 }
 static bool (*display_bus_chain)(void *from, enum display_bus_cmd_e cmd);
 static bool display_dummy_handler(void *from, enum display_bus_cmd_e cmd) {
-	// chain to rest of "bus"
+
+	// Nothing implemented at this point
 	if (display_bus_chain) return (*display_bus_chain)(from, cmd);
 	else return true;
 }
@@ -117,7 +118,7 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     }
     va_end(args);
 
-    displayer_scroll(msg_str, 33);
+    displayer_scroll(msg_str, 33, 250);
     cJSON_AddStringToObject(msg,"ota_dsc",str_or_unknown(msg_str));
     free(msg_str);
     cJSON_AddNumberToObject(msg,"ota_pct",	ota_get_pct_complete()	);
@@ -440,7 +441,7 @@ void ota_task(void *pvParameter)
 {
 	esp_err_t err = ESP_OK;
 	displayer_control(DISPLAYER_ACTIVATE, "Firmware update");
-	displayer_scroll("Initializing...", 33);
+	displayer_scroll("Initializing...", 33, 250);
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
