@@ -31,7 +31,7 @@
 #include "gds_draw.h"
 #include "gds_text.h"
 #include "gds_font.h"
-
+#include "display.h"
 #include "cmd_squeezelite.h"
 #include "config.h"
 pthread_t thread_console;
@@ -191,6 +191,7 @@ void console_start() {
 	if(!is_serial_suppressed()){
 		printf("\n"
 	#if RECOVERY_APPLICATION
+
 				"****************************************************************\n"
 				"RECOVERY APPLICATION\n"
 				"This mode is used to flash Squeezelite into the OTA partition\n"
@@ -207,7 +208,11 @@ void console_start() {
 	#endif
 				"\n"
 				"\n");
+#if RECOVERY_APPLICATION
+		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
+		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
 
+#endif
 		/* Figure out if the terminal supports escape sequences */
 		int probe_status = linenoiseProbe();
 		if (probe_status) { /* zero indicates success */
@@ -244,9 +249,7 @@ void console_start() {
 #if !RECOVERY_APPLICATION
 		// process autoexec locally, as we're not going to start the console thread
 	process_autoexec();
-#else
-	GDS_ClearExt(display, true);
-	GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_UPDATE, "Recovery mode");
+
 #endif
 	}
 }
