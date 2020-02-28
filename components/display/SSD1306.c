@@ -39,6 +39,7 @@ static void Update( struct GDS_Device* Device ) {
 	// not sure the compiler does not have to redo all calculation in for loops, so local it is
 	int width = Device->Width, rows = Device->Height / 8;
 	uint8_t *optr = Device->Shadowbuffer, *iptr = Device->Framebuffer;
+	int CurrentRow = -1, FirstCol = -1, LastCol = -1;
 	
 	// by row, find first and last columns that have been updated
 	for (int r = 0; r < rows; r++) {
@@ -53,8 +54,22 @@ static void Update( struct GDS_Device* Device ) {
 		
 		// now update the display by "byte rows"
 		if (first--) {
-			SetColumnAddress( Device, first, last );
-			SetPageAddress( Device, r, r);
+			
+			// only set column when useful, saves a fair bit of CPU
+			if (first > FirstCol && first <= FirstCol + 4 && last < LastCol && last >= LastCol - 4) {
+				first = FirstCol;
+				last = LastCol;
+			} else {	
+				SetColumnAddress( Device, first, last );
+				FirstCol = first;
+				LastCol = last;
+			}
+			
+			// Set row only when needed, otherwise let auto-increment work
+			if (r != CurrentRow) SetPageAddress( Device, r, Device->Height / 8 - 1 );
+			CurrentRow = r + 1;
+			
+			// actual write
 			Device->WriteData( Device, Device->Shadowbuffer + r*width + first, last - first + 1);
 		}
 	}	

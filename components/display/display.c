@@ -289,13 +289,14 @@ void displayer_metadata(char *artist, char *album, char *title) {
 /****************************************************************************************
  *
  */
-void displayer_scroll(char *string, int speed) {
+void displayer_scroll(char *string, int speed, int pause) {
 	// need a display!
 	if (!display) return;
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 	if (speed) displayer.speed = speed;
+	if (pause) displayer.pause = pause;
 	displayer.offset = 0;	
 	strncpy(displayer.string, string, SCROLLABLE_SIZE);
 	displayer.string[SCROLLABLE_SIZE] = '\0';
