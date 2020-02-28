@@ -209,6 +209,7 @@ void console_start() {
 				"\n"
 				"\n");
 #if RECOVERY_APPLICATION
+		GDS_ClearExt(display, true);
 		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
 
