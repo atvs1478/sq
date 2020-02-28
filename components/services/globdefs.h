@@ -24,6 +24,7 @@
 #define SPI_SYSTEM_HOST	SPI2_HOST
 
 extern int i2c_system_port;
+extern int i2c_system_speed;
 extern int spi_system_host;
 extern int spi_system_dc_gpio;
 extern bool gpio36_39_used;

@@ -23,6 +23,7 @@ extern void monitor_svc_init(void);
 extern void led_svc_init(void);
 
 int i2c_system_port = I2C_SYSTEM_PORT;
+int i2c_system_speed = 400000;
 int spi_system_host = SPI_SYSTEM_HOST;
 int spi_system_dc_gpio = -1;
 

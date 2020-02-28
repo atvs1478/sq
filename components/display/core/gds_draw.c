@@ -14,8 +14,8 @@
 #include <math.h>
 #include <esp_attr.h>
 
-#include "gds.h"
 #include "gds_private.h"
+#include "gds.h"
 #include "gds_draw.h"
 
 static const unsigned char BitReverseTable256[] = 
@@ -45,49 +45,11 @@ __attribute__( ( always_inline ) ) static inline void SwapInt( int* a, int* b ) 
     *a = Temp;
 }
 
-inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color ) {
-    uint32_t YBit = ( Y & 0x07 );
-    uint8_t* FBOffset = NULL;
+// un-comment if need to be instanciated for external callers
+extern inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
+extern inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int X, int Y, int Color );
 
-    /* 
-     * We only need to modify the Y coordinate since the pitch
-     * of the screen is the same as the width.
-     * Dividing Y by 8 gives us which row the pixel is in but not
-     * the bit position.
-     */
-    Y>>= 3;
-
-    FBOffset = Device->Framebuffer + ( ( Y * Device->Width ) + X );
-
-    if ( Color == GDS_COLOR_XOR ) {
-        *FBOffset ^= BIT( YBit );
-    } else {
-        *FBOffset = ( Color == GDS_COLOR_WHITE ) ? *FBOffset | BIT( YBit ) : *FBOffset & ~BIT( YBit );
-    }
-}
-
-inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
-    uint32_t YBit = ( Y & 0x07 );
-    uint8_t* FBOffset = NULL;
-
-    /* 
-     * We only need to modify the Y coordinate since the pitch
-     * of the screen is the same as the width.
-     * Dividing Y by 8 gives us which row the pixel is in but not
-     * the bit position.
-     */
-    Y>>= 3;
-
-    FBOffset = Device->Framebuffer + ( ( Y * Device->Width ) + X );
-
-    if ( Color == GDS_COLOR_XOR ) {
-        *FBOffset ^= BIT( YBit );
-    } else {
-        *FBOffset = ( Color == GDS_COLOR_WHITE ) ? *FBOffset | BIT( YBit ) : *FBOffset & ~BIT( YBit );
-    }
-}
-
-void IRAM_ATTR GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width, int Color ) {
+void GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width, int Color ) {
     int XEnd = x + Width;
 
 	Device->Dirty = true;
@@ -98,30 +60,24 @@ void IRAM_ATTR GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width
 	if (y < 0) y = 0;
 	else if (y >= Device->Height) x = Device->Height - 1;
 
-    for ( ; x < XEnd; x++ ) {
-        if ( IsPixelVisible( Device, x, y ) == true ) {
-            Device->DrawPixelFast( Device, x, y, Color );
-        } else {
-            break;
-        }
-    }
+    for ( ; x < XEnd; x++ ) GDS_DrawPixelFast( Device, x, y, Color );
 }
 
-void IRAM_ATTR GDS_DrawVLine( struct GDS_Device* Device, int x, int y, int Height, int Color ) {
+void GDS_DrawVLine( struct GDS_Device* Device, int x, int y, int Height, int Color ) {
     int YEnd = y + Height;
 
 	Device->Dirty = true;
+	
+	if (x < 0) x = 0;
+	if (x >= Device->Width) x = Device->Width - 1;
+	
+	if (y < 0) y = 0;
+	else if (YEnd >= Device->Height) YEnd = Device->Height - 1;
 
-    for ( ; y < YEnd; y++ ) {
-        if ( IsPixelVisible( Device, x, y ) == true ) {
-            GDS_DrawPixel( Device, x, y, Color );
-        } else {
-            break;
-        }
-    }
+    for ( ; y < YEnd; y++ ) GDS_DrawPixel( Device, x, y, Color );
 }
 
-static inline void IRAM_ATTR DrawWideLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
+static inline void DrawWideLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
     int dx = ( x1 - x0 );
     int dy = ( y1 - y0 );
     int Error = 0;
@@ -138,7 +94,7 @@ static inline void IRAM_ATTR DrawWideLine( struct GDS_Device* Device, int x0, in
 
     for ( ; x < x1; x++ ) {
         if ( IsPixelVisible( Device, x, y ) == true ) {
-            Device->DrawPixelFast( Device, x, y, Color );
+            GDS_DrawPixelFast( Device, x, y, Color );
         }
 
         if ( Error > 0 ) {
@@ -150,7 +106,7 @@ static inline void IRAM_ATTR DrawWideLine( struct GDS_Device* Device, int x0, in
     }
 }
 
-static inline void IRAM_ATTR DrawTallLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
+static inline void DrawTallLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
     int dx = ( x1 - x0 );
     int dy = ( y1 - y0 );
     int Error = 0;
@@ -167,7 +123,7 @@ static inline void IRAM_ATTR DrawTallLine( struct GDS_Device* Device, int x0, in
 
     for ( ; y < y1; y++ ) {
         if ( IsPixelVisible( Device, x, y ) == true ) {
-            Device->DrawPixelFast( Device, x, y, Color );
+            GDS_DrawPixelFast( Device, x, y, Color );
         }
 
         if ( Error > 0 ) {
@@ -179,7 +135,7 @@ static inline void IRAM_ATTR DrawTallLine( struct GDS_Device* Device, int x0, in
     }
 }
 
-void IRAM_ATTR GDS_DrawLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
+void GDS_DrawLine( struct GDS_Device* Device, int x0, int y0, int x1, int y1, int Color ) {
     if ( x0 == x1 ) {
         GDS_DrawVLine( Device, x0, y0, ( y1 - y0 ), Color );
     } else if ( y0 == y1 ) {
@@ -206,7 +162,7 @@ void IRAM_ATTR GDS_DrawLine( struct GDS_Device* Device, int x0, int y0, int x1, 
     }
 }
 
-void IRAM_ATTR GDS_DrawBox( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color, bool Fill ) {
+void GDS_DrawBox( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color, bool Fill ) {
     int Width = ( x2 - x1 );
     int Height = ( y2 - y1 );
 
@@ -236,57 +192,80 @@ void IRAM_ATTR GDS_DrawBox( struct GDS_Device* Device, int x1, int y1, int x2, i
 /****************************************************************************************
  * Process graphic display data from column-oriented data (MSbit first)
  */
-void GDS_DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int Height) {
+void GDS_DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int Height, int Color ) {
 	if (!Height) Height = Device->Height;
 	if (!Width) Width = Device->Width;
-
-	// need to do row/col swap and bit-reverse
-	int Rows = Height / 8;
-	for (int r = 0; r < Rows; r++) {
-		uint8_t *optr = Device->Framebuffer + r*Device->Width, *iptr = Data + r;
-		for (int c = Width; --c >= 0;) {
-			*optr++ = BitReverseTable256[*iptr];;
-			iptr += Rows;
-		}	
+	Height >>= 3;
+		
+	if (Device->DrawBitmapCBR) {
+		Device->DrawBitmapCBR( Device, Data, Width, Height, Color );
+	} else if (Device->Depth == 1) {
+		// need to do row/col swap and bit-reverse
+		for (int r = 0; r < Height; r++) {
+			uint8_t *optr = Device->Framebuffer + r*Device->Width, *iptr = Data + r;
+			for (int c = Width; --c >= 0;) {
+				*optr++ = BitReverseTable256[*iptr];
+				iptr += Height;
+			}	
+		}
+	} else if (Device->Depth == 4)	{
+		uint8_t *optr = Device->Framebuffer;
+		int LineLen = Device->Width >> 1;
+		for (int i = Width * Height, r = 0, c = 0; --i >= 0;) {
+			uint8_t Byte = BitReverseTable256[*Data++];
+			// we need to linearize code to let compiler better optimize
+			if (c & 0x01) {
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0x0f) | (((Byte & 0x01)*Color)<<4); optr += LineLen; Byte >>= 1;
+			} else {
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+				*optr = (*optr & 0xf0) | (((Byte & 0x01)*Color)); optr += LineLen; Byte >>= 1;
+			}	
+			// end of a column, move to next one
+			if (++r == Height) { c++; r = 0; optr = Device->Framebuffer + (c >> 1); }		
+		}
+	} else {
+		// don't know bitdepth, use brute-force solution
+		for (int i = Width * Height, r = 0, c = 0; --i >= 0;) {
+			uint8_t Byte = *Data++;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 7, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 6, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 5, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 4, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 3, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 2, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 1, (Byte & 0x01) * Color ); Byte >>= 1;
+			GDS_DrawPixelFast( Device, c, (r << 3) + 0, (Byte & 0x01) * Color ); 
+			if (++r == Height) { c++; r = 0; }			
+		}
+		/* for better understanding, here is the mundane version 
+		for (int x = 0; x < Width; x++) {
+			for (int y = 0; y < Height; y++) {
+				uint8_t Byte = *Data++;
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 0, ((Byte >> 7) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 1, ((Byte >> 6) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 2, ((Byte >> 5) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 3, ((Byte >> 4) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 4, ((Byte >> 3) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 5, ((Byte >> 2) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 6, ((Byte >> 1) & 0x01) * Color );
+				GDS_DrawPixel4Fast( Device, x, y * 8 + 7, ((Byte >> 0) & 0x01) * Color );
+			}
+		}
+		*/
 	}
 	
 	Device->Dirty = true;
 }
-
-/****************************************************************************************
- * Process graphic display data MSBit first
- * WARNING: this has not been tested yet
- */
- /*
-static void draw_raw(int x1, int y1, int x2, int y2, bool by_column, bool MSb, u8_t *data) {
-	// default end point to display size
-	if (x2 == -1) x2 = Display.Width - 1;
-	if (y2 == -1) y2 = Display.Height - 1;
-	
-	display->dirty = true;
-	
-	//	not a boundary draw
-	// same comment about bit depth
-	if (y1 % 8 || y2 % 8 || x1 % 8 | x2 % 8) {
-		ESP_LOGW(TAG, "can't write on non cols/rows boundaries for now");
-	} else {	
-		// set addressing mode to match data
-		if (by_column) {
-			// copy the window and do row/col exchange
-			for (int r = y1/8; r <=  y2/8; r++) {
-				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r;
-				for (int c = x1; c <= x2; c++) {
-					*optr++ = MSb ? BitReverseTable256[*iptr] : *iptr;
-					iptr += (y2-y1)/8 + 1;
-			}	
-			}	
-		} else {
-			// just copy the window inside the frame buffer
-			for (int r = y1/8; r <= y2/8; r++) {
-				uint8_t *optr = Display.Framebuffer + r*Display.Width + x1, *iptr = data + r*(x2-x1+1);
-				for (int c = x1; c <= x2; c++) *optr++ = *iptr++;
-			}	
-		}
-	}	
-}
-*/

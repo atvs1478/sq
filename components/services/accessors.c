@@ -45,9 +45,11 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 		.sda_pullup_en = GPIO_PULLUP_ENABLE,
 		.scl_io_num = -1,
 		.scl_pullup_en = GPIO_PULLUP_ENABLE,
-		.master.clk_speed = 400000,
+		.master.clk_speed = 0,
 	};
 
+	i2c.master.clk_speed = i2c_system_speed;
+	
 	nvs_item = config_alloc_get(NVS_TYPE_STR, "i2c_config");
 	if (nvs_item) {
 		if ((p = strcasestr(nvs_item, "scl")) != NULL) i2c.scl_io_num = atoi(strchr(p, '=') + 1);
@@ -89,7 +91,7 @@ const spi_bus_config_t * config_spi_get(spi_host_device_t * spi_host) {
  * 
  */
 void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
-	char *nvs_item, *p, type[4];
+	char *nvs_item, *p, type[16];
 	int gpio;
 	
 	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) == NULL) return;
@@ -97,7 +99,7 @@ void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
 	p = nvs_item;
 	
 	do {
-		if (sscanf(p, "%d=%3[^,]", &gpio, type) > 0) cb(gpio, type);
+		if (sscanf(p, "%d=%15[^,]", &gpio, type) > 0) cb(gpio, type);
 		p = strchr(p, ',');
 	} while (p++);
 	

@@ -47,7 +47,7 @@
 #define TELNET_STACK_SIZE 8048
 #define TELNET_RX_BUF 1024
 
-const static char tag[] = "telnet";
+const static char TAG[] = "telnet";
 static int uart_fd=0;
 RingbufHandle_t buf_handle;
 //static SemaphoreHandle_t xSemaphore = NULL;
@@ -56,6 +56,7 @@ static size_t log_buf_size=2000;      //32-bit aligned size
 static bool bIsEnabled=false;
 static int partnerSocket=0;
 static telnet_t *tnHandle;
+extern bool bypass_wifi_manager;
 
 /************************************
  * Forward declarations
@@ -77,16 +78,23 @@ struct telnetUserData {
 };
 
 bool is_serial_suppressed(){
-	return !bIsEnabled || !bMirrorToUART ;
+	return bIsEnabled?!bMirrorToUART:false ;
 }
 void init_telnet(){
 	char *val= get_nvs_value_alloc(NVS_TYPE_STR, "telnet_enable");
 	if (!val || strlen(val) == 0 || !strcasestr("YXD",val) ) {
-		ESP_LOGI(tag,"Telnet support disabled");
+		ESP_LOGI(TAG,"Telnet support disabled");
 		if(val) free(val);
 		return;
 	}
-	bMirrorToUART = strcasestr("D",val)!=NULL;
+	// if wifi manager is bypassed, there will possibly be no wifi available
+	//
+	bMirrorToUART = (strcasestr("D",val)!=NULL);
+	if(!bMirrorToUART && bypass_wifi_manager){
+		// This isn't supposed to happen, as telnet won't start if wifi manager isn't
+		// started. So this is a safeguard only.
+		ESP_LOGW(TAG,"Wifi manager is not active.  Forcing console on Serial output.");
+	}
 
 	FREE_AND_NULL(val);
 	val=get_nvs_value_alloc(NVS_TYPE_STR, "telnet_block");
@@ -110,11 +118,11 @@ void init_telnet(){
 	uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(sizeof(uint8_t)*log_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT );
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
 	if (buf_handle == NULL) {
-		ESP_LOGE(tag,"Failed to create ring buffer for telnet!");
+		ESP_LOGE(TAG,"Failed to create ring buffer for telnet!");
 		return;
 	}
 
-	ESP_LOGI(tag, "***Redirecting log output to telnet");
+	ESP_LOGI(TAG, "***Redirecting log output to telnet");
 	const esp_vfs_t vfs = {
 			.flags = ESP_VFS_FLAG_DEFAULT,
 			.write = &stdout_write,
@@ -152,14 +160,14 @@ static void telnet_task(void *data) {
 
 	int rc = bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
 	if (rc < 0) {
-		ESP_LOGE(tag, "bind: %d (%s)", errno, strerror(errno));
+		ESP_LOGE(TAG, "bind: %d (%s)", errno, strerror(errno));
 		close(serverSocket);
 		return;
 	}
 
 	rc = listen(serverSocket, 5);
 	if (rc < 0) {
-		ESP_LOGE(tag, "listen: %d (%s)", errno, strerror(errno));
+		ESP_LOGE(TAG, "listen: %d (%s)", errno, strerror(errno));
 		close(serverSocket);
 		return;
 	}
@@ -168,14 +176,14 @@ static void telnet_task(void *data) {
 		socklen_t len = sizeof(serverAddr);
 		rc = accept(serverSocket, (struct sockaddr *)&serverAddr, &len);
 		if (rc < 0 ){
-			ESP_LOGE(tag, "accept: %d (%s)", errno, strerror(errno));
+			ESP_LOGE(TAG, "accept: %d (%s)", errno, strerror(errno));
 			return;
 		}
 		else {
 			partnerSocket = rc;
-			ESP_LOGD(tag, "We have a new client connection!");
+			ESP_LOGD(TAG, "We have a new client connection!");
 			handle_telnet_conn();
-			ESP_LOGD(tag, "Telnet connection terminated");
+			ESP_LOGD(TAG, "Telnet connection terminated");
 		}
 	}
 	close(serverSocket);
