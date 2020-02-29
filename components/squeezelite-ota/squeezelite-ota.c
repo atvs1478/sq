@@ -47,7 +47,7 @@ extern const char * get_certificate();
 static const char *TAG = "squeezelite-ota";
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
-#define BUFFSIZE 2048
+#define BUFFSIZE 4096
 #define HASH_LEN 32 /* SHA-256 digest length */
 typedef struct  {
 	char * url;
@@ -68,6 +68,7 @@ static struct {
 	ota_type_t ota_type;
 	char * ota_write_data;
 	char * bin_data;
+	char * http_client_write_buf;
 	bool bOTAStarted;
 	size_t buffer_size;
 	uint8_t lastpct;
@@ -312,6 +313,7 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		ota_config.skip_cert_common_name_check = false;
 		ota_config.url = strdup(p_ota_thread_parms->url);
 		ota_config.max_redirection_count = 3;
+		ota_config.buffer_size = ota_status.buffer_size;
 		break;
 	case OTA_TYPE_BUFFER:
 		ota_status.bin_data = p_ota_thread_parms->bin;
@@ -435,14 +437,14 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     		return ESP_ERR_NO_MEM;
     	}
         while (1) {
-        	ESP_LOGD(TAG, "Buffer successfully allocated. Reading data chunk. ");
+        	ESP_LOGI(TAG, "Buffer successfully allocated. Reading data chunk. ");
             int data_read = esp_http_client_read(http_client, local_buff, ota_status.buffer_size);
             if (data_read < 0) {
                 ESP_LOGE(TAG, "Error: SSL data read error");
                 err= ESP_FAIL;
                 break;
             } else if (data_read == 0) {
-            	ESP_LOGD(TAG, "No more data. ");
+            	ESP_LOGI(TAG, "No more data. ");
             	err= ESP_OK;
             	break;
             }
@@ -457,27 +459,37 @@ static esp_err_t _http_connect(esp_http_client_handle_t http_client)
     esp_err_t err = ESP_FAIL;
     int status_code, header_ret;
     do {
-    	ESP_LOGD(TAG, "connecting the http client. ");
+    	ESP_LOGI(TAG, "connecting the http client. ");
         err = esp_http_client_open(http_client, 0);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+            sendMessaging(MESSAGING_ERROR,"Failed to open HTTP connection: %s", esp_err_to_name(err));
             return err;
         }
-        ESP_LOGD(TAG, "Fetching headers");
+        ESP_LOGI(TAG, "Fetching headers");
         header_ret = esp_http_client_fetch_headers(http_client);
         if (header_ret < 0) {
         	// Error found
+            sendMessaging(MESSAGING_ERROR,"Header fetch failed");
             return header_ret;
         }
-        ESP_LOGD(TAG, "HTTP Header fetch completed, found content length of %d",header_ret);
+        ESP_LOGI(TAG, "HTTP Header fetch completed, found content length of %d",header_ret);
         status_code = esp_http_client_get_status_code(http_client);
         ESP_LOGD(TAG, "HTTP status code was %d",status_code);
 
         err = _http_handle_response_code(http_client, status_code);
         if (err != ESP_OK) {
+            sendMessaging(MESSAGING_ERROR,"HTTP connect error: %s", esp_err_to_name(err));
             return err;
         }
+
     } while (process_again(status_code));
+
+    if(status_code >=400 && status_code <=900){
+    	sendMessaging(MESSAGING_ERROR,"Error: HTTP Status %d",status_code);
+    	err=ESP_FAIL;
+    }
+
     return err;
 }
 void ota_task_cleanup(const char * message, ...){
@@ -512,7 +524,6 @@ esp_err_t ota_buffer_all(){
 	    // Open the http connection and follow any redirection
 	    err = _http_connect(ota_http_client);
 	    if (err != ESP_OK) {
-	    	sendMessaging(MESSAGING_ERROR,"Error: HTTP Start read failed. (%s)",esp_err_to_name(err));
 	       return err;
 	    }
 	    if(ota_status.total_image_len<=0){
