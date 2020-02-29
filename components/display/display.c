@@ -59,8 +59,8 @@ static EXT_RAM_ATTR struct {
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, ELD_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, ELD_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, NULL };
 
 /****************************************************************************************
  * 
