@@ -631,11 +631,9 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			current = ((current - start) / 44100) * 1000;
 			if (stop) stop = ((stop - start) / 44100) * 1000;
 			else stop = -1;
-			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
-			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
-		}
-
-		if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
+			LOG_INFO("[%p]: SET PARAMETER progress %d/%u %s", ctx, current, stop, p);
+			success = ctx->cmd_cb(RAOP_PROGRESS, max(current, 0), stop);
+		} else if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
 			struct metadata_s metadata;
 			dmap_settings settings = {
 				NULL, NULL, NULL, NULL,	NULL, NULL,	NULL, on_dmap_string, NULL,
@@ -651,6 +649,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 				success = ctx->cmd_cb(RAOP_METADATA, metadata.artist, metadata.album, metadata.title);
 				free_metadata(&metadata);
 			}
+		} else {
+			char *dump = kd_dump(headers);
+			LOG_INFO("Unhandled SET PARAMETER\n%s", dump);
+			free(dump);
 		}
 	}
 

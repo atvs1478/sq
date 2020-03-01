@@ -192,7 +192,7 @@ static void displayer_task(void *args) {
 		
 		// handler elapsed track time
 		if (displayer.timer && displayer.state == DISPLAYER_ACTIVE) {
-			char counter[12];
+			char counter[16];
 			TickType_t tick = xTaskGetTickCount();
 			uint32_t elapsed = (tick - displayer.tick) * portTICK_PERIOD_MS;
 			
