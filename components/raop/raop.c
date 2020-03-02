@@ -57,9 +57,9 @@ typedef struct raop_ctx_s {
 	struct in_addr peer;	// IP of the iDevice (airplay sender)
 	bool running;
 #ifdef WIN32
-	pthread_t thread, search_thread;
+	pthread_t thread;
 #else
-	TaskHandle_t thread, search_thread, joiner;
+	TaskHandle_t thread, joiner;
 	StaticTask_t *xTaskBuffer;
 	StackType_t xStack[RTSP_STACK_SIZE] __attribute__ ((aligned (4)));
 #endif
@@ -81,10 +81,11 @@ typedef struct raop_ctx_s {
 		char				DACPid[32], id[32];
 		struct in_addr		host;
 		u16_t				port;
+		bool running;
 #ifdef WIN32
 		struct mDNShandle_s *handle;
+		pthread_t thread;
 #else
-		bool running;
 		TaskHandle_t thread, joiner;
 		StaticTask_t *xTaskBuffer;
 		StackType_t xStack[SEARCH_STACK_SIZE] __attribute__ ((aligned (4)));;
@@ -218,7 +219,7 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	struct sockaddr addr;
 	socklen_t nlen = sizeof(struct sockaddr);
 #endif
-	
+
 	if (!ctx) return;
 
 #ifdef WIN32
@@ -240,7 +241,7 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	// terminate search, but do not reclaim memory of pthread if never launched
 	if (ctx->active_remote.handle) {
 		close_mDNS(ctx->active_remote.handle);
-		pthread_join(ctx->search_thread, NULL);
+		pthread_join(ctx->active_remote.thread, NULL);
 	}
 
 	// stop broadcasting devices
@@ -515,7 +516,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 #ifdef WIN32	
 		ctx->active_remote.handle = init_mDNS(false, ctx->host);
-		pthread_create(&ctx->search_thread, NULL, &search_remote, ctx);
+		pthread_create(&ctx->active_remote.thread, NULL, &search_remote, ctx);
 #else
 		ctx->active_remote.running = true;
 		ctx->active_remote.destroy_mutex = xSemaphoreCreateMutex();		
@@ -592,7 +593,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		// need to make sure no search is on-going and reclaim pthread memory
 #ifdef WIN32
 		if (ctx->active_remote.handle) close_mDNS(ctx->active_remote.handle);
-		pthread_join(ctx->search_thread, NULL);
+		pthread_join(ctx->active_remote.thread, NULL);
 #else
 		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
 		ctx->active_remote.running = false;
@@ -631,18 +632,16 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			current = ((current - start) / 44100) * 1000;
 			if (stop) stop = ((stop - start) / 44100) * 1000;
 			else stop = -1;
-			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
-			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
-		}
-
-		if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
+			LOG_INFO("[%p]: SET PARAMETER progress %d/%u %s", ctx, current, stop, p);
+			success = ctx->cmd_cb(RAOP_PROGRESS, max(current, 0), stop);
+		} else if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
 			struct metadata_s metadata;
 			dmap_settings settings = {
 				NULL, NULL, NULL, NULL,	NULL, NULL,	NULL, on_dmap_string, NULL,
 				NULL
 			};
 
-			LOG_INFO("[%p]: received metadata");
+			LOG_INFO("[%p]: received metadata", ctx);
 			settings.ctx = &metadata;
 			memset(&metadata, 0, sizeof(struct metadata_s));
 			if (!dmap_parse(&settings, body, len)) {
@@ -651,6 +650,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 				success = ctx->cmd_cb(RAOP_METADATA, metadata.artist, metadata.album, metadata.title);
 				free_metadata(&metadata);
 			}
+		} else {
+			char *dump = kd_dump(headers);
+			LOG_INFO("Unhandled SET PARAMETER\n%s", dump);
+			free(dump);
 		}
 	}
 
@@ -684,9 +687,13 @@ void abort_rtsp(raop_ctx_t *ctx) {
 		rtp_end(ctx->rtp);
 		ctx->rtp = NULL;
 		LOG_INFO("[%p]: RTP thread aborted", ctx);
-	}	
+	}
 
 	if (ctx->active_remote.running) {
+#ifdef WIN32
+		pthread_join(ctx->active_remote.thread, NULL);
+		close_mDNS(ctx->active_remote.handle);
+#else
 		// need to make sure no search is on-going and reclaim task memory
 		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
 		ctx->active_remote.running = false;
@@ -696,7 +703,9 @@ void abort_rtsp(raop_ctx_t *ctx) {
 		vSemaphoreDelete(ctx->active_remote.thread);
 
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
+#endif
 		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
+
 
 		LOG_INFO("[%p]: Remote search thread aborted", ctx);
 	}	

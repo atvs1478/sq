@@ -443,25 +443,23 @@ static void buffer_put_packet(rtp_t *ctx, seq_t seqno, unsigned rtptime, bool fi
 		LOG_SDEBUG("packet expected seqno:%hu rtptime:%u (W:%hu R:%hu)", seqno, rtptime, ctx->ab_write, ctx->ab_read);
 
 	} else if (seq_order(ctx->ab_write, seqno)) {
+		seq_t i;
+		u32_t now;
+
 		// newer than expected
 		if (ctx->latency && seq_order(ctx->latency / ctx->frame_size, seqno - ctx->ab_write - 1)) {
 			// only get rtp latency-1 frames back (last one is seqno)
 			LOG_WARN("[%p] too many missing frames %hu seq: %hu, (W:%hu R:%hu)", ctx, seqno - ctx->ab_write - 1, seqno, ctx->ab_write, ctx->ab_read);
 			ctx->ab_write = seqno - ctx->latency / ctx->frame_size;
 		}
-		if (ctx->latency && seq_order(ctx->latency / ctx->frame_size, seqno - ctx->ab_read)) {
-			// if ab_read is lagging more than http latency, advance it
-			LOG_WARN("[%p] on hold for too long %hu (W:%hu R:%hu)", ctx, seqno - ctx->ab_read + 1, ctx->ab_write, ctx->ab_read);
-			ctx->ab_read = seqno - ctx->latency / ctx->frame_size + 1;
+
+		// need to request re-send and adjust timing of gaps
+		rtp_request_resend(ctx, ctx->ab_write + 1, seqno-1);
+		for (now = gettime_ms(), i = ctx->ab_write + 1; seq_order(i, seqno); i++) {
+			ctx->audio_buffer[BUFIDX(i)].rtptime = rtptime - (seqno-i)*ctx->frame_size;
+			ctx->audio_buffer[BUFIDX(i)].last_resend = now;
 		}
-		if (rtp_request_resend(ctx, ctx->ab_write + 1, seqno-1)) {
-			seq_t i;
-			u32_t now = gettime_ms();
-			for (i = ctx->ab_write + 1; seq_order(i, seqno); i++) {
-				ctx->audio_buffer[BUFIDX(i)].rtptime = rtptime - (seqno-i)*ctx->frame_size;
-				ctx->audio_buffer[BUFIDX(i)].last_resend = now;
-			}
-		}
+
 		LOG_DEBUG("[%p]: packet newer seqno:%hu rtptime:%u (W:%hu R:%hu)", ctx, seqno, rtptime, ctx->ab_write, ctx->ab_read);
 		abuf = ctx->audio_buffer + BUFIDX(seqno);
 		ctx->ab_write = seqno;
@@ -519,14 +517,21 @@ static void buffer_push_packet(rtp_t *ctx) {
 			LOG_DEBUG("[%p]: discarded frame now:%u missed by:%d (W:%hu R:%hu)", ctx, now, now - playtime, ctx->ab_write, ctx->ab_read);
 			ctx->discarded++;
 			curframe->ready = 0;
+		} else if (playtime - now <= hold) {
+			if (curframe->ready) {
+				ctx->data_cb((const u8_t*) curframe->data, curframe->len, playtime);
+				curframe->ready = 0;
+			} else {
+				LOG_DEBUG("[%p]: created zero frame (W:%hu R:%hu)", ctx, ctx->ab_write, ctx->ab_read);
+				ctx->data_cb(silence_frame, ctx->frame_size * 4, playtime);
+				ctx->silent_frames++;
+			}
 		} else if (curframe->ready) {
 			ctx->data_cb((const u8_t*) curframe->data, curframe->len, playtime);
 			curframe->ready = 0;
-		} else if (playtime - now <= hold) {
-			LOG_DEBUG("[%p]: created zero frame (W:%hu R:%hu)", ctx, ctx->ab_write, ctx->ab_read);
-			ctx->data_cb(silence_frame, ctx->frame_size * 4, playtime);
-			ctx->silent_frames++;
-		} else break;
+		} else {
+			break;
+		}
 
 		ctx->ab_read++;
 		ctx->out_frames++;
@@ -637,7 +642,7 @@ static void *rtp_thread_func(void *arg) {
 				u32_t rtp_now = ntohl(*(u32_t*)(pktp+16));
 				u16_t flags = ntohs(*(u16_t*)(pktp+2));
 				u32_t remote_gap = NTP2MS(remote - ctx->timing.remote);
-				
+
 				// something is wrong and if we are supposed to be NTP synced, better ask for re-sync
 				if (remote_gap > 10000) {
 					if (ctx->synchro.status & NTP_SYNC) rtp_request_timing(ctx);

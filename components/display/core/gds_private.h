@@ -7,6 +7,7 @@
 #include "gds.h"
 #include "gds_err.h"
 
+#define GDS_ALLOC_NONE		0x80
 #define GDS_ALLOC_IRAM		0x01
 #define GDS_ALLOC_IRAM_SPI	0x02
 
@@ -158,7 +159,7 @@ inline void IRAM_ATTR GDS_DrawPixel1Fast( struct GDS_Device* Device, int X, int 
     if ( Color == GDS_COLOR_XOR ) {
         *FBOffset ^= BIT( YBit );
     } else {
-        *FBOffset = ( Color >= GDS_COLOR_WHITE / 2 ) ? *FBOffset | BIT( YBit ) : *FBOffset & ~BIT( YBit );
+        *FBOffset = ( Color == GDS_COLOR_BLACK ) ? *FBOffset & ~BIT( YBit ) : *FBOffset | BIT( YBit );
     }
 }
 
@@ -166,7 +167,7 @@ inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int 
 	uint8_t* FBOffset;
 
     FBOffset = Device->Framebuffer + ( (Y * Device->Width >> 1) + (X >> 1));
-	*FBOffset = X & 0x01 ? (*FBOffset & 0x0f) | (Color << 4) : ((*FBOffset & 0xf0) | Color);
+	*FBOffset = X & 0x01 ? (*FBOffset & 0x0f) | ((Color  & 0x0f) << 4) : ((*FBOffset & 0xf0) | (Color & 0x0f));
 }
 
 inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color ) {
