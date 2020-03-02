@@ -47,7 +47,7 @@ extern const char * get_certificate();
 static const char *TAG = "squeezelite-ota";
 esp_http_client_handle_t ota_http_client = NULL;
 #define IMAGE_HEADER_SIZE sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t) + 1
-#define BUFFSIZE 2048
+#define BUFFSIZE 4096
 #define HASH_LEN 32 /* SHA-256 digest length */
 typedef struct  {
 	char * url;
@@ -82,7 +82,7 @@ static struct {
 } ota_status;
 
 struct timeval tv;
-static esp_http_client_config_t ota_config;
+static esp_http_client_config_t http_client_config;
 
 void _printMemStats(){
 	ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
@@ -143,9 +143,9 @@ static void loc_displayer_progressbar(uint8_t pct){
 	if(!progress_coordinates) progress_coordinates = loc_displayer_get_progress_dft();
 	int filler_x=progress_coordinates->filler.x1+(int)((float)progress_coordinates->filler.width*(float)pct/(float)100);
 
-	ESP_LOGI(TAG,"Drawing %d,%d,%d,%d",progress_coordinates->border.x1,progress_coordinates->border.y1,progress_coordinates->border.x2,progress_coordinates->border.y2);
+	ESP_LOGD(TAG,"Drawing %d,%d,%d,%d",progress_coordinates->border.x1,progress_coordinates->border.y1,progress_coordinates->border.x2,progress_coordinates->border.y2);
 	GDS_DrawBox(display,progress_coordinates->border.x1,progress_coordinates->border.y1,progress_coordinates->border.x2,progress_coordinates->border.y2,GDS_COLOR_WHITE,false);
-	ESP_LOGI(TAG,"Drawing %d,%d,%d,%d",progress_coordinates->filler.x1,progress_coordinates->filler.y1,filler_x,progress_coordinates->filler.y2);
+	ESP_LOGD(TAG,"Drawing %d,%d,%d,%d",progress_coordinates->filler.x1,progress_coordinates->filler.y1,filler_x,progress_coordinates->filler.y2);
 	if(filler_x > progress_coordinates->filler.x1){
 		GDS_DrawBox(display,progress_coordinates->filler.x1,progress_coordinates->filler.y1,filler_x,progress_coordinates->filler.y2,GDS_COLOR_WHITE,true);
 	}
@@ -153,7 +153,7 @@ static void loc_displayer_progressbar(uint8_t pct){
 		// Clear the inner box
 		GDS_DrawBox(display,progress_coordinates->filler.x1,progress_coordinates->filler.y1,progress_coordinates->filler.x2,progress_coordinates->filler.y2,GDS_COLOR_BLACK,true);
 	}
-	ESP_LOGI(TAG,"Updating Display");
+	ESP_LOGD(TAG,"Updating Display");
 	GDS_Update(display);
 }
 void sendMessaging(messaging_types type,const char * fmt, ...){
@@ -282,7 +282,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
-	memset(&ota_config, 0x00, sizeof(ota_config));
+	memset(&http_client_config, 0x00, sizeof(http_client_config));
 	sendMessaging(MESSAGING_INFO,"Initializing...");
 	loc_displayer_progressbar(0);
 	ota_status.ota_type= OTA_TYPE_INVALID;
@@ -306,12 +306,14 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		}
 	switch (ota_status.ota_type) {
 	case OTA_TYPE_HTTP:
-		ota_config.cert_pem =get_certificate();
-		ota_config.event_handler = _http_event_handler;
-		ota_config.disable_auto_redirect=true;
-		ota_config.skip_cert_common_name_check = false;
-		ota_config.url = strdup(p_ota_thread_parms->url);
-		ota_config.max_redirection_count = 3;
+		http_client_config.cert_pem =get_certificate();
+		http_client_config.event_handler = _http_event_handler;
+		http_client_config.disable_auto_redirect=true;
+		http_client_config.skip_cert_common_name_check = false;
+		http_client_config.url = strdup(p_ota_thread_parms->url);
+		http_client_config.max_redirection_count = 3;
+		// buffer size below is for http read chunks
+		http_client_config.buffer_size = 1024 ;
 		break;
 	case OTA_TYPE_BUFFER:
 		ota_status.bin_data = p_ota_thread_parms->bin;
@@ -428,15 +430,16 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
     ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
     if (process_again(status_code)) {
     	//ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
-    	char * local_buff = heap_caps_malloc(ota_status.buffer_size+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+    	//char * local_buff = heap_caps_malloc(ota_status.buffer_size+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
 
-    	if(local_buff==NULL){
-    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
-    		return ESP_ERR_NO_MEM;
-    	}
+//    	if(local_buff==NULL){
+//    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
+//    		return ESP_ERR_NO_MEM;
+//    	}
+
         while (1) {
-        	ESP_LOGD(TAG, "Buffer successfully allocated. Reading data chunk. ");
-            int data_read = esp_http_client_read(http_client, local_buff, ota_status.buffer_size);
+        	ESP_LOGD(TAG, "Reading data chunk. ");
+            int data_read = esp_http_client_read(http_client, ota_status.ota_write_data, ota_status.buffer_size);
             if (data_read < 0) {
                 ESP_LOGE(TAG, "Error: SSL data read error");
                 err= ESP_FAIL;
@@ -447,7 +450,7 @@ static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client
             	break;
             }
         }
-        FREE_RESET(local_buff);
+        //FREE_RESET(local_buff);
     }
 
     return err;
@@ -457,27 +460,37 @@ static esp_err_t _http_connect(esp_http_client_handle_t http_client)
     esp_err_t err = ESP_FAIL;
     int status_code, header_ret;
     do {
-    	ESP_LOGD(TAG, "connecting the http client. ");
+    	ESP_LOGI(TAG, "connecting the http client. ");
         err = esp_http_client_open(http_client, 0);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+            sendMessaging(MESSAGING_ERROR,"Failed to open HTTP connection: %s", esp_err_to_name(err));
             return err;
         }
-        ESP_LOGD(TAG, "Fetching headers");
+        ESP_LOGI(TAG, "Fetching headers");
         header_ret = esp_http_client_fetch_headers(http_client);
         if (header_ret < 0) {
         	// Error found
+            sendMessaging(MESSAGING_ERROR,"Header fetch failed");
             return header_ret;
         }
-        ESP_LOGD(TAG, "HTTP Header fetch completed, found content length of %d",header_ret);
+        ESP_LOGI(TAG, "HTTP Header fetch completed, found content length of %d",header_ret);
         status_code = esp_http_client_get_status_code(http_client);
         ESP_LOGD(TAG, "HTTP status code was %d",status_code);
 
         err = _http_handle_response_code(http_client, status_code);
         if (err != ESP_OK) {
+            sendMessaging(MESSAGING_ERROR,"HTTP connect error: %s", esp_err_to_name(err));
             return err;
         }
+
     } while (process_again(status_code));
+
+    if(status_code >=400 && status_code <=900){
+    	sendMessaging(MESSAGING_ERROR,"Error: HTTP Status %d",status_code);
+    	err=ESP_FAIL;
+    }
+
     return err;
 }
 void ota_task_cleanup(const char * message, ...){
@@ -503,7 +516,7 @@ esp_err_t ota_buffer_all(){
 	esp_err_t err=ESP_OK;
 	if (ota_status.ota_type == OTA_TYPE_HTTP){
 		GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Downloading file");
-	    ota_http_client = esp_http_client_init(&ota_config);
+	    ota_http_client = esp_http_client_init(&http_client_config);
 	    if (ota_http_client == NULL) {
 	    	sendMessaging(MESSAGING_ERROR,"Error: Failed to initialize HTTP connection.");
 	        return ESP_FAIL;
@@ -512,7 +525,6 @@ esp_err_t ota_buffer_all(){
 	    // Open the http connection and follow any redirection
 	    err = _http_connect(ota_http_client);
 	    if (err != ESP_OK) {
-	    	sendMessaging(MESSAGING_ERROR,"Error: HTTP Start read failed. (%s)",esp_err_to_name(err));
 	       return err;
 	    }
 	    if(ota_status.total_image_len<=0){
@@ -556,7 +568,6 @@ esp_err_t ota_header_check(){
 
     ota_status.configured = esp_ota_get_boot_partition();
     ota_status.running = esp_ota_get_running_partition();
-    ota_status.update_partition = esp_ota_get_next_update_partition(NULL);
     ota_status.last_invalid_app= esp_ota_get_last_invalid_partition();
     ota_status.ota_partition = _get_ota_partition(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 
@@ -613,6 +624,7 @@ void ota_task(void *pvParameter)
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     _printMemStats();
 
+    ota_status.update_partition = esp_ota_get_next_update_partition(NULL);
 
 	ESP_LOGI(TAG,"Initializing OTA configuration");
 	err = init_config(pvParameter);
