@@ -144,7 +144,7 @@ void init_telnet(){
 void start_telnet(void * pvParameter){
 	static bool isStarted=false;
 	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-	StackType_t *xStack = heap_caps_malloc(TELNET_STACK_SIZE,(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+	StackType_t *xStack = heap_caps_malloc(TELNET_STACK_SIZE,(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
 	
 	if(!isStarted && bIsEnabled) {
 		xTaskCreateStatic( (TaskFunction_t) &telnet_task, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_MAIN_PRIO , xStack, xTaskBuffer);

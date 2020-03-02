@@ -7,7 +7,7 @@
 # please read the SDK documents if you need to do this.
 #
 COMPONENT_EMBED_FILES := style.css code.js index.html bootstrap.min.css.gz jquery.min.js.gz popper.min.js.gz bootstrap.min.js.gz
-COMPONENT_ADD_INCLUDEDIRS := .
+COMPONENT_ADD_INCLUDEDIRS := . $(IDF_PATH)/components/esp_http_server/src $(IDF_PATH)/components/esp_http_server/src/port/esp32  $(IDF_PATH)/components/esp_http_server/src/util
 CFLAGS += -D LOG_LOCAL_LEVEL=ESP_LOG_INFO
 
 

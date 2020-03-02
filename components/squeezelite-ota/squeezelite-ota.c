@@ -616,7 +616,7 @@ void ota_task(void *pvParameter)
 {
 	esp_err_t err = ESP_OK;
     int data_read = 0;
-	GDS_TextSetFont(display,2,&Font_droid_sans_fallback_15x17,-2);
+	GDS_TextSetFont(display,2,GDS_GetHeight(display)>32?&Font_droid_sans_fallback_15x17:&Font_droid_sans_fallback_11x13,-2);
 	GDS_ClearExt(display, true);
 	GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Firmware update");
 	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Initializing");

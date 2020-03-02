@@ -1,4 +1,4 @@
-set(COMPONENT_ADD_INCLUDEDIRS . )
+set(COMPONENT_ADD_INCLUDEDIRS . ${IDF_PATH}/components/esp_http_server/src ${IDF_PATH}/components/esp_http_server/src/port/esp32  ${IDF_PATH}/components/esp_http_server/src/util)
 
 set(COMPONENT_SRCS "esp_app_main.c" "platform_esp32.c" "cmd_wifi.c" "console.c" "nvs_utilities.c" "cmd_squeezelite.c" "config.c")
 set(REQUIRES esp_common)

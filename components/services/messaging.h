@@ -9,7 +9,8 @@ typedef enum {
 } messaging_types;
 typedef enum {
 	MESSAGING_CLASS_OTA,
-	MESSAGING_CLASS_SYSTEM
+	MESSAGING_CLASS_SYSTEM,
+	MESSAGING_CLASS_STATS
 } messaging_classes;
 
 typedef struct messaging_list_t *messaging_handle_t;
@@ -18,7 +19,8 @@ typedef struct {
 	time_t sent_time;
 	messaging_types type;
 	messaging_classes msg_class;
-	char message[151];
+	size_t msg_size;
+	char message[];
 } single_message_t;
 
 cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle);

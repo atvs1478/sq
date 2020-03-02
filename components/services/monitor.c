@@ -21,6 +21,9 @@
 #include "globdefs.h"
 #include "config.h"
 #include "accessors.h"
+#include "messaging.h"
+#include "cJSON.h"
+#include "trace.h"
 
 #define MONITOR_TIMER	(10*1000)
 
@@ -49,10 +52,12 @@ static void task_stats( void ) {
 		TaskStatus_t *tasks;
 		uint32_t total, n;
 	} current, previous;
-	
+	cJSON * top=cJSON_CreateObject();
+	cJSON * tlist=cJSON_CreateArray();
 	current.n = uxTaskGetNumberOfTasks();
 	current.tasks = malloc( current.n * sizeof( TaskStatus_t ) );
 	current.n = uxTaskGetSystemState( current.tasks, current.n, &current.total );
+	cJSON_AddNumberToObject(top,"ntasks",current.n);
 	
 	static EXT_RAM_ATTR char scratch[128+1];
 	*scratch = '\0';
@@ -66,6 +71,20 @@ static void task_stats( void ) {
 				n += sprintf(scratch + n, "%16s %2u%% s:%5u", current.tasks[i].pcTaskName, 
 																		   100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed, 
 																		   current.tasks[i].usStackHighWaterMark);
+				cJSON * t=cJSON_CreateObject();
+				cJSON_AddNumberToObject(t,"cpu",100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed);
+				cJSON_AddNumberToObject(t,"minstk",current.tasks[i].usStackHighWaterMark);
+				cJSON_AddNumberToObject(t,"bprio",current.tasks[i].uxBasePriority);
+				cJSON_AddNumberToObject(t,"cprio",current.tasks[i].uxCurrentPriority);
+				cJSON_AddStringToObject(t,"nme",current.tasks[i].pcTaskName);
+				cJSON_AddNumberToObject(t,"st",current.tasks[i].eCurrentState);
+				cJSON_AddNumberToObject(t,"num",current.tasks[i].xTaskNumber);
+				cJSON_AddItemToArray(tlist,t);
+				char * topsts = cJSON_PrintUnformatted(t);
+				if(topsts){
+					ESP_LOGI(TAG,"task detail: %s",topsts);
+					FREE_AND_NULL(topsts);
+				}
 				if (i % 3 == 2 || i == current.n - 1) {
 					ESP_LOGI(TAG, "%s", scratch);
 					n = 0;
@@ -77,13 +96,32 @@ static void task_stats( void ) {
 #else
 	for (int i = 0, n = 0; i < current.n; i ++) {
 		n += sprintf(scratch + n, "%16s s:%5u\t", current.tasks[i].pcTaskName, current.tasks[i].usStackHighWaterMark);
+		cJSON * t=cJSON_CreateObject();
+		cJSON_AddNumberToObject(t,"minstk",current.tasks[i].usStackHighWaterMark);
+		cJSON_AddNumberToObject(t,"bprio",current.tasks[i].uxBasePriority);
+		cJSON_AddNumberToObject(t,"cprio",current.tasks[i].uxCurrentPriority);
+		cJSON_AddStringToObject(t,"nme",current.tasks[i].pcTaskName);
+		cJSON_AddStringToObject(t,"st",current.tasks[i].eCurrentState);
+		cJSON_AddNumberToObject(t,"num",current.tasks[i].xTaskNumber);
+		cJSON_AddItemToArray(tlist,t);
+		char * topsts = cJSON_PrintUnformatted(t);
+		if(topsts){
+			ESP_LOGI(TAG,"task detail: %s",topsts);
+			FREE_AND_NULL(topsts);
+		}
 		if (i % 3 == 2 || i == current.n - 1) {
 			ESP_LOGI(TAG, "%s", scratch);
 			n = 0;
 		}	
 	}
 #endif	
-	
+	cJSON_AddItemToObject(top,"tasks",tlist);
+	char * top_a= cJSON_PrintUnformatted(top);
+	if(top_a){
+		messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_STATS,top_a);
+		FREE_AND_NULL(top_a);
+	}
+	cJSON_free(top);
 	if (previous.tasks) free(previous.tasks);
 	previous = current;
 #endif	
