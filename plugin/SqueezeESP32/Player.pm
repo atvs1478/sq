@@ -20,10 +20,10 @@ sub playerSettingsFrame {
 	
 	my $value;
 	my $id = unpack('C', $$data_ref);
-        
+		        
 	# New SETD command 0xfe for display width
 	if ($id == 0xfe) { 
-		$value = (unpack('CC', $$data_ref))[1];
+		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
 			$client->display->widthOverride(1, $value);
 			$client->update;
