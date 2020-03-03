@@ -683,8 +683,9 @@ function getMessages() {
 	        			var stats_data = JSON.parse(msg["message"]);
 	        			console.log(msg_time + " - Number of tasks on the ESP32: " + stats_data["ntasks"]);
 	        			var stats_tasks = stats_data["tasks"];
+	        			console.log(msg_time + '\tname' + '\tcpu' + '\tstate'+ '\tminstk'+ '\tbprio'+ '\tcprio'+ '\tnum' );
 	        			stats_tasks.forEach(function(task) {
-	        				console.log(msg_time + " - " + task["nme"] + ' - '+ task["cpu"]);
+	        				console.log(msg_time + '\t' + task["nme"] + '\t'+ task["cpu"] + '\t'+ task_state_t[task["st"]]+ '\t'+ task["minstk"]+ '\t'+ task["bprio"]+ '\t'+ task["cprio"]+ '\t'+ task["num"]);
 	        			});
 	        			break;
 	        		case "MESSAGING_CLASS_SYSTEM":

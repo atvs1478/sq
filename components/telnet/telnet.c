@@ -38,7 +38,9 @@
 #include "config.h"
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
+#include "messaging.h"
 #include "trace.h"
+
 
 /************************************
  * Globals
@@ -119,6 +121,8 @@ void init_telnet(){
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
 	if (buf_handle == NULL) {
 		ESP_LOGE(TAG,"Failed to create ring buffer for telnet!");
+		messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Failed to allocate memory for telnet buffer");
+
 		return;
 	}
 

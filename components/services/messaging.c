@@ -27,7 +27,7 @@ typedef struct {
 	RingbufHandle_t buf_handle;
 } messaging_list_t;
 static messaging_list_t top;
-#define MSG_LENGTH_AVG 201
+#define MSG_LENGTH_AVG 1024
 
 messaging_list_t * get_struct_ptr(messaging_handle_t handle){
 	return (messaging_list_t *)handle;
@@ -176,21 +176,24 @@ esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_m
 		return ESP_FAIL;
 	}
 	void * pItem=NULL;
-	int passes=0;
 	UBaseType_t res=pdFALSE;
-	while(passes++<3){
-		res =  xRingbufferSendAcquire(subscriber->buf_handle, &pItem, message_size, pdMS_TO_TICKS(100));
+	while(1){
+		ESP_LOGD(tag,"Attempting to reserve %d bytes for %s",message_size, str_or_unknown(subscriber->subscriber_name));
+		res =  xRingbufferSendAcquire(subscriber->buf_handle, &pItem, message_size, pdMS_TO_TICKS(50));
 		if(res == pdTRUE && pItem){
+			ESP_LOGD(tag,"Reserving complete for %s", str_or_unknown(subscriber->subscriber_name));
 			memcpy(pItem,message,message_size);
 			xRingbufferSendComplete(subscriber->buf_handle, pItem);
 			break;
 		}
-		ESP_LOGD(tag,"messaged dropped for %s",str_or_unknown(subscriber->subscriber_name));
+		ESP_LOGD(tag,"Dropping for %s",str_or_unknown(subscriber->subscriber_name));
 		single_message_t * dummy = (single_message_t *)xRingbufferReceive(subscriber->buf_handle, &item_size, pdMS_TO_TICKS(50));
 		if (dummy== NULL) {
-			ESP_LOGE(tag,"receive from buffer failed");
+			ESP_LOGE(tag,"Dropping message failed");
+			break;
 		}
 		else {
+			ESP_LOGD(tag,"Dropping message of %d bytes for %s",item_size, str_or_unknown(subscriber->subscriber_name));
 			vRingbufferReturnItem(subscriber->buf_handle, (void *)dummy);
 		}
 	}
@@ -216,7 +219,7 @@ void messaging_post_message(messaging_types type,messaging_classes msg_class, ch
 	message->type = type;
 	message->msg_class = msg_class;
 	message->sent_time = esp_timer_get_time() / 1000;
-	ESP_LOGI(tag,"Post: %s",message->message);
+	ESP_LOGD(tag,"Post: %s",message->message);
 	while(cur){
 		messaging_post_to_queue(get_handle_ptr(cur),  message, msg_size);
 		cur = get_struct_ptr(cur->next);
