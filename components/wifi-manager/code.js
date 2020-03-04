@@ -24,6 +24,14 @@ var nvs_type_t = {
     NVS_TYPE_ANY   : 0xff   /*!< Must be last */
 } ;
 
+var task_state_t = {
+		 0 : "eRunning",	/*!< A task is querying the state of itself, so must be running. */
+		 1 : "eReady",			/*!< The task being queried is in a read or pending ready list. */
+		 2 : "eBlocked",		/*!< The task being queried is in the Blocked state. */
+		 3 : "eSuspended",		/*!< The task being queried is in the Suspended state, or is in the Blocked state with an infinite time out. */
+		 4 : "eDeleted"				
+
+}
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
 var enableAPTimer = true;
@@ -649,7 +657,9 @@ function refreshAPHTML(data){
 function getMessages() {
 	   $.getJSON("/messages.json", function(data) {
 	        data.forEach(function(msg) {
-				var msg_age = msg["current_time"] - msg["sent_time"];
+	        	var msg_age = msg["current_time"] - msg["sent_time"];
+				var msg_time  = new Date(  );
+				msg_time.setTime( msg_time .getTime() - msg_age  );
 	        	switch (msg["class"]) {
 	        		case "MESSAGING_CLASS_OTA":
 	        			//message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
@@ -667,6 +677,16 @@ function getMessages() {
 	        	                enableStatusTimer = true;
 	        	            }
 	        	        }        			
+	        			break;
+	        		case "MESSAGING_CLASS_STATS":
+	        			// for task states, check structure : task_state_t
+	        			var stats_data = JSON.parse(msg["message"]);
+	        			console.log(msg_time + " - Number of tasks on the ESP32: " + stats_data["ntasks"]);
+	        			var stats_tasks = stats_data["tasks"];
+	        			console.log(msg_time + '\tname' + '\tcpu' + '\tstate'+ '\tminstk'+ '\tbprio'+ '\tcprio'+ '\tnum' );
+	        			stats_tasks.forEach(function(task) {
+	        				console.log(msg_time + '\t' + task["nme"] + '\t'+ task["cpu"] + '\t'+ task_state_t[task["st"]]+ '\t'+ task["minstk"]+ '\t'+ task["bprio"]+ '\t'+ task["cprio"]+ '\t'+ task["num"]);
+	        			});
 	        			break;
 	        		case "MESSAGING_CLASS_SYSTEM":
 	        			showMessage(msg["message"], msg["type"],msg_age);

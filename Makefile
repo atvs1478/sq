@@ -13,8 +13,7 @@
 #recovery: EXTRA_CPPFLAGS+=-DRECOVERY_APPLICATION=1
 
 PROJECT_NAME?=squeezelite
-EXTRA_CPPFLAGS+=  -I$(PROJECT_PATH)/main
-EXTRA_COMPONENT_DIRS := esp-dsp
+EXTRA_CPPFLAGS+=  -I$(PROJECT_PATH)/main -I$(IDF_PATH)/components/esp_http_server/src -I$(IDF_PATH)/components/esp_http_server/src/port/esp32  -I$(IDF_PATH)/components/esp_http_server/src/util
 #/-Wno-error=maybe-uninitialized 
 include $(IDF_PATH)/make/project.mk 
 

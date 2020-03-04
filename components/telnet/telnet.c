@@ -38,7 +38,9 @@
 #include "config.h"
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
+#include "messaging.h"
 #include "trace.h"
+
 
 /************************************
  * Globals
@@ -119,6 +121,8 @@ void init_telnet(){
 	buf_handle = xRingbufferCreateStatic(log_buf_size, RINGBUF_TYPE_BYTEBUF, buffer_storage, buffer_struct);
 	if (buf_handle == NULL) {
 		ESP_LOGE(TAG,"Failed to create ring buffer for telnet!");
+		messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Failed to allocate memory for telnet buffer");
+
 		return;
 	}
 
@@ -144,7 +148,7 @@ void init_telnet(){
 void start_telnet(void * pvParameter){
 	static bool isStarted=false;
 	StaticTask_t *xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-	StackType_t *xStack = heap_caps_malloc(TELNET_STACK_SIZE,(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+	StackType_t *xStack = heap_caps_malloc(TELNET_STACK_SIZE,(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
 	
 	if(!isStarted && bIsEnabled) {
 		xTaskCreateStatic( (TaskFunction_t) &telnet_task, "telnet", TELNET_STACK_SIZE, NULL, ESP_TASK_MAIN_PRIO , xStack, xTaskBuffer);

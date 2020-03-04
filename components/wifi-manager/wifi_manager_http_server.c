@@ -22,6 +22,7 @@
 #include "http_server_handlers.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "_esp_http_server.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -112,6 +113,7 @@ void register_regular_handlers(httpd_handle_t server){
 
 }
 
+
 esp_err_t http_server_start()
 {
 	ESP_LOGI(TAG, "Initializing HTTP Server");
@@ -131,7 +133,7 @@ esp_err_t http_server_start()
     // config.open_fn
 
     ESP_LOGI(TAG, "Starting HTTP Server");
-    esp_err_t err= httpd_start(&_server, &config);
+    esp_err_t err= __httpd_start(&_server, &config);
     if(err != ESP_OK){
     	ESP_LOGE_LOC(TAG,"Start server failed");
     }

@@ -361,6 +361,7 @@ esp_err_t wifi_manager_save_sta_config(){
 		esp_err = nvs_commit(handle);
 		if (esp_err != ESP_OK) {
 			ESP_LOGE(TAG,  "Unable to commit changes. Error %s", esp_err_to_name(esp_err));
+			messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to save wifi credentials. %s",esp_err_to_name(esp_err));
 			return esp_err;
 		}
 		nvs_close(handle);
@@ -1335,6 +1336,8 @@ void wifi_manager( void * pvParameters ){
 				else{
 					/* lost connection ? */
 					ESP_LOGE(TAG,   "WiFi Connection lost.");
+					messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"WiFi Connection lost");
+
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
 						wifi_manager_unlock_json_buffer();

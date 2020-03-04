@@ -47,6 +47,7 @@
 #include "config.h"
 #include "audio_controls.h"
 #include "telnet.h"
+#include "messaging.h"
 
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
@@ -73,12 +74,14 @@ const char * str_or_unknown(const char * str) { return (str?str:unknown_string_p
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
 	ESP_LOGI(TAG, "I have a connection!");
+	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"Wifi connected");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 	bWifiConnected=true;
 	led_unpush(LED_GREEN);
 }
 void cb_connection_sta_disconnected(void *pvParameter){
 	led_blink_pushed(LED_GREEN, 250, 250);
+	messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Wifi disconnected");
 	bWifiConnected=false;
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 }
@@ -427,4 +430,5 @@ void app_main()
 #endif
 		free(fwurl);
 	}
+	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"System started");
 }

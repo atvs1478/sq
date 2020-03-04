@@ -106,8 +106,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		if(!wait_for_commit()){
 			ESP_LOGW(TAG,"Unable to commit configuration. ");
 		}
-		ESP_LOGW(TAG, "Restarting after tx complete");
-		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		vTaskDelay(750/ portTICK_PERIOD_MS);
 		esp_restart();
 		return ESP_OK;
 	}
@@ -117,8 +116,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		if(!wait_for_commit()){
 			ESP_LOGW(TAG,"Unable to commit configuration. ");
 		}
-		ESP_LOGW(TAG, "Restarting after tx complete");
-		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		vTaskDelay(750/ portTICK_PERIOD_MS);
 		esp_restart();
 		return ESP_OK;
 	}
@@ -166,8 +164,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 			if(!wait_for_commit()){
 				ESP_LOGW(TAG,"Unable to commit configuration. ");
 			}
-			ESP_LOGW(TAG, "Restarting after tx complete");
-			uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+			vTaskDelay(750/ portTICK_PERIOD_MS);
 			esp_restart();
 		}
 	}
@@ -181,8 +178,7 @@ static int restart(int argc, char **argv)
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
-	ESP_LOGW(TAG, "Restarting after tx complete");
-    uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+	vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
     return 0;
 }
@@ -193,9 +189,7 @@ void simple_restart()
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
-
-	ESP_LOGW(TAG, "Restarting after tx complete");
-	uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+	vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
 }
 

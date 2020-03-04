@@ -27,7 +27,7 @@ typedef struct {
 	RingbufHandle_t buf_handle;
 } messaging_list_t;
 static messaging_list_t top;
-
+#define MSG_LENGTH_AVG 1024
 
 messaging_list_t * get_struct_ptr(messaging_handle_t handle){
 	return (messaging_list_t *)handle;
@@ -35,12 +35,14 @@ messaging_list_t * get_struct_ptr(messaging_handle_t handle){
 messaging_handle_t  get_handle_ptr(messaging_list_t * handle){
 	return (messaging_handle_t )handle;
 }
+
 RingbufHandle_t messaging_create_ring_buffer(uint8_t max_count){
 	RingbufHandle_t buf_handle = NULL;
 	StaticRingbuffer_t *buffer_struct = malloc(sizeof(StaticRingbuffer_t));
 	if (buffer_struct != NULL) {
-		size_t buf_size = (size_t )(sizeof(single_message_t)+8)*(size_t )(max_count>0?max_count:5); // no-split buffer requires an additional 8 bytes
-		uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+		size_t buf_size = (size_t )(sizeof(single_message_t)+8+MSG_LENGTH_AVG)*(size_t )(max_count>0?max_count:5); // no-split buffer requires an additional 8 bytes
+		buf_size = buf_size - (buf_size % 4);
+		uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_32BIT);
 		if (buffer_storage== NULL) {
 			ESP_LOGE(tag,"buff alloc failed");
 		}
@@ -62,9 +64,9 @@ void messaging_fill_messages(messaging_list_t * target_subscriber){
     	message= messaging_retrieve_message(top.buf_handle);
     	if(message){
 			//re-post to original queue so it is available to future subscribers
-			messaging_post_to_queue(get_handle_ptr(&top), message, sizeof(single_message_t));
+			messaging_post_to_queue(get_handle_ptr(&top), message, message->msg_size);
 			// post to new subscriber
-			messaging_post_to_queue(get_handle_ptr(target_subscriber) , message, sizeof(single_message_t));
+			messaging_post_to_queue(get_handle_ptr(target_subscriber) , message, message->msg_size);
 			FREE_AND_NULL(message);
     	}
     }
@@ -116,6 +118,7 @@ const char * messaging_get_class_desc(messaging_classes msg_class){
 	switch (msg_class) {
 	CASE_TO_STR(MESSAGING_CLASS_OTA);
 	CASE_TO_STR(MESSAGING_CLASS_SYSTEM);
+	CASE_TO_STR(MESSAGING_CLASS_STATS);
 		default:
 			return "Unknown";
 			break;
@@ -156,14 +159,9 @@ single_message_t *  messaging_retrieve_message(RingbufHandle_t buf_handle){
     vRingbufferGetInfo(buf_handle, NULL, NULL, NULL, NULL, &uxItemsWaiting);
 	if(uxItemsWaiting>0){
 		message = (single_message_t *)xRingbufferReceive(buf_handle, &item_size, pdMS_TO_TICKS(50));
-		if(item_size!=sizeof(single_message_t)){
-			ESP_LOGE(tag,"Invalid message length!");
-		}
-		else {
-			message_copy  = heap_caps_malloc(item_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-			if(message_copy){
-				memcpy(message_copy,message,item_size);
-			}
+		message_copy  = heap_caps_malloc(item_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+		if(message_copy){
+			memcpy(message_copy,message,item_size);
 		}
 		vRingbufferReturnItem(buf_handle, (void *)message);
 	}
@@ -171,25 +169,34 @@ single_message_t *  messaging_retrieve_message(RingbufHandle_t buf_handle){
 }
 
 esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_message_t * message, size_t message_size){
-	UBaseType_t uxItemsWaiting=0;
 	size_t item_size=0;
 	messaging_list_t * subscriber=get_struct_ptr(subscriber_handle);
 	if(!subscriber->buf_handle){
 		ESP_LOGE(tag,"post failed: null buffer for %s", str_or_unknown(subscriber->subscriber_name));
 		return ESP_FAIL;
 	}
-	vRingbufferGetInfo(subscriber->buf_handle,NULL,NULL,NULL,NULL,&uxItemsWaiting);
-	if(uxItemsWaiting>=subscriber->max_count){
-		ESP_LOGD(tag,"messaged dropped for %s",str_or_unknown(subscriber->subscriber_name));
+	void * pItem=NULL;
+	UBaseType_t res=pdFALSE;
+	while(1){
+		ESP_LOGD(tag,"Attempting to reserve %d bytes for %s",message_size, str_or_unknown(subscriber->subscriber_name));
+		res =  xRingbufferSendAcquire(subscriber->buf_handle, &pItem, message_size, pdMS_TO_TICKS(50));
+		if(res == pdTRUE && pItem){
+			ESP_LOGD(tag,"Reserving complete for %s", str_or_unknown(subscriber->subscriber_name));
+			memcpy(pItem,message,message_size);
+			xRingbufferSendComplete(subscriber->buf_handle, pItem);
+			break;
+		}
+		ESP_LOGD(tag,"Dropping for %s",str_or_unknown(subscriber->subscriber_name));
 		single_message_t * dummy = (single_message_t *)xRingbufferReceive(subscriber->buf_handle, &item_size, pdMS_TO_TICKS(50));
 		if (dummy== NULL) {
-			ESP_LOGE(tag,"receive from buffer failed");
+			ESP_LOGE(tag,"Dropping message failed");
+			break;
 		}
 		else {
+			ESP_LOGD(tag,"Dropping message of %d bytes for %s",item_size, str_or_unknown(subscriber->subscriber_name));
 			vRingbufferReturnItem(subscriber->buf_handle, (void *)dummy);
 		}
 	}
-	UBaseType_t res =  xRingbufferSend(subscriber->buf_handle, message, message_size, pdMS_TO_TICKS(1000));
 	if (res != pdTRUE) {
 		ESP_LOGE(tag,"post to %s failed",str_or_unknown(subscriber->subscriber_name));
 		return ESP_FAIL;
@@ -197,19 +204,27 @@ esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_m
 	return ESP_OK;
 }
 void messaging_post_message(messaging_types type,messaging_classes msg_class, char *fmt, ...){
-	single_message_t message={};
+	single_message_t * message=NULL;
+	size_t msg_size=0;
+	size_t ln =0;
 	messaging_list_t * cur=&top;
 	va_list va;
 	va_start(va, fmt);
-	vsnprintf(message.message, sizeof(message.message), fmt, va);
+	ln = vsnprintf(NULL, 0, fmt, va)+1;
+	msg_size = sizeof(single_message_t)+ln;
+	message = (single_message_t *)heap_caps_malloc(msg_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	vsprintf(message->message, fmt, va);
 	va_end(va);
-	message.type = type;
-	message.msg_class = msg_class;
-	message.sent_time = esp_timer_get_time() / 1000;
+	message->msg_size = msg_size;
+	message->type = type;
+	message->msg_class = msg_class;
+	message->sent_time = esp_timer_get_time() / 1000;
+	ESP_LOGD(tag,"Post: %s",message->message);
 	while(cur){
-		messaging_post_to_queue(get_handle_ptr(cur),  &message, sizeof(single_message_t));
+		messaging_post_to_queue(get_handle_ptr(cur),  message, msg_size);
 		cur = get_struct_ptr(cur->next);
 	}
+	FREE_AND_NULL(message);
 	return;
 
 }
