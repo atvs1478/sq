@@ -800,21 +800,23 @@ function checkStatus(){
                 $("#otadiv").show();
                 $('a[href^="#tab-audio"]').hide();
                 $('a[href^="#tab-gpio"]').show();
+                $('#uploaddiv').show();
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
                 $("#boot-button").html('Reboot');
                 $("#boot-form").attr('action', '/reboot_ota.json');
+
                 enableStatusTimer = true;
             } else {
                 recovery = false;
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').hide();
+                $('#uploaddiv').hide();
                 $("footer.footer").removeClass('recovery');
                 $("footer.footer").addClass('sl');
                 $("#boot-button").html('Recovery');
                 $("#boot-form").attr('action', '/recovery.json');
-                $('#uploaddiv"]').hide();
                 
                 enableStatusTimer = false;
             }
