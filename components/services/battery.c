@@ -16,7 +16,7 @@
 #include "esp_log.h"
 #include "driver/adc.h"
 #include "battery.h"
-#include "config.h"
+#include "platform_config.h"
 
 /* 
  There is a bug in esp32 which causes a spurious interrupt on gpio 36/39 when

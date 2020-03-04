@@ -22,7 +22,7 @@
 #include "driver/gpio.h"
 #include "squeezelite.h"
 #include "perf_trace.h"
-#include "config.h"
+#include "platform_config.h"
 
 extern struct outputstate output;
 extern struct buffer *outputbuf;

@@ -23,7 +23,7 @@
 #include <arpa/inet.h>
 #include "esp_log.h"
 #include "globdefs.h"
-#include "config.h"
+#include "platform_config.h"
 #include "tools.h"
 #include "display.h"
 #include "gds.h"

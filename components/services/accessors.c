@@ -11,7 +11,7 @@
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "driver/spi_master.h"
-#include "config.h"
+#include "platform_config.h"
 #include "accessors.h"
 #include "globdefs.h"
 

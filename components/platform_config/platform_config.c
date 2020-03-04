@@ -19,7 +19,7 @@
  *
  */
 //#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
-#include "config.h"
+#include "platform_config.h"
 #include "nvs_utilities.h"
 
 #include <stdio.h>
@@ -31,7 +31,7 @@
 #include "driver/uart.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
-#include "esp_vfs_fat.h"
+
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "nvs_utilities.h"

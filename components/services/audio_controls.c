@@ -26,7 +26,7 @@
 #include "esp_log.h"
 #include "cJSON.h"
 #include "buttons.h"
-#include "config.h"
+#include "platform_config.h"
 #include "audio_controls.h"
 
 typedef esp_err_t (actrls_config_map_handler) (const cJSON * member, actrls_config_t *cur_config,uint32_t offset);

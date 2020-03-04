@@ -7,6 +7,8 @@
  CONDITIONS OF ANY KIND, either express or implied.
  */
 
+#include "platform_console.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,11 +25,10 @@
 #include "platform_esp32.h"
 #include "esp_pthread.h"
 #include "cmd_decl.h"
-#include "console.h"
 #include "wifi_manager.h"
 
 #include "cmd_squeezelite.h"
-#include "config.h"
+#include "platform_config.h"
 pthread_t thread_console;
 static void * console_thread();
 void console_start();

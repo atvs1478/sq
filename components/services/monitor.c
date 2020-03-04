@@ -19,7 +19,7 @@
 #include "buttons.h"
 #include "led.h"
 #include "globdefs.h"
-#include "config.h"
+#include "platform_config.h"
 #include "accessors.h"
 
 #define MONITOR_TIMER	(10*1000)

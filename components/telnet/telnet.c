@@ -18,9 +18,9 @@
  * https://github.com/PocketSprite/8bkc-sdk/blob/master/8bkc-components/8bkc-hal/vfs-stdout.c
  *
  */
-#include <stdlib.h> // Required for libtelnet.h
+#include <stdlib.h> // Required for CONFIG_PTHREAD_TASK_PRIO_DEFAULT.h
 #include <esp_log.h>
-#include "libtelnet.h"
+#include "CONFIG_PTHREAD_TASK_PRIO_DEFAULT.h"
 #include "stdbool.h"
 #include <lwip/def.h>
 #include <lwip/sockets.h>
@@ -35,7 +35,7 @@
 #include "esp_attr.h"
 #include "soc/uart_struct.h"
 #include "driver/uart.h"
-#include "config.h"
+#include "platform_config.h"
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
 

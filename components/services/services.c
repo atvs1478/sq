@@ -10,7 +10,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include <driver/i2c.h>
-#include "config.h"
+#include "platform_config.h"
 #include "battery.h"
 #include "led.h"
 #include "monitor.h"

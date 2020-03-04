@@ -26,7 +26,7 @@
 #include "esp_partition.h"
 #include "esp_ota_ops.h"
 #include "platform_esp32.h"
-#include "config.h"
+#include "platform_config.h"
 #include "esp_sleep.h"
 #include "driver/uart.h"            // for the uart driver access
 

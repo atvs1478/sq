@@ -19,7 +19,7 @@
  *
  */
 
-#include "config.h" 
+#include "platform_config.h"
 #include "squeezelite.h"
 #include "bt_app_sink.h"
 #include "raop_sink.h"

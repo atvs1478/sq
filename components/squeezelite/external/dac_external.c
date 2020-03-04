@@ -23,7 +23,7 @@
 #include <freertos/task.h>
 #include <driver/i2s.h>
 #include "esp_log.h"
-#include "config.h"
+#include "platform_config.h"
 #include "adac.h"
 
 static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config);

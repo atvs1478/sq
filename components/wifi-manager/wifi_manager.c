@@ -58,7 +58,7 @@ Contains the freeRTOS task and all necessary support
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
 #include "cJSON.h"
-#include "config.h"
+#include "platform_config.h"
 #include "trace.h"
 #include "cmd_system.h"
 #include "monitor.h"

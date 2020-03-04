@@ -45,7 +45,7 @@
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"
 #include <math.h>
-#include "config.h"
+#include "platform_config.h"
 #include "audio_controls.h"
 #include "telnet.h"
 

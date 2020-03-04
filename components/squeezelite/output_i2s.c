@@ -51,7 +51,7 @@ sure that using rate_delay would fix that
 #include "time.h"
 #include "led.h"
 #include "monitor.h"
-#include "config.h"
+#include "platform_config.h"
 #include "accessors.h"
 #include "globdefs.h"
 

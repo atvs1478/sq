@@ -42,7 +42,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "config.h"
+#include "platform_config.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 
