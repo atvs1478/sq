@@ -233,7 +233,7 @@
                             							
                             <targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.640456368" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
                             							
-                            <builder arguments="eclipse_make_wrapper.py" buildPath="${workspace_loc:/squeezelite-esp32}" command="python" id="cdt.managedbuild.builder.gnu.cross.715117345" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+                            <builder arguments="eclipse_make_wrapper.py -j8" buildPath="${workspace_loc:/squeezelite-esp32}" command="python" id="cdt.managedbuild.builder.gnu.cross.715117345" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
                             							
                             <tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.45996168" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
                                 								
@@ -398,6 +398,8 @@
             <resource resourceType="PROJECT" workspacePath="/squeezelite-esp32-merge"/>
             		
         </configuration>
+        		
+        <configuration configurationName="recovery_v4_windows"/>
         		
         <configuration configurationName="recovery_windows">
             			
