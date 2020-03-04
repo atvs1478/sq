@@ -151,7 +151,7 @@ static EXT_RAM_ATTR struct {
 #define ANIM_SCREEN_2     0x08 
 
 static u8_t ANIC_resp = ANIM_NONE;
-static u8_t SETD_width;
+static uint16_t SETD_width;
 
 #define SCROLL_STACK_SIZE	(3*1024)
 #define LINELEN				40
@@ -316,8 +316,9 @@ static void send_server(void) {
 		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
 		pkt_header.length = htonl(sizeof(pkt_header) +  2 - 8);
 
+		SETD_width = htons(SETD_width);
 		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
-		send_packet(&SETD_width, 2);
+		send_packet((uint8_t*) &SETD_width, 2);
 
 		SETD_width = 0;
 	}	

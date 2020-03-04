@@ -44,7 +44,7 @@
 #include "log_util.h"
 
 #define RTSP_STACK_SIZE 	(8*1024)
-#define SEARCH_STACK_SIZE	(2*1048)
+#define SEARCH_STACK_SIZE	(3*1048)
 
 typedef struct raop_ctx_s {
 #ifdef WIN32
@@ -86,7 +86,7 @@ typedef struct raop_ctx_s {
 		struct mDNShandle_s *handle;
 		pthread_t thread;
 #else
-		TaskHandle_t thread, joiner;
+		TaskHandle_t thread;
 		StaticTask_t *xTaskBuffer;
 		StackType_t xStack[SEARCH_STACK_SIZE] __attribute__ ((aligned (4)));;
 		SemaphoreHandle_t destroy_mutex;
@@ -100,7 +100,7 @@ extern log_level	raop_loglevel;
 static log_level 	*loglevel = &raop_loglevel;
 
 static void*	rtsp_thread(void *arg);
-static void		abort_rtsp(raop_ctx_t *ctx);
+static void		cleanup_rtsp(raop_ctx_t *ctx, bool abort);
 static bool 	handle_rtsp(raop_ctx_t *ctx, int sock);
 
 static char*	rsa_apply(unsigned char *input, int inlen, int *outlen, int mode);
@@ -248,18 +248,6 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	mdns_service_remove(ctx->svr, ctx->svc);
 	mdnsd_stop(ctx->svr);
 #else 
-	// first stop the search task if any
-	if (ctx->active_remote.running) {
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
-		ctx->active_remote.running = false;
-
-		vTaskResume(ctx->active_remote.thread);
-		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-		vTaskDelete(ctx->active_remote.thread);
-
-		heap_caps_free(ctx->active_remote.xTaskBuffer);
-	}
-
 	// then the RTSP task
 	ctx->joiner = xTaskGetCurrentTaskHandle();
 	ctx->running = false;
@@ -268,10 +256,11 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	vTaskDelete(ctx->thread);
 	heap_caps_free(ctx->xTaskBuffer);
 
-	rtp_end(ctx->rtp);
-
 	shutdown(ctx->sock, SHUT_RDWR);
 	closesocket(ctx->sock);
+	
+	// cleanup all session-created items
+	cleanup_rtsp(ctx, true);
 		
 	mdns_service_remove("_raop", "_tcp");	
 #endif
@@ -406,7 +395,7 @@ static void *rtsp_thread(void *arg) {
 		if (n > 0) res = handle_rtsp(ctx, sock);
 
 		if (n < 0 || !res || ctx->abort) {
-			abort_rtsp(ctx);
+			cleanup_rtsp(ctx, true);
 			closesocket(sock);
 			LOG_INFO("RTSP close %u", sock);
 			sock = -1;
@@ -581,37 +570,11 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		if ((p = strcasestr(buf, "rtptime")) != NULL) sscanf(p, "%*[^=]=%u", &rtptime);
 
 		// only send FLUSH if useful (discards frames above buffer head and top)
-		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime))
-			success = ctx->cmd_cb(RAOP_FLUSH);
+		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime)) success = ctx->cmd_cb(RAOP_FLUSH);
 
 	}  else if (!strcmp(method, "TEARDOWN")) {
 
-		rtp_end(ctx->rtp);
-
-		ctx->rtp = NULL;
-
-		// need to make sure no search is on-going and reclaim pthread memory
-#ifdef WIN32
-		if (ctx->active_remote.handle) close_mDNS(ctx->active_remote.handle);
-		pthread_join(ctx->active_remote.thread, NULL);
-#else
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
-		ctx->active_remote.running = false;
-
-		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
-		vTaskDelete(ctx->active_remote.thread);
-		vSemaphoreDelete(ctx->active_remote.thread);
-		
-		heap_caps_free(ctx->active_remote.xTaskBuffer);
-		
-		LOG_INFO("[%p]: mDNS search task terminated", ctx);
-#endif
-
-		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-		NFREE(ctx->rtsp.aeskey);
-		NFREE(ctx->rtsp.aesiv);
-		NFREE(ctx->rtsp.fmtp);
-
+		cleanup_rtsp(ctx, false);
 		success = ctx->cmd_cb(RAOP_STOP);
 
 	} else if (!strcmp(method, "SET_PARAMETER")) {
@@ -681,12 +644,12 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 }
 
 /*----------------------------------------------------------------------------*/
-void abort_rtsp(raop_ctx_t *ctx) {
+void cleanup_rtsp(raop_ctx_t *ctx, bool abort) {
 	// first stop RTP process
 	if (ctx->rtp) {
 		rtp_end(ctx->rtp);
 		ctx->rtp = NULL;
-		LOG_INFO("[%p]: RTP thread aborted", ctx);
+		if (abort) LOG_INFO("[%p]: RTP thread aborted", ctx);
 	}
 
 	if (ctx->active_remote.running) {
@@ -695,9 +658,7 @@ void abort_rtsp(raop_ctx_t *ctx) {
 		close_mDNS(ctx->active_remote.handle);
 #else
 		// need to make sure no search is on-going and reclaim task memory
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
 		ctx->active_remote.running = false;
-
 		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
 		vTaskDelete(ctx->active_remote.thread);
 		vSemaphoreDelete(ctx->active_remote.thread);
@@ -705,8 +666,6 @@ void abort_rtsp(raop_ctx_t *ctx) {
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
 #endif
 		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-
-
 		LOG_INFO("[%p]: Remote search thread aborted", ctx);
 	}	
 
@@ -776,7 +735,7 @@ static void* search_remote(void *args) {
 				LOG_INFO("found remote %s %s:%hu", r->instance_name, inet_ntoa(ctx->active_remote.host), ctx->active_remote.port);
 			}
 		}
-	
+
 		mdns_query_results_free(results);
 	}
 

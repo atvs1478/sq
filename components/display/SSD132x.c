@@ -162,15 +162,15 @@ static void IRAM_ATTR DrawPixel1Fast( struct GDS_Device* Device, int X, int Y, i
         *FBOffset ^= BIT( 7 - XBit );
     } else {
 		// we might be able to save the 7-Xbit using BitRemap (A0 bit 2)
-        *FBOffset = ( Color == GDS_COLOR_BLACK ) ?  *FBOffset & ~BIT( 7 - XBit ) : *FBOffset | BIT( 7 - XBit );
+        *FBOffset = ( Color == GDS_COLOR_BLACK ) ?  *FBOffset & ~BIT( XBit ) : *FBOffset | BIT( XBit );
     }
 }
 
 static void ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color ) {
 	uint8_t _Color = Color == GDS_COLOR_BLACK ? 0: 0xff;
-	uint8_t Width = Device->Width >> 3;
+	int Width = Device->Width >> 3;
 	uint8_t *optr = Device->Framebuffer;
-
+	
 	for (int r = y1; r <= y2; r++) {
 		int c = x1;
 		// for a row that is not on a boundary, not column opt can be done, so handle all columns on that line
@@ -184,13 +184,28 @@ static void ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int 
 }
 
 static void DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int Height, int Color ) {
-	uint8_t *optr = Device->Framebuffer;
-	
 	if (!Height) Height = Device->Height;
 	if (!Width) Width = Device->Width;
+	int DWidth = Device->Width >> 3;
 	
-	// just do bitreverse and if BitRemap works, there will be even nothing to do	
-	for (int i = Height * Width >> 3; --i >= 0;) *optr++ = BitReverseTable256[*Data++];
+	// Two consecutive bits of source data are split over two different bytes of framebuffer
+	for (int c = 0; c < Width; c++) {
+		uint8_t shift = c & 0x07, bit = ~(1 << shift);
+		uint8_t *optr = Device->Framebuffer + (c >> 3);
+		
+		// we need to linearize code to let compiler better optimize
+		for (int r = Height >> 3; --r >= 0;) {
+			uint8_t Byte = BitReverseTable256[*Data++];
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth;
+		}	
+	}
 }
 
 static void SetHFlip( struct GDS_Device* Device, bool On ) { 
@@ -294,6 +309,7 @@ static const struct GDS_Device SSD132x = {
 
 struct GDS_Device* SSD132x_Detect(char *Driver, struct GDS_Device* Device) {
 	uint8_t Model;
+	int Depth;
 	
 	if (strcasestr(Driver, "SSD1326")) Model = SSD1326;
 	else if (strcasestr(Driver, "SSD1327")) Model = SSD1327;
@@ -304,7 +320,8 @@ struct GDS_Device* SSD132x_Detect(char *Driver, struct GDS_Device* Device) {
 	*Device = SSD132x;	
 	((struct PrivateSpace*) Device->Private)->Model = Model;
 		
-	sscanf(Driver, "%*[^:]:%c", &Device->Depth);
+	sscanf(Driver, "%*[^:]:%u", &Depth);
+	Device->Depth = Depth;
 	
 	if (Model == SSD1326 && Device->Depth == 1) {
 		Device->Update = Update1;
