@@ -22,8 +22,8 @@
 
 #include <esp_http_server.h>
 #include <_esp_http_server.h>
-#include "../src/esp_httpd_priv.h"
-#include "../src/util/ctrl_sock.h"
+#include "esp_httpd_priv.h"
+#include "ctrl_sock.h"
 
 static const char *TAG = "_httpd";
 
