@@ -40,7 +40,6 @@ var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
-var lastMsg = '';
 
 var apList = null;
 var selectedSSID = "";
@@ -655,11 +654,11 @@ function refreshAPHTML(data){
 }
 
 function getMessages() {
-	   $.getJSON("/messages.json", function(data) {
+	   $.getJSON("/messages.json?1", function(data) {
 	        data.forEach(function(msg) {
 	        	var msg_age = msg["current_time"] - msg["sent_time"];
-				var msg_time  = new Date(  );
-				msg_time.setTime( msg_time .getTime() - msg_age  );
+				var msg_time  = new Date();
+				msg_time.setTime( msg_time.getTime() - msg_age );
 	        	switch (msg["class"]) {
 	        		case "MESSAGING_CLASS_OTA":
 	        			//message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
@@ -681,16 +680,22 @@ function getMessages() {
 	        		case "MESSAGING_CLASS_STATS":
 	        			// for task states, check structure : task_state_t
 	        			var stats_data = JSON.parse(msg["message"]);
-	        			console.log(msg_time + " - Number of tasks on the ESP32: " + stats_data["ntasks"]);
+	        			console.log(msg_time.toLocaleString() + " - Number of tasks on the ESP32: " + stats_data["ntasks"]);
 	        			var stats_tasks = stats_data["tasks"];
-	        			console.log(msg_time + '\tname' + '\tcpu' + '\tstate'+ '\tminstk'+ '\tbprio'+ '\tcprio'+ '\tnum' );
+	        			console.log(msg_time.toLocaleString() + '\tname' + '\tcpu' + '\tstate'+ '\tminstk'+ '\tbprio'+ '\tcprio'+ '\tnum' );
 	        			stats_tasks.forEach(function(task) {
-	        				console.log(msg_time + '\t' + task["nme"] + '\t'+ task["cpu"] + '\t'+ task_state_t[task["st"]]+ '\t'+ task["minstk"]+ '\t'+ task["bprio"]+ '\t'+ task["cprio"]+ '\t'+ task["num"]);
+	        				console.log(msg_time.toLocaleString() + '\t' + task["nme"] + '\t'+ task["cpu"] + '\t'+ task_state_t[task["st"]]+ '\t'+ task["minstk"]+ '\t'+ task["bprio"]+ '\t'+ task["cprio"]+ '\t'+ task["num"]);
 	        			});
 	        			break;
 	        		case "MESSAGING_CLASS_SYSTEM":
 	        			showMessage(msg["message"], msg["type"],msg_age);
-	        			lastMsg = msg;
+
+                        $("#syslogTable").append(
+                            "<tr class='"+msg["type"]+"'>"+
+                                "<td>"+msg_time.toLocaleString()+"</td>"+
+                                "<td>"+msg["message"]+"</td>"+
+                            "</tr>"
+                        );
 	        			break;
 				default:
 					break;
@@ -703,6 +708,14 @@ function getMessages() {
 	        console.log(thrownError);
 	        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
 	    });
+    /*
+    Minstk is minimum stack space left
+Bprio is base priority
+cprio is current priority
+nme is name
+st is task state. I provided a "typedef" that you can use to convert to text
+cpu is cpu percent used
+*/
 }
 function checkStatus(){
     RepeatCheckStatusInterval();
@@ -924,7 +937,6 @@ function getConfig() {
 
 
 function showMessage(message, severity, age=0) {
-	
 	if (severity == 'MESSAGING_INFO') {
         $('#message').css('background', '#6af');
     } else if (severity == 'MESSAGING_WARNING') {
@@ -934,7 +946,6 @@ function showMessage(message, severity, age=0) {
     } else {
         $('#message').css('background', '#f00');
     }
-    	
     	
     $('#message').html(message);
     $("#content").fadeTo("slow", 0.3, function() {

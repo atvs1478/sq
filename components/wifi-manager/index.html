@@ -67,7 +67,7 @@
                 <a class="nav-link" data-toggle="tab" href="#tab-firmware">Firmware</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#tab-gpio">GPIO</a>
+                <a class="nav-link" data-toggle="tab" href="#tab-syslog">Syslog</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
@@ -190,7 +190,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> <!-- wifi -->
 
                 <div class="tab-pane fade" id="tab-audio">
                     <div id="audioout">
@@ -240,72 +240,7 @@
                           <label class="custom-control-label" for="autoexec-cb"></label>
                     </div>
                     <br />
-                </div>
-
-                <div class="tab-pane fade" id="tab-gpio">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Signal</th>
-                                <th scope="col">I2S pin</th>
-                                <th scope="col">SPDIF pin</th>
-                            </tr>
-                        </thead>
-                        <tbody id="gpioTable">
-                            <tr>
-                                <td>Bit clock</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-bc" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-bc" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Word select</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-ws" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-ws" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Data</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-data" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-data" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="buttons">
-                        <input id="save-gpio" type="button" class="btn btn-success" value="Save" />
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-nvs">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Key</th>
-                                <th scope="col">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="nvsTable">
-                        </tbody>
-                    </table>
-                    <div class="buttons">
-						<div id="boot-div">
-                        	<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
-                            	<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
-                        	</form>
-                    	</div>                    
-                        <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
-                    </div>
-                </div>
+                </div> <!-- audio -->
 
                 <div class="tab-pane fade" id="tab-firmware">
                     <div id="boot-div">
@@ -354,11 +289,48 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> <!-- firmware -->
+
+                <div class="tab-pane fade" id="tab-syslog">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Timestamp</th>
+                                <th scope="col">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syslogTable">
+                        </tbody>
+                    </table>
+                    <div class="buttons">
+                        <input id="clear-syslog" type="button" class="btn btn-danger btn-sm" value="Clear" />
+                    </div>
+                </div> <!-- syslog -->
+
+                <div class="tab-pane fade" id="tab-nvs">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Key</th>
+                                <th scope="col">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nvsTable">
+                        </tbody>
+                    </table>
+                    <div class="buttons">
+						<div id="boot-div">
+                        	<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
+                            	<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
+                        	</form>
+                    	</div>                    
+                        <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
+                    </div>
+                </div> <!-- nvs -->
 
                 <div class="tab-pane fade" id="tab-credits">
                     <div class="jumbotron">
-                        <p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2019, philippe44, sle118, daduke<br />Licensed under the GPL</p>
+                        <p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2020, philippe44, sle118, daduke<br />Licensed under the GPL</p>
                          <p>
                             This app would not be possible without the following libraries:
                         </p>
@@ -377,7 +349,7 @@
 	                      <input type="checkbox" class="custom-control-input" id="show-nvs" checked="checked">
 	                      <label class="custom-control-label" for="show-nvs"></label>
 	                </div>
-                </div>
+                </div> <!-- credits -->
             </div>
             <footer class="footer"><span id="foot-fw"></span><span id="foot-wifi"></span></footer>
             <iframe width="0" height="0" border="0" name="dummyframe" id="dummyframe"></iframe>
