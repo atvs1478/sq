@@ -142,7 +142,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER_SMALL'],
 		bar => 0, secs => 0,  width => $width, _width => int -($spectrum->{small}->{size}*$width/100),
 		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space, bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($spectrum->{small}->{size}*$width/100), 32, int -($spectrum->{small}->{size}*$width/100), 0, 2, int ($spectrum->{small}->{size}/100*$width/$spectrum->{small}->{band}), $spectrum->{scale}/100] },  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($spectrum->{small}->{size}*$width/100), 32, int -($spectrum->{small}->{size}*$width/100), 0, 2, int ($spectrum->{small}->{size}/100*$width/$spectrum->{small}->{band}), $spectrum->{scale}] },  
 		# mode 9	 
 		{ desc => ['VISUALIZER_VUMETER'],
 		bar => 0, secs => 0,  width => $width,
@@ -151,7 +151,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER'],
 		bar => 0, secs => 0,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
 		# mode 11	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
@@ -160,7 +160,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
 		# mode 13	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
@@ -169,7 +169,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	
 	);
 	
 	return \@modes;
