@@ -1,7 +1,6 @@
 idf_component_register(SRCS link_helper.c
 					   INCLUDE_DIRS .  ./inc  inc/alac inc/faad2 inc/FLAC  inc/helix-aac inc/mad inc/ogg inc/opus inc/opusfile inc/resample16 inc/soxr inc/vorbis
-                       REQUIRES esp_common platform_config 
-                       PRIV_REQUIRES freertos bt nvs_flash esp32 spi_flash newlib log console pthread
+	                       REQUIRES esp_common platform_config freertos nvs_flash esp32 spi_flash newlib log pthread
 )
 
 add_prebuilt_library(libmad 		lib/libmad.a)

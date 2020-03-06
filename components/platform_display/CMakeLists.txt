@@ -23,7 +23,7 @@ idf_component_register(SRCS display.c
 							fonts/font_line_2.c  
 							fonts/font_tarable7seg_16x32.c  
 							fonts/font_tarable7seg_32x64.c 
-						PRIV_REQUIRES services
+						REQUIRES services
 						INCLUDE_DIRS . fonts core                   
 )
 

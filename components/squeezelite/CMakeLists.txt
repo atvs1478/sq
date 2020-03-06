@@ -57,9 +57,5 @@ set_source_files_properties(flac.c
     -Wno-maybe-uninitialized
 )
 
-add_definitions(-O3 -DLINKALL -DLOOPBACK -DNO_FAAD -DRESAMPLE16 -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=4)
-#add_library(platform_bluetooth STATIC IMPORTED GLOBAL)
-#set_property(TARGET platform_bt PROPERTY IMPORTED_LOCATION "${COMPONENT_DIR}/../freetype/libfreetype.a")
-#add_library(platform_bluetooth STATIC IMPORTED GLOBAL)
-#set_property(TARGET platform_bluetooth PROPERTY IMPORTED_LOCATION "../platform_bluetooth/platform_bluetooth.a")
-#target_link_libraries(${COMPONENT_TARGET} PUBLIC platform_bluetooth)
+add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DRESAMPLE16 -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=4)
+add_compile_options (-O3)
