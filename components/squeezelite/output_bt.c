@@ -18,11 +18,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
- 
+
 #include "driver/gpio.h"
 #include "squeezelite.h"
 #include "perf_trace.h"
 #include "platform_config.h"
+#include <assert.h>
 
 extern struct outputstate output;
 extern struct buffer *outputbuf;
@@ -196,3 +197,4 @@ void output_bt_tick(void) {
 		RESET_ALL_MIN_MAX;
 	}	
 }	
+

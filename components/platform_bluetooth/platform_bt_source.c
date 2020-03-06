@@ -15,8 +15,8 @@
 #include "esp_wifi.h"
 #include "freertos/timers.h"
 #include "argtable3/argtable3.h"
+#include "platform_bt_core.h"
 #include "platform_config.h"
-#include "bt_app_core.h"
 #include "trace.h"
 
 static const char * TAG = "platform";

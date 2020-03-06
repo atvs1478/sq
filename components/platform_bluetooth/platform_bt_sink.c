@@ -7,14 +7,13 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#include <platform_bt_sink.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include "esp_log.h"
 
-#include "bt_app_core.h"
-#include "bt_app_sink.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
@@ -29,6 +28,7 @@
 #include "audio_controls.h"
 #include "sys/lock.h"
 #include "display.h"
+#include "platform_bt_core.h"
 
 // AVRCP used transaction label
 #define APP_RC_CT_TL_GET_CAPS            (0)
@@ -231,6 +231,7 @@ void bt_app_rc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *param
     switch (event) {
     case ESP_AVRC_CT_METADATA_RSP_EVT:
         bt_app_alloc_meta_buffer(param);
+        /* no break */
         /* fall through */
     case ESP_AVRC_CT_CONNECTION_STATE_EVT:
     case ESP_AVRC_CT_PASSTHROUGH_RSP_EVT:

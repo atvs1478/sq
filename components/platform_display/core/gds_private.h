@@ -118,7 +118,7 @@ struct GDS_Device {
 
 bool GDS_Reset( struct GDS_Device* Device );
 
-inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
+static inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
     bool Result = (
         ( x >= 0 ) &&
         ( x < Device->Width ) &&
@@ -135,7 +135,7 @@ inline bool IsPixelVisible( struct GDS_Device* Device, int x, int y )  {
     return Result;
 }
 
-inline void IRAM_ATTR GDS_DrawPixel1Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
+static inline void IRAM_ATTR GDS_DrawPixel1Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
     uint32_t YBit = ( Y & 0x07 );
     uint8_t* FBOffset = NULL;
 
@@ -156,20 +156,20 @@ inline void IRAM_ATTR GDS_DrawPixel1Fast( struct GDS_Device* Device, int X, int 
     }
 }
 
-inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
+static inline void IRAM_ATTR GDS_DrawPixel4Fast( struct GDS_Device* Device, int X, int Y, int Color ) {
 	uint8_t* FBOffset;
 
     FBOffset = Device->Framebuffer + ( (Y * Device->Width >> 1) + (X >> 1));
 	*FBOffset = X & 0x01 ? (*FBOffset & 0x0f) | (Color << 4) : ((*FBOffset & 0xf0) | Color);
 }
 
-inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color ) {
+static inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color ) {
     if (Device->DrawPixelFast) Device->DrawPixelFast( Device, X, Y, Color );
 	else if (Device->Depth == 4) GDS_DrawPixel4Fast( Device, X, Y, Color);
 	else if (Device->Depth == 1) GDS_DrawPixel1Fast( Device, X, Y, Color);
 }	
 
-inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color ) {
+static inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int x, int y, int Color ) {
     if ( IsPixelVisible( Device, x, y ) == true ) {
         GDS_DrawPixelFast( Device, x, y, Color );
     }

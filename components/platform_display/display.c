@@ -211,7 +211,7 @@ static void displayer_task(void *args) {
 		scroll_sleep -= sleep;
 		vTaskDelay(sleep / portTICK_PERIOD_MS);
 	}
-}	
+}
 
 /****************************************************************************************
  * 

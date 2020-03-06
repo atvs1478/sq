@@ -266,6 +266,6 @@ void GDS_DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int 
 		}
 		*/
 	}
-	
+
 	Device->Dirty = true;
 }

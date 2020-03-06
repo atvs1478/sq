@@ -1,4 +1,5 @@
 idf_component_register(SRCS "esp_app_main.c"  
-						REQUIRES esp_common  pthread squeezelite-ota platform_console
+						REQUIRES esp_common  pthread squeezelite-ota platform_console telnet
                     	INCLUDE_DIRS .
+                    	EMBED_FILES ../server_certs/github.pem
                     	)

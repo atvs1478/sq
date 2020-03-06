@@ -21,9 +21,9 @@
 
 #include "platform_config.h"
 #include "squeezelite.h"
-#include "bt_app_sink.h"
 #include "raop_sink.h"
 #include <math.h>
+#include <platform_bt_sink.h>
 
 #define LOCK_O   mutex_lock(outputbuf->mutex)
 #define UNLOCK_O mutex_unlock(outputbuf->mutex)

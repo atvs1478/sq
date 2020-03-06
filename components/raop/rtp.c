@@ -38,7 +38,6 @@
 #include <sys/stat.h>
 #include <stdint.h>
 #include <fcntl.h>
-#include <assert.h>
 
 #include "platform.h"
 #include "rtp.h"
@@ -49,9 +48,11 @@
 #ifdef WIN32
 #include <openssl/aes.h>
 #include "alac_wrapper.h"
+#include <assert.h>
 #else
 #include "esp_pthread.h"
 #include "esp_system.h"
+#include "assert.h"
 #include <mbedtls/version.h>
 #include <mbedtls/aes.h>
 #include "alac_wrapper.h"

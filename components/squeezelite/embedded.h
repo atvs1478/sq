@@ -1,6 +1,6 @@
 #ifndef EMBEDDED_H
 #define EMBEDDED_H
-
+#include <ctype.h>
 #include <inttypes.h>
 
 /* 	must provide 
@@ -19,6 +19,9 @@
 	
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN	256
+#endif
+#ifndef _CONST
+#define _CONST
 #endif
 
 #define STREAM_THREAD_STACK_SIZE  6 * 1024
