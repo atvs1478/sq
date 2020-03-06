@@ -1,7 +1,7 @@
 <?xml version='1.0' standalone='yes'?>
 <extensions>
   <plugins>
-    <plugin version="0.21" name="SqueezeESP32" minTarget="7.5" maxTarget="*">
+    <plugin version="0.30" name="SqueezeESP32" minTarget="7.5" maxTarget="*">
       <link>https://github.com/sle118/squeezelite-esp32</link>
       <creator>Philippe</creator>
       <sha>a110570f53f24c571492b13cf225cbfd1bdf9a52</sha>
