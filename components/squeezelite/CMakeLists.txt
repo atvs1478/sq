@@ -33,7 +33,7 @@ idf_component_register(SRCS "alac.c"
 						REQUIRES 	newlib 
 									esp_common 
 									esp-dsp
-						  			platform_display 
+						  			display 
 						 			platform_config 
 						 			platform_bluetooth 
 						 			codecs 
