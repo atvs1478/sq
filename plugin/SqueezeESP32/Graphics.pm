@@ -21,13 +21,22 @@ my $VISUALIZER_WAVEFORM = 3;
 	__PACKAGE__->mk_accessor('rw', qw(vfdmodel));
 }
 
-use Data::Dumper;
-
 sub new {
 	my $class = shift;
 	my $client = shift;
 	
 	my $display = $class->SUPER::new($client);
+	my $cprefs = $prefs->client($client);
+	
+	$cprefs->init( { 
+		width => 128,
+		small_VU => 15,
+		spectrum =>	{	scale => 25,
+						small => { size => 25, band => 5.33 },
+						full  => { band => 8 },
+				},
+		}		
+	);				
 		
 	$display->init_accessor(	
 		modes => $display->build_modes,
@@ -44,14 +53,13 @@ sub modes {
 =cut
 
 sub nmodes {
-	# -1 for LMS bug workaround
-	return scalar(@{shift->modes}) - 1;
+	return scalar($#{shift->modes()});
 }
 
 sub displayWidth {
 	my $display = shift;
 	my $client = $display->client;
-
+	
 	# if we're showing the always-on visualizer & the current buttonmode 
 	# hasn't overridden, then use the playing display mode to index
 	# into the display width, otherwise, it's fullscreen.
@@ -88,22 +96,13 @@ sub displayHeight {
 	return 32;
 }
 
-=comment
-sub vfdmodel {
-	return 'graphic-'.$width.'x32';
-}
-=cut
-
 sub build_modes {
 	my $client = shift->client;
-	print("CLIENT IN BUILD MODE $client\n");
 	my $cprefs = $prefs->client($client);
 	
-	my $width = shift || $cprefs->get('width') || $prefs->get('width') || 128;
-	my $small_VU = shift || $cprefs->get('small_vu') || 0.15; 
-	my $small_spectrum = shift || $cprefs->get('small_spectrum') || 0.25;
-	my $spectrum_bar = shift ||  $cprefs->get('spectrum_bar') || { 'small' => 0.1875, 'full' => 0.125 };
-	my $spectrum_scale = shift ||  $cprefs->get('spectrum_scale') || $prefs->get('spectrum_scale') || 50;
+	my $width = shift || $cprefs->get('width') || 128;
+	my $small_VU = $cprefs->get('small_VU');
+	my $spectrum = $cprefs->get('spectrum');
 	
 	my @modes = (
 		# mode 0
@@ -136,14 +135,14 @@ sub build_modes {
 		params => [$VISUALIZER_NONE] },
 		# mode 7
 		{ desc => ['VISUALIZER_VUMETER_SMALL'],
-		bar => 0, secs => 0,  width => $width, _width => int -($small_VU*$width),
+		bar => 0, secs => 0,  width => $width, _width => int -($small_VU*$width/100),
 		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space)
-		params => [$VISUALIZER_VUMETER, int ($small_VU* $width), 32, int -($small_VU*$width), 0, 2] },
+		params => [$VISUALIZER_VUMETER, int ($small_VU*$width/100), 32, int -($small_VU*$width/100), 0, 2] },
 		# mode 8
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER_SMALL'],
-		bar => 0, secs => 0,  width => $width, _width => int -($small_spectrum*$width),
+		bar => 0, secs => 0,  width => $width, _width => int -($spectrum->{small}->{size}*$width/100),
 		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space, bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($small_spectrum*$width), 32, int -($small_spectrum*$width), 0, 2, int ($small_spectrum*$width*$spectrum_bar->{small}), $spectrum_scale] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($spectrum->{small}->{size}*$width/100), 32, int -($spectrum->{small}->{size}*$width/100), 0, 2, int ($spectrum->{small}->{size}/100*$width/$spectrum->{small}->{band}), $spectrum->{scale}/100] },  
 		# mode 9	 
 		{ desc => ['VISUALIZER_VUMETER'],
 		bar => 0, secs => 0,  width => $width,
@@ -152,7 +151,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER'],
 		bar => 0, secs => 0,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width * $spectrum_bar->{full}), $spectrum_scale] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	  
 		# mode 11	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
@@ -161,7 +160,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width * $spectrum_bar->{full}), $spectrum_scale] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	  
 		# mode 13	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
@@ -170,9 +169,7 @@ sub build_modes {
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width * $spectrum_bar->{full}), $spectrum_scale] },	
-		# dummy for LMS bug workaround
-		{ desc => [], bar => 0, secs => -1,  width => $width,params => [] },	
+		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}/100] },	
 	);
 	
 	return \@modes;

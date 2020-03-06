@@ -25,6 +25,7 @@ sub playerSettingsFrame {
 	if ($id == 0xfe) { 
 		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
+			$prefs->client($client)->set('width', $value);
 			$client->display->modes($client->display->build_modes($value));
 			$client->display->widthOverride(1, $value);
 			$client->update;
