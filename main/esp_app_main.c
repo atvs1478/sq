@@ -73,6 +73,18 @@ extern void	display_init(char *welcome);
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
+	static ip4_addr_t ip;
+	tcpip_adapter_ip_info_t ipInfo; 
+
+	tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipInfo);
+	if (ip.addr && ipInfo.ip.addr != ip.addr) {
+		ESP_LOGW(TAG, "IP change, need to reboot");
+		if(!wait_for_commit()){
+			ESP_LOGW(TAG,"Unable to commit configuration. ");
+		}
+		esp_restart();
+	}
+	ip.addr = ipInfo.ip.addr;
 	ESP_LOGI(TAG, "I have a connection!");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 	bWifiConnected=true;

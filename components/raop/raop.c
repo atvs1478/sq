@@ -508,7 +508,7 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		pthread_create(&ctx->active_remote.thread, NULL, &search_remote, ctx);
 #else
 		ctx->active_remote.running = true;
-		ctx->active_remote.destroy_mutex = xSemaphoreCreateMutex();		
+		ctx->active_remote.destroy_mutex = xSemaphoreCreateBinary();
 		ctx->active_remote.xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 		ctx->active_remote.thread = xTaskCreateStatic( (TaskFunction_t) search_remote, "search_remote", SEARCH_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->active_remote.xStack, ctx->active_remote.xTaskBuffer);
 #endif		
@@ -570,7 +570,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		if ((p = strcasestr(buf, "rtptime")) != NULL) sscanf(p, "%*[^=]=%u", &rtptime);
 
 		// only send FLUSH if useful (discards frames above buffer head and top)
-		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime)) success = ctx->cmd_cb(RAOP_FLUSH);
+		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime, true)) {
+			success = ctx->cmd_cb(RAOP_FLUSH);
+			rtp_flush_release(ctx->rtp);
+		}	
 
 	}  else if (!strcmp(method, "TEARDOWN")) {
 

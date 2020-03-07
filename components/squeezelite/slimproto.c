@@ -773,7 +773,7 @@ void wake_controller(void) {
 	wake_signal(wake_e);
 }
 
-in_addr_t discover_server(char *default_server) {
+in_addr_t discover_server(char *default_server, int max) {
 	struct sockaddr_in d;
 	struct sockaddr_in s;
 	char buf[32], port_d[] = "JSON", clip_d[] = "CLIP";
@@ -827,7 +827,7 @@ in_addr_t discover_server(char *default_server) {
 			server_addr(default_server, &s.sin_addr.s_addr, &port);
 		}
 
-	} while (s.sin_addr.s_addr == 0 && running);
+	} while (s.sin_addr.s_addr == 0 && running && (!max || --max));
 
 	closesocket(disc_sock);
 
@@ -858,7 +858,7 @@ void slimproto(log_level level, char *server, u8_t mac[6], const char *name, con
 	}
 
 	if (!slimproto_ip) {
-		slimproto_ip = discover_server(server);
+		slimproto_ip = discover_server(server, 0);
 	}
 
 	if (!slimproto_port) {
@@ -937,10 +937,18 @@ void slimproto(log_level level, char *server, u8_t mac[6], const char *name, con
 				sleep(5);
 			}
 
-			// rediscover server if it was not set at startup
+#if EMBEDDED
+			// in embedded we give up after a while no matter what
+			if (++failed_connect > 5 && !server) {
+				slimproto_ip = serv_addr.sin_addr.s_addr = discover_server(NULL, MAX_SERVER_RETRIES);
+				if (!slimproto_ip) return;
+			} else if (MAX_SERVER_RETRIES && failed_connect > 5 * MAX_SERVER_RETRIES) return;
+#else
+			// rediscover server if it was not set at startup or exit 
 			if (!server && ++failed_connect > 5) {
-				slimproto_ip = serv_addr.sin_addr.s_addr = discover_server(NULL);
-			}
+				slimproto_ip = serv_addr.sin_addr.s_addr = discover_server(NULL, 0);
+			} 
+#endif	
 
 		} else {
 

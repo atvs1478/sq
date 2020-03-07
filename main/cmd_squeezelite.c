@@ -13,9 +13,8 @@
 #include "freertos/event_groups.h"
 #include "pthread.h"
 #include "platform_esp32.h"
-#include "nvs.h"
-#include "nvs_flash.h"
-//extern char current_namespace[];
+#include "config.h"
+
 static const char * TAG = "squeezelite_cmd";
 #define SQUEEZELITE_THREAD_STACK_SIZE (6*1024)
 extern int main(int argc, char **argv);
@@ -36,7 +35,7 @@ static void * squeezelite_runner_thread(){
 	main(thread_parms.argc,thread_parms.argv);
 	return NULL;
 }
-#define ADDITIONAL_SQUEEZELILTE_ARGS 5
+#define ADDITIONAL_SQUEEZELITE_ARGS 5
 static void * squeezelite_thread(){
 	int * exit_code;
 	static bool isRunning=false;
@@ -45,9 +44,6 @@ static void * squeezelite_thread(){
 		return NULL;
 	}
 	isRunning=true;
-//  Let's not wait on WiFi to allow squeezelite to run in bluetooth mode
-//	ESP_LOGI(TAG,"Waiting for WiFi.");
-//	while(!wait_for_wifi()){usleep(100000);};
 	ESP_LOGV(TAG ,"Number of args received: %u",thread_parms.argc );
 	ESP_LOGV(TAG ,"Values:");
     for(int i = 0;i<thread_parms.argc; i++){
@@ -73,6 +69,11 @@ static void * squeezelite_thread(){
 	ESP_LOGV(TAG ,"Freeing argv pointer");
 	free(thread_parms.argv);
 	isRunning=false;
+	ESP_LOGE(TAG, "Exited from squeezelite thread, something's wrong ... rebooting");
+	if(!wait_for_commit()){
+		ESP_LOGW(TAG,"Unable to commit configuration. ");
+	}
+    esp_restart();
 	return NULL;
 }
 
@@ -87,8 +88,8 @@ static int launchsqueezelite(int argc, char **argv)
     ESP_LOGV(TAG,"Saving args in thread structure");
 
     thread_parms.argc=0;
-    thread_parms.argv = malloc(sizeof(char**)*(argc+ADDITIONAL_SQUEEZELILTE_ARGS));
-	memset(thread_parms.argv,'\0',sizeof(char**)*(argc+ADDITIONAL_SQUEEZELILTE_ARGS));
+    thread_parms.argv = malloc(sizeof(char**)*(argc+ADDITIONAL_SQUEEZELITE_ARGS));
+	memset(thread_parms.argv,'\0',sizeof(char**)*(argc+ADDITIONAL_SQUEEZELITE_ARGS));
 
 	for(int i=0;i<argc;i++){
 		ESP_LOGD(TAG ,"assigning parm %u : %s",i,argv[i]);

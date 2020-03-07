@@ -6,6 +6,7 @@
 /* 	must provide 
 		- mutex_create_p
 		- pthread_create_name
+		- register_xxx (see below)
 		- stack size
 		- s16_t, s32_t, s64_t and u64_t
 		- PLAYER_ID / custom_player_id
@@ -16,6 +17,11 @@
 		- EXT_BSS 		
 	recommended to add platform specific include(s) here
 */	
+
+typedef int16_t   s16_t;
+typedef int32_t   s32_t;
+typedef int64_t   s64_t;
+typedef unsigned long long u64_t;
 	
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN	256
@@ -26,17 +32,16 @@
 #define OUTPUT_THREAD_STACK_SIZE  6 * 1024
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
+// number of 5s times search for a server will happen beforee slimproto exits (0 = no limit)
+#define MAX_SERVER_RETRIES	5
+
 // or can be as simple as #define PLAYER_ID 100
-#define PLAYER_ID custom_player_id;
+#define PLAYER_ID custom_player_id
 extern u8_t custom_player_id;
 
 #define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION
+// to force some special buffer attribute
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
-
-typedef int16_t   s16_t;
-typedef int32_t   s32_t;
-typedef int64_t   s64_t;
-typedef unsigned long long u64_t;
 
 // all exit() calls are made from main thread (or a function called in main thread)
 #define exit(code) { int ret = code; pthread_exit(&ret); }

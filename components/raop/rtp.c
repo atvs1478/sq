@@ -267,25 +267,25 @@ rtp_resp_t rtp_init(struct in_addr host, int latency, char *aeskey, char *aesiv,
 	resp.cport = ctx->rtp_sockets[CONTROL].lport;
 	resp.tport = ctx->rtp_sockets[TIMING].lport;
 	resp.aport = ctx->rtp_sockets[DATA].lport;
-	
-	if (rc) {
-		ctx->running = true;
+		
+	ctx->running = true;
+
 #ifdef WIN32
-		pthread_create(&ctx->thread, NULL, rtp_thread_func, (void *) ctx);
+	pthread_create(&ctx->thread, NULL, rtp_thread_func, (void *) ctx);
 #else
-		// xTaskCreate((TaskFunction_t) rtp_thread_func, "RTP_thread", RTP_TASK_SIZE, ctx,  CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1 , &ctx->thread);
-		ctx->xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-		ctx->thread = xTaskCreateStatic( (TaskFunction_t) rtp_thread_func, "RTP_thread", RTP_STACK_SIZE, ctx, 
-										 CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1, ctx->xStack, ctx->xTaskBuffer );
+	ctx->xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+	ctx->thread = xTaskCreateStatic( (TaskFunction_t) rtp_thread_func, "RTP_thread", RTP_STACK_SIZE, ctx,
+									 CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1, ctx->xStack, ctx->xTaskBuffer );
 #endif
-	} else {
+	
+	// cleanup everything if we failed
+	if (!rc) {	
 		LOG_ERROR("[%p]: cannot start RTP", ctx);
 		rtp_end(ctx);
 		ctx = NULL;
-	}
-
-	resp.ctx = ctx;
-
+	}	
+	
+	resp.ctx = ctx;	
 	return resp;
 }
 
@@ -327,7 +327,7 @@ void rtp_end(rtp_t *ctx)
 }
 
 /*---------------------------------------------------------------------------*/
-bool rtp_flush(rtp_t *ctx, unsigned short seqno, unsigned int rtptime)
+bool rtp_flush(rtp_t *ctx, unsigned short seqno, unsigned int rtptime, bool exit_locked)
 {
 	bool rc = true;
 	u32_t now = gettime_ms();
@@ -340,7 +340,7 @@ bool rtp_flush(rtp_t *ctx, unsigned short seqno, unsigned int rtptime)
 		buffer_reset(ctx->audio_buffer);
 		ctx->playing = false;
 		ctx->flush_seqno = seqno;
-		pthread_mutex_unlock(&ctx->ab_mutex);
+		if (!exit_locked) pthread_mutex_unlock(&ctx->ab_mutex);
 	}
 
 	LOG_INFO("[%p]: flush %hu %u", ctx, seqno, rtptime);
@@ -349,8 +349,13 @@ bool rtp_flush(rtp_t *ctx, unsigned short seqno, unsigned int rtptime)
 }
 
 /*---------------------------------------------------------------------------*/
-void rtp_record(rtp_t *ctx, unsigned short seqno, unsigned rtptime)
-{
+void rtp_flush_release(rtp_t *ctx) {
+	pthread_mutex_unlock(&ctx->ab_mutex);
+}
+
+
+/*---------------------------------------------------------------------------*/
+void rtp_record(rtp_t *ctx, unsigned short seqno, unsigned rtptime) {
 	ctx->record.seqno = seqno;
 	ctx->record.rtptime = rtptime;
 	ctx->record.time = gettime_ms();
@@ -576,7 +581,7 @@ static void *rtp_thread_func(void *arg) {
 	while (ctx->running) {
 		ssize_t plen;
 		char type;
-		socklen_t rtp_client_len = sizeof(struct sockaddr_storage);
+		socklen_t rtp_client_len = sizeof(struct sockaddr_in);
 		int idx = 0;
 		char *pktp = packet;
 		struct timeval timeout = {0, 100*1000};
@@ -589,14 +594,18 @@ static void *rtp_thread_func(void *arg) {
 		for (i = 0; i < 3; i++)
 			if (FD_ISSET(ctx->rtp_sockets[i].sock, &fds)) idx = i;
 
-		plen = recvfrom(ctx->rtp_sockets[idx].sock, packet, MAX_PACKET, 0, (struct sockaddr*) &ctx->rtp_host, &rtp_client_len);
+		plen = recvfrom(ctx->rtp_sockets[idx].sock, packet, MAX_PACKET, MSG_DONTWAIT, (struct sockaddr*) &ctx->rtp_host, &rtp_client_len);
 
 		if (!ntp_sent) {
 			LOG_WARN("[%p]: NTP request not send yet", ctx);
 			ntp_sent = rtp_request_timing(ctx);
 		}
 
-		if (plen < 0) continue;
+		if (plen <= 0) {
+			LOG_WARN("Nothing received on a readable socket %d", plen);
+			continue;
+		}
+		
 		assert(plen <= MAX_PACKET);
 
 		type = packet[1] & ~0x80;
@@ -715,6 +724,11 @@ static void *rtp_thread_func(void *arg) {
 
 				break;
 			}
+			
+			default: {
+				LOG_WARN("Unknown packet received %x", (int) type);
+				break;
+			}
 		}
 	}
 
@@ -756,7 +770,7 @@ static bool rtp_request_timing(rtp_t *ctx) {
 
 	host.sin_port = htons(ctx->rtp_sockets[TIMING].rport);
 
-	if (sizeof(req) != sendto(ctx->rtp_sockets[TIMING].sock, req, sizeof(req), 0, (struct sockaddr*) &host, sizeof(host))) {
+	if (sizeof(req) != sendto(ctx->rtp_sockets[TIMING].sock, req, sizeof(req), MSG_DONTWAIT, (struct sockaddr*) &host, sizeof(host))) {
 		LOG_WARN("[%p]: SENDTO failed (%s)", ctx, strerror(errno));
 	}
 
@@ -782,7 +796,7 @@ static bool rtp_request_resend(rtp_t *ctx, seq_t first, seq_t last) {
 
 	ctx->rtp_host.sin_port = htons(ctx->rtp_sockets[CONTROL].rport);
 
-	if (sizeof(req) != sendto(ctx->rtp_sockets[CONTROL].sock, req, sizeof(req), 0, (struct sockaddr*) &ctx->rtp_host, sizeof(ctx->rtp_host))) {
+	if (sizeof(req) != sendto(ctx->rtp_sockets[CONTROL].sock, req, sizeof(req), MSG_DONTWAIT, (struct sockaddr*) &ctx->rtp_host, sizeof(ctx->rtp_host))) {
 		LOG_WARN("[%p]: SENDTO failed (%s)", ctx, strerror(errno));
 	}
 

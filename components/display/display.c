@@ -201,8 +201,8 @@ static void displayer_task(void *args) {
 				displayer.tick = tick;
 				displayer.elapsed += elapsed / 1000;
 				xSemaphoreGive(displayer.mutex);				
-				if (displayer.elapsed < 3600) sprintf(counter, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
-				else sprintf(counter, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
+				if (displayer.elapsed < 3600) snprintf(counter, 16, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
+				else snprintf(counter, 16, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
 				GDS_TextLine(display, 1, GDS_TEXT_RIGHT, (GDS_TEXT_CLEAR | GDS_TEXT_CLEAR_EOL) | GDS_TEXT_UPDATE, counter);
 				timer_sleep = 1000;
 			} else timer_sleep = max(1000 - elapsed, 0);	

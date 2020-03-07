@@ -100,7 +100,7 @@ static struct {
 #define SB_HEIGHT		32
 
 // lenght are number of frames, i.e. 2 channels of 16 bits
-#define	FFT_LEN_BIT	6		
+#define	FFT_LEN_BIT	7		
 #define	FFT_LEN		(1 << FFT_LEN_BIT)
 #define RMS_LEN_BIT	6
 #define RMS_LEN		(1 << RMS_LEN_BIT)
@@ -739,10 +739,10 @@ static void visu_update(void) {
  */
 void spectrum_limits(int min, int n, int pos) {
 	if (n / 2) {
-		int step = ((DISPLAY_BW - min) * visu.spectrum_scale * 2) / n;
+		int step = ((DISPLAY_BW - min) * visu.spectrum_scale)  / (n/2);
 		visu.bars[pos].limit = min + step;
 		for (int i = 1; i < n/2; i++) visu.bars[pos+i].limit = visu.bars[pos+i-1].limit + step;
-		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n/2, pos + n/2);
+		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n - n/2, pos + n/2);
 	} else {
 		visu.bars[pos].limit = DISPLAY_BW;
 	}	
