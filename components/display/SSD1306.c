@@ -127,9 +127,11 @@ static bool Init( struct GDS_Device* Device ) {
     Device->WriteCommand( Device, 0xA8 );
     Device->WriteCommand( Device, Device->Height - 1);
 	// Page & GDDRAM Start Column High/Low
+	/*
     Device->WriteCommand( Device, 0x00 );
 	Device->WriteCommand( Device, 0x10 );
 	Device->WriteCommand( Device, 0xB0 );
+	*/
 	// Display Offset
     Device->WriteCommand( Device, 0xD3 );
     Device->WriteCommand( Device, 0 );
