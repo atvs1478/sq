@@ -49,6 +49,7 @@
 #ifdef WIN32
 #include <openssl/aes.h>
 #include "alac_wrapper.h"
+#define MSG_DONTWAIT 0
 #else
 #include "esp_pthread.h"
 #include "esp_system.h"
