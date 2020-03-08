@@ -206,6 +206,10 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 				// in how many ms will the most recent block play 
 				ms = ((u64_t) ((_buf_used(outputbuf) - raop_sync.len) / BYTES_PER_FRAME + output.device_frames + output.frames_in_process) * 1000) / RAOP_SAMPLE_RATE - (now - output.updated);
 				raop_sync.error[raop_sync.idx] = (raop_sync.playtime - now) - ms;
+				if (abs(raop_sync.error[raop_sync.idx]) > 1000) {
+					LOG_INFO("erroneous sync point %d", raop_sync.error[raop_sync.idx]);
+					raop_sync.error[raop_sync.idx] = raop_sync.error[raop_sync.idx] > 0 ? 1000 : -1000;
+				}
 				sync_nb = SYNC_NB;
 				LOG_DEBUG("head local:%u, remote:%u (delta:%d)", ms, raop_sync.playtime - now, raop_sync.error[raop_sync.idx]);
 				LOG_DEBUG("obuf:%u, sync_len:%u, devframes:%u, inproc:%u", _buf_used(outputbuf), raop_sync.len, output.device_frames, output.frames_in_process);

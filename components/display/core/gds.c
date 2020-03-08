@@ -95,7 +95,7 @@ void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2,
 			memset( Device->Framebuffer, Color | (Color << 4), Device->FramebufferSize );
 		} else {
 			uint8_t _Color = Color | (Color << 4);
-			uint8_t Width = Device->Width;
+			int Width = Device->Width;
 			uint8_t *optr = Device->Framebuffer;
 			// try to do byte processing as much as possible
 			for (int r = y1; r <= y2; r++) {
@@ -113,7 +113,7 @@ void GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2,
 			}
 		}
 	}
-
+	
 	// make sure diplay will do update
 	Device->Dirty = true;
 }
@@ -132,10 +132,29 @@ bool GDS_Reset( struct GDS_Device* Device ) {
     return true;
 }
 
-void GDS_SetContrast( struct GDS_Device* Device, uint8_t Contrast ) { Device->SetContrast( Device, Contrast); }
-void GDS_SetHFlip( struct GDS_Device* Device, bool On ) { Device->SetHFlip( Device, On ); }
-void GDS_SetVFlip( struct GDS_Device* Device, bool On ) { Device->SetVFlip( Device, On ); }
+bool GDS_Init( struct GDS_Device* Device ) {
+	
+	Device->FramebufferSize = (Device->Width * Device->Height) / (8 / Device->Depth);
+	
+	// allocate FB unless explicitely asked not to
+	if (!(Device->Alloc & GDS_ALLOC_NONE)) {
+		if ((Device->Alloc & GDS_ALLOC_IRAM) || ((Device->Alloc & GDS_ALLOC_IRAM_SPI) && Device->IF == GDS_IF_SPI)) {
+			heap_caps_calloc( 1, Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+		} else {
+			Device->Framebuffer = calloc( 1, Device->FramebufferSize );
+		}	
+		NullCheck( Device->Framebuffer, return false );
+	}	
+	
+	bool Res = Device->Init( Device );
+	if (!Res) free(Device->Framebuffer);
+	return Res;
+}
+
+void GDS_SetContrast( struct GDS_Device* Device, uint8_t Contrast ) { if (Device->SetContrast) Device->SetContrast( Device, Contrast); }
+void GDS_SetHFlip( struct GDS_Device* Device, bool On ) { if (Device->SetHFlip) Device->SetHFlip( Device, On ); }
+void GDS_SetVFlip( struct GDS_Device* Device, bool On ) { if (Device->SetVFlip) Device->SetVFlip( Device, On ); }
 int	GDS_GetWidth( struct GDS_Device* Device ) { return Device->Width; }
 int	GDS_GetHeight( struct GDS_Device* Device ) { return Device->Height; }
-void GDS_DisplayOn( struct GDS_Device* Device ) { Device->DisplayOn( Device ); }
-void GDS_DisplayOff( struct GDS_Device* Device ) { Device->DisplayOff( Device ); }
+void GDS_DisplayOn( struct GDS_Device* Device ) { if (Device->DisplayOn) Device->DisplayOn( Device ); }
+void GDS_DisplayOff( struct GDS_Device* Device ) { if (Device->DisplayOff) Device->DisplayOff( Device ); }

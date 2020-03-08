@@ -44,7 +44,7 @@
 #include "log_util.h"
 
 #define RTSP_STACK_SIZE 	(8*1024)
-#define SEARCH_STACK_SIZE	(2*1048)
+#define SEARCH_STACK_SIZE	(3*1048)
 
 typedef struct raop_ctx_s {
 #ifdef WIN32
@@ -57,9 +57,9 @@ typedef struct raop_ctx_s {
 	struct in_addr peer;	// IP of the iDevice (airplay sender)
 	bool running;
 #ifdef WIN32
-	pthread_t thread, search_thread;
+	pthread_t thread;
 #else
-	TaskHandle_t thread, search_thread, joiner;
+	TaskHandle_t thread, joiner;
 	StaticTask_t *xTaskBuffer;
 	StackType_t xStack[RTSP_STACK_SIZE] __attribute__ ((aligned (4)));
 #endif
@@ -81,11 +81,12 @@ typedef struct raop_ctx_s {
 		char				DACPid[32], id[32];
 		struct in_addr		host;
 		u16_t				port;
+		bool running;
 #ifdef WIN32
 		struct mDNShandle_s *handle;
+		pthread_t thread;
 #else
-		bool running;
-		TaskHandle_t thread, joiner;
+		TaskHandle_t thread;
 		StaticTask_t *xTaskBuffer;
 		StackType_t xStack[SEARCH_STACK_SIZE] __attribute__ ((aligned (4)));;
 		SemaphoreHandle_t destroy_mutex;
@@ -99,7 +100,7 @@ extern log_level	raop_loglevel;
 static log_level 	*loglevel = &raop_loglevel;
 
 static void*	rtsp_thread(void *arg);
-static void		abort_rtsp(raop_ctx_t *ctx);
+static void		cleanup_rtsp(raop_ctx_t *ctx, bool abort);
 static bool 	handle_rtsp(raop_ctx_t *ctx, int sock);
 
 static char*	rsa_apply(unsigned char *input, int inlen, int *outlen, int mode);
@@ -218,7 +219,7 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	struct sockaddr addr;
 	socklen_t nlen = sizeof(struct sockaddr);
 #endif
-	
+
 	if (!ctx) return;
 
 #ifdef WIN32
@@ -240,25 +241,13 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	// terminate search, but do not reclaim memory of pthread if never launched
 	if (ctx->active_remote.handle) {
 		close_mDNS(ctx->active_remote.handle);
-		pthread_join(ctx->search_thread, NULL);
+		pthread_join(ctx->active_remote.thread, NULL);
 	}
 
 	// stop broadcasting devices
 	mdns_service_remove(ctx->svr, ctx->svc);
 	mdnsd_stop(ctx->svr);
 #else 
-	// first stop the search task if any
-	if (ctx->active_remote.running) {
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
-		ctx->active_remote.running = false;
-
-		vTaskResume(ctx->active_remote.thread);
-		ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-		vTaskDelete(ctx->active_remote.thread);
-
-		heap_caps_free(ctx->active_remote.xTaskBuffer);
-	}
-
 	// then the RTSP task
 	ctx->joiner = xTaskGetCurrentTaskHandle();
 	ctx->running = false;
@@ -267,10 +256,11 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	vTaskDelete(ctx->thread);
 	heap_caps_free(ctx->xTaskBuffer);
 
-	rtp_end(ctx->rtp);
-
 	shutdown(ctx->sock, SHUT_RDWR);
 	closesocket(ctx->sock);
+	
+	// cleanup all session-created items
+	cleanup_rtsp(ctx, true);
 		
 	mdns_service_remove("_raop", "_tcp");	
 #endif
@@ -405,7 +395,7 @@ static void *rtsp_thread(void *arg) {
 		if (n > 0) res = handle_rtsp(ctx, sock);
 
 		if (n < 0 || !res || ctx->abort) {
-			abort_rtsp(ctx);
+			cleanup_rtsp(ctx, true);
 			closesocket(sock);
 			LOG_INFO("RTSP close %u", sock);
 			sock = -1;
@@ -515,10 +505,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 
 #ifdef WIN32	
 		ctx->active_remote.handle = init_mDNS(false, ctx->host);
-		pthread_create(&ctx->search_thread, NULL, &search_remote, ctx);
+		pthread_create(&ctx->active_remote.thread, NULL, &search_remote, ctx);
 #else
 		ctx->active_remote.running = true;
-		ctx->active_remote.destroy_mutex = xSemaphoreCreateMutex();		
+		ctx->active_remote.destroy_mutex = xSemaphoreCreateBinary();
 		ctx->active_remote.xTaskBuffer = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 		ctx->active_remote.thread = xTaskCreateStatic( (TaskFunction_t) search_remote, "search_remote", SEARCH_STACK_SIZE, ctx, ESP_TASK_PRIO_MIN + 1, ctx->active_remote.xStack, ctx->active_remote.xTaskBuffer);
 #endif		
@@ -580,37 +570,14 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		if ((p = strcasestr(buf, "rtptime")) != NULL) sscanf(p, "%*[^=]=%u", &rtptime);
 
 		// only send FLUSH if useful (discards frames above buffer head and top)
-		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime))
+		if (ctx->rtp && rtp_flush(ctx->rtp, seqno, rtptime, true)) {
 			success = ctx->cmd_cb(RAOP_FLUSH);
+			rtp_flush_release(ctx->rtp);
+		}	
 
 	}  else if (!strcmp(method, "TEARDOWN")) {
 
-		rtp_end(ctx->rtp);
-
-		ctx->rtp = NULL;
-
-		// need to make sure no search is on-going and reclaim pthread memory
-#ifdef WIN32
-		if (ctx->active_remote.handle) close_mDNS(ctx->active_remote.handle);
-		pthread_join(ctx->search_thread, NULL);
-#else
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
-		ctx->active_remote.running = false;
-
-		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
-		vTaskDelete(ctx->active_remote.thread);
-		vSemaphoreDelete(ctx->active_remote.thread);
-		
-		heap_caps_free(ctx->active_remote.xTaskBuffer);
-		
-		LOG_INFO("[%p]: mDNS search task terminated", ctx);
-#endif
-
-		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-		NFREE(ctx->rtsp.aeskey);
-		NFREE(ctx->rtsp.aesiv);
-		NFREE(ctx->rtsp.fmtp);
-
+		cleanup_rtsp(ctx, false);
 		success = ctx->cmd_cb(RAOP_STOP);
 
 	} else if (!strcmp(method, "SET_PARAMETER")) {
@@ -631,18 +598,16 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 			current = ((current - start) / 44100) * 1000;
 			if (stop) stop = ((stop - start) / 44100) * 1000;
 			else stop = -1;
-			LOG_INFO("[%p]: SET PARAMETER progress %u/%u %s", ctx, current, stop, p);
-			success = ctx->cmd_cb(RAOP_PROGRESS, current, stop);
-		}
-
-		if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
+			LOG_INFO("[%p]: SET PARAMETER progress %d/%u %s", ctx, current, stop, p);
+			success = ctx->cmd_cb(RAOP_PROGRESS, max(current, 0), stop);
+		} else if (body && ((p = kd_lookup(headers, "Content-Type")) != NULL) && !strcasecmp(p, "application/x-dmap-tagged")) {
 			struct metadata_s metadata;
 			dmap_settings settings = {
 				NULL, NULL, NULL, NULL,	NULL, NULL,	NULL, on_dmap_string, NULL,
 				NULL
 			};
 
-			LOG_INFO("[%p]: received metadata");
+			LOG_INFO("[%p]: received metadata", ctx);
 			settings.ctx = &metadata;
 			memset(&metadata, 0, sizeof(struct metadata_s));
 			if (!dmap_parse(&settings, body, len)) {
@@ -651,6 +616,10 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 				success = ctx->cmd_cb(RAOP_METADATA, metadata.artist, metadata.album, metadata.title);
 				free_metadata(&metadata);
 			}
+		} else {
+			char *dump = kd_dump(headers);
+			LOG_INFO("Unhandled SET PARAMETER\n%s", dump);
+			free(dump);
 		}
 	}
 
@@ -678,26 +647,28 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 }
 
 /*----------------------------------------------------------------------------*/
-void abort_rtsp(raop_ctx_t *ctx) {
+void cleanup_rtsp(raop_ctx_t *ctx, bool abort) {
 	// first stop RTP process
 	if (ctx->rtp) {
 		rtp_end(ctx->rtp);
 		ctx->rtp = NULL;
-		LOG_INFO("[%p]: RTP thread aborted", ctx);
-	}	
+		if (abort) LOG_INFO("[%p]: RTP thread aborted", ctx);
+	}
 
 	if (ctx->active_remote.running) {
+#ifdef WIN32
+		pthread_join(ctx->active_remote.thread, NULL);
+		close_mDNS(ctx->active_remote.handle);
+#else
 		// need to make sure no search is on-going and reclaim task memory
-		ctx->active_remote.joiner = xTaskGetCurrentTaskHandle();
 		ctx->active_remote.running = false;
-
 		xSemaphoreTake(ctx->active_remote.destroy_mutex, portMAX_DELAY);
 		vTaskDelete(ctx->active_remote.thread);
 		vSemaphoreDelete(ctx->active_remote.thread);
 
 		heap_caps_free(ctx->active_remote.xTaskBuffer);
+#endif
 		memset(&ctx->active_remote, 0, sizeof(ctx->active_remote));
-
 		LOG_INFO("[%p]: Remote search thread aborted", ctx);
 	}	
 
@@ -767,7 +738,7 @@ static void* search_remote(void *args) {
 				LOG_INFO("found remote %s %s:%hu", r->instance_name, inet_ntoa(ctx->active_remote.host), ctx->active_remote.port);
 			}
 		}
-	
+
 		mdns_query_results_free(results);
 	}
 
@@ -947,9 +918,8 @@ static unsigned int token_decode(const char *token)
 	else
 		val += pos(token[i]);
 	}
-	if (marker > 2){
-		return DECODE_ERROR;
-	}
+	if (marker > 2)
+	return DECODE_ERROR;
 	return (marker << 24) | val;
 }
 

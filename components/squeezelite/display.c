@@ -100,7 +100,7 @@ static struct {
 #define SB_HEIGHT		32
 
 // lenght are number of frames, i.e. 2 channels of 16 bits
-#define	FFT_LEN_BIT	6		
+#define	FFT_LEN_BIT	7		
 #define	FFT_LEN		(1 << FFT_LEN_BIT)
 #define RMS_LEN_BIT	6
 #define RMS_LEN		(1 << RMS_LEN_BIT)
@@ -115,7 +115,7 @@ static struct scroller_s {
 	u16_t mode;	
 	s16_t by;
 	// scroller management & sharing between grfg and scrolling task
-	bool active, first;
+	bool active, first, overflow;
 	int scrolled;
 	struct {
 		u8_t *frame;
@@ -151,7 +151,7 @@ static EXT_RAM_ATTR struct {
 #define ANIM_SCREEN_2     0x08 
 
 static u8_t ANIC_resp = ANIM_NONE;
-static u8_t SETD_width;
+static uint16_t SETD_width;
 
 #define SCROLL_STACK_SIZE	(3*1024)
 #define LINELEN				40
@@ -234,7 +234,7 @@ bool sb_display_init(void) {
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
 	// size scroller (width + current screen)
-	scroller.scroll.max = (displayer.width * displayer.height / 8) * (10 + 1);
+	scroller.scroll.max = (displayer.width * displayer.height / 8) * (15 + 1);
 	scroller.scroll.frame = malloc(scroller.scroll.max);
 	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
 	scroller.frame = malloc(displayer.width * displayer.height / 8);
@@ -316,8 +316,9 @@ static void send_server(void) {
 		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
 		pkt_header.length = htonl(sizeof(pkt_header) +  2 - 8);
 
+		SETD_width = htons(SETD_width);
 		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
-		send_packet(&SETD_width, 2);
+		send_packet((uint8_t*) &SETD_width, 2);
 
 		SETD_width = 0;
 	}	
@@ -559,6 +560,7 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.mode = htons(pkt->mode);
 		scroller.scroll.width = htons(pkt->width);
 		scroller.first = true;
+		scroller.overflow = false;
 		
 		// background excludes space taken by visu (if any)
 		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
@@ -576,13 +578,14 @@ static void grfs_handler(u8_t *data, int len) {
 	}	
 
 	// copy scroll frame data (no semaphore needed)
-	if (scroller.scroll.size + size < scroller.scroll.max) {
+	if (scroller.scroll.size + size < scroller.scroll.max && !scroller.overflow) {
 		memcpy(scroller.scroll.frame + offset, data + sizeof(struct grfs_packet), size);
 		scroller.scroll.size = offset + size;
-		LOG_INFO("scroller current size %u", scroller.scroll.size);
+		LOG_INFO("scroller current size %u (w:%u)", scroller.scroll.size, scroller.scroll.width);
 	} else {
-		LOG_INFO("scroller too larger %u/%u/%u", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
-		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8);
+		LOG_INFO("scroller too large %u/%u (w:%u)", scroller.scroll.size + size, scroller.scroll.max, scroller.scroll.width);
+		scroller.scroll.width = scroller.scroll.size / (displayer.height / 8) - scroller.back.width;
+		scroller.overflow = true;
 	}	
 }
 
@@ -736,10 +739,10 @@ static void visu_update(void) {
  */
 void spectrum_limits(int min, int n, int pos) {
 	if (n / 2) {
-		int step = ((DISPLAY_BW - min) * visu.spectrum_scale * 2) / n;
+		int step = ((DISPLAY_BW - min) * visu.spectrum_scale)  / (n/2);
 		visu.bars[pos].limit = min + step;
 		for (int i = 1; i < n/2; i++) visu.bars[pos+i].limit = visu.bars[pos+i-1].limit + step;
-		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n/2, pos + n/2);
+		spectrum_limits(visu.bars[pos + n/2 - 1].limit, n - n/2, pos + n/2);
 	} else {
 		visu.bars[pos].limit = DISPLAY_BW;
 	}	
@@ -860,7 +863,7 @@ static void displayer_task(void *args) {
 			// by default go for the long sleep, will change below if required
 			scroller.wake = LONG_WAKE;
 			
-			// do we have more to scroll (scroll.width is the last column from which we havea  full zone)
+			// do we have more to scroll (scroll.width is the last column from which we have a full zone)
 			if (scroller.by > 0 ? (scroller.scrolled <= scroller.scroll.width) : (scroller.scrolled >= 0)) {
 				memcpy(scroller.frame, scroller.back.frame, scroller.back.width * displayer.height / 8);
 				for (int i = 0; i < scroller.width * displayer.height / 8; i++) scroller.frame[i] |= scroller.scroll.frame[scroller.scrolled * displayer.height / 8 + i];

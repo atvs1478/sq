@@ -26,8 +26,8 @@ static char TAG[] = "SSD132x";
 
 enum { SSD1326, SSD1327 };
 
-struct SSD132x_Private {
-	uint8_t *iRAM;
+struct PrivateSpace {
+	uint8_t *iRAM, *Shadowbuffer;
 	uint8_t ReMap, PageSize;
 	uint8_t Model;
 };
@@ -67,13 +67,13 @@ static void SetRowAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End
 }
 
 static void Update4( struct GDS_Device* Device ) {
-	struct SSD132x_Private *Private = (struct SSD132x_Private*) Device->Private;
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 		
 	// always update by full lines
 	SetColumnAddress( Device, 0, Device->Width / 2 - 1);
 	
 #ifdef SHADOW_BUFFER
-	uint16_t *optr = (uint16_t*) Device->Shadowbuffer, *iptr = (uint16_t*) Device->Framebuffer;
+	uint16_t *optr = (uint16_t*) Private->Shadowbuffer, *iptr = (uint16_t*) Device->Framebuffer;
 	bool dirty = false;
 	
 	for (int r = 0, page = 0; r < Device->Height; r++) {
@@ -92,10 +92,10 @@ static void Update4( struct GDS_Device* Device ) {
 				SetRowAddress( Device, r - page + 1, r );
 				// own use of IRAM has not proven to be much better than letting SPI do its copy
 				if (Private->iRAM) {
-					memcpy(Private->iRAM, Device->Shadowbuffer + (r - page + 1) * Device->Width / 2, page * Device->Width / 2 );
+					memcpy(Private->iRAM, Private->Shadowbuffer + (r - page + 1) * Device->Width / 2, page * Device->Width / 2 );
 					Device->WriteData( Device, Private->iRAM, Device->Width * page / 2 );
 				} else	{
-					Device->WriteData( Device, Device->Shadowbuffer + (r - page + 1) * Device->Width / 2, page * Device->Width / 2 );					
+					Device->WriteData( Device, Private->Shadowbuffer + (r - page + 1) * Device->Width / 2, page * Device->Width / 2 );					
 				}	
 				dirty = false;
 			}	
@@ -122,9 +122,11 @@ static void Update4( struct GDS_Device* Device ) {
 */ 
 static void Update1( struct GDS_Device* Device ) {
 #ifdef SHADOW_BUFFER
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 	// not sure the compiler does not have to redo all calculation in for loops, so local it is
 	int width = Device->Width / 8, rows = Device->Height;
-	uint8_t *optr = Device->Shadowbuffer, *iptr = Device->Framebuffer;
+	uint8_t *optr = Private->Shadowbuffer, *iptr = Device->Framebuffer;
+	int CurrentRow = -1, FirstCol = -1, LastCol = -1;
 	
 	// by row, find first and last columns that have been updated
 	for (int r = 0; r < rows; r++) {
@@ -139,9 +141,22 @@ static void Update1( struct GDS_Device* Device ) {
 		
 		// now update the display by "byte rows"
 		if (first--) {
-			SetColumnAddress( Device, first, last );
-			SetRowAddress( Device, r, r);
-			Device->WriteData( Device, Device->Shadowbuffer + r*width + first, last - first + 1);
+			// only set column when useful, saves a fair bit of CPU
+			if (first > FirstCol && first <= FirstCol + 4 && last < LastCol && last >= LastCol - 4) {
+				first = FirstCol;
+				last = LastCol;
+			} else {	
+				SetColumnAddress( Device, first, last );
+				FirstCol = first;
+				LastCol = last;
+			}
+			
+			// Set row only when needed, otherwise let auto-increment work
+			if (r != CurrentRow) SetRowAddress( Device, r, Device->Height - 1 );
+			CurrentRow = r + 1;
+			
+			// actual write
+			Device->WriteData( Device, Private->Shadowbuffer + r*width + first, last - first + 1 );
 		}
 	}	
 #else	
@@ -161,15 +176,15 @@ static void IRAM_ATTR DrawPixel1Fast( struct GDS_Device* Device, int X, int Y, i
         *FBOffset ^= BIT( 7 - XBit );
     } else {
 		// we might be able to save the 7-Xbit using BitRemap (A0 bit 2)
-        *FBOffset = ( Color == GDS_COLOR_WHITE ) ? *FBOffset | BIT( 7 - XBit ) : *FBOffset & ~BIT( 7 - XBit );
+        *FBOffset = ( Color == GDS_COLOR_BLACK ) ?  *FBOffset & ~BIT( XBit ) : *FBOffset | BIT( XBit );
     }
 }
 
 static void ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color ) {
 	uint8_t _Color = Color == GDS_COLOR_BLACK ? 0: 0xff;
-	uint8_t Width = Device->Width >> 3;
+	int Width = Device->Width >> 3;
 	uint8_t *optr = Device->Framebuffer;
-
+	
 	for (int r = y1; r <= y2; r++) {
 		int c = x1;
 		// for a row that is not on a boundary, not column opt can be done, so handle all columns on that line
@@ -180,24 +195,35 @@ static void ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int 
 		c += chunk * 8;
 		while (c <= x2) DrawPixel1Fast( Device, c++, r, Color );
 	}
-	
-	Device->Dirty = true;
 }
 
 static void DrawBitmapCBR(struct GDS_Device* Device, uint8_t *Data, int Width, int Height, int Color ) {
-	uint8_t *optr = Device->Framebuffer;
-	
 	if (!Height) Height = Device->Height;
 	if (!Width) Width = Device->Width;
+	int DWidth = Device->Width >> 3;
 	
-	// just do bitreverse and if BitRemap works, there will be even nothing to do	
-	for (int i = Height * Width >> 3; --i >= 0;) *optr++ = BitReverseTable256[*Data++];
-	
-	// Dirty is set for us
+	// Two consecutive bits of source data are split over two different bytes of framebuffer
+	for (int c = 0; c < Width; c++) {
+		uint8_t shift = c & 0x07, bit = ~(1 << shift);
+		uint8_t *optr = Device->Framebuffer + (c >> 3);
+		
+		// we need to linearize code to let compiler better optimize
+		for (int r = Height >> 3; --r >= 0;) {
+			uint8_t Byte = BitReverseTable256[*Data++];
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth; Byte >>= 1;
+			*optr = (*optr & bit) | ((Byte & 0x01) << shift); optr += DWidth;
+		}	
+	}
 }
 
 static void SetHFlip( struct GDS_Device* Device, bool On ) { 
-	struct SSD132x_Private *Private = (struct SSD132x_Private*) Device->Private;
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 	if (Private->Model == SSD1326) Private->ReMap = On ? (Private->ReMap | ((1 << 0) | (1 << 2))) : (Private->ReMap & ~((1 << 0) | (1 << 2)));
 	else Private->ReMap = On ? (Private->ReMap | ((1 << 0) | (1 << 1))) : (Private->ReMap & ~((1 << 0) | (1 << 1)));
 	Device->WriteCommand( Device, 0xA0 );
@@ -205,7 +231,7 @@ static void SetHFlip( struct GDS_Device* Device, bool On ) {
 }	
 
 static void SetVFlip( struct GDS_Device *Device, bool On ) { 
-	struct SSD132x_Private *Private = (struct SSD132x_Private*) Device->Private;
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 	if (Private->Model == SSD1326) Private->ReMap = On ? (Private->ReMap | (1 << 1)) : (Private->ReMap & ~(1 << 1));
 	else Private->ReMap = On ? (Private->ReMap | (1 << 4)) : (Private->ReMap & ~(1 << 4));
 	Device->WriteCommand( Device, 0xA0 );
@@ -221,49 +247,31 @@ static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
 }
 
 static bool Init( struct GDS_Device* Device ) {
-	struct SSD132x_Private *Private = (struct SSD132x_Private*) Device->Private;
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 	
 	// find a page size that is not too small is an integer of height
 	Private->PageSize = min(8, PAGE_BLOCK / (Device->Width / 2));
 	Private->PageSize = Device->Height / (Device->Height / Private->PageSize) ;	
 	
-#ifdef USE_IRAM	
-	// let SPI driver allocate memory, it has not proven to be more efficient
-	if (Device->IF == IF_SPI) Private->iRAM = heap_caps_malloc( Private->PageSize * Device->Width / 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
-#endif	
-	Device->FramebufferSize = ( Device->Width * Device->Height ) / 2;	
-	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
-    NullCheck( Device->Framebuffer, return false );
-	
-// benchmarks showed little gain to have SPI memory already in IRAM vs letting driver copy		
 #ifdef SHADOW_BUFFER	
-	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
-    NullCheck( Device->Framebuffer, return false );
 #ifdef USE_IRAM
-	if (Device->IF == IF_SPI) {
+	if (Device->IF == GDS_IF_SPI) {
 		if (Device->Depth == 1) {
-			Device->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+			Private->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 		} else {
-			Device->Shadowbuffer = malloc( Device->FramebufferSize );	
+			Private->Shadowbuffer = malloc( Device->FramebufferSize );	
 			Private->iRAM = heap_caps_malloc( Private->PageSize * Device->Width / 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 		}	
 	} else
 #endif
-	Device->Shadowbuffer = malloc( Device->FramebufferSize );	
-	memset(Device->Shadowbuffer, 0xFF, Device->FramebufferSize);
-#else	// not SHADOW_BUFFER
-#ifdef USE_IRAM
-	if (Device->IF == IF_SPI) {
-		if (Device->Depth == 1) {
-			Device->Framebuffer = heap_caps_calloc( 1, Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
-		} else  {
-			Device->Framebuffer = calloc( 1, Device->FramebufferSize );	
-			Private->iRAM = heap_caps_malloc( Private->PageSize * Device->Width / 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
-		}
-	} else 
+	Private->Shadowbuffer = malloc( Device->FramebufferSize );	
+	memset(Private->Shadowbuffer, 0xFF, Device->FramebufferSize);
+#else
+#ifdef USE_IRAM	
+	if (Device->Depth == 4 && Device->IF == GDS_IF_SPI) Private->iRAM = heap_caps_malloc( Private->PageSize * Device->Width / 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 #endif	
-	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
-#endif	
+
+#endif
 
 	ESP_LOGI(TAG, "SSD1326/7 with bit depth %u, page %u, iRAM %p", Device->Depth, Private->PageSize, Private->iRAM);
 			
@@ -315,23 +323,28 @@ static const struct GDS_Device SSD132x = {
 
 struct GDS_Device* SSD132x_Detect(char *Driver, struct GDS_Device* Device) {
 	uint8_t Model;
+	int Depth;
 	
-	if (!strcasestr(Driver, "SSD1326")) Model = SSD1326;
-	else if (!strcasestr(Driver, "SSD1327")) Model = SSD1327;
+	if (strcasestr(Driver, "SSD1326")) Model = SSD1326;
+	else if (strcasestr(Driver, "SSD1327")) Model = SSD1327;
 	else return NULL;
 	
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
 	
 	*Device = SSD132x;	
-	((struct SSD132x_Private*) Device->Private)->Model = Model;
-	
-	sscanf(Driver, "%*[^:]:%c", &Device->Depth);
+	((struct PrivateSpace*) Device->Private)->Model = Model;
+		
+	sscanf(Driver, "%*[^:]:%u", &Depth);
+	Device->Depth = Depth;
 	
 	if (Model == SSD1326 && Device->Depth == 1) {
 		Device->Update = Update1;
 		Device->DrawPixelFast = DrawPixel1Fast;
 		Device->DrawBitmapCBR = DrawBitmapCBR;
 		Device->ClearWindow = ClearWindow;
+#if !defined SHADOW_BUFFER && defined USE_IRAM	
+		Device->Alloc = GDS_ALLOC_IRAM_SPI;
+#endif	
 	} else {
 		Device->Depth = 4;
 	}	

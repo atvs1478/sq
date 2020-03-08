@@ -46,3 +46,10 @@ endif()
 
 
 
+
+
+
+#   add_custom_target(size
+#        DEPENDS ${project_elf}
+#        COMMAND ${idf_size} ${mapfile}
+#        )

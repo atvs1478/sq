@@ -13,13 +13,43 @@ PLUGIN_SQUEEZEESP32_BANNER_TEXT
 PLUGIN_SQUEEZEESP32_DESC
 	EN	Adds a new player id (100) to enable display with SqueezeESP32
 	
+PLUGIN_SQUEEZEESP32_PLAYERSETTINGS
+	EN	Display (ESP32)
+	
 PLUGIN_SQUEEZEESP32_WIDTH
 	EN	Screen width
+
+PLUGIN_SQUEEZEESP32_WIDTH_DESC
+	EN	Width of the display in pixel as reported by the player
+	
+PLUGIN_SQUEEZEESP32_SMALL_VU
+	EN	Small VU size
+	
+PLUGIN_SQUEEZEESP32_SMALL_VU_DESC
+	EN	% of the display used for small VU (right-justified)
 	
 PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE
-	EN	Spectrum scale
-
+	EN	Spectrum scaling
+	
 PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC
-	EN	Sets the scale factor % of spectrum visualizer by halves for better representation. 
-	EN	For example, 50 means that 50% of spectrum is displayed in 1/2 of the screen, so it's linear...
+	EN	% of Spectrum displayed in first half of the screen. For example, 50 means that 50% of spectrum is displayed in 1/2 of the screen
 	EN	But 25 means that only 25% of spectrum is displayed in 1/2 of the screen, so it's a sort of log
+	
+PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM
+	EN	Small spectrum options
+	
+PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_DESC
+	EN	<i>Size</i>: % of the screen used by small spectrum
+	EN	<br><i>Band factor</i>: number of bands is the width of the <b>spectrum</b> screen  divided by this factor
+	
+PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_SIZE
+	EN	Size
+	
+PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_BAND
+	EN	Band factor
+	
+PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND
+	EN	Full spectrum band factor
+		
+PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND_DESC
+	EN	The number of bands is the width of the screen divided by this factor

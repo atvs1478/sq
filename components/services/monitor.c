@@ -23,6 +23,7 @@
 #include "accessors.h"
 
 #define MONITOR_TIMER	(10*1000)
+#define SCRATCH_SIZE	256
 
 static const char *TAG = "monitor";
 
@@ -54,7 +55,7 @@ static void task_stats( void ) {
 	current.tasks = malloc( current.n * sizeof( TaskStatus_t ) );
 	current.n = uxTaskGetSystemState( current.tasks, current.n, &current.total );
 	
-	static EXT_RAM_ATTR char scratch[128+1];
+	static EXT_RAM_ATTR char scratch[SCRATCH_SIZE];
 	*scratch = '\0';
 
 #ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
@@ -63,7 +64,8 @@ static void task_stats( void ) {
 	for(int i = 0, n = 0; i < current.n; i++ ) {
 		for (int j = 0; j < previous.n; j++) {
 			if (current.tasks[i].xTaskNumber == previous.tasks[j].xTaskNumber) {
-				n += sprintf(scratch + n, "%16s %2u%% s:%5u", current.tasks[i].pcTaskName, 
+				n += snprintf(scratch + n, SCRATCH_SIZE - n, "%16s (%u) %2u%% s:%5u", current.tasks[i].pcTaskName, 
+																		   current.tasks[i].eCurrentState,
 																		   100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed, 
 																		   current.tasks[i].usStackHighWaterMark);
 				if (i % 3 == 2 || i == current.n - 1) {
@@ -72,7 +74,7 @@ static void task_stats( void ) {
 				}	
 				break;
 			}
-		}	
+		}
 	}	
 #else
 	for (int i = 0, n = 0; i < current.n; i ++) {

@@ -21,7 +21,11 @@
 
 static char TAG[] = "SSD1306";
 
-// Functions are not deckared to minimize # of lines
+struct PrivateSpace {
+	uint8_t *Shadowbuffer;
+};
+
+// Functions are not declared to minimize # of lines
 
 static void SetColumnAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End ) {
 	Device->WriteCommand( Device, 0x21 );
@@ -36,12 +40,14 @@ static void SetPageAddress( struct GDS_Device* Device, uint8_t Start, uint8_t En
 
 static void Update( struct GDS_Device* Device ) {
 #ifdef SHADOW_BUFFER
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 	// not sure the compiler does not have to redo all calculation in for loops, so local it is
-	int width = Device->Width, rows = Device->Height / 8;
-	uint8_t *optr = Device->Shadowbuffer, *iptr = Device->Framebuffer;
+	int width = Device->Width, pages = Device->Height / 8;
+	uint8_t *optr = Private->Shadowbuffer, *iptr = Device->Framebuffer;
+	int CurrentPage = -1, FirstCol = -1, LastCol = -1;
 	
 	// by row, find first and last columns that have been updated
-	for (int r = 0; r < rows; r++) {
+	for (int p = 0; p < pages; p++) {
 		uint8_t first = 0, last;	
 		for (int c = 0; c < width; c++) {
 			if (*iptr != *optr) {
@@ -53,13 +59,26 @@ static void Update( struct GDS_Device* Device ) {
 		
 		// now update the display by "byte rows"
 		if (first--) {
-			SetColumnAddress( Device, first, last );
-			SetPageAddress( Device, r, r);
-			Device->WriteData( Device, Device->Shadowbuffer + r*width + first, last - first + 1);
+			// only set column when useful, saves a fair bit of CPU
+			if (first > FirstCol && first <= FirstCol + 4 && last < LastCol && last >= LastCol - 4) {
+				first = FirstCol;
+				last = LastCol;
+			} else {	
+				SetColumnAddress( Device, first, last );
+				FirstCol = first;
+				LastCol = last;
+			}
+			
+			// Set row only when needed, otherwise let auto-increment work
+			if (p != CurrentPage) SetPageAddress( Device, p, Device->Height / 8 - 1 );
+			CurrentPage = p + 1;
+			
+			// actual write
+			Device->WriteData( Device, Private->Shadowbuffer + p*width + first, last - first + 1 );
 		}
 	}	
 #else	
-	// automatic counter and end Page/Column
+	// automatic counter and end Page/Column (we assume Height % 8 == 0)
 	SetColumnAddress( Device, 0, Device->Width - 1);
 	SetPageAddress( Device, 0, Device->Height / 8 - 1);
 	Device->WriteData( Device, Device->Framebuffer, Device->FramebufferSize );
@@ -77,26 +96,15 @@ static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
 }
 
 static bool Init( struct GDS_Device* Device ) {
-	Device->FramebufferSize = ( Device->Width * Device->Height ) / 8;	
-	
-// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy		
 #ifdef SHADOW_BUFFER	
-	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
-    NullCheck( Device->Framebuffer, return false );
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 #ifdef USE_IRAM
-	if (Device->IF == IF_SPI) Device->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+	if (Device->IF == GDS_IF_SPI) Private->Shadowbuffer = heap_caps_malloc( Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 	else 
 #endif
-	Device->Shadowbuffer = malloc( Device->FramebufferSize );	
-	NullCheck( Device->Shadowbuffer, return false );
-	memset(Device->Shadowbuffer, 0xFF, Device->FramebufferSize);
-#else	// not SHADOW_BUFFER
-#ifdef USE_IRAM
-	// benchmarks showed little gain to have SPI memory already in IRAL vs letting driver copy
-	if (Device->IF == IF_SPI) Device->Framebuffer = heap_caps_calloc( 1, Device->FramebufferSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
-	else 
-#endif
-	Device->Framebuffer = calloc( 1, Device->FramebufferSize );
+	Private->Shadowbuffer = malloc( Device->FramebufferSize );	
+	NullCheck( Private->Shadowbuffer, return false );
+	memset(Private->Shadowbuffer, 0xFF, Device->FramebufferSize);
 #endif	
 		
 	// need to be off and disable display RAM
@@ -106,6 +114,10 @@ static bool Init( struct GDS_Device* Device ) {
 	// charge pump regulator, do direct init
 	Device->WriteCommand( Device, 0x8D );
 	Device->WriteCommand( Device, 0x14 ); 
+	
+	// set Clocks
+    Device->WriteCommand( Device, 0xD5 );
+    Device->WriteCommand( Device, ( 0x08 << 4 ) | 0x00 );
 			
 	// COM pins HW config (alternative:EN if 64, DIS if 32, remap:DIS) - some display might need something different
 	Device->WriteCommand( Device, 0xDA );
@@ -114,6 +126,12 @@ static bool Init( struct GDS_Device* Device ) {
 	// MUX Ratio
     Device->WriteCommand( Device, 0xA8 );
     Device->WriteCommand( Device, Device->Height - 1);
+	// Page & GDDRAM Start Column High/Low
+	/*
+    Device->WriteCommand( Device, 0x00 );
+	Device->WriteCommand( Device, 0x10 );
+	Device->WriteCommand( Device, 0xB0 );
+	*/
 	// Display Offset
     Device->WriteCommand( Device, 0xD3 );
     Device->WriteCommand( Device, 0 );
@@ -125,9 +143,6 @@ static bool Init( struct GDS_Device* Device ) {
 	Device->SetHFlip( Device, false );
 	// no Display Inversion
     Device->WriteCommand( Device, 0xA6 );
-	// set Clocks
-    Device->WriteCommand( Device, 0xD5 );
-    Device->WriteCommand( Device, ( 0x08 << 4 ) | 0x00 );
 	// set Adressing Mode Horizontal
 	Device->WriteCommand( Device, 0x20 );
 	Device->WriteCommand( Device, 0 );
@@ -144,8 +159,6 @@ static const struct GDS_Device SSD1306 = {
 	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
 	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
 	.Update = Update, .Init = Init,
-	//.DrawPixelFast = GDS_DrawPixelFast,
-	//.ClearWindow = ClearWindow,
 };	
 
 struct GDS_Device* SSD1306_Detect(char *Driver, struct GDS_Device* Device) {
@@ -154,6 +167,9 @@ struct GDS_Device* SSD1306_Detect(char *Driver, struct GDS_Device* Device) {
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
 	*Device = SSD1306;	
 	Device->Depth = 1;
+#if !defined SHADOW_BUFFER && defined USE_IRAM	
+	Device->Alloc = GDS_ALLOC_IRAM_SPI;
+#endif	
 	ESP_LOGI(TAG, "SSD1306 driver");
 	
 	return Device;

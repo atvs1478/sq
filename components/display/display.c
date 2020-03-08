@@ -59,8 +59,8 @@ static EXT_RAM_ATTR struct {
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, NULL };
 
 /****************************************************************************************
  * 
@@ -86,15 +86,18 @@ void display_init(char *welcome) {
 			
 	// so far so good
 	if (display && width > 0 && height > 0) {
+		int RST_pin = -1;
+		if ((p = strcasestr(config, "reset")) != NULL) RST_pin = atoi(strchr(p, '=') + 1);
+		
 		// Detect driver interface
 		if (strstr(config, "I2C") && i2c_system_port != -1) {
 			int address = 0x3C;
 				
 			if ((p = strcasestr(config, "address")) != NULL) address = atoi(strchr(p, '=') + 1);
-		
+				
 			init = true;
 			GDS_I2CInit( i2c_system_port, -1, -1, i2c_system_speed ) ;
-			GDS_I2CAttachDevice( display, width, height, address, -1 );
+			GDS_I2CAttachDevice( display, width, height, address, RST_pin );
 		
 			ESP_LOGI(TAG, "Display is I2C on port %u", address);
 		} else if (strstr(config, "SPI") && spi_system_host != -1) {
@@ -105,7 +108,7 @@ void display_init(char *welcome) {
 		
 			init = true;
 			GDS_SPIInit( spi_system_host, spi_system_dc_gpio );
-			GDS_SPIAttachDevice( display, width, height, CS_pin, -1, speed );
+			GDS_SPIAttachDevice( display, width, height, CS_pin, RST_pin, speed );
 				
 			ESP_LOGI(TAG, "Display is SPI host %u with cs:%d", spi_system_host, CS_pin);
 		} else {
@@ -189,7 +192,7 @@ static void displayer_task(void *args) {
 		
 		// handler elapsed track time
 		if (displayer.timer && displayer.state == DISPLAYER_ACTIVE) {
-			char counter[12];
+			char counter[16];
 			TickType_t tick = xTaskGetTickCount();
 			uint32_t elapsed = (tick - displayer.tick) * portTICK_PERIOD_MS;
 			
@@ -198,8 +201,8 @@ static void displayer_task(void *args) {
 				displayer.tick = tick;
 				displayer.elapsed += elapsed / 1000;
 				xSemaphoreGive(displayer.mutex);				
-				if (displayer.elapsed < 3600) sprintf(counter, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
-				else sprintf(counter, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
+				if (displayer.elapsed < 3600) snprintf(counter, 16, "%5u:%02u", displayer.elapsed / 60, displayer.elapsed % 60);
+				else snprintf(counter, 16, "%2u:%02u:%02u", displayer.elapsed / 3600, (displayer.elapsed % 3600) / 60, displayer.elapsed % 60);
 				GDS_TextLine(display, 1, GDS_TEXT_RIGHT, (GDS_TEXT_CLEAR | GDS_TEXT_CLEAR_EOL) | GDS_TEXT_UPDATE, counter);
 				timer_sleep = 1000;
 			} else timer_sleep = max(1000 - elapsed, 0);	
@@ -289,13 +292,14 @@ void displayer_metadata(char *artist, char *album, char *title) {
 /****************************************************************************************
  *
  */
-void displayer_scroll(char *string, int speed) {
+void displayer_scroll(char *string, int speed, int pause) {
 	// need a display!
 	if (!display) return;
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 
 	if (speed) displayer.speed = speed;
+	if (pause) displayer.pause = pause;
 	displayer.offset = 0;	
 	strncpy(displayer.string, string, SCROLLABLE_SIZE);
 	displayer.string[SCROLLABLE_SIZE] = '\0';
