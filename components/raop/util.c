@@ -23,12 +23,7 @@
 #ifdef WIN32
 #include <iphlpapi.h>
 #else
-/*
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <net/if_arp.h>
-#include <netdb.h>
-*/
+#include "tcpip_adapter.h"
 #include <ctype.h>
 #endif
 
@@ -84,8 +79,26 @@ in_addr_t get_localhost(char **name)
 	}
 	else return INADDR_ANY;
 #else
-	// missing platform here ...
-	return INADDR_ANY;
+	tcpip_adapter_ip_info_t ipInfo; 
+	tcpip_adapter_if_t if_type = TCPIP_ADAPTER_IF_STA;
+
+	// then get IP address
+ 	tcpip_adapter_get_ip_info(if_type, &ipInfo);
+	
+	// we might be in AP mode
+	if (ipInfo.ip.addr == INADDR_ANY) {
+		if_type = TCPIP_ADAPTER_IF_AP;
+		tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ipInfo);
+	}
+
+	// get hostname if required
+	if (name) {
+		const char *hostname;
+		tcpip_adapter_get_hostname(if_type, &hostname);
+		*name = strdup(hostname);
+	}	
+
+	return ipInfo.ip.addr;
 #endif
 }
 
