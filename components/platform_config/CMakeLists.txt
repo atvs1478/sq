@@ -1,6 +1,7 @@
 idf_component_register(	SRC_DIRS . 
 						INCLUDE_DIRS . 
-						REQUIRES newlib nvs_flash json platform_console services vfs
+						PRIV_REQUIRES  json newlib  console esp_common freertos 
+						REQUIRES nvs_flash
 )
 
 

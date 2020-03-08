@@ -36,6 +36,7 @@ Contains the freeRTOS task for the DNS server that processes the requests.
 #include <stdbool.h>
 #include "squeezelite-ota.h"
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif

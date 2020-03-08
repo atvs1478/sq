@@ -1,6 +1,7 @@
 idf_component_register(SRC_DIRS .
-					  INCLUDE_DIRS . 
-					  REQUIRES console spi_flash console freertos platform_console esp_https_ota
+					  INCLUDE_DIRS .
+					  REQUIRES app_update esp_https_ota 
+					  PRIV_REQUIRES  console platform_config spi_flash vfs console freertos platform_console 
 					  )
 
 

@@ -35,7 +35,7 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "freertos/event_groups.h"
-#include "mdns.h"
+
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"

@@ -5,19 +5,19 @@ idf_component_register( SRC_DIRS . external a1s tas57xx
 						PRIV_REQUIRES 	newlib 
 									esp_common 
 									esp-dsp
-						  			display 
-						 			platform_config 
+						  			platform_config 
 						 			platform_bluetooth 
 						 			codecs 
 						 			services 
 						 			raop   
+						 			display
 )
 
 
 
 set_source_files_properties(mad.c
     PROPERTIES COMPILE_FLAGS
-    -Wno-maybe-uninitialized
+    -Wno-maybe-uninitialized 
 )
 set_source_files_properties(pcm.c
     PROPERTIES COMPILE_FLAGS

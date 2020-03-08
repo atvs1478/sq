@@ -14,7 +14,7 @@
 #include "freertos/event_groups.h"
 #include "pthread.h"
 #include "platform_esp32.h"
-#include "config.h"
+#include "platform_config.h"
 
 static const char * TAG = "squeezelite_cmd";
 #define SQUEEZELITE_THREAD_STACK_SIZE (6*1024)
