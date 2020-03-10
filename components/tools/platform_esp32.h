@@ -31,9 +31,4 @@ extern  bool wait_for_wifi();
 extern void console_start();
 extern pthread_cond_t wifi_connect_suspend_cond;
 extern pthread_t wifi_connect_suspend_mutex;
-typedef enum {
-	INFO,
-	WARNING,
-	ERROR
-} message_severity_t;
-extern void set_status_message(message_severity_t severity, const char * message);
+

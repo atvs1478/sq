@@ -37,7 +37,6 @@ Contains the freeRTOS task and all necessary support
 #include <stdbool.h>
 
 #include "dns_server.h"
-#include "http_server.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -61,6 +60,9 @@ Contains the freeRTOS task and all necessary support
 #include "platform_config.h"
 #include "trace.h"
 #include "cmd_system.h"
+#include "messaging.h"
+
+#include "http_server_handlers.h"
 #include "monitor.h"
 #include "globdefs.h"
 
@@ -69,7 +71,7 @@ Contains the freeRTOS task and all necessary support
 #endif
 
 #define STR_OR_BLANK(p) p==NULL?"":p
-#define FREE_AND_NULL(p) if(p!=NULL){ free(p); p=NULL;}
+
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
@@ -83,7 +85,7 @@ char *ip_info_json = NULL;
 char * release_url=NULL;
 cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
-static update_reason_code_t last_update_reason_code=0;
+
 
 static int32_t total_connected_time=0;
 static int64_t last_connected=0;
@@ -201,9 +203,6 @@ void set_host_name(){
 bool isGroupBitSet(uint8_t bit){
 	EventBits_t uxBits= xEventGroupGetBits(wifi_manager_event_group);
 	return (uxBits & bit);
-}
-void wifi_manager_refresh_ota_json(){
-	wifi_manager_send_message(EVENT_REFRESH_OTA, NULL);
 }
 
 void wifi_manager_scan_async(){
@@ -357,6 +356,7 @@ esp_err_t wifi_manager_save_sta_config(){
 		esp_err = nvs_commit(handle);
 		if (esp_err != ESP_OK) {
 			ESP_LOGE(TAG,  "Unable to commit changes. Error %s", esp_err_to_name(esp_err));
+			messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to save wifi credentials. %s",esp_err_to_name(esp_err));
 			return esp_err;
 		}
 		nvs_close(handle);
@@ -449,8 +449,6 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
 	cJSON_AddNumberToObject(root,"recovery",	is_recovery_running?1:0);
-	cJSON_AddItemToObject(root, "ota_dsc", cJSON_CreateString(ota_get_status()));
-	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
 	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));
 	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
@@ -479,12 +477,6 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 	wifi_config_t *config = wifi_manager_get_wifi_sta_config();
 	ip_info_cjson = wifi_manager_get_basic_info(&ip_info_cjson);
 
-	if(update_reason_code == UPDATE_OTA) {
-		update_reason_code = last_update_reason_code;
-	}
-	else {
-		last_update_reason_code = update_reason_code;
-	}
 	cJSON_AddNumberToObject(ip_info_cjson, "urc", update_reason_code);
 	if(config){
 		cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
@@ -505,7 +497,7 @@ char * get_mac_string(uint8_t mac[6]){
 
 	char * macStr=malloc(LOCAL_MAC_SIZE);
 	memset(macStr, 0x00, LOCAL_MAC_SIZE);
-	snprintf(macStr, LOCAL_MAC_SIZE-1,MACSTR, MAC2STR(mac));
+	snprintf(macStr, LOCAL_MAC_SIZE,MACSTR, MAC2STR(mac));
 	return macStr;
 
 }
@@ -855,20 +847,6 @@ void wifi_manager_connect_async(){
 	wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_USER);
 }
 
-void set_status_message(message_severity_t severity, const char * message){
-	if(ip_info_cjson==NULL){
-		ip_info_cjson = wifi_manager_get_new_json(&ip_info_cjson);
-	}
-	if(ip_info_cjson==NULL){
-		ESP_LOGE(TAG,  "Error setting status message. Unable to allocate cJSON.");
-		return;
-	}
-	cJSON * item=cJSON_GetObjectItem(ip_info_cjson, "message");
-	item = wifi_manager_get_new_json(&item);
-	cJSON_AddItemToObject(item, "severity", cJSON_CreateString(severity==INFO?"INFO":severity==WARNING?"WARNING":severity==ERROR?"ERROR":"" ));
-	cJSON_AddItemToObject(item, "text", cJSON_CreateString(message));
-}
-
 
 char* wifi_manager_alloc_get_ip_info_json(){
 	return cJSON_PrintUnformatted(ip_info_cjson);
@@ -1138,12 +1116,6 @@ void wifi_manager( void * pvParameters ){
 					ESP_LOGD(TAG,  "Done Invoking SCAN DONE callback");
 				}
 				break;
-			case EVENT_REFRESH_OTA:
-				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
-					wifi_manager_generate_ip_info_json( UPDATE_OTA );
-					wifi_manager_unlock_json_buffer();
-				}
-				break;
 
 			case ORDER_START_WIFI_SCAN:
 				ESP_LOGD(TAG,   "MESSAGE: ORDER_START_WIFI_SCAN");
@@ -1153,6 +1125,7 @@ void wifi_manager( void * pvParameters ){
 					if(esp_wifi_scan_start(&scan_config, false)!=ESP_OK){
 						ESP_LOGW(TAG,  "Unable to start scan; wifi is trying to connect");
 //						set_status_message(WARNING, "Wifi Connecting. Cannot start scan.");
+						messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Wifi connecting. Cannot start scan.");
 					}
 					else {
 						xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_SCAN_BIT);
@@ -1358,6 +1331,8 @@ void wifi_manager( void * pvParameters ){
 				else{
 					/* lost connection ? */
 					ESP_LOGE(TAG,   "WiFi Connection lost.");
+					messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"WiFi Connection lost");
+
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_LOST_CONNECTION );
 						wifi_manager_unlock_json_buffer();
@@ -1439,7 +1414,7 @@ void wifi_manager( void * pvParameters ){
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 				break;
 			case UPDATE_CONNECTION_OK:
-				/* refresh JSON with the new ota data */
+				/* refresh JSON */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					/* generate the connection info with success */
 					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );

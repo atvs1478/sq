@@ -29,6 +29,7 @@
 #include "platform_config.h"
 #include "esp_sleep.h"
 #include "driver/uart.h"            // for the uart driver access
+#include "messaging.h"				  
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -105,8 +106,8 @@ if(is_recovery_running){
 		if(!wait_for_commit()){
 			ESP_LOGW(TAG,"Unable to commit configuration. ");
 		}
-		ESP_LOGW(TAG, "Restarting after tx complete");
-		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		
+		vTaskDelay(750/ portTICK_PERIOD_MS);
 		esp_restart();
 		return ESP_OK;
 	}
@@ -117,8 +118,8 @@ else {
 		if(!wait_for_commit()){
 			ESP_LOGW(TAG,"Unable to commit configuration. ");
 		}
-		ESP_LOGW(TAG, "Restarting after tx complete");
-		uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+		
+		vTaskDelay(750/ portTICK_PERIOD_MS);
 		esp_restart();
 		return ESP_OK;
 	}
@@ -131,7 +132,7 @@ else {
 
 	if(it == NULL){
 		ESP_LOGE(TAG,"Unable initialize partition iterator!");
-		set_status_message(ERROR, "Reboot failed. Cannot iterate through partitions");
+		messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Reboot failed. Cannot iterate through partitions");
 	}
 	else
 	{
@@ -145,18 +146,19 @@ else {
 			if(err!=ESP_OK){
 				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));
 				bFound=false;
-				set_status_message(ERROR, "Unable to select partition for reboot.");
+				messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to select partition for reboot.");
 			}
 			else{
 				ESP_LOGW(TAG, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);
 				bFound=true;
-				set_status_message(WARNING, "Rebooting!");
+				messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Reboot failed. Cannot iterate through partitions");
 			}
 		}
 		else
 		{
 			ESP_LOGE(TAG,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
-			set_status_message(ERROR, "Partition not found.");
+			messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
+
 		}
 		ESP_LOGD(TAG, "Yielding to other processes");
 		taskYIELD();
@@ -165,8 +167,7 @@ else {
 			if(!wait_for_commit()){
 				ESP_LOGW(TAG,"Unable to commit configuration. ");
 			}
-			ESP_LOGW(TAG, "Restarting after tx complete");
-			uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+			vTaskDelay(750/ portTICK_PERIOD_MS);
 			esp_restart();
 		}
 	}
@@ -180,8 +181,7 @@ static int restart(int argc, char **argv)
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
-	ESP_LOGW(TAG, "Restarting after tx complete");
-    uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+    vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
     return 0;
 }
@@ -193,8 +193,8 @@ void simple_restart()
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
 
-	ESP_LOGW(TAG, "Restarting after tx complete");
-	uart_wait_tx_done(UART_NUM_1, 500 / portTICK_RATE_MS);
+											   
+	vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
 }
 

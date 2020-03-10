@@ -511,14 +511,14 @@ static void buffer_push_packet(rtp_t *ctx) {
 	// not ready to play yet
 	if (!ctx->playing ||  ctx->synchro.status != (RTP_SYNC | NTP_SYNC)) return;
 
-	// maybe re-evaluate time in loop in case data callback blocks ...
-	now = gettime_ms();
-
 	// there is always at least one frame in the buffer
 	do {
+		// re-evaluate time in loop in case data callback blocks ...
+		now = gettime_ms();
 
+		// try to manage playtime so that we overflow as late as possible if we miss NTP (2^31 / 10 / 44100)
 		curframe = ctx->audio_buffer + BUFIDX(ctx->ab_read);
-		playtime = ctx->synchro.time + (((s32_t)(curframe->rtptime - ctx->synchro.rtp)) * 1000) / RAOP_SAMPLE_RATE;
+		playtime = ctx->synchro.time + (((s32_t)(curframe->rtptime - ctx->synchro.rtp)) * 10) / (RAOP_SAMPLE_RATE / 100);
 
 		if (now > playtime) {
 			LOG_DEBUG("[%p]: discarded frame now:%u missed by:%d (W:%hu R:%hu)", ctx, now, now - playtime, ctx->ab_write, ctx->ab_read);
@@ -654,9 +654,14 @@ static void *rtp_thread_func(void *arg) {
 				u16_t flags = ntohs(*(u16_t*)(pktp+2));
 				u32_t remote_gap = NTP2MS(remote - ctx->timing.remote);
 
-				// something is wrong and if we are supposed to be NTP synced, better ask for re-sync
+				// try to get NTP every 3 sec or every time if we are not synced
+				if (!count-- || !(ctx->synchro.status && NTP_SYNC)) {
+					rtp_request_timing(ctx);
+					count = 3;
+				}
+
+				// something is wrong, we should not have such gap
 				if (remote_gap > 10000) {
-					if (ctx->synchro.status & NTP_SYNC) rtp_request_timing(ctx);
 					LOG_WARN("discarding remote timing information %u", remote_gap);
 					break;
 				}
@@ -684,11 +689,6 @@ static void *rtp_thread_func(void *arg) {
 				LOG_DEBUG("[%p]: sync packet latency:%d rtp_latency:%u rtp:%u remote ntp:%llx, local time:%u local rtp:%u (now:%u)",
 						  ctx, ctx->latency, rtp_now_latency, rtp_now, remote, ctx->synchro.time, ctx->synchro.rtp, gettime_ms());
 
-				if (!count--) {
-					rtp_request_timing(ctx);
-					count = 3;
-				}
-
 				if ((ctx->synchro.status & RTP_SYNC) && (ctx->synchro.status & NTP_SYNC)) ctx->cmd_cb(RAOP_TIMING);
 
 				break;
@@ -700,7 +700,7 @@ static void *rtp_thread_func(void *arg) {
 				u32_t reference   = ntohl(*(u32_t*)(pktp+12)); // only low 32 bits in our case
 				u64_t remote 	  =(((u64_t) ntohl(*(u32_t*)(pktp+16))) << 32) + ntohl(*(u32_t*)(pktp+20));
 				u32_t roundtrip   = gettime_ms() - reference;
-
+				
 				// better discard sync packets when roundtrip is suspicious and ask for another one
 				if (roundtrip > 100) {
 					rtp_request_timing(ctx);
@@ -786,7 +786,7 @@ static bool rtp_request_resend(rtp_t *ctx, seq_t first, seq_t last) {
 	// do not request silly ranges (happens in case of network large blackouts)
 	if (seq_order(last, first) || last - first > BUFFER_FRAMES / 2) return false;
 	
-	ctx->resent_req += last - first + 1;
+	ctx->resent_req += (seq_t) (last - first) + 1;
 
 	LOG_DEBUG("resend request [W:%hu R:%hu first=%hu last=%hu]", ctx->ab_write, ctx->ab_read, first, last);
 

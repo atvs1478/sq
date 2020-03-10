@@ -559,7 +559,7 @@ void config_delete_key(const char *key){
 	ESP_LOGD(TAG, "Deleting nvs entry for [%s]", key);
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 		ESP_LOGE(TAG, "Unable to lock config for delete");
-		return false;
+		return ;
 	}
 	esp_err_t err = nvs_open_from_partition(settings_partition, current_namespace, NVS_READWRITE, &nvs);
 	if (err == ESP_OK) {
@@ -663,7 +663,7 @@ char * config_alloc_get_json(bool bFormatted){
 	config_unlock();
 	return json_buffer;
 }
-esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, void * value){
+esp_err_t config_set_value(nvs_type_t nvs_type, const char *key, const void * value){
 	esp_err_t result = ESP_OK;
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 			ESP_LOGE(TAG, "Unable to lock config after %d ms",LOCK_MAX_WAIT);

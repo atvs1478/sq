@@ -10,9 +10,13 @@
 
 
 #recovery: PROJECT_NAME:=recovery.$(PROJECT_CONFIG_TARGET)
-#recovery: CPPFLAGS+=-DRECOVERY_APPLICATION=1
+#recovery: EXTRA_CPPFLAGS+=-DRECOVERY_APPLICATION=1
 
 PROJECT_NAME?=squeezelite
-EXTRA_COMPONENT_DIRS := esp-dsp
+EXTRA_CPPFLAGS+=  -I$(PROJECT_PATH)/main 
+
+#/-Wno-error=maybe-uninitialized 
 include $(IDF_PATH)/make/project.mk 
-CPPFLAGS+= -Wno-error=maybe-uninitialized
+
+# for future gcc version, this could be needed: CPPFLAGS+= -Wno-error=format-overflow -Wno-error=stringop-truncation
+

@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include "platform_esp32.h"
 #include "led.h"
 #include <stdio.h>
@@ -40,7 +40,6 @@
 #include "lwip/err.h"
 #include "lwip/netdb.h"
 #include "nvs_utilities.h"
-#include "http_server.h"
 #include "trace.h"
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"
@@ -48,11 +47,12 @@
 #include "platform_config.h"
 #include "audio_controls.h"
 #include "telnet.h"
+#include "messaging.h"
 
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
-
+const char unknown_string_placeholder[] = "unknown";
 EventGroupHandle_t wifi_event_group;
 
 bool bypass_wifi_manager=false;
@@ -70,7 +70,9 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 // as an exception _init function don't need include
 extern void services_init(void);
 extern void	display_init(char *welcome);
+
 bool is_recovery_running;
+const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -87,12 +89,14 @@ void cb_connection_got_ip(void *pvParameter){
 	}
 	ip.addr = ipInfo.ip.addr;
 	ESP_LOGI(TAG, "I have a connection!");
+	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"Wifi connected");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 	bWifiConnected=true;
 	led_unpush(LED_GREEN);
 }
 void cb_connection_sta_disconnected(void *pvParameter){
 	led_blink_pushed(LED_GREEN, 250, 250);
+	messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Wifi disconnected");
 	bWifiConnected=false;
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 }
@@ -168,7 +172,7 @@ esp_err_t update_certificates(){
 	if ( (esp_err= nvs_get_str(handle, certs_version, NULL, &len)) == ESP_OK) {
 		str=(char *)malloc(len);
 		if ( (esp_err = nvs_get_str(handle,  certs_version, str, &len)) == ESP_OK) {
-			printf("String associated with key '%s' is %s \n", certs_version, str);
+			ESP_LOGI(TAG,"String associated with key '%s' is %s", certs_version, str);
 		}
 	}
 	if(str!=NULL){
@@ -374,17 +378,15 @@ void app_main()
 	wifi_event_group = xEventGroupCreate();
 	ESP_LOGD(TAG,"Clearing CONNECTED_BIT from wifi group");
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-	
 
 	ESP_LOGI(TAG,"Registering default values");
 	register_default_nvs();
 
-	ESP_LOGD(TAG,"Configuring services");
+	ESP_LOGI(TAG,"Configuring services");
 	services_init();
 
-	ESP_LOGD(TAG,"Initializing display");	
+	ESP_LOGI(TAG,"Initializing display");
 	display_init("SqueezeESP32");
-
 	if(!is_recovery_running){
 		ESP_LOGI(TAG,"Checking if certificates need to be updated");
 		update_certificates();
@@ -418,10 +420,12 @@ void app_main()
 	led_blink(LED_GREEN, 250, 250);
 
 	if(bypass_wifi_manager){
-		ESP_LOGW(TAG,"\n\nwifi manager is disabled. Please use wifi commands to connect to your wifi access point.\n\n");
+		ESP_LOGW(TAG,"*******************************************************************************************");
+		ESP_LOGW(TAG,"* wifi manager is disabled. Please use wifi commands to connect to your wifi access point.");
+		ESP_LOGW(TAG,"*******************************************************************************************");
 	}
 	else {
-		ESP_LOGW(TAG,"\n\nwifi manager is ENABLED. Starting...\n\n");
+		ESP_LOGI(TAG,"Starting Wifi Manager");
 		wifi_manager_start();
 		wifi_manager_set_callback(EVENT_STA_GOT_IP, &cb_connection_got_ip);
 		wifi_manager_set_callback(EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
@@ -445,4 +449,5 @@ void app_main()
 		}
 		free(fwurl);
 	}
+	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"System started");
 }

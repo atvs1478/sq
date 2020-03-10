@@ -4,19 +4,12 @@
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <link rel="stylesheet" href="/bootstrap.css">
-        <link rel="stylesheet" href="res/test/bootstrap.min.css"> <!-- TODO delete -->
-        <link rel="stylesheet" href="/style.css">
-        <script src="/jquery.js"></script>
-        <script src="/popper.js"></script>
-        <script src="/bootstrap.js"></script>
-
-        <script src="res/test/jquery.min.js"></script> <!-- TODO delete -->
-        <script src="res/test/popper.min.js"></script> <!-- TODO delete -->
-        <script src="res/test/bootstrap.min.js"></script> <!-- TODO delete -->
-
-        <script src="/code.js"></script>
-
+        <link rel="stylesheet" href="/res/bootstrap.css">
+        <link rel="stylesheet" href="/res/style.css">
+        <script src="/res/jquery.js"></script>
+        <script src="/res/popper.js"></script>
+        <script src="/res/bootstrap.js"></script>
+        <script src="/res/code.js"></script>
 
         <title>esp32-wifi-manager</title>
     </head>
@@ -74,7 +67,7 @@
                 <a class="nav-link" data-toggle="tab" href="#tab-firmware">Firmware</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#tab-gpio">GPIO</a>
+                <a class="nav-link" data-toggle="tab" href="#tab-syslog">Syslog</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
@@ -197,7 +190,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> <!-- wifi -->
 
                 <div class="tab-pane fade" id="tab-audio">
                     <div id="audioout">
@@ -247,72 +240,7 @@
                           <label class="custom-control-label" for="autoexec-cb"></label>
                     </div>
                     <br />
-                </div>
-
-                <div class="tab-pane fade" id="tab-gpio">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Signal</th>
-                                <th scope="col">I2S pin</th>
-                                <th scope="col">SPDIF pin</th>
-                            </tr>
-                        </thead>
-                        <tbody id="gpioTable">
-                            <tr>
-                                <td>Bit clock</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-bc" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-bc" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Word select</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-ws" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-ws" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Data</td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-i2s-data" maxlength="2" size="2">
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control gpio" id="gpio-spdif-data" maxlength="2" size="2">
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="buttons">
-                        <input id="save-gpio" type="button" class="btn btn-success" value="Save" />
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-nvs">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Key</th>
-                                <th scope="col">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="nvsTable">
-                        </tbody>
-                    </table>
-                    <div class="buttons">
-						<div id="boot-div">
-                        	<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
-                            	<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
-                        	</form>
-                    	</div>                    
-                        <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
-                    </div>
-                </div>
+                </div> <!-- audio -->
 
                 <div class="tab-pane fade" id="tab-firmware">
                     <div id="boot-div">
@@ -343,21 +271,17 @@
                     </table>
                     <h2>Firmware URL:</h2>
                     <textarea id="fwurl" maxlength="350"></textarea>
-                   <!-- 
-                    <br />OR<br />
-                    <div class="input-group mb-3" id="upload">
-                        <div class="custom-file">
-                            <input type="file" class="custom-file-input" id="inputGroupFile01">
-                            <label class="custom-file-label" for="inputGroupFile01"></label>
-                        </div>
-                        <div class="input-group-append">
-                            <span class="input-group-text" id="fwUpload">Upload</span>
-                        </div>
-                    </div>
-                   -->
                     <div class="buttons">
-                    	<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
+                        <input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
                     </div>
+                    <p>OR</p>
+                    <div class="form-group">
+                        <input type="file" class="form-control-file" id="flashfilename" aria-describedby="fileHelp">
+                        <div class="buttons">
+                            <button type="button" class="btn btn-danger" id="fwUpload">Upload!</button>
+                        </div>
+                    </div>
+
                     <div id="otadiv">
                         <div class="progress" id="progress">
                             <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width:0%">
@@ -365,11 +289,48 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> <!-- firmware -->
+
+                <div class="tab-pane fade" id="tab-syslog">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Timestamp</th>
+                                <th scope="col">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syslogTable">
+                        </tbody>
+                    </table>
+                    <div class="buttons">
+                        <input id="clear-syslog" type="button" class="btn btn-danger btn-sm" value="Clear" />
+                    </div>
+                </div> <!-- syslog -->
+
+                <div class="tab-pane fade" id="tab-nvs">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Key</th>
+                                <th scope="col">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nvsTable">
+                        </tbody>
+                    </table>
+                    <div class="buttons">
+						<div id="boot-div">
+                        	<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
+                            	<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
+                        	</form>
+                    	</div>                    
+                        <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
+                    </div>
+                </div> <!-- nvs -->
 
                 <div class="tab-pane fade" id="tab-credits">
                     <div class="jumbotron">
-                        <p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2019, philippe44, sle118, daduke<br />Licensed under the GPL</p>
+                        <p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2020, philippe44, sle118, daduke<br />Licensed under the GPL</p>
                          <p>
                             This app would not be possible without the following libraries:
                         </p>
@@ -388,7 +349,7 @@
 	                      <input type="checkbox" class="custom-control-input" id="show-nvs" checked="checked">
 	                      <label class="custom-control-label" for="show-nvs"></label>
 	                </div>
-                </div>
+                </div> <!-- credits -->
             </div>
             <footer class="footer"><span id="foot-fw"></span><span id="foot-wifi"></span></footer>
             <iframe width="0" height="0" border="0" name="dummyframe" id="dummyframe"></iframe>

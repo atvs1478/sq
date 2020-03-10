@@ -73,11 +73,7 @@ void  dns_server_stop(){
 }
 
 
-
 void  dns_server(void *pvParameters) {
-
-
-
     struct sockaddr_in sa, ra;
 
     /* Set redirection DNS hijack to the access point IP */

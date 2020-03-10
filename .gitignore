@@ -66,3 +66,6 @@ libs/
 /cdump.cmd
 /_*
 squeezelite-esp32-jsonblob.zip
+/flash_cmd.txt
+/writeSequeezeEsp.bat
+/writeSequeezeEsp.sh

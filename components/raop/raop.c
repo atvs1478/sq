@@ -958,4 +958,3 @@ static void on_dmap_string(void *ctx, const char *code, const char *name, const 
 	else if (!strcasecmp(code, "asal")) metadata->album = strndup(buf, len);
 	else if (!strcasecmp(code, "minm")) metadata->title = strndup(buf, len);
 }
-

@@ -21,6 +21,9 @@
 #include "globdefs.h"
 #include "platform_config.h"
 #include "accessors.h"
+#include "messaging.h"
+#include "cJSON.h"
+#include "trace.h"
 
 #define MONITOR_TIMER	(10*1000)
 #define SCRATCH_SIZE	256
@@ -44,16 +47,17 @@ bool spkfault_svc(void);
 /****************************************************************************************
  * 
  */
-static void task_stats( void ) {
+static void task_stats( cJSON* top ) {
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY 
 	static struct {
 		TaskStatus_t *tasks;
 		uint32_t total, n;
 	} current, previous;
-	
+	cJSON * tlist=cJSON_CreateArray();
 	current.n = uxTaskGetNumberOfTasks();
 	current.tasks = malloc( current.n * sizeof( TaskStatus_t ) );
 	current.n = uxTaskGetSystemState( current.tasks, current.n, &current.total );
+	cJSON_AddNumberToObject(top,"ntasks",current.n);
 	
 	static EXT_RAM_ATTR char scratch[SCRATCH_SIZE];
 	*scratch = '\0';
@@ -68,6 +72,15 @@ static void task_stats( void ) {
 																		   current.tasks[i].eCurrentState,
 																		   100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed, 
 																		   current.tasks[i].usStackHighWaterMark);
+				cJSON * t=cJSON_CreateObject();
+				cJSON_AddNumberToObject(t,"cpu",100 * (current.tasks[i].ulRunTimeCounter - previous.tasks[j].ulRunTimeCounter) / elapsed);
+				cJSON_AddNumberToObject(t,"minstk",current.tasks[i].usStackHighWaterMark);
+				cJSON_AddNumberToObject(t,"bprio",current.tasks[i].uxBasePriority);
+				cJSON_AddNumberToObject(t,"cprio",current.tasks[i].uxCurrentPriority);
+				cJSON_AddStringToObject(t,"nme",current.tasks[i].pcTaskName);
+				cJSON_AddNumberToObject(t,"st",current.tasks[i].eCurrentState);
+				cJSON_AddNumberToObject(t,"num",current.tasks[i].xTaskNumber);
+				cJSON_AddItemToArray(tlist,t);
 				if (i % 3 == 2 || i == current.n - 1) {
 					ESP_LOGI(TAG, "%s", scratch);
 					n = 0;
@@ -79,13 +92,21 @@ static void task_stats( void ) {
 #else
 	for (int i = 0, n = 0; i < current.n; i ++) {
 		n += sprintf(scratch + n, "%16s s:%5u\t", current.tasks[i].pcTaskName, current.tasks[i].usStackHighWaterMark);
+		cJSON * t=cJSON_CreateObject();
+		cJSON_AddNumberToObject(t,"minstk",current.tasks[i].usStackHighWaterMark);
+		cJSON_AddNumberToObject(t,"bprio",current.tasks[i].uxBasePriority);
+		cJSON_AddNumberToObject(t,"cprio",current.tasks[i].uxCurrentPriority);
+		cJSON_AddStringToObject(t,"nme",current.tasks[i].pcTaskName);
+		cJSON_AddStringToObject(t,"st",current.tasks[i].eCurrentState);
+		cJSON_AddNumberToObject(t,"num",current.tasks[i].xTaskNumber);
+		cJSON_AddItemToArray(tlist,t);
 		if (i % 3 == 2 || i == current.n - 1) {
 			ESP_LOGI(TAG, "%s", scratch);
 			n = 0;
 		}	
 	}
 #endif	
-	
+	cJSON_AddItemToObject(top,"tasks",tlist);
 	if (previous.tasks) free(previous.tasks);
 	previous = current;
 #endif	
@@ -95,13 +116,26 @@ static void task_stats( void ) {
  * 
  */
 static void monitor_callback(TimerHandle_t xTimer) {
+	cJSON * top=cJSON_CreateObject();
+	cJSON_AddNumberToObject(top,"free_iram",heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+	cJSON_AddNumberToObject(top,"min_free_iram",heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+	cJSON_AddNumberToObject(top,"free_spiram",heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	cJSON_AddNumberToObject(top,"min_free_spiram",heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+
 	ESP_LOGI(TAG, "Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
 			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 			
-	task_stats();
+	task_stats(top);
+	char * top_a= cJSON_PrintUnformatted(top);
+	if(top_a){
+		messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_STATS,top_a);
+		FREE_AND_NULL(top_a);
+	}
+	cJSON_free(top);
+
 }
 
 /****************************************************************************************
@@ -109,6 +143,7 @@ static void monitor_callback(TimerHandle_t xTimer) {
  */
 static void jack_handler_default(void *id, button_event_e event, button_press_e mode, bool long_press) {
 	ESP_LOGD(TAG, "Jack %s", event == BUTTON_PRESSED ? "inserted" : "removed");
+	messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_SYSTEM,"jack is %s",BUTTON_PRESSED ? "inserted" : "removed");
 	if (jack_handler_svc) (*jack_handler_svc)(event == BUTTON_PRESSED);
 }
 

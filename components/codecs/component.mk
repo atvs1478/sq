@@ -21,6 +21,6 @@ COMPONENT_ADD_LDFLAGS=-l$(COMPONENT_NAME) 	\
 	#$(COMPONENT_PATH)/lib/libesp-tremor.a
 	#$(COMPONENT_PATH)/lib/libesp-ogg-container.a
 	
-
+COMPONENT_ADD_INCLUDEDIRS := /inc
 	
 	

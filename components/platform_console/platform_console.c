@@ -28,6 +28,15 @@
 #include "wifi_manager.h"
 
 #include "platform_config.h"
+#include "telnet.h"
+#include "gds.h"
+#include "gds_default_if.h"
+#include "gds_draw.h"
+#include "gds_text.h"
+#include "gds_font.h"
+#include "display.h"
+#include "cmd_squeezelite.h"
+#include "config.h"
 pthread_t thread_console;
 static void * console_thread();
 void console_start();
@@ -152,9 +161,24 @@ void initialize_console() {
 }
 
 void console_start() {
-
-	initialize_console();
-
+	if(is_recovery_running){
+		GDS_ClearExt(display, true);
+		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
+		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
+	}
+	if(!is_serial_suppressed()){
+		initialize_console();
+	}
+	else {
+		/* Initialize the console */
+		esp_console_config_t console_config = { .max_cmdline_args = 22,
+				.max_cmdline_length = 600,
+	#if CONFIG_LOG_COLORS
+				.hint_color = atoi(LOG_COLOR_CYAN)
+	#endif
+				};
+		ESP_ERROR_CHECK(esp_console_init(&console_config));
+	}
 	/* Register commands */
 	esp_console_register_help_command();
 	register_system();
@@ -167,53 +191,59 @@ void console_start() {
 		register_ota_cmd();
 	}
 	register_i2ctools();
-	printf("\n");
-	if(is_recovery_running){
-		printf("****************************************************************\n"
-		"RECOVERY APPLICATION\n"
-		"This mode is used to flash Squeezelite into the OTA partition\n"
-		"****\n\n");
-	}
-	printf("Type 'help' to get the list of commands.\n"
-	"Use UP/DOWN arrows to navigate through command history.\n"
-	"Press TAB when typing command name to auto-complete.\n"
-	"\n");
-	if(!is_recovery_running){
-		printf("To automatically execute lines at startup:\n"
-				"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
-				"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n");
-	}
-	printf("\n\n");
+	
+	if(!is_serial_suppressed()){
+		printf("\n");
+		if(is_recovery_running){
+			printf("****************************************************************\n"
+			"RECOVERY APPLICATION\n"
+			"This mode is used to flash Squeezelite into the OTA partition\n"
+			"****\n\n");
+		}
+		printf("Type 'help' to get the list of commands.\n"
+		"Use UP/DOWN arrows to navigate through command history.\n"
+		"Press TAB when typing command name to auto-complete.\n"
+		"\n");
+		if(!is_recovery_running){
+			printf("To automatically execute lines at startup:\n"
+					"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
+					"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n");
+		}
+		printf("\n\n");
 
-	/* Figure out if the terminal supports escape sequences */
-	int probe_status = linenoiseProbe();
-	if (probe_status) { /* zero indicates success */
-		printf("\n****************************\n"
-				"Your terminal application does not support escape sequences.\n"
-				"Line editing and history features are disabled.\n"
-				"On Windows, try using Putty instead.\n"
-				"****************************\n");
-		linenoiseSetDumbMode(1);
-#if CONFIG_LOG_COLORS
-		/* Since the terminal doesn't support escape sequences,
-		 * don't use color codes in the prompt.
-		 */
-		prompt = "squeezelite-esp32> ";
-#endif //CONFIG_LOG_COLORS
+		/* Figure out if the terminal supports escape sequences */
+		int probe_status = linenoiseProbe();
+		if (probe_status) { /* zero indicates success */
+			printf("\n****************************\n"
+					"Your terminal application does not support escape sequences.\n"
+					"Line editing and history features are disabled.\n"
+					"On Windows, try using Putty instead.\n"
+					"****************************\n");
+			linenoiseSetDumbMode(1);
+	#if CONFIG_LOG_COLORS
+			/* Since the terminal doesn't support escape sequences,
+			 * don't use color codes in the prompt.
+			 */
+			prompt = "squeezelite-esp32> ";
+	#endif //CONFIG_LOG_COLORS
+		}
+		esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+		cfg.thread_name= "console";
+		cfg.inherit_cfg = true;
+		if(is_recovery_running){
+			cfg.stack_size = 4096 ;
+		}
+		esp_pthread_set_cfg(&cfg);
+		pthread_attr_t attr;
+		pthread_attr_init(&attr);
 
+		pthread_create(&thread_console, &attr, console_thread, NULL);
+		pthread_attr_destroy(&attr);   	
+	} 
+	else if(!is_recovery_running){
+		process_autoexec();
 	}
-    esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-    cfg.thread_name= "console";
-    cfg.inherit_cfg = true;
-    if(is_recovery_running){
-    	cfg.stack_size = 4096 ;
-    }
-    esp_pthread_set_cfg(&cfg);
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
 
-	pthread_create(&thread_console, &attr, console_thread, NULL);
-	pthread_attr_destroy(&attr);
 }
 void run_command(char * line){
 	/* Try to run the command */
@@ -221,15 +251,16 @@ void run_command(char * line){
 	esp_err_t err = esp_console_run(line, &ret);
 
 	if (err == ESP_ERR_NOT_FOUND) {
-		ESP_LOGE(TAG,"Unrecognized command: %s\n", line);
+		ESP_LOGE(TAG,"Unrecognized command: %s", line);
 	} else if (err == ESP_ERR_INVALID_ARG) {
 		// command was empty
 	} else if (err == ESP_OK && ret != ESP_OK) {
-		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)\n", ret,
+		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)", ret,
 				esp_err_to_name(err));
 	} else if (err != ESP_OK) {
-		ESP_LOGE(TAG,"Internal error: %s\n", esp_err_to_name(err));
+		ESP_LOGE(TAG,"Internal error: %s", esp_err_to_name(err));
 	}
+
 }
 static void * console_thread() {
 	if(!is_recovery_running){

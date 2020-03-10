@@ -212,12 +212,6 @@ input[type='text'], input[type='password'], textarea {
   padding: 4px;
 }
 
-input.gpio {
-    width: 2em;
-    color: #000;
-    height: 1.8em;
-}
-
 .custom-switch {
     margin-left: 8px;
 }
@@ -271,6 +265,18 @@ input.gpio {
 
 textarea#autoexec1, textarea#fwurl, div#upload {
     width: 80%;
+}
+
+table tr.MESSAGING_INFO {
+    background: #123;
+}
+
+table tr.MESSAGING_WARNING {
+    background: #330;
+}
+
+table tr.MESSAGING_ERROR {
+    background: #300;
 }
 
 input, textarea {

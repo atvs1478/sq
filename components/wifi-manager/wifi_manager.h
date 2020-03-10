@@ -42,6 +42,17 @@ extern "C" {
 #include "squeezelite-ota.h"
 #include "cJSON.h"
 
+#ifndef RECOVERY_APPLICATION
+#error "RECOVERY_APPLICATION not defined. Defaulting to squeezelite"
+#endif
+
+#if RECOVERY_APPLICATION==1
+#elif RECOVERY_APPLICATION==0
+#else
+#error "unknown configuration"
+#endif
+
+
 
 /**
  * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.
@@ -187,12 +198,11 @@ typedef enum message_code_t {
 	EVENT_STA_DISCONNECTED = 12,
 	EVENT_SCAN_DONE = 13,
 	EVENT_STA_GOT_IP = 14,
-	EVENT_REFRESH_OTA = 15,
-	ORDER_RESTART_OTA = 16,
-	ORDER_RESTART_RECOVERY = 17,
-	ORDER_RESTART_OTA_URL = 18,
-	ORDER_RESTART = 19,
-	MESSAGE_CODE_COUNT = 20 /* important for the callback array */
+	ORDER_RESTART_OTA = 15,
+	ORDER_RESTART_RECOVERY = 16,
+	ORDER_RESTART_OTA_URL = 17,
+	ORDER_RESTART = 18,
+	MESSAGE_CODE_COUNT = 19 /* important for the callback array */
 
 }message_code_t;
 
@@ -215,8 +225,7 @@ typedef enum update_reason_code_t {
 	UPDATE_CONNECTION_OK = 0,
 	UPDATE_FAILED_ATTEMPT = 1,
 	UPDATE_USER_DISCONNECT = 2,
-	UPDATE_LOST_CONNECTION = 3,
-	UPDATE_OTA=4
+	UPDATE_LOST_CONNECTION = 3
 }update_reason_code_t;
 
 typedef enum connection_request_made_by_code_t{

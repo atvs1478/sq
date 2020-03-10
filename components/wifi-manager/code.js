@@ -10,7 +10,28 @@ if (!String.prototype.format) {
         });
     };
 }
+var nvs_type_t = {
+    NVS_TYPE_U8    : 0x01,  /*!< Type uint8_t */
+    NVS_TYPE_I8    : 0x11,  /*!< Type int8_t */
+    NVS_TYPE_U16   : 0x02,  /*!< Type uint16_t */
+    NVS_TYPE_I16   : 0x12,  /*!< Type int16_t */
+    NVS_TYPE_U32   : 0x04,  /*!< Type uint32_t */
+    NVS_TYPE_I32   : 0x14,  /*!< Type int32_t */
+    NVS_TYPE_U64   : 0x08,  /*!< Type uint64_t */
+    NVS_TYPE_I64   : 0x18,  /*!< Type int64_t */
+    NVS_TYPE_STR   : 0x21,  /*!< Type string */
+    NVS_TYPE_BLOB  : 0x42,  /*!< Type blob */
+    NVS_TYPE_ANY   : 0xff   /*!< Must be last */
+} ;
 
+var task_state_t = {
+		 0 : "eRunning",	/*!< A task is querying the state of itself, so must be running. */
+		 1 : "eReady",			/*!< The task being queried is in a read or pending ready list. */
+		 2 : "eBlocked",		/*!< The task being queried is in the Blocked state. */
+		 3 : "eSuspended",		/*!< The task being queried is in the Suspended state, or is in the Blocked state with an infinite time out. */
+		 4 : "eDeleted"				
+
+}
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
 var enableAPTimer = true;
@@ -19,7 +40,6 @@ var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
-var lastMsg = '';
 
 var apList = null;
 var selectedSSID = "";
@@ -189,20 +209,29 @@ $(document).ready(function(){
     $("input#autoexec-cb").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec = (this.checked)?1:0;
-        data['autoexec'] = autoexec;
-        showMessage('please wait for the ESP32 to reboot', 'WARNING');
+        data['config'] = {};
+        data['config'] = {
+            autoexec : {
+                value : autoexec,
+                type : 33
+            }
+        }
+
+
+        showMessage('please wait for the ESP32 to reboot', 'MESSAGING_WARNING');
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-autoexec": autoexec },
+//            headers: { "X-Custom-autoexec": autoexec },
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data:  JSON.stringify(data),
+
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             },
             complete: function(response) {
                 //var returnedResponse = JSON.parse(response.responseText);
@@ -219,7 +248,7 @@ $(document).ready(function(){
                     error: function (xhr, ajaxOptions, thrownError) {
                         console.log(xhr.status);
                         console.log(thrownError);
-                        if (thrownError != '') showMessage(thrownError, 'ERROR');
+                        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
                     },
                     complete: function(response) {
                     	console.log('reboot call completed');
@@ -232,20 +261,26 @@ $(document).ready(function(){
     $("input#save-autoexec1").on("click", function() {
         var data = { 'timestamp': Date.now() };
         autoexec1 = $("#autoexec1").val();
-        data['autoexec1'] = autoexec1;
+        data['config'] = {};
+        data['config'] = {
+            autoexec1 : {
+                value : autoexec1,
+                type : 33
+            }
+        }
 
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-autoexec1": autoexec1 },
+//            headers: { "X-Custom-autoexec1": autoexec1 },
             contentType: 'application/json; charset=utf-8',
             data: JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', autoexec1);
@@ -254,15 +289,19 @@ $(document).ready(function(){
 
     $("input#save-gpio").on("click", function() {
         var data = { 'timestamp': Date.now() };
+        var config = {};
+
         var headers = {};
         $("input.gpio").each(function() {
             var id = $(this)[0].id;
             var pin = $(this).val();
             if (pin != '') {
-                headers["X-Custom-"+id] = pin;
-                data[id] = pin;
+                config[id] = {};
+                config[id].value = pin;
+                config[id].type = nvs_type_t.NVS_TYPE_STR;
             }
         });
+        data['config'] = config;
         $.ajax({
             url: '/config.json',
             dataType: 'text',
@@ -274,7 +313,7 @@ $(document).ready(function(){
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
@@ -284,23 +323,40 @@ $(document).ready(function(){
     $("#save-nvs").on("click", function() {
         var headers = {};
         var data = { 'timestamp': Date.now() };
+        var config = {};
         $("input.nvs").each(function() {
             var key = $(this)[0].id;
             var val = $(this).val();
+            var nvs_type = parseInt($(this)[0].attributes.nvs_type.nodeValue,10);
             if (key != '') {
-                headers["X-Custom-"+key] = val;
-                data[key] = {};
-                data[key].value = val;
-                data[key].type = 33;
+                config[key] = {};
+                if(nvs_type == nvs_type_t.NVS_TYPE_U8    
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I8    
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U16   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I16   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U32   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I32   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_U64   
+					|| nvs_type ==  nvs_type_t.NVS_TYPE_I64) {
+						config[key].value = parseInt(val);	
+				}   
+				else { 
+					config[key].value = val; 
+				} 
+                
+                
+                config[key].type = nvs_type;
             }
         });
         var key = $("#nvs-new-key").val();
         var val = $("#nvs-new-value").val();
         if (key != '') {
-            headers["X-Custom-"+key] = val;
-            data[key] = {};
-            data[key].value = val;
+//            headers["X-Custom-"	+key] = val;
+            config[key] = {};
+            config[key].value = val;
+            config[key].type = 33;
         }
+        data['config'] = config;
         $.ajax({
             url: '/config.json',
             dataType: 'text',
@@ -308,35 +364,64 @@ $(document).ready(function(){
             cache: false,
             headers: headers,
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data : JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         console.log('sent config JSON with headers:', JSON.stringify(headers));
         console.log('sent config JSON with data:', JSON.stringify(data));
     });
-
+    $("#fwUpload").on("click", function() {
+        var upload_path = "/flash.json";
+        var fileInput = document.getElementById("flashfilename").files;
+        if (fileInput.length == 0) {
+            alert("No file selected!");
+        } else {
+            var file = fileInput[0];
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (xhttp.readyState == 4) {
+                    if (xhttp.status == 200) {
+                    	showMessage(xhttp.responseText, 'MESSAGING_INFO')
+                    } else if (xhttp.status == 0) {
+                    	showMessage("Upload connection was closed abruptly!", 'MESSAGING_ERROR');
+                    } else {
+                    	showMessage(xhttp.status + " Error!\n" + xhttp.responseText, 'MESSAGING_ERROR');
+                    }
+                }
+            };
+            xhttp.open("POST", upload_path, true);
+            xhttp.send(file);    	
+        }
+    	enableStatusTimer = true;
+    });
     $("#flash").on("click", function() {
         var data = { 'timestamp': Date.now() };
         if (blockFlashButton) return;
         blockFlashButton = true;
         var url = $("#fwurl").val();
-        data['fwurl'] = url;
+        data['config'] = {
+            fwurl : {
+            value : url,
+            type : 33
+
+            }
+        };
+
         $.ajax({
             url: '/config.json',
             dataType: 'text',
             method: 'POST',
             cache: false,
-            headers: { "X-Custom-fwurl": url },
             contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify(data),
+            data:  JSON.stringify(data),
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
-                if (thrownError != '') showMessage(thrownError, 'ERROR');
+                if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
             }
         });
         enableStatusTimer = true;
@@ -509,13 +594,17 @@ function performConnect(conntype){
         dataType: 'text',
         method: 'POST',
         cache: false,
-        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
+//        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
         contentType: 'application/json; charset=utf-8',
-        data: { 'timestamp': Date.now()},
+        data: JSON.stringify({ 'timestamp': Date.now(),
+        	'ssid' : selectedSSID, 
+        	'pwd' : pwd,
+        	'host_name' : dhcpname
+        	}), 
         error: function (xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);
             console.log(thrownError);
-            if (thrownError != '') showMessage(thrownError, 'ERROR');
+            if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         }
     });
 
@@ -564,11 +653,76 @@ function refreshAPHTML(data){
     $( "#wifi-list" ).html(h)
 }
 
+function getMessages() {
+	   $.getJSON("/messages.json?1", function(data) {
+	        data.forEach(function(msg) {
+	        	var msg_age = msg["current_time"] - msg["sent_time"];
+				var msg_time  = new Date();
+				msg_time.setTime( msg_time.getTime() - msg_age );
+	        	switch (msg["class"]) {
+	        		case "MESSAGING_CLASS_OTA":
+	        			//message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
+	        			var ota_data = JSON.parse(msg["message"]);
+	        			if (ota_data.hasOwnProperty('ota_pct') && ota_data['ota_pct'] != 0){
+	        	            otapct = ota_data['ota_pct'];
+	        	            $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
+	        	            $('.progress-bar').html(otapct+'%');
+	        	        }
+	        	        if (ota_data.hasOwnProperty('ota_dsc') && ota_data['ota_dsc'] != ''){
+	        	            otadsc = ota_data['ota_dsc'];
+	        	            $("span#flash-status").html(otadsc);
+	        	            if (otadsc.match(/Error:/) || otapct > 95) {
+	        	                blockFlashButton = false;
+	        	                enableStatusTimer = true;
+	        	            }
+	        	        }        			
+	        			break;
+	        		case "MESSAGING_CLASS_STATS":
+	        			// for task states, check structure : task_state_t
+	        			var stats_data = JSON.parse(msg["message"]);
+	        			console.log(msg_time.toLocaleString() + " - Number of tasks on the ESP32: " + stats_data["ntasks"]);
+	        			var stats_tasks = stats_data["tasks"];
+	        			console.log(msg_time.toLocaleString() + '\tname' + '\tcpu' + '\tstate'+ '\tminstk'+ '\tbprio'+ '\tcprio'+ '\tnum' );
+	        			stats_tasks.forEach(function(task) {
+	        				console.log(msg_time.toLocaleString() + '\t' + task["nme"] + '\t'+ task["cpu"] + '\t'+ task_state_t[task["st"]]+ '\t'+ task["minstk"]+ '\t'+ task["bprio"]+ '\t'+ task["cprio"]+ '\t'+ task["num"]);
+	        			});
+	        			break;
+	        		case "MESSAGING_CLASS_SYSTEM":
+	        			showMessage(msg["message"], msg["type"],msg_age);
+
+                        $("#syslogTable").append(
+                            "<tr class='"+msg["type"]+"'>"+
+                                "<td>"+msg_time.toLocaleString()+"</td>"+
+                                "<td>"+msg["message"]+"</td>"+
+                            "</tr>"
+                        );
+	        			break;
+				default:
+					break;
+				}	
+	        });
+	        
+	    })
+	    .fail(function(xhr, ajaxOptions, thrownError) {
+	        console.log(xhr.status);
+	        console.log(thrownError);
+	        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
+	    });
+    /*
+    Minstk is minimum stack space left
+Bprio is base priority
+cprio is current priority
+nme is name
+st is task state. I provided a "typedef" that you can use to convert to text
+cpu is cpu percent used
+*/
+}
 function checkStatus(){
     RepeatCheckStatusInterval();
     if (!enableStatusTimer) return;
     if (blockAjax) return;
     blockAjax = true;
+    getMessages();
     $.getJSON( "/status.json", function( data ) {
         if (data.hasOwnProperty('ssid') && data['ssid'] != ""){
             if (data["ssid"] === selectedSSID){
@@ -659,20 +813,24 @@ function checkStatus(){
                 $("#otadiv").show();
                 $('a[href^="#tab-audio"]').hide();
                 $('a[href^="#tab-gpio"]').show();
+                $('#uploaddiv').show();
                 $("footer.footer").removeClass('sl');
                 $("footer.footer").addClass('recovery');
                 $("#boot-button").html('Reboot');
                 $("#boot-form").attr('action', '/reboot_ota.json');
+
                 enableStatusTimer = true;
             } else {
                 recovery = false;
                 $("#otadiv").hide();
                 $('a[href^="#tab-audio"]').show();
                 $('a[href^="#tab-gpio"]').hide();
+                $('#uploaddiv').hide();
                 $("footer.footer").removeClass('recovery');
                 $("footer.footer").addClass('sl');
                 $("#boot-button").html('Recovery');
                 $("#boot-form").attr('action', '/recovery.json');
+                
                 enableStatusTimer = false;
             }
         }
@@ -683,29 +841,10 @@ function checkStatus(){
             ver = data['version'];
             $("span#foot-fw").html("fw: <strong>"+ver+"</strong>, mode: <strong>"+pname+"</strong>");
         }
-        if (data.hasOwnProperty('ota_pct') && data['ota_pct'] != 0){
-            otapct = data['ota_pct'];
-            $('.progress-bar').css('width', otapct+'%').attr('aria-valuenow', otapct);
-            $('.progress-bar').html(otapct+'%');
-        }
-        if (data.hasOwnProperty('ota_dsc') && data['ota_dsc'] != ''){
-            otadsc = data['ota_dsc'];
-            $("span#flash-status").html(otadsc);
-            if (otadsc.match(/Error:/) || otapct > 95) {
-                blockFlashButton = false;
-                enableStatusTimer = true;
-            }
-        } else {
+         else {
             $("span#flash-status").html('');
         }
-        if (data.hasOwnProperty('message') && data['message'] != ''){
-            var msg = data['message'].text;
-            var severity = data['message'].severity;
-            if (msg != lastMsg) {
-                showMessage(msg, severity);
-                lastMsg = msg;
-            }
-        }
+       
         if (data.hasOwnProperty('Voltage')) {
             var voltage = data['Voltage'];
             var layer;
@@ -735,7 +874,7 @@ function checkStatus(){
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
         console.log(thrownError);
-        if (thrownError != '') showMessage(thrownError, 'ERROR');
+        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         blockAjax = false;
     });
 }
@@ -770,7 +909,7 @@ function getConfig() {
                     "<tr>"+
                         "<td>"+key+"</td>"+
                         "<td class='value'>"+
-                            "<input type='text' class='form-control nvs' id='"+key+"'>"+
+                            "<input type='text' class='form-control nvs' id='"+key+"'  nvs_type="+data[key].type+" >"+
                         "</td>"+
                     "</tr>"
                 );
@@ -783,7 +922,7 @@ function getConfig() {
                     "<input type='text' class='form-control' id='nvs-new-key' placeholder='new key'>"+
                 "</td>"+
                 "<td>"+
-                    "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value'>"+
+                    "<input type='text' class='form-control' id='nvs-new-value' placeholder='new value' nvs_type=33 >"+ // todo: provide a way to choose field type 
                 "</td>"+
             "</tr>"
         );
@@ -791,19 +930,23 @@ function getConfig() {
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
         console.log(thrownError);
-        if (thrownError != '') showMessage(thrownError, 'ERROR');
+        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         blockAjax = false;
     });
 }
 
-function showMessage(message, severity) {
-    if (severity == 'INFO') {
+
+function showMessage(message, severity, age=0) {
+	if (severity == 'MESSAGING_INFO') {
         $('#message').css('background', '#6af');
-    } else if (severity == 'WARNING') {
+    } else if (severity == 'MESSAGING_WARNING') {
         $('#message').css('background', '#ff0');
+    } else if (severity == 'MESSAGING_ERROR' ) {
+        $('#message').css('background', '#f00');
     } else {
         $('#message').css('background', '#f00');
     }
+    	
     $('#message').html(message);
     $("#content").fadeTo("slow", 0.3, function() {
         $("#message").show(500).delay(5000).hide(500, function() {
@@ -815,3 +958,6 @@ function showMessage(message, severity) {
 function inRange(x, min, max) {
     return ((x-min)*(x-max) <= 0);
 }
+
+    
+    
