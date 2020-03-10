@@ -23,11 +23,11 @@ add_custom_command(OUTPUT ${squeezelite_project_elf_src}
 
 
     add_custom_command(OUTPUT "${build_dir}/.squeezelite_bin_timestamp"
+	    COMMAND echo ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${esptool_elf2image_args}
         COMMAND ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${esptool_elf2image_args}
             -o "${build_dir}/squeezelite.bin" "squeezelite.elf"
         COMMAND ${CMAKE_COMMAND} -E echo "Generated ${build_dir}/squeezelite.bin"
         COMMAND ${CMAKE_COMMAND} -E md5sum "${build_dir}/squeezelite.bin" > "${build_dir}/.squeezelite_bin_timestamp"
-        DEPENDS ${elf}
         VERBATIM
         WORKING_DIRECTORY ${build_dir}
         COMMENT "Generating binary image from built executable"
@@ -46,3 +46,6 @@ target_link_libraries(${squeezelite_project_elf} "-Wl,--cref -Wl,--Map=${squeeze
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
         ADDITIONAL_MAKE_CLEAN_FILES
         "${squeezelite_mapfile}" "${squeezelite_project_elf_src}")
+
+partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ota_0" "offset")
+esptool_py_flash_project_args(squeezelite ${otaapp_offset} ${build_dir}/squeezelite.bin FLASH_IN_PROJECT)
