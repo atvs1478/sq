@@ -2,12 +2,14 @@
 
 idf_component_register( SRC_DIRS . external a1s tas57xx
 						INCLUDE_DIRS .  a1s 
-						PRIV_REQUIRES 	newlib 
+						PRIV_REQUIRES 	
+									codecs
+									newlib 
 									esp_common 
 									esp-dsp
 						  			platform_config 
 						 			bluetooth 
-						 			codecs 
+						 			 
 						 			services 
 						 			raop   
 						 			display

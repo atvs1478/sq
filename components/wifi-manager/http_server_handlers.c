@@ -45,7 +45,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "config.h"
+#include "platform_config.h"
 #include "sys/param.h"
 #include "esp_vfs.h"
 #include "lwip/ip_addr.h"
@@ -663,11 +663,13 @@ esp_err_t config_post_handler(httpd_req_t *req){
     cJSON_Delete(root);
 	if(bOTA) {
 
-#if RECOVERY_APPLICATION
-		ESP_LOGW_LOC(TAG,   "Starting process OTA for url %s",otaURL);
-#else
-		ESP_LOGW_LOC(TAG,   "Restarting system to process OTA for url %s",otaURL);
-#endif
+		if(is_recovery_running){
+			ESP_LOGW_LOC(TAG,   "Starting process OTA for url %s",otaURL);
+		}
+		else {
+			ESP_LOGW_LOC(TAG,   "Restarting system to process OTA for url %s",otaURL);
+		}
+
 		wifi_manager_reboot_ota(otaURL);
 		free(otaURL);
 	}
@@ -805,82 +807,83 @@ esp_err_t recovery_post_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
-#if RECOVERY_APPLICATION
+
 esp_err_t flash_post_handler(httpd_req_t *req){
-    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
-    char success[]="File uploaded. Flashing started.";
-    if(!is_user_authenticated(req)){
-    	// todo:  redirect to login page
-    	// return ESP_OK;
-    }
-    esp_err_t err = httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
-	if(err != ESP_OK){
-		return err;
-	}
-	char * binary_buffer = malloc(req->content_len);
-	if(binary_buffer == NULL){
-        ESP_LOGE(TAG, "File too large : %d bytes", req->content_len);
-        /* Respond with 400 Bad Request */
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                            "Binary file too large. Unable to allocate memory!");
-        return ESP_FAIL;
-	}
-	ESP_LOGI(TAG, "Receiving ota binary file");
-	/* Retrieve the pointer to scratch buffer for temporary storage */
-	char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+	esp_err_t err =ESP_OK;
+	if(is_recovery_running){
+		ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+		char success[]="File uploaded. Flashing started.";
+		if(!is_user_authenticated(req)){
+			// todo:  redirect to login page
+			// return ESP_OK;
+		}
+		err = httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+		if(err != ESP_OK){
+			return err;
+		}
+		char * binary_buffer = malloc(req->content_len);
+		if(binary_buffer == NULL){
+			ESP_LOGE(TAG, "File too large : %d bytes", req->content_len);
+			/* Respond with 400 Bad Request */
+			httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+								"Binary file too large. Unable to allocate memory!");
+			return ESP_FAIL;
+		}
+		ESP_LOGI(TAG, "Receiving ota binary file");
+		/* Retrieve the pointer to scratch buffer for temporary storage */
+		char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
 
-	char *head=binary_buffer;
-	int received;
+		char *head=binary_buffer;
+		int received;
 
-	/* Content length of the request gives
-	 * the size of the file being uploaded */
-	int remaining = req->content_len;
+		/* Content length of the request gives
+		 * the size of the file being uploaded */
+		int remaining = req->content_len;
 
-	while (remaining > 0) {
+		while (remaining > 0) {
 
-		ESP_LOGI(TAG, "Remaining size : %d", remaining);
-		/* Receive the file part by part into a buffer */
-		if ((received = httpd_req_recv(req, buf, MIN(remaining, SCRATCH_BUFSIZE))) <= 0) {
-			if (received == HTTPD_SOCK_ERR_TIMEOUT) {
-				/* Retry if timeout occurred */
-				continue;
+			ESP_LOGI(TAG, "Remaining size : %d", remaining);
+			/* Receive the file part by part into a buffer */
+			if ((received = httpd_req_recv(req, buf, MIN(remaining, SCRATCH_BUFSIZE))) <= 0) {
+				if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+					/* Retry if timeout occurred */
+					continue;
+				}
+				FREE_RESET(binary_buffer);
+				ESP_LOGE(TAG, "File reception failed!");
+				/* Respond with 500 Internal Server Error */
+				httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive file");
+				err = ESP_FAIL;
+				goto bail_out;
 			}
-			FREE_RESET(binary_buffer);
-			ESP_LOGE(TAG, "File reception failed!");
-			/* Respond with 500 Internal Server Error */
-			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive file");
-			err = ESP_FAIL;
+
+			/* Write buffer content to file on storage */
+			if (received ) {
+				memcpy(head,buf,received );
+				head+=received;
+			}
+
+			/* Keep track of remaining size of
+			 * the file left to be uploaded */
+			remaining -= received;
+		}
+
+		/* Close file upon upload completion */
+		ESP_LOGI(TAG, "File reception complete. Invoking OTA process.");
+		err = start_ota(NULL, binary_buffer, req->content_len);
+		if(err!=ESP_OK){
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA processing failed");
 			goto bail_out;
 		}
 
-		/* Write buffer content to file on storage */
-		if (received ) {
-			memcpy(head,buf,received );
-			head+=received;
-		}
-
-		/* Keep track of remaining size of
-		 * the file left to be uploaded */
-		remaining -= received;
+		//todo:  handle this in ajax.  For now, just send the root page
+		httpd_resp_send(req, (const char *)success, strlen(success));
 	}
-
-	/* Close file upon upload completion */
-	ESP_LOGI(TAG, "File reception complete. Invoking OTA process.");
-	err = start_ota(NULL, binary_buffer, req->content_len);
-	if(err!=ESP_OK){
-		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA processing failed");
-		goto bail_out;
-	}
-
-	//todo:  handle this in ajax.  For now, just send the root page
-	httpd_resp_send(req, (const char *)success, strlen(success));
-
 bail_out:
 
 	return err;
 }
 
-#endif
 char * get_ap_ip_address(){
 	static char ap_ip_address[IP4ADDR_STRLEN_MAX]={};
 

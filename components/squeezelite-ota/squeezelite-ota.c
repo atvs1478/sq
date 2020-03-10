@@ -20,7 +20,7 @@
 #include "esp_err.h"
 #include "tcpip_adapter.h"
 #include "squeezelite-ota.h"
-#include "config.h"
+#include "platform_config.h"
 #include <time.h>
 #include <sys/time.h>
 #include <stdarg.h>
@@ -35,6 +35,7 @@
 #include "gds.h"
 #include "gds_text.h"
 #include "gds_draw.h"
+#include "platform_esp32.h"
 
 extern const char * get_certificate();
 
@@ -782,9 +783,9 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
 
 esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length)
 {
-#if RECOVERY_APPLICATION
-	return process_recovery_ota(bin_url,bin_buffer,length);
-#else
+	if(is_recovery_running){
+		return process_recovery_ota(bin_url,bin_buffer,length);
+	}
 	if(!bin_url){
 		ESP_LOGE(TAG,"missing URL parameter. Unable to start OTA");
 		return ESP_ERR_INVALID_ARG;
@@ -802,5 +803,5 @@ esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length)
 	ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
 	return guided_factory();
 	return ESP_OK;
-#endif
+
 }

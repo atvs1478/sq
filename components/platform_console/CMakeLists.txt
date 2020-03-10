@@ -7,5 +7,6 @@ idf_component_register( SRCS
 							platform_console.c
 						INCLUDE_DIRS .   
 						REQUIRES nvs_flash
-						PRIV_REQUIRES console  tools services   spi_flash app_update platform_config vfs pthread wifi-manager platform_config codecs newlib )
-target_link_libraries(__idf_platform_console ${build_dir}/esp-idf/$<TARGET_PROPERTY:RECOVERY_PREFIX>/lib$<TARGET_PROPERTY:RECOVERY_PREFIX>.a 	)
+						PRIV_REQUIRES console tools services spi_flash app_update platform_config vfs pthread wifi-manager platform_config newlib  telnet display)
+target_link_libraries(${COMPONENT_LIB} ${build_dir}/esp-idf/$<TARGET_PROPERTY:RECOVERY_PREFIX>/lib$<TARGET_PROPERTY:RECOVERY_PREFIX>.a 	)
+

@@ -31,6 +31,7 @@
 #include "freertos/task.h"
 #include "config.h"
 #include "messaging.h"
+#include "platform_esp32.h"
 static const char TAG[] = "http_server";
 
 static httpd_handle_t _server = NULL;
@@ -74,13 +75,10 @@ void register_regular_handlers(httpd_handle_t server){
 	httpd_uri_t connect_delete = { .uri = "/connect.json", .method = HTTP_DELETE, .handler = connect_delete_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &connect_delete);
 
-#if RECOVERY_APPLICATION
-
-	httpd_uri_t flash_post = { .uri = "/flash.json", .method = HTTP_POST, .handler = flash_post_handler, .user_ctx = rest_context };
-	httpd_register_uri_handler(server, &flash_post);
-#endif
-
-
+	if(is_recovery_running){
+		httpd_uri_t flash_post = { .uri = "/flash.json", .method = HTTP_POST, .handler = flash_post_handler, .user_ctx = rest_context };
+		httpd_register_uri_handler(server, &flash_post);
+	}
 	// from https://github.com/tripflex/wifi-captive-portal/blob/master/src/mgos_wifi_captive_portal.c
 	// https://unix.stackexchange.com/questions/432190/why-isnt-androids-captive-portal-detection-triggering-a-browser-window
 	 // Known HTTP GET requests to check for Captive Portal

@@ -35,7 +35,7 @@
 #include "gds_text.h"
 #include "gds_font.h"
 #include "display.h"
-#include "cmd_squeezelite.h"
+
 #include "config.h"
 pthread_t thread_console;
 static void * console_thread();

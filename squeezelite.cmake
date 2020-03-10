@@ -1,5 +1,7 @@
 
 
+#include($ENV{IDF_PATH}/components/esptool_py/project_include.cmake)
+
 if(NOT SDKCONFIG OR NOT IDF_PATH  OR NOT IDF_TARGET )
     message(FATAL_ERROR "squeezelite should not be made outside of the main project !")
 endif()

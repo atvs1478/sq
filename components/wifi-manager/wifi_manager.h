@@ -42,17 +42,6 @@ extern "C" {
 #include "squeezelite-ota.h"
 #include "cJSON.h"
 
-#ifndef RECOVERY_APPLICATION
-#error "RECOVERY_APPLICATION not defined. Defaulting to squeezelite"
-#endif
-
-#if RECOVERY_APPLICATION==1
-#elif RECOVERY_APPLICATION==0
-#else
-#error "unknown configuration"
-#endif
-
-
 
 /**
  * @brief Defines the maximum size of a SSID name. 32 is IEEE standard.
