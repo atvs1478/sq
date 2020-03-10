@@ -1,55 +1,48 @@
 cmake_minimum_required(VERSION 3.5)
-
-set(COMPONENT_ADD_INCLUDEDIRS main components/tools)
-
-if((DEFINED "$ENV{PROJECT_BUILD_NAME}") AND (DEFINED "$ENV{PROJECT_CONFIG_TARGET}"))
-	set(PROJECT_VER "$ENV{PROJECT_BUILD_NAME}-$ENV{PROJECT_CONFIG_TARGET}" )	
-endif()  
-
- 
-
-
-
-if(DEFINED "$ENV{PROJECT_NAME}")
-	set(PROJECT_NAME "$ENV{PROJECT_NAME}")
-	message("Project name is $PROJECT_NAME") 
-else()
-	message("Project name is not set! Defaulting")
-	set(PROJECT_NAME "squeezelite-esp32")
-endif()
+set(EXTRA_COMPONENT_DIRS components/platform_console/app_recovery components/platform_console/app_squeezelite  )
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+message(WARNING  "Building RECOVERY")
 
-if(NOT ${PROJECT_NAME} STREQUAL  "squeezelite-esp32" )
-	add_definitions( -DRECOVERY_APPLICATION=1 )
-	message(WARNING "Building Recovery")
-	project(recovery)
-else()
-	message(WARNING  "Building Squeezelite")
-	add_definitions( -DRECOVERY_APPLICATION=0 )
-	project(squeezelite)
-endif()
+project(recovery)
+set_property(TARGET recovery.elf PROPERTY RECOVERY_BUILD 0 ) 
+set_property(TARGET recovery.elf PROPERTY RECOVERY_PREFIX app_recovery )
 
-
-
-# Include ESP-IDF components in the build, may be thought as an equivalent of
-# add_subdirectory() but with some additional procesing and magic for ESP-IDF build
-# specific build processes.
-#idf_build_process(esp32)
-
-# Create the project executable and plainly link the newlib component to it using
-# its alias, idf::newlib.
-#add_executable(${CMAKE_PROJECT_NAME}.elf main.c)
-#target_link_libraries(${CMAKE_PROJECT_NAME}.elf idf::newlib)
-
-# Let the build system know what the project executable is to attach more targets, dependencies, etc.
-#idf_build_executable(${CMAKE_PROJECT_NAME}.elf)
+#
+#message(WARNING  "Building SQUEEZELITE")
+#set(project_name squeezelite)
+#__project(${project_name} C CXX ASM)
+#
+set(squeezelite_project_elf squeezelite.elf)
+#
+#    # Create a dummy file to work around CMake requirement of having a source
+#    # file while adding an executable
+set(squeezelite_project_elf_src ${CMAKE_BINARY_DIR}/squeezelite_project_elf_src.c)
+add_custom_command(OUTPUT ${squeezelite_project_elf_src}
+	COMMAND ${CMAKE_COMMAND} -E touch ${squeezelite_project_elf_src}
+    VERBATIM)
 
 
+    add_custom_command(OUTPUT "${build_dir}/.squeezelite_bin_timestamp"
+        COMMAND ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${esptool_elf2image_args}
+            -o "${build_dir}/squeezelite.bin" "squeezelite.elf"
+        COMMAND ${CMAKE_COMMAND} -E echo "Generated ${build_dir}/squeezelite.bin"
+        COMMAND ${CMAKE_COMMAND} -E md5sum "${build_dir}/squeezelite.bin" > "${build_dir}/.squeezelite_bin_timestamp"
+        DEPENDS ${elf}
+        VERBATIM
+        WORKING_DIRECTORY ${build_dir}
+        COMMENT "Generating binary image from built executable"
+        )
 
+add_custom_target(_squeezelite_project_elf_src DEPENDS "${squeezelite_project_elf_src}" "${build_dir}/.squeezelite_bin_timestamp")
+add_executable(${squeezelite_project_elf} "${squeezelite_project_elf_src}")
+add_dependencies(${squeezelite_project_elf} _squeezelite_project_elf_src)
+set_property(TARGET ${squeezelite_project_elf} PROPERTY RECOVERY_BUILD 0 )
+set_property(TARGET ${squeezelite_project_elf} PROPERTY RECOVERY_PREFIX app_squeezelite)
 
-
-
-#   add_custom_target(size
-#        DEPENDS ${project_elf}
-#        COMMAND ${idf_size} ${mapfile}
-#        )
+idf_build_get_property(bca BUILD_COMPONENT_ALIASES)            
+target_link_libraries(${squeezelite_project_elf} ${bca})
+set(squeezelite_mapfile "${CMAKE_BINARY_DIR}/squeezelite.map")
+target_link_libraries(${squeezelite_project_elf} "-Wl,--cref -Wl,--Map=${squeezelite_mapfile}")
+set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
+        ADDITIONAL_MAKE_CLEAN_FILES
+        "${squeezelite_mapfile}" "${squeezelite_project_elf_src}")

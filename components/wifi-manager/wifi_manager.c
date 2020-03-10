@@ -64,10 +64,6 @@ Contains the freeRTOS task and all necessary support
 #include "monitor.h"
 #include "globdefs.h"
 
-#ifndef RECOVERY_APPLICATION
-#define RECOVERY_APPLICATION 0
-#endif
-
 #ifndef SQUEEZELITE_ESP32_RELEASE_URL
 #define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
@@ -452,7 +448,7 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "project_name", cJSON_CreateString(desc->project_name));
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
-	cJSON_AddNumberToObject(root,"recovery",	RECOVERY_APPLICATION	);
+	cJSON_AddNumberToObject(root,"recovery",	is_recovery_running?1:0);
 	cJSON_AddItemToObject(root, "ota_dsc", cJSON_CreateString(ota_get_status()));
 	cJSON_AddNumberToObject(root,"ota_pct",	ota_get_pct_complete()	);
 	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));

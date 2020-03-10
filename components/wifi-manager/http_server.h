@@ -67,13 +67,13 @@ extern "C" {
  * @brief RTOS task for the HTTP server. Do not start manually.
  * @see void http_server_start()
  */
-void CODE_RAM_LOCATION http_server(void *pvParameters);
+void http_server(void *pvParameters);
 
 /* @brief helper function that processes one HTTP request at a time */
-void CODE_RAM_LOCATION http_server_netconn_serve(struct netconn *conn);
+void http_server_netconn_serve(struct netconn *conn);
 
 /* @brief create the task for the http server */
-void CODE_RAM_LOCATION http_server_start();
+void http_server_start();
 
 /**
  * @brief gets a char* pointer to the first occurence of header_name withing the complete http request request.
@@ -86,9 +86,9 @@ void CODE_RAM_LOCATION http_server_start();
  * @param len the size of the header value if found.
  * @return pointer to the beginning of the header value.
  */
-char* CODE_RAM_LOCATION http_server_get_header(char *request, char *header_name, int *len);
+char* http_server_get_header(char *request, char *header_name, int *len);
 
-void CODE_RAM_LOCATION strreplace(char *src, char *str, char *rep);
+void strreplace(char *src, char *str, char *rep);
 /* @brief lock the json config object */
 bool http_server_lock_json_object(TickType_t xTicksToWait);
 /* @brief unlock the json config object */

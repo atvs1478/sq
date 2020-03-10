@@ -1,10 +1,5 @@
-
-//size_t esp_console_split_argv(char *line, char **argv, size_t argv_size);
-#include "cmd_squeezelite.h"
-
 #include <stdio.h>
 #include <string.h>
-#include "cmd_decl.h"
 
 #include "esp_log.h"
 #include "esp_console.h"

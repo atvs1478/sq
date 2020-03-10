@@ -27,14 +27,13 @@
 #include "cmd_decl.h"
 #include "wifi_manager.h"
 
-#include "cmd_squeezelite.h"
 #include "platform_config.h"
 pthread_t thread_console;
 static void * console_thread();
 void console_start();
 static const char * TAG = "console";
 extern bool bypass_wifi_manager;
-
+extern void register_squeezelite();
 
 /* Prompt to be printed before each line.
  * This can be customized, made dynamic, etc.
@@ -60,10 +59,9 @@ void process_autoexec(){
 	if(!bypass_wifi_manager){
 		ESP_LOGW(TAG, "Processing autoexec commands while wifi_manager active.  Wifi related commands will be ignored.");
 	}
-#if RECOVERY_APPLICATION
-	ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.");
-#endif
-
+	if(is_recovery_running){
+		ESP_LOGD(TAG, "Processing autoexec commands in recovery mode.  Squeezelite commands will be ignored.");
+	}
 	if(str_flag !=NULL ){
 		autoexec_flag=atoi(str_flag);
 		ESP_LOGI(TAG,"autoexec is set to %s auto-process", autoexec_flag>0?"perform":"skip");
@@ -76,11 +74,9 @@ void process_autoexec(){
 					if(!bypass_wifi_manager && strstr(autoexec_value, "join ")!=NULL ){
 						ESP_LOGW(TAG,"Ignoring wifi join command.");
 					}
-#if RECOVERY_APPLICATION
-					else if(!strstr(autoexec_value, "squeezelite " ) ){
+					else if(is_recovery_running && !strstr(autoexec_value, "squeezelite " ) ){
 						ESP_LOGW(TAG,"Ignoring command. ");
 					}
-#endif
 					else {
 						ESP_LOGI(TAG,"Running command %s = %s", autoexec_name, autoexec_value);
 						run_command(autoexec_value);
@@ -164,32 +160,30 @@ void console_start() {
 	register_system();
 	register_nvs();
 	register_wifi();
-#if RECOVERY_APPLICATION!=1
-	register_squeezelite();
-#elif RECOVERY_APPLICATION==1
-	register_ota_cmd();
-#else
-#error "Unknown build configuration"
-#endif
+	if(!is_recovery_running){
+		register_squeezelite();
+	}
+	else {
+		register_ota_cmd();
+	}
 	register_i2ctools();
-	printf("\n"
-#if RECOVERY_APPLICATION
-			"****************************************************************\n"
-			"RECOVERY APPLICATION\n"
-			"This mode is used to flash Squeezelite into the OTA partition\n"
-			"****\n\n"
-#endif
-			"Type 'help' to get the list of commands.\n"
-			"Use UP/DOWN arrows to navigate through command history.\n"
-			"Press TAB when typing command name to auto-complete.\n"
-			"\n"
-#if !RECOVERY_APPLICATION
-			"To automatically execute lines at startup:\n"
-			"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
-			"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n"
-#endif
-			"\n"
-			"\n");
+	printf("\n");
+	if(is_recovery_running){
+		printf("****************************************************************\n"
+		"RECOVERY APPLICATION\n"
+		"This mode is used to flash Squeezelite into the OTA partition\n"
+		"****\n\n");
+	}
+	printf("Type 'help' to get the list of commands.\n"
+	"Use UP/DOWN arrows to navigate through command history.\n"
+	"Press TAB when typing command name to auto-complete.\n"
+	"\n");
+	if(!is_recovery_running){
+		printf("To automatically execute lines at startup:\n"
+				"\tSet NVS variable autoexec (U8) = 1 to enable, 0 to disable automatic execution.\n"
+				"\tSet NVS variable autoexec[1~9] (string)to a command that should be executed automatically\n");
+	}
+	printf("\n\n");
 
 	/* Figure out if the terminal supports escape sequences */
 	int probe_status = linenoiseProbe();
@@ -211,9 +205,9 @@ void console_start() {
     esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
     cfg.thread_name= "console";
     cfg.inherit_cfg = true;
-#if RECOVERY_APPLICATION
-	cfg.stack_size = 4096 ;
-#endif
+    if(is_recovery_running){
+    	cfg.stack_size = 4096 ;
+    }
     esp_pthread_set_cfg(&cfg);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -238,9 +232,9 @@ void run_command(char * line){
 	}
 }
 static void * console_thread() {
-#if !RECOVERY_APPLICATION
-	process_autoexec();
-#endif
+	if(!is_recovery_running){
+		process_autoexec();
+	}
 	/* Main loop */
 	while (1) {
 		/* Get a line using linenoise.

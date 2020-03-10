@@ -9,16 +9,7 @@
 #include "esp_attr.h"
 #include "esp_image_format.h"
 #include "esp_ota_ops.h"
-
-#if RECOVERY_APPLICATION
-#define CODE_RAM_LOCATION
-#define RECOVERY_IRAM_FUNCTION IRAM_ATTR
-#else
-#define RECOVERY_IRAM_FUNCTION
-#define CODE_RAM_LOCATION
-#endif
-
-
+//
 
 // ERASE BLOCK needs to be a multiple of sector size. If a different multiple is passed
 // the OTA process will adjust. Here, we need to strike the balance between speed and

@@ -21,6 +21,7 @@
 //#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "platform_config.h"
 #include "nvs_utilities.h"
+#include "platform_esp32.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -69,38 +70,18 @@ void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 		void * pval = config_alloc_get(nt, key);\
 		if(pval!=NULL){ *value = *(t * )pval; free(pval); return ESP_OK; }\
 		return ESP_FAIL;}
-#if RECOVERY_APPLICATION==0
 static void * malloc_fn(size_t sz){
 
-	void * ptr = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
+	void * ptr = is_recovery_running?malloc(sz):heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
 	if(ptr==NULL){
 		ESP_LOGE(TAG,"malloc_fn:  unable to allocate memory!");
 	}
 	return ptr;
 }
-/*
-static void * free_fn(void * ptr){
-	if(ptr!=NULL){
-		heap_caps_free(ptr);
-	}
-	else {
-		ESP_LOGW(TAG,"free_fn: Cannot free null pointer!");
-	}
-	return NULL;
-}
-*/
-#endif
 void init_cJSON(){
 	static cJSON_Hooks hooks;
-	// initialize cJSON hooks it uses SPIRAM memory
-	// as opposed to IRAM
-#if RECOVERY_APPLICATION==0
-	// In squeezelite mode, allocate memory from PSRAM.  Otherwise allocate from internal RAM
-	// as recovery will lock flash access when erasing FLASH or writing to OTA partition.
 	hooks.malloc_fn=&malloc_fn;
-    //hooks.free_fn=&free_fn;
 	cJSON_InitHooks(&hooks);
-#endif
 }
 void config_init(){
 	ESP_LOGD(TAG, "Creating mutex for Config");

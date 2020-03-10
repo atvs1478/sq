@@ -99,7 +99,7 @@ static void register_version()
 
 esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 {
-#if RECOVERY_APPLICATION
+if(is_recovery_running){
 	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
 		ESP_LOGW(TAG,"RECOVERY application is already active");
 		if(!wait_for_commit()){
@@ -110,7 +110,8 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		esp_restart();
 		return ESP_OK;
 	}
-#else
+}
+else {
 	if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
 		ESP_LOGW(TAG,"SQUEEZELITE application is already active");
 		if(!wait_for_commit()){
@@ -121,7 +122,7 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 		esp_restart();
 		return ESP_OK;
 	}
-#endif
+}
 	esp_err_t err = ESP_OK;
 	bool bFound=false;
     ESP_LOGI(TAG, "Looking for partition type %u",partition_subtype);

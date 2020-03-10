@@ -1,5 +1,6 @@
 idf_component_register(SRC_DIRS . 
 					   INCLUDE_DIRS .  ./inc  inc/alac inc/faad2 inc/FLAC  inc/helix-aac inc/mad inc/ogg inc/opus inc/opusfile inc/resample16 inc/soxr inc/vorbis
+					   PRIV_REQUIRES newlib
 )
 
 add_prebuilt_library(libmad 		lib/libmad.a)

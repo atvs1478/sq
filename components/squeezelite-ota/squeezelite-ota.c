@@ -24,12 +24,14 @@
 #include "tcpip_adapter.h"
 #include "squeezelite-ota.h"
 #include "platform_config.h"
+#include "platform_esp32.h"
 #include <time.h>
 #include <sys/time.h>
 #include <stdarg.h>
 #include "esp_secure_boot.h"
 #include "esp_flash_encrypt.h"
 #include "esp_spi_flash.h"
+#include "platform_esp32.h"
 #include "sdkconfig.h"
 
 #include "esp_ota_ops.h"
@@ -593,22 +595,19 @@ esp_err_t process_recovery_ota(const char * bin_url){
 
 esp_err_t start_ota(const char * bin_url)
 {
-//	uint8_t * config_alloc_get_default(NVS_TYPE_BLOB, "certs", server_cert_pem_start , server_cert_pem_end-server_cert_pem_start);
-#if RECOVERY_APPLICATION
-	return process_recovery_ota(bin_url);
-#else
-		ESP_LOGW(TAG, "Called to update the firmware from url: %s",bin_url);
-		if(config_set_value(NVS_TYPE_STR, "fwurl", bin_url) != ESP_OK){
-			ESP_LOGE(TAG,"Failed to save the OTA url into nvs cache");
-			return ESP_FAIL;
-		}
+	if(is_recovery_running){
+		return process_recovery_ota(bin_url);
+	}
+	ESP_LOGW(TAG, "Called to update the firmware from url: %s",bin_url);
+	if(config_set_value(NVS_TYPE_STR, "fwurl", bin_url) != ESP_OK){
+		ESP_LOGE(TAG,"Failed to save the OTA url into nvs cache");
+		return ESP_FAIL;
+	}
 
-		if(!wait_for_commit()){
-			ESP_LOGW(TAG,"Unable to commit configuration. ");
-		}
+	if(!wait_for_commit()){
+		ESP_LOGW(TAG,"Unable to commit configuration. ");
+	}
 
-		ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
+	ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
 	return guided_factory();
-	return ESP_OK;
-#endif
 }

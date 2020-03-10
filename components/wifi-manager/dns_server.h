@@ -127,9 +127,9 @@ typedef struct __attribute__((__packed__)) dns_answer_t{
 	uint32_t RDATA; /* For the sake of simplicity only ipv4 is supported, and as such it's a unsigned 32 bit */
 }dns_answer_t;
 
-void CODE_RAM_LOCATION dns_server(void *pvParameters);
-void CODE_RAM_LOCATION dns_server_start();
-void CODE_RAM_LOCATION dns_server_stop();
+void dns_server(void *pvParameters);
+void dns_server_start();
+void dns_server_stop();
 
 
 

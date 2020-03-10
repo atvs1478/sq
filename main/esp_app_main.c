@@ -70,6 +70,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 // as an exception _init function don't need include
 extern void services_init(void);
 extern void	display_init(char *welcome);
+bool is_recovery_running;
 
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -357,6 +358,9 @@ void register_default_nvs(){
 
 void app_main()
 {
+	const esp_partition_t *running = esp_ota_get_running_partition();
+	is_recovery_running = (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+
 	char * fwurl = NULL;
 	ESP_LOGI(TAG,"Starting app_main");
 	initialize_nvs();
@@ -381,10 +385,10 @@ void app_main()
 	ESP_LOGD(TAG,"Initializing display");	
 	display_init("SqueezeESP32");
 
-#if !RECOVERY_APPLICATION
-	ESP_LOGI(TAG,"Checking if certificates need to be updated");
-	update_certificates();
-#endif
+	if(!is_recovery_running){
+		ESP_LOGI(TAG,"Checking if certificates need to be updated");
+		update_certificates();
+	}
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
@@ -428,16 +432,17 @@ void app_main()
 	}
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
-#if RECOVERY_APPLICATION
-		while(!bWifiConnected){
-			wait_for_wifi();
-			taskYIELD();
+		if(is_recovery_running){
+			while(!bWifiConnected){
+				wait_for_wifi();
+				taskYIELD();
+			}
+			ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
+			start_ota(fwurl);
 		}
-		ESP_LOGI(TAG,"Updating firmware from link: %s",fwurl);
-		start_ota(fwurl);
-#else
-		ESP_LOGE(TAG,"Restarted to application partition. We're not going to perform OTA!");
-#endif
+		else {
+			ESP_LOGE(TAG,"Restarted to application partition. We're not going to perform OTA!");
+		}
 		free(fwurl);
 	}
 }

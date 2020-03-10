@@ -6,7 +6,7 @@ idf_component_register( SRC_DIRS . external a1s tas57xx
 									esp_common 
 									esp-dsp
 						  			platform_config 
-						 			platform_bluetooth 
+						 			bluetooth 
 						 			codecs 
 						 			services 
 						 			raop   

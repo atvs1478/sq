@@ -59,11 +59,11 @@ static const char TAG[] = "dns_server";
 static TaskHandle_t task_dns_server = NULL;
 int socket_fd;
 
-void CODE_RAM_LOCATION dns_server_start() {
+void  dns_server_start() {
     xTaskCreate(&dns_server, "dns_server", 3072, NULL, WIFI_MANAGER_TASK_PRIORITY-1, &task_dns_server);
 }
 
-void CODE_RAM_LOCATION dns_server_stop(){
+void  dns_server_stop(){
 	if(task_dns_server){
 		vTaskDelete(task_dns_server);
 		close(socket_fd);
@@ -74,7 +74,7 @@ void CODE_RAM_LOCATION dns_server_stop(){
 
 
 
-void CODE_RAM_LOCATION dns_server(void *pvParameters) {
+void  dns_server(void *pvParameters) {
 
 
 

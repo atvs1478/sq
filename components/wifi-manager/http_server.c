@@ -43,6 +43,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "platform_config.h"
+#include "platform_esp32.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 
@@ -51,11 +52,7 @@ static const char TAG[] = "http_server";
 /* @brief task handle for the http server */
 static TaskHandle_t task_http_server = NULL;
 static StaticTask_t task_http_buffer;
-#if RECOVERY_APPLICATION
-static StackType_t task_http_stack[HTTP_STACK_SIZE];
-#else
 static StackType_t EXT_RAM_ATTR task_http_stack[HTTP_STACK_SIZE];
-#endif
 SemaphoreHandle_t http_server_config_mutex = NULL;
 
 /**
@@ -490,11 +487,12 @@ void http_server_netconn_serve(struct netconn *conn) {
 						netconn_write(conn, http_ok_json_no_cache_hdr, sizeof(http_ok_json_no_cache_hdr) - 1, NETCONN_NOCOPY); //200ok
 						if(bOTA) {
 
-#if RECOVERY_APPLICATION
-							ESP_LOGW(TAG,   "Starting process OTA for url %s",otaURL);
-#else
-							ESP_LOGW(TAG,   "Restarting system to process OTA for url %s",otaURL);
-#endif
+							if(is_recovery_running){
+								ESP_LOGW(TAG,   "Starting process OTA for url %s",otaURL);
+							}
+							else{
+								ESP_LOGW(TAG,   "Restarting system to process OTA for url %s",otaURL);
+							}
 							wifi_manager_reboot_ota(otaURL);
 							free(otaURL);
 						}
