@@ -10,8 +10,8 @@ Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includ
 
 The board showed above has the following IO sets
 - amplifier: GPIO21
-- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5
-- key1: not sure, somethign with GPIO36
+- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed width dipswitches)
+- key1: not sure, something with GPIO36
 - jack insertion: GPIO39 (inserted low)
 - LED: GPIO22 (active low)
 
