@@ -116,7 +116,8 @@ static void jack_handler_default(void *id, button_event_e event, button_press_e 
  * 
  */
 bool jack_inserted_svc (void) {
-	return button_is_pressed(jack.gpio, NULL);
+	if (jack.gpio != -1) return button_is_pressed(jack.gpio, NULL);
+	else return true;
 }
 
 /****************************************************************************************

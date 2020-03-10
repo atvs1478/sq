@@ -274,6 +274,8 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
 	else adac->speaker(true);
 	
+	adac->headset(jack_inserted_svc());
+	
 	parse_set_GPIO(set_amp_gpio);
 		
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();

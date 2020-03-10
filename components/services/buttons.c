@@ -191,7 +191,7 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
 
 	if (n_buttons >= MAX_BUTTONS) return;
 
-	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %u", gpio, type, pull, long_press, shifter_gpio);
+	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %d", gpio, type, pull, long_press, shifter_gpio);
 
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(struct button_s));
@@ -209,7 +209,6 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
  	buttons[n_buttons].debounce = debounce ? debounce: DEBOUNCE;
 	buttons[n_buttons].handler = handler;
 	buttons[n_buttons].long_press = long_press;
-	buttons[n_buttons].level = -1;
 	buttons[n_buttons].shifter_gpio = shifter_gpio;
 	buttons[n_buttons].type = type;
 	buttons[n_buttons].timer = xTimerCreate("buttonTimer", buttons[n_buttons].debounce / portTICK_RATE_MS, pdFALSE, (void *) &buttons[n_buttons], buttons_timer);
@@ -247,6 +246,9 @@ void button_create(void *client, int gpio, int type, bool pull, int debounce, bu
 	
 	// nasty ESP32 bug: fire-up constantly INT on GPIO 36/39 if ADC1, AMP, Hall used which WiFi does when PS is activated
 	if (gpio == 36 || gpio == 39) gpio36_39_used = true;
+	
+	// and initialize level ...
+	buttons[n_buttons].level = gpio_get_level(gpio);
 
 	gpio_isr_handler_add(gpio, gpio_isr_handler, (void*) &buttons[n_buttons]);
 	gpio_intr_enable(gpio);
