@@ -163,7 +163,7 @@ void raop_sink_init(raop_cmd_vcb_t cmd_cb, raop_data_cb_t data_cb) {
     	free(sink_name_buffer);
     }
 
-	LOG_INFO( "mdns hostname set to: [%s] with servicename %s", hostname, sink_name);
+	LOG_INFO( "mdns hostname for ip %s set to: [%s] with servicename %s", inet_ntoa(host), hostname, sink_name);
 
     // create RAOP instance, latency is set by controller
 	uint8_t mac[6];	

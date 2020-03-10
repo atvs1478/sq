@@ -35,7 +35,7 @@
 
 const static char TAG[] = "AC101";
 
-#define SPKOUT_EN ((1 << 11) | (1 << 7))
+#define SPKOUT_EN ((1 << 9) | (1 << 11) | (1 << 7) | (1 << 5))
 #define EAROUT_EN ((1 << 11) | (1 << 12) | (1 << 13))
 #define BIN(a,b,c,d)	0b##a##b##c##d
 
@@ -132,8 +132,8 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	//Path Configuration
 	i2c_write_reg(DAC_MXR_SRC, 		BIN(1000,1000,0000,0000));	// DAC from I2S
 	i2c_write_reg(DAC_DIG_CTRL, 	BIN(1000,0000,0000,0000));	// enable DAC
-	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,0000,0000,000));	// enable DAC/Analogue (see note on offset removal and PA)
-	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1100,0000,0000,000));	// enable DAC/Analogue (see note on offset removal and PA)
+	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,0000,0000,0000));	// enable DAC/Analogue (see note on offset removal and PA)
+	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,1111,0000,0000));	// this toggle is needed for headphone PA offset
 #if ENABLE_ADC	
 	i2c_write_reg(OMIXER_SR, 		BIN(0000,0001,0000,0010));	// source=DAC(R/L) (are DACR and DACL really inverted in bitmap?)
 #else
@@ -149,8 +149,7 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	
 	// enable earphone & speaker
 	i2c_write_reg(SPKOUT_CTRL, 0x0220);
-	i2c_write_reg(OMIXER_DACA_CTRL, 0xff00);
-	i2c_write_reg(HPOUT_CTRL, 0x3801);
+	i2c_write_reg(HPOUT_CTRL, 0xf801);
 	
 	// set gain for speaker and earphone
 	ac101_set_spk_volume(100);
@@ -206,9 +205,10 @@ static void speaker(bool active) {
  * headset
  */
 static void headset(bool active) {
+	// there might be  aneed to toggle OMIXER_DACA_CTRL 11:8, not sure
 	uint16_t value = i2c_read_reg(HPOUT_CTRL);
 	if (active) i2c_write_reg(HPOUT_CTRL, value | EAROUT_EN);
-	else i2c_write_reg(HPOUT_CTRL, value & ~EAROUT_EN);			
+	else i2c_write_reg(HPOUT_CTRL, value & ~EAROUT_EN);		
 } 	
 
 /****************************************************************************************
@@ -284,14 +284,14 @@ static int ac101_get_spk_volume(void) {
  * Set normalized (0..100) volume
  */
 static void ac101_set_spk_volume(uint8_t volume) {
-	volume = max(volume, 0x1f);
-	volume = ((int) volume * 0x1f) / 100;
-	volume |= i2c_read_reg(SPKOUT_CTRL) & ~0x1f;
-	i2c_write_reg(SPKOUT_CTRL, volume);
+	uint16_t value = max(volume, 100);
+	value = ((int) value * 0x1f) / 100;
+	value |= i2c_read_reg(SPKOUT_CTRL) & ~0x1f;
+	i2c_write_reg(SPKOUT_CTRL, value);
 }
 
 /****************************************************************************************
- * Get normalized (0..100) earphonz volume
+ * Get normalized (0..100) earphone volume
  */
 static int ac101_get_earph_volume(void) {
 	return (((i2c_read_reg(HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
@@ -301,10 +301,10 @@ static int ac101_get_earph_volume(void) {
  * Set normalized (0..100) earphone volume
  */
 static void ac101_set_earph_volume(uint8_t volume) {
-	volume = max(volume, 0x3f);
-	volume = (((int) volume * 0x3f) / 100) << 4;
-	volume |= i2c_read_reg(HPOUT_CTRL) & ~(0x3f << 4);
-	i2c_write_reg(HPOUT_CTRL, volume);
+	uint16_t value = max(volume, 100);
+	value = (((int) value * 0x3f) / 100) << 4;
+	value |= i2c_read_reg(HPOUT_CTRL) & ~(0x3f << 4);
+	i2c_write_reg(HPOUT_CTRL, value);
 }
 
 /****************************************************************************************
@@ -345,17 +345,16 @@ static void ac101_start(ac_module_t mode) {
 		i2c_write_reg(0x50, 0x3bc0);
     }
     if (mode == AC_MODULE_ADC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
-		//I2S1_SDOUT_CTRL
-		//i2c_write_reg(PLL_CTRL2, 0x8120);
+		// I2S1_SDOUT_CTRL
+		// i2c_write_reg(PLL_CTRL2, 0x8120);
     	i2c_write_reg(0x04, 0x800c);
     	i2c_write_reg(0x05, 0x800c);
-		//res |= i2c_write_reg(0x06, 0x3000);
+		// res |= i2c_write_reg(0x06, 0x3000);
     }
     if (mode == AC_MODULE_DAC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
-		headset(true);
-		speaker(true);
-		ac101_set_earph_volume(100);
-		ac101_set_spk_volume(100);
+		uint16_t value = i2c_read_reg(PLL_CTRL2);
+		value |= 0x8000;
+		i2c_write_reg(PLL_CTRL2, value);
     }
 }
 
@@ -363,8 +362,9 @@ static void ac101_start(ac_module_t mode) {
  * 
  */
 static void ac101_stop(void) {
-	speaker(false);
-	headset(false);	
+	uint16_t value = i2c_read_reg(PLL_CTRL2);
+	value &= ~0x8000;
+	i2c_write_reg(PLL_CTRL2, value);
 }
 
 /****************************************************************************************

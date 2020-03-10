@@ -436,6 +436,12 @@ static bool handle_rtsp(raop_ctx_t *ctx, int sock)
 		char *buf_pad, *p, *data_b64 = NULL, data[32];
 
 		LOG_INFO("[%p]: challenge %s", ctx, buf);
+		
+		// try to re-acquire IP address if we were missing it
+		if (S_ADDR(ctx->host) == INADDR_ANY) {
+			S_ADDR(ctx->host) = get_localhost(NULL);
+			LOG_INFO("[%p]: IP was missing, trying to get it %s", ctx, inet_ntoa(ctx->host));
+		}
 
 		// need to pad the base64 string as apple device don't
 		base64_pad(buf, &buf_pad);

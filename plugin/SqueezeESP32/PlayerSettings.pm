@@ -21,7 +21,7 @@ sub needsClient {
 
 sub validFor {
 	my ($class, $client) = @_;
-	return $client->model eq 'squeezeesp32';
+	return $client->model eq 'squeezeesp32' && $client->displayWidth;
 }
 
 sub page {

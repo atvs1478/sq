@@ -6,7 +6,21 @@ Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.p
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
 ### ESP32-A1S
-Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board or an external amplifier if you want direct speaker connection. 
+Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4000765857347.html?spm=2114.12010615.8148356.11.5d963cd0j669ns) or an external amplifier if you want direct speaker connection. 
+
+The board showed above has the following IO set
+- amplifier: GPIO21
+- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed width dipswitches)
+- key1: not sure, something with GPIO36
+- jack insertion: GPIO39 (inserted low)
+- LED: GPIO22 (active low)
+
+So a possible config would be
+- set_GPIO: 21=amp,22=green:0,39=jack:0
+- a button mapping: 
+```
+[{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
+```
 
 ### ESP32-WROVER + I2S DAC
 Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements. To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
@@ -137,10 +151,14 @@ Where (all parameters are optionals except gpio)
  - "shifted": action to take when a button is pressed/released and shifted (see above/below)
  - "longshifted": action to take when a button is long-pressed/released and shifted (see above/below)
 
-Where \<action\> is either the name of another configuration to load or one amongst 
-				ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
-				ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
-				BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT
+Where \<action\> is either the name of another configuration to load (remap) or one amongst
+
+```
+ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
+ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
+BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,
+KNOB_LEFT, KNOB_RIGHT, KNOB_PUSH
+```
 				
 One you've created such a string, use it to fill a new NVS parameter with any name below 16(?) characters. You can have as many of these configs as you can. Then set the config parameter "actrls_config" with the name of your default config
 
