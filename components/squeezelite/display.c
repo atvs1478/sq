@@ -772,7 +772,7 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	if (visu.row >= SB_HEIGHT && displayer.owned) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 	
 	if (visu.mode) {
 		if (pkt->count >= 4) {

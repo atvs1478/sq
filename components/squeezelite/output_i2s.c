@@ -384,7 +384,7 @@ static void *output_thread_i2s(void *arg) {
 	int discard = 0;
 	uint32_t fullness = gettime_ms();
 	bool synced;
-	output_state state = OUTPUT_OFF;
+	output_state state = OUTPUT_OFF - 1;
 	char *sbuf = NULL;
 	
 	// spdif needs 16 bytes per frame : 32 bits/sample, 2 channels, BMC encoded
@@ -423,7 +423,7 @@ static void *output_thread_i2s(void *arg) {
 				adac->power(ADAC_STANDBY);
 				count = 0;
 			}
-			usleep(200000);
+			usleep(100000);
 			continue;
 		} else if (output.state == OUTPUT_STOPPED) {
 			synced = false;
