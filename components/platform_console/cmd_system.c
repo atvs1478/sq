@@ -146,7 +146,7 @@ else {
 			if(err!=ESP_OK){
 				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));
 				bFound=false;
-				messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to select partition for reboot.");
+				messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to select partition for reboot: %s",esp_err_to_name(err));
 			}
 			else{
 				ESP_LOGW(TAG, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);

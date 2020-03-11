@@ -29,12 +29,7 @@
 
 #include "platform_config.h"
 #include "telnet.h"
-#include "gds.h"
-#include "gds_default_if.h"
-#include "gds_draw.h"
-#include "gds_text.h"
-#include "gds_font.h"
-#include "display.h"
+
 
 #include "config.h"
 pthread_t thread_console;
@@ -48,6 +43,7 @@ extern void register_squeezelite();
  * This can be customized, made dynamic, etc.
  */
 const char* prompt = LOG_COLOR_I "squeezelite-esp32> " LOG_RESET_COLOR;
+const char* recovery_prompt = LOG_COLOR_E "recovery-squeezelite-esp32> " LOG_RESET_COLOR;
 
 /* Console command history can be stored to and loaded from a file.
  * The easiest way to do this is to use FATFS filesystem on top of
@@ -161,11 +157,6 @@ void initialize_console() {
 }
 
 void console_start() {
-	if(is_recovery_running){
-		GDS_ClearExt(display, true);
-		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
-		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
-	}
 	if(!is_serial_suppressed()){
 		initialize_console();
 	}
@@ -224,13 +215,18 @@ void console_start() {
 			/* Since the terminal doesn't support escape sequences,
 			 * don't use color codes in the prompt.
 			 */
+			if(is_recovery_running){
+				recovery_prompt=  "recovery-squeezelite-esp32>";
+			}
 			prompt = "squeezelite-esp32> ";
+
 	#endif //CONFIG_LOG_COLORS
 		}
 		esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 		cfg.thread_name= "console";
 		cfg.inherit_cfg = true;
 		if(is_recovery_running){
+			prompt = recovery_prompt;
 			cfg.stack_size = 4096 ;
 		}
 		esp_pthread_set_cfg(&cfg);

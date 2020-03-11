@@ -49,7 +49,12 @@
 #include "platform_config.h"
 #include "telnet.h"
 #include "messaging.h"
-
+#include "gds.h"
+#include "gds_default_if.h"
+#include "gds_draw.h"
+#include "gds_text.h"
+#include "gds_font.h"
+#include "display.h"
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -386,6 +391,11 @@ void app_main()
 
 	ESP_LOGI(TAG,"Initializing display");
 	display_init("SqueezeESP32");
+	if(is_recovery_running && display){
+		GDS_ClearExt(display, true);
+		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
+		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
+	}
 
 	if(!is_recovery_running){
 		ESP_LOGI(TAG,"Checking if certificates need to be updated");

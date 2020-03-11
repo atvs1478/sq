@@ -110,6 +110,9 @@ typedef struct _progress {
 } progress_t;
 
 static progress_t * loc_displayer_get_progress_dft(){
+	if(!display){
+		return;
+	}
 	int start_coord_offset=0;
 	static progress_t def={
 		.border_thickness = 2,
@@ -141,6 +144,9 @@ static progress_t * loc_displayer_get_progress_dft(){
 }
 static void loc_displayer_progressbar(uint8_t pct){
 	static progress_t * progress_coordinates;
+	if(!display){
+		return;
+	}
 	if(!progress_coordinates) progress_coordinates = loc_displayer_get_progress_dft();
 	int filler_x=progress_coordinates->filler.x1+(int)((float)progress_coordinates->filler.width*(float)pct/(float)100);
 
@@ -182,7 +188,10 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     }
     va_end(args);
     if(type!=MESSAGING_INFO){
-    	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg_str);
+
+    	if(display) {
+    		GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg_str);
+    	}
     }
 
     cJSON_AddStringToObject(msg,"ota_dsc",str_or_unknown(msg_str));

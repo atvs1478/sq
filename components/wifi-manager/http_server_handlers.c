@@ -32,7 +32,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 */
 
 #include "http_server_handlers.h"
-
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "esp_http_server.h"
 #include "cmd_system.h"
 #include <inttypes.h>
@@ -101,19 +101,6 @@ extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-//
-//
-///* const http headers stored in ROM */
-//const static char http_hdr_template[] = "HTTP/1.1 200 OK\nContent-type: %s\nAccept-Ranges: bytes\nContent-Length: %d\nContent-Encoding: %s\nAccess-Control-Allow-Origin: *\n\n";
-//const static char http_html_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/html\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
-//const static char http_css_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/css\nCache-Control: public, max-age=31536000\nAccess-Control-Allow-Origin: *\n\n";
-//const static char http_js_hdr[] = "HTTP/1.1 200 OK\nContent-type: text/javascript\nAccess-Control-Allow-Origin: *\n\n";
-//const static char http_400_hdr[] = "HTTP/1.1 400 Bad Request\nContent-Length: 0\n\n";
-//const static char http_404_hdr[] = "HTTP/1.1 404 Not Found\nContent-Length: 0\n\n";
-//const static char http_503_hdr[] = "HTTP/1.1 503 Service Unavailable\nContent-Length: 0\n\n";
-//const static char http_ok_json_no_cache_hdr[] = "HTTP/1.1 200 OK\nContent-type: application/json\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\nPragma: no-cache\nAccess-Control-Allow-Origin: *\nAccept-Encoding: identity\n\n";
-//const static char http_redirect_hdr_start[] = "HTTP/1.1 302 Found\nLocation: http://";
-//const static char http_redirect_hdr_end[] = "/\n\n";
 esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error);
 
 
@@ -393,6 +380,7 @@ esp_err_t root_get_handler(httpd_req_t *req){
 	if(err == ESP_OK){
 		httpd_resp_send(req, (const char *)index_html_start, file_size);
 	}
+	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
     return err;
 }
 
@@ -495,6 +483,7 @@ esp_err_t ap_get_handler(httpd_req_t *req){
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "AP list unavailable");
 		ESP_LOGE_LOC(TAG,   "GET /ap.json failed to obtain mutex");
 	}
+	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
 	return err;
 }
 
