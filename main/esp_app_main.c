@@ -35,7 +35,7 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "freertos/event_groups.h"
-
+#include "mdns.h"
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/netdb.h"
@@ -44,8 +44,9 @@
 #include "wifi_manager.h"
 #include "squeezelite-ota.h"
 #include <math.h>
-#include "platform_config.h"
+#include "config.h"
 #include "audio_controls.h"
+#include "platform_config.h"
 #include "telnet.h"
 #include "messaging.h"
 
@@ -70,12 +71,22 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 // as an exception _init function don't need include
 extern void services_init(void);
 extern void	display_init(char *welcome);
-
-bool is_recovery_running;
 const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
-
+bool is_recovery_running;
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
+	static ip4_addr_t ip;
+	tcpip_adapter_ip_info_t ipInfo; 
+
+	tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipInfo);
+	if (ip.addr && ipInfo.ip.addr != ip.addr) {
+		ESP_LOGW(TAG, "IP change, need to reboot");
+		if(!wait_for_commit()){
+			ESP_LOGW(TAG,"Unable to commit configuration. ");
+		}
+		esp_restart();
+	}
+	ip.addr = ipInfo.ip.addr;
 	ESP_LOGI(TAG, "I have a connection!");
 	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"Wifi connected");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
@@ -375,6 +386,7 @@ void app_main()
 
 	ESP_LOGI(TAG,"Initializing display");
 	display_init("SqueezeESP32");
+
 	if(!is_recovery_running){
 		ESP_LOGI(TAG,"Checking if certificates need to be updated");
 		update_certificates();
