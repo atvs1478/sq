@@ -15,7 +15,6 @@
 #include "gds_err.h"
 #include "gds_private.h"
 #include "gds_default_if.h"
-#include "messaging.h"
 
 static int I2CPortNumber;
 static int I2CWait;
@@ -90,12 +89,6 @@ bool GDS_I2CAttachDevice( struct GDS_Device* Device, int Width, int Height, int 
 static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Data, size_t DataLength ) {
     i2c_cmd_handle_t* CommandHandle = NULL;
     static uint8_t ModeByte = 0;
-    static uint32_t failures=0;
-    if(failures > 1000){
-    	ESP_LOGE("I2C_Display","I2C Write failure");
-    	failures = 1;
-    	return false;
-    }
 
     NullCheck( Data, return false );
 
@@ -115,10 +108,6 @@ static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Da
     return true;
 	
 error:
-
-    if(++failures == 1){
-    	messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM, "Display communication failed.");
-    }
 	if (CommandHandle) i2c_cmd_link_delete( CommandHandle );
 	return false;
 }
