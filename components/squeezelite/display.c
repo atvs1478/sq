@@ -525,13 +525,18 @@ static void grfb_handler(u8_t *data, int len) {
 	
 	pkt->brightness = htons(pkt->brightness);
 	
-	LOG_INFO("brightness %hu", pkt->brightness);
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+	
 	if (pkt->brightness < 0) {
 		GDS_DisplayOff(display); 
 	} else {
 		GDS_DisplayOn(display);
 		GDS_SetContrast(display, pkt->brightness);
 	}
+	
+	xSemaphoreGive(displayer.mutex);
+	
+	LOG_INFO("brightness %hu", pkt->brightness);
 }
 
 /****************************************************************************************
@@ -772,7 +777,7 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT && displayer.owned) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
 	
 	if (visu.mode) {
 		if (pkt->count >= 4) {
