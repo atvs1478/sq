@@ -52,7 +52,7 @@
 const static char TAG[] = "telnet";
 static int uart_fd=0;
 RingbufHandle_t buf_handle;
-//static SemaphoreHandle_t xSemaphore = NULL;
+
 static size_t send_chunk=300;
 static size_t log_buf_size=2000;      //32-bit aligned size
 static bool bIsEnabled=false;
@@ -111,9 +111,6 @@ void init_telnet(){
 		free(val);
 		log_buf_size=log_buf_size>0?log_buf_size:4000;
 	}
-	// Create the semaphore to guard a shared resource.
-	//vSemaphoreCreateBinary( xSemaphore );
-
 	// Redirect the output to our telnet handler as soon as possible
 	StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)malloc(sizeof(StaticRingbuffer_t) );
 	// All non-split ring buffer must have their memory alignment set to 32 bits.
