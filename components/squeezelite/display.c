@@ -525,13 +525,18 @@ static void grfb_handler(u8_t *data, int len) {
 	
 	pkt->brightness = htons(pkt->brightness);
 	
-	LOG_INFO("brightness %hu", pkt->brightness);
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+	
 	if (pkt->brightness < 0) {
 		GDS_DisplayOff(display); 
 	} else {
 		GDS_DisplayOn(display);
 		GDS_SetContrast(display, pkt->brightness);
 	}
+	
+	xSemaphoreGive(displayer.mutex);
+	
+	LOG_INFO("brightness %hu", pkt->brightness);
 }
 
 /****************************************************************************************
