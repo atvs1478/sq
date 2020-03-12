@@ -101,6 +101,8 @@ extern const uint8_t code_js_start[] asm("_binary_code_js_start");
 extern const uint8_t code_js_end[] asm("_binary_code_js_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
+extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
 esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error);
 
 
@@ -407,35 +409,35 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 	    const size_t file_size = (code_js_end - code_js_start);
 	    set_content_type_from_file(req, filename);
 	    httpd_resp_send(req, (const char *)code_js_start, file_size);
-	}
-	else if(strstr(filename, "style.css")) {
+	} else if(strstr(filename, "style.css")) {
 		set_content_type_from_file(req, filename);
 	    const size_t file_size = (style_css_end - style_css_start);
 	    httpd_resp_send(req, (const char *)style_css_start, file_size);
+    } else if(strstr(filename, "favicon.ico")) {
+		set_content_type_from_file(req, filename);
+	    const size_t file_size = (favicon_ico_end - favicon_ico_start);
+	    httpd_resp_send(req, (const char *)favicon_ico_start, file_size);
 	} else if(strstr(filename, "jquery.js")) {
 		set_content_type_from_file(req, filename);
 		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (jquery_gz_end - jquery_gz_start);
 	    httpd_resp_send(req, (const char *)jquery_gz_start, file_size);
-	}else if(strstr(filename, "popper.js")) {
+	} else if(strstr(filename, "popper.js")) {
 		set_content_type_from_file(req, filename);
 		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (popper_gz_end - popper_gz_start);
 	    httpd_resp_send(req, (const char *)popper_gz_start, file_size);
-	}
-	else if(strstr(filename, "bootstrap.js")) {
+	} else if(strstr(filename, "bootstrap.js")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_js_gz_end - bootstrap_js_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_js_gz_start, file_size);
-	}
-	else if(strstr(filename, "bootstrap.css")) {
+	} else if(strstr(filename, "bootstrap.css")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 		    const size_t file_size = (bootstrap_css_gz_end - bootstrap_css_gz_start);
 		    httpd_resp_send(req, (const char *)bootstrap_css_gz_start, file_size);
-    }
-	else {
+    } else {
 	   ESP_LOGE_LOC(TAG, "Unknown resource [%s] from path [%s] ", filename,filepath);
 	   /* Respond with 404 Not Found */
 	   httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File does not exist");
