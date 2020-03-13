@@ -213,6 +213,8 @@ channel=0..7,scale=<scale>
 NB: Set parameter to empty to disable battery reading
 ## Setting up ESP-IDF
 ### Docker
+#### **************** todo: Docker scripts needs some rework.
+
 You can use docker to build squeezelite-esp32  
 First you need to build the Docker container:
 ```
@@ -226,10 +228,7 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<strong>Currently this project requires a specific combination of IDF 4 with gcc 5.2. You'll have to implement the gcc 5.2 toolchain from an IDF 3.2 install into the IDF 4 directory in order to successfully compile it</strong>
-
-You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
-And then copying the i2s.c patch file from this repo over to the esp-idf folder
+Follow the instructions from https://docs.espressif.com/projects/esp-idf/en/v4.0/get-started/index.html to install the esp-idf v4.0. This is the currently supported release of the espressif software development system. 
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
@@ -241,29 +240,11 @@ Then adapt the config file to your wifi/BT/I2C device (can also be done on the c
 Then
 
 ```
-# Build recovery.bin, bootloader.bin, ota_data_initial.bin, partitions.bin  
-# force appropriate rebuild by touching all the files which may have a RECOVERY_APPLICATION specific source compile logic
-	find . \( -name "*.cpp" -o -name "*.c" -o -name "*.h" \) -type f -print0 | xargs -0 grep -l "RECOVERY_APPLICATION" | xargs touch
-	export PROJECT_NAME="recovery" 
-	make -j4 all EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=1'
-make flash
-#
-# Build squeezelite.bin
-# Now force a rebuild by touching all the files which may have a RECOVERY_APPLICATION specific source compile logic
-find . \( -name "*.cpp" -o -name "*.c" -o -name "*.h" \) -type f -print0 | xargs -0 grep -l "RECOVERY_APPLICATION" | xargs touch
-export PROJECT_NAME="squeezelite" 
-make -j4 app EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=0'
-python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port ${ESPPORT} --baud ${ESPBAUD} --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0x150000 ./build/squeezelite.bin  
-# monitor serial output
-make monitor
+idf.py -p PORT [-b BAUD] flash
+idf.py -p PORT [-b BAUD] monitor
 
 ```
 
-You can also manually download the recovery & initial boot
-```
-python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port ${ESPPORT} --baud ${ESPBAUD} --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0xd000 ./build/ota_data_initial.bin 0x1000 ./build/bootloader/bootloader.bin 0x10000 ./build/recovery.bin 0x8000 ./build/partitions.bin
-```
- 
 # Configuration
 1/ setup WiFi
 - Boot the esp, look for a new wifi access point showing up and connect to it.  Default build ssid and passwords are "squeezelite"/"squeezelite". 
