@@ -6,65 +6,6 @@ if(NOT SDKCONFIG OR NOT IDF_PATH  OR NOT IDF_TARGET )
     message(FATAL_ERROR "squeezelite should not be made outside of the main project !")
 endif()
 
-function(___output_debug_target bin_name )
-
-    idf_build_get_property(build_dir BUILD_DIR)
-    file(TO_CMAKE_PATH "${build_dir}" cm_build_dir)
-    if( "${bin_name}" STREQUAL "_" )
-    	set(debug_file "dbg_project_args" )
-    else()
-        set(debug_file "dbg_${bin_name}" )
-    endif()
-	set(flash_debug_file "flash_${debug_file}" )
-			    
-    set(flash_args_file "${cm_build_dir}/flash_project_args"  )
-    set(line_prefix "mon program_esp32 ${cm_build_dir}/"  )
-    
-	file(READ ${flash_args_file} flash_args)
-
-
-	list(APPEND dbg_cmds "mon reset halt")
-	list(APPEND dbg_cmds "flushregs")
-	list(APPEND dbg_cmds "set remote hardware-watchpoint-limit 2")
-
-	STRING(REGEX REPLACE "\n" ";" SPLIT "${flash_args}")
-	
-
-
-	foreach(flash_arg_line ${SPLIT})
-		string(REGEX MATCH "^(0[xX][^ ]*)[ ]*([^ ]*)" out_matches "${flash_arg_line}")
-	  
-	  	if( ${CMAKE_MATCH_COUNT}  )
-	  		if( ( NOT "${CMAKE_MATCH_0}" STREQUAL "" ) AND ( "${bin_name}" STREQUAL "${CMAKE_MATCH_1}" ) OR ( "${bin_name}" STREQUAL "_" ) )
-			  	list(APPEND flash_dbg_cmds "${line_prefix}/${CMAKE_MATCH_2} ${CMAKE_MATCH_1}")
-	  		endif()
-			if( ( NOT "${CMAKE_MATCH_0}" STREQUAL "" ) AND ( "${bin_name}" STREQUAL "${CMAKE_MATCH_2}" ) )
-			   list(APPEND dbg_cmds "mon esp32 appoffset ${CMAKE_MATCH_1}") 	  
-			endif()
-	  endif()
-	endforeach()
-
-	list(APPEND dbg_cmds_end "mon reset halt")
-	list(APPEND dbg_cmds_end "flushregs")
-
-	list(APPEND full_dbg_cmds "${dbg_cmds}")
-	list(APPEND full_dbg_cmds "${dbg_cmds_end}")
-
-	list(APPEND full_flash_dbg_cmds "${dbg_cmds}")
-	list(APPEND full_flash_dbg_cmds "${flash_dbg_cmds}")
-	list(APPEND full_flash_dbg_cmds "${dbg_cmds_end}")
-	STRING(REGEX REPLACE  ";" "\n" dbg_cmds_end "${dbg_cmds_end}")
-	STRING(REGEX REPLACE  ";" "\n" full_dbg_cmds "${full_dbg_cmds}")
-	STRING(REGEX REPLACE  ";" "\n" full_flash_dbg_cmds "${full_flash_dbg_cmds}")
-
-file(GENERATE OUTPUT "${cm_build_dir}${debug_file}" CONTENT "${full_dbg_cmds}")
-file(GENERATE OUTPUT "${cm_build_dir}${flash_debug_file}" CONTENT "${full_flash_dbg_cmds}")
-    set_property(DIRECTORY ${cm_build_dir}
-                    APPEND PROPERTY
-                    ADDITIONAL_MAKE_CLEAN_FILES "${debug_file}" "${flash_debug_file}")
- 
-
-endfunction() 
 
 function(___register_flash target_name sub_type)
 	partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ${sub_type}" "offset")
@@ -82,7 +23,6 @@ function(___create_new_target target_name)
 	add_custom_command(OUTPUT ${target_elf_src}
 		COMMAND ${CMAKE_COMMAND} -E touch ${target_elf_src}
 	    VERBATIM)
-	
 	
 	add_custom_target(_${target_name}_elf DEPENDS "${target_elf_src}"  )
 	add_executable(${target_elf} "${target_elf_src}")
@@ -113,9 +53,12 @@ function(___create_new_target target_name)
         
 
 endfunction()
-
 ___create_new_target(squeezelite )
 ___register_flash(squeezelite ota_0)
-___output_debug_target("_")
-___output_debug_target("squeezelite")
-___output_debug_target("recovery")
+add_custom_command(
+			TARGET "squeezelite.elf"
+			POST_BUILD 
+			COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/generate_debug_scripts.cmake"
+			)
+
+
