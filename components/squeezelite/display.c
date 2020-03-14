@@ -337,6 +337,7 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
 	if (displayer.owned) GDS_TextPos(display, GDS_FONT_DEFAULT, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg);
 	SETD_width = displayer.width;
+	displayer.dirty = true;
 	
 	xSemaphoreGive(displayer.mutex);
 	
