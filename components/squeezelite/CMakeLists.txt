@@ -8,8 +8,7 @@ idf_component_register( SRC_DIRS . external a1s tas57xx
 									esp_common 
 									esp-dsp
 						  			platform_config 
-						 			bluetooth 
-						 			 
+						 			driver_bt 
 						 			services 
 						 			raop   
 						 			display

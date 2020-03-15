@@ -6,7 +6,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include "platform_bt_core.h"
+#include "bt_app_core.h"
 
 #include <stdint.h>
 #include "esp_system.h"

@@ -22,7 +22,7 @@
 #include "esp_a2dp_api.h"
 #include "esp_avrc_api.h"
 #include "nvs.h"
-#include "config.h"
+#include "platform_config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "trace.h"
@@ -71,7 +71,8 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
 static _lock_t s_volume_lock;
 static uint8_t s_volume = 0;
 static bool s_volume_notify;
-static enum { AUDIO_IDLE, AUDIO_CONNECTED, AUDIO_PLAYING } s_audio = AUDIO_IDLE;
+static bool s_playing = false; 
+static enum { AUDIO_IDLE, AUDIO_CONNECTED, AUDIO_ACTIVATED } s_audio = AUDIO_IDLE;
 
 static int s_sample_rate;
 static int tl;
@@ -101,7 +102,7 @@ static void bt_volume_down(void) {
 }
 
 static void bt_toggle(void) {
-	if (s_audio == AUDIO_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	if (s_playing) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	else esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
@@ -138,14 +139,14 @@ const static actrls_t controls = {
 /* disconnection */
 void bt_disconnect(void) {
 	displayer_control(DISPLAYER_SHUTDOWN);
-	if (s_audio == AUDIO_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+	if (s_playing) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	actrls_unset();
-	ESP_LOGI(BT_AV_TAG, "forced disconnection %d", s_audio);
+	ESP_LOGI(BT_AV_TAG, "forced disconnection");
 }
 
 /* update metadata if any */
 void update_metadata(bool force) {
-	if ((s_metadata.updated || force) && s_audio == AUDIO_PLAYING) {
+	if ((s_metadata.updated || force) && s_audio == AUDIO_ACTIVATED) {
 		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, -1, s_metadata.duration);
 		(*bt_app_a2d_cmd_cb)(BT_SINK_METADATA, s_metadata.artist, s_metadata.album, s_metadata.title);
 		s_metadata.updated = false;
@@ -289,17 +290,18 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 			
 			// verify that we can take control
 			if ((*bt_app_a2d_cmd_cb)(BT_SINK_AUDIO_STARTED, s_sample_rate)) {
+				// resynchronize events as¨PLAY might be sent before STARTED ...
+				s_audio = AUDIO_ACTIVATED;
 				
-				// if PLAY is sent before AUDIO_STARTED, generate the event here
-				s_audio = AUDIO_PLAYING;
-				(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
+				// send PLAY there, in case it was sent before AUDIO_STATE
+				if (s_playing) (*bt_app_a2d_cmd_cb)(BT_SINK_PLAY);
 				
 				// force metadata update
 				update_metadata(true);
 				
 				actrls_set(controls, NULL);
-			} else {
-				// if decoder is busy, stop it (would be better to not ACK this command, but don't know how)
+			} else if (s_playing) {
+				// if decoder is busy but BT is playing, stop it (would be better to not ACK this command, but don't know how)
 				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);	
 			}	
 		} else if (ESP_A2D_AUDIO_STATE_STOPPED == a2d->audio_stat.state ||
@@ -380,33 +382,19 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
         break;
     case ESP_AVRC_RN_PLAY_STATUS_CHANGE:
         ESP_LOGI(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
-		if (s_audio != AUDIO_IDLE) {
-			switch (event_parameter->playback) {
-			case ESP_AVRC_PLAYBACK_PLAYING:
-				// if decoder is busy then stop (would be better to not ACK this command, but don't know how)
-				if (s_audio != AUDIO_PLAYING && !(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY)) {
-					ESP_LOGW(BT_AV_TAG, "Player busy with another controller");					
-					esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
-				} else {
-					s_audio = AUDIO_PLAYING;
-					update_metadata(false);
-				}
-				break;		
-			case ESP_AVRC_PLAYBACK_PAUSED:
-				s_audio = AUDIO_CONNECTED;
-				(*bt_app_a2d_cmd_cb)(BT_SINK_PAUSE);
-				break;
-			case ESP_AVRC_PLAYBACK_STOPPED:
-				s_audio = AUDIO_CONNECTED;
-				(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, -1);			
-				(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
-				break;
-			default:
-				ESP_LOGI(BT_AV_TAG, "Un-handled event");
-				break;
+		// re-synchronize events
+		s_playing = (event_parameter->playback == ESP_AVRC_PLAYBACK_PLAYING);
+		if (event_parameter->playback == ESP_AVRC_PLAYBACK_PLAYING && s_audio != AUDIO_IDLE) {
+			// if decoder is busy then stop (would be better to not ACK this command, but don't know how)
+			if (s_audio == AUDIO_CONNECTED || !(*bt_app_a2d_cmd_cb)(BT_SINK_PLAY)) {
+				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
+			} else {
+				update_metadata(false);
 			}	
-		} else {
-			ESP_LOGW(BT_AV_TAG, "Not yet in BT connected mode: 0x%x", event_parameter->playback);
+		} else if (event_parameter->playback == ESP_AVRC_PLAYBACK_PAUSED) (*bt_app_a2d_cmd_cb)(BT_SINK_PAUSE);
+		else if (event_parameter->playback == ESP_AVRC_PLAYBACK_STOPPED) {
+			(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, -1);			
+			(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
 		}	
         bt_av_playback_changed();
         break;

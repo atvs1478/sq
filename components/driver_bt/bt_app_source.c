@@ -3,7 +3,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#include "platform_bt_core.h"
+#include "bt_app_core.h"
 #include "esp_log.h"
 #include "esp_bt.h"
 #include "esp_bt_device.h"

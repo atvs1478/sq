@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#include "platform_bt_core.h"
+#include "bt_app_core.h"
 typedef enum { 	BT_SINK_CONNECTED, BT_SINK_DISCONNECTED, BT_SINK_AUDIO_STARTED, BT_SINK_AUDIO_STOPPED, BT_SINK_PLAY, BT_SINK_STOP, BT_SINK_PAUSE, 
 				BT_SINK_RATE, BT_SINK_VOLUME, BT_SINK_METADATA, BT_SINK_PROGRESS } bt_sink_cmd_t;
 				

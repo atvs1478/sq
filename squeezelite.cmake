@@ -53,12 +53,18 @@ function(___create_new_target target_name)
         
 
 endfunction()
+
+
 ___create_new_target(squeezelite )
 ___register_flash(squeezelite ota_0)
-add_custom_command(
-			TARGET "squeezelite.elf"
-			POST_BUILD 
-			COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/generate_debug_scripts.cmake"
-			)
 
+#add_custom_target(_jtag_scripts ALL 
+#	BYPRODUCTS flash_dbg_project_args
+#	COMMAND ${CMAKE_COMMAND} 
+#    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/build/partition_table/partition-table.bin"  )
+add_custom_target(_jtag_scripts  ALL
+					BYPRODUCTS "flash_dbg_project_args"  
+					POST_BUILD
+					COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/generate_debug_scripts.cmake")
+add_dependencies(partition_table _jtag_scripts)
 
