@@ -127,12 +127,13 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		output.frames_played = 0;
 		_buf_flush(outputbuf);
 		if (decode.state != DECODE_STOPPED) decode.state = DECODE_ERROR;
-		LOG_INFO("BT sink started");
+		LOG_INFO("BT audio sink started");
 		break;
 	case BT_SINK_AUDIO_STOPPED:	
 		if (output.external == DECODE_BT) {
 			if (output.state > OUTPUT_STOPPED) output.state = OUTPUT_STOPPED;
-			LOG_INFO("BT sink stopped");
+			output.stop_time = gettime_ms();
+			LOG_INFO("BT audio sink stopped");
 		}	
 		break;
 	case BT_SINK_PLAY:
@@ -146,6 +147,7 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		LOG_INFO("BT sink stopped");
 		break;
 	case BT_SINK_PAUSE:		
+		output.stop_time = gettime_ms();
 		LOG_INFO("BT sink paused, just silence");
 		break;
 	case BT_SINK_RATE:
