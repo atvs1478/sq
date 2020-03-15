@@ -362,6 +362,7 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 		break;
 	case DISPLAYER_TIMER_RUN:
 		if (!displayer.timer) {
+			display_bus(&displayer, DISPLAY_BUS_TAKE);
 			displayer.timer = true;		
 			displayer.tick = xTaskGetTickCount();		
 		}	
