@@ -26,6 +26,7 @@
 #include "gds.h"
 #include "gds_text.h"
 #include "gds_draw.h"
+#include "gds_image.h"
 
 #pragma pack(push, 1)
 
@@ -57,6 +58,12 @@ struct grfg_packet {
 	char  opcode[4];
 	u16_t  screen;	
 	u16_t  width;		// # of pixels of scrollable
+};
+
+struct grfa_packet {
+	char  opcode[4];
+	u32_t length; 
+	u32_t offset;
 };
 
 struct visu_packet {
@@ -130,6 +137,11 @@ static struct scroller_s {
 	u32_t width;
 } scroller;
 
+static struct {
+	u8_t *data;
+	u32_t size;
+} artwork;
+
 #define MAX_BARS	32
 static EXT_RAM_ATTR struct {
 	int bar_gap, bar_width, bar_border;
@@ -174,6 +186,7 @@ static void grfe_handler( u8_t *data, int len);
 static void grfb_handler(u8_t *data, int len);
 static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
+static void grfa_handler(u8_t *data, int len);
 static void visu_handler(u8_t *data, int len);
 
 static void displayer_task(void* arg);
@@ -360,6 +373,8 @@ static bool handler(u8_t *data, int len){
 		grfs_handler(data, len);		
 	} else if (!strncmp((char*) data, "grfg", 4)) {
 		grfg_handler(data, len);
+	} else if (!strncmp((char*) data, "grfa", 4)) {
+		grfa_handler(data, len);		
 	} else if (!strncmp((char*) data, "visu", 4)) {
 		visu_handler(data, len);
 	} else {
@@ -634,6 +649,33 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	// resume task once we have background, not in grfs
 	vTaskResume(displayer.task);
+}
+
+
+/****************************************************************************************
+ * Artwork
+ */
+static void grfa_handler(u8_t *data, int len) {
+	struct grfa_packet *pkt = (struct grfa_packet*) data;
+	int size = len - sizeof(struct grfa_packet);
+	int offset = htonl(pkt->offset);
+	int length = htonl(pkt->length);
+	
+	LOG_INFO("gfra l:%u o:%u s:%u", length, offset, size);
+				
+	// new grfa artwork, allocate memory
+	if (!offset) {	
+		if (artwork.data) free(artwork.data);
+		artwork.data = malloc(length);
+		artwork.size = 0;
+	}	
+
+	// copy artwork data
+	memcpy(artwork.data + offset, data + sizeof(struct grfa_packet), size);
+	artwork.size += size;
+	if (artwork.size == length) {
+		GDS_DrawJPEG(display, artwork.data, 0, 32, GDS_IMAGE_CENTER);		
+	}	
 }
 
 /****************************************************************************************
