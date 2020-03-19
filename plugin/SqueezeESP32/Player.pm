@@ -42,6 +42,11 @@ sub hasScrolling  {
 	return 1;
 }
 
+sub reconnect {
+	my $client = shift;
+	$client->pluginData('artwork_md5', '');
+	$client->SUPER::reconnect(@_);
+}	
 
 sub directMetadata {
 	my $client = shift;

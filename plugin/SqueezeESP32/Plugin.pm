@@ -33,38 +33,44 @@ sub initPlugin {
 	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
 	$log->info("Added class 100 for SqueezeESP32");
 	
-	Slim::Control::Request::subscribe(\&update_artwork, [ ['newmetadata'] ] );
-	Slim::Control::Request::subscribe(\&update_artwork, [ ['playlist'], ['open', 'newsong'] ]);
+	Slim::Control::Request::subscribe(\&onNotification, [ ['newmetadata'] ] );
+	Slim::Control::Request::subscribe(\&onNotification, [ ['playlist'], ['open', 'newsong'] ]);
+}
+
+sub onNotification {
+    my $request = shift;
+    my $client  = $request->client;
+	
+	my $reqstr     = $request->getRequestString();
+	$log->info("artwork update notification $reqstr");
+	#my $path = $request->getParam('_path');
+
+	update_artwork($client);
 }
 
 sub update_artwork {
-    my $request = shift;
-    my $client  = $request->client;
+    my $client  = shift;
+	my $force = shift || 0;
 	my $cprefs = $prefs->client($client);
 	my $artwork = $cprefs->get('artwork');
 		
 	return unless $client->model eq 'squeezeesp32' && $artwork->{'enable'};
 
-	my $reqstr     = $request->getRequestString();
-	#my $path = $request->getParam('_path');
-
 	my $s = $artwork->{'y'} >= 32 ? $cprefs->get('height') - $artwork->{'y'} : 32;
 	$s = min($s, $cprefs->get('width') - $artwork->{'x'});
 	
 	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
-	my $body = Slim::Web::Graphics::artworkRequest($client, $path, undef, \&send_artwork, undef, HTTP::Response->new);
+	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $force, \&send_artwork, undef, HTTP::Response->new);
 	
 	send_artwork($client, undef, \$body) if $body;
-	
-	$log->info("artwork update notification $reqstr with $path");
 }
 
 sub send_artwork {
-	my ($client, $params, $dataref) = @_;
+	my ($client, $force, $dataref) = @_;
 	
 	# I'm not sure why we are called so often, so only send when needed
 	my $md5 = md5($$dataref);
-	return if $client->pluginData('artwork_md5') eq $md5;
+	return if $client->pluginData('artwork_md5') eq $md5 && !$force;
 	
 	$client->pluginData('artwork', $dataref);
 	$client->pluginData('artwork_md5', $md5);

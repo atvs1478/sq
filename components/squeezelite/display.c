@@ -595,9 +595,6 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.first = true;
 		scroller.overflow = false;
 		
-		// background excludes space taken by visu (if any)
-		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
-		
 		// set scroller steps & beginning
 		if (pkt->direction == 1) {
 			scroller.scrolled = 0;
@@ -634,6 +631,7 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	// size of scrollable area (less than background)
 	scroller.width = htons(pkt->width);
+	scroller.back.width = ((len - sizeof(struct grfg_packet)) * 8) / displayer.height;
 	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
 	// update display asynchronously (frames are organized by columns)
@@ -670,13 +668,20 @@ static void grfa_handler(u8_t *data, int len) {
 	
 	// new grfa artwork, allocate memory
 	if (!offset) {	
+		// same trick to clean current/previous window
+		if (artwork.size) {
+			GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+			artwork.size = 0;
+		}
+		
+		// now use new parameters
 		artwork.x = htons(pkt->x);
 		artwork.y = htons(pkt->y);
 		if (artwork.data) free(artwork.data);
 		artwork.data = malloc(length);
 		artwork.size = 0;
 	}	
-
+	
 	// copy artwork data
 	memcpy(artwork.data + offset, data + sizeof(struct grfa_packet), size);
 	artwork.size += size;
@@ -685,7 +690,6 @@ static void grfa_handler(u8_t *data, int len) {
 		GDS_DrawJPEG(display, artwork.data, artwork.x, artwork.y, artwork.y < 32 ? (GDS_IMAGE_RIGHT | GDS_IMAGE_TOP) : GDS_IMAGE_CENTER);
 		free(artwork.data);
 		artwork.data = NULL;
-		artwork.size = 0;
 	} 
 	
 	LOG_INFO("gfra l:%u x:%hu, y:%hu, o:%u s:%u", length, artwork.x, artwork.y, offset, size);
@@ -849,9 +853,6 @@ static void visu_handler( u8_t *data, int len) {
 			visu.border =  htonl(pkt->border);
 			bars = htonl(pkt->bars);
 			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
-			
-			// might have a race condition with scroller message, so update width in case
-			if (scroller.active) scroller.back.width = displayer.width - visu.width;
 		} else {
 			// full screen visu, try to use bottom screen if available
 			visu.width = displayer.width;

@@ -109,7 +109,7 @@ sub build_modes {
 	my $artwork = $cprefs->get('artwork');
 	
 	# if artwork is in main display, reduce width
-	$width = $artwork->{'x'} - 1 if $artwork->{'enable'} && $artwork->{y} < 32;
+	$width = $artwork->{'x'} if $artwork->{'enable'} && $artwork->{y} < 32;
 	
 	my $small_VU = $cprefs->get('small_VU');
 	my $spectrum = $cprefs->get('spectrum');
@@ -119,7 +119,7 @@ sub build_modes {
 			};
 	my $small_VU_pos = { x => $width - int ($small_VU * $width / 100), 
 						 width => int ($small_VU * $width / 100),
-			};		 				
+			};		
 	
 	my @modes = (
 		# mode 0

@@ -54,6 +54,9 @@ sub handler {
 		$cprefs->set('artwork', $artwork);				
 		$client->display->modes($client->display->build_modes);
 		$client->display->update;
+		
+		# force update
+		Plugins::SqueezeESP32::Plugin::update_artwork($client, 1) if $artwork->{'enable'};
 	}
 	
 	# as there is nothing captured, we need to re-set these variables
