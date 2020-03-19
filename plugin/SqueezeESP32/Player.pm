@@ -20,8 +20,8 @@ sub playerSettingsFrame {
 	
 	my $value;
 	my $id = unpack('C', $$data_ref);
-		        
-	# New SETD command 0xfe for display width
+	
+	# New SETD command 0xfe for display width & height
 	if ($id == 0xfe) { 
 		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
@@ -30,7 +30,9 @@ sub playerSettingsFrame {
 			$client->display->widthOverride(1, $value);
 			$client->update;
 		} 
-		$log->info("Setting player width $value for ", $client->name);
+		my $height = (unpack('Cnn', $$data_ref))[2];
+		$prefs->client($client)->set('height', $height || 0);
+		$log->info("Setting player $value" . "x" . "$height for ", $client->name);
 	}
 	
 	$client->SUPER::playerSettingsFrame($data_ref);
@@ -38,6 +40,13 @@ sub playerSettingsFrame {
 
 sub hasScrolling  {
 	return 1;
+}
+
+
+sub directMetadata {
+	my $client = shift;
+	$client->SUPER::directMetadata(@_);
+	Slim::Control::Request::notifyFromArray( $client, [ 'newmetadata' ] );
 }
 
 1;

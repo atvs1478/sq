@@ -30,7 +30,7 @@ sub page {
 
 sub prefs {
 	my ($class, $client) = @_;
-	my @prefs = qw(width small_VU spectrum);
+	my @prefs = qw(width small_VU spectrum artwork);
 	return ($prefs->client($client), @prefs);
 }
 
@@ -47,6 +47,11 @@ sub handler {
 							full  => { 	band => $paramRef->{'pref_spectrum_full_band'} },
 				};
 		$cprefs->set('spectrum', $spectrum);
+		my $artwork =	{	enable => $paramRef->{'pref_artwork_enable'},
+							x => $paramRef->{'pref_artwork_x'}, 
+							y => $paramRef->{'pref_artwork_y'},
+				};
+		$cprefs->set('artwork', $artwork);				
 		$client->display->modes($client->display->build_modes);
 		$client->display->update;
 	}
@@ -56,9 +61,10 @@ sub handler {
 	
 	# here I don't know why you need to set again spectrum which is a reference
 	# to a hash. Using $paramRef->{prefs} does not work either. It seems that 
-	# soem are copies of value, some are references, can't figure out.This whole
+	# some are copies of value, some are references, can't figure out. This whole
 	# logic of "Settings" is beyond me and I really hate it
 	$paramRef->{'pref_spectrum'} = $cprefs->get('spectrum');
+	$paramRef->{'pref_artwork'} = $cprefs->get('artwork');
 	
 	return $class->SUPER::handler($client, $paramRef);
 }

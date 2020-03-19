@@ -62,7 +62,9 @@ struct grfg_packet {
 
 struct grfa_packet {
 	char  opcode[4];
-	u32_t length; 
+	u32_t length;
+	u16_t x;
+	u16_t y;	
 	u32_t offset;
 };
 
@@ -140,6 +142,7 @@ static struct scroller_s {
 static struct {
 	u8_t *data;
 	u32_t size;
+	u16_t x, y;
 } artwork;
 
 #define MAX_BARS	32
@@ -313,7 +316,7 @@ static void send_server(void) {
 		pkt_header.length = htonl(sizeof(pkt_header) - 8);
 		pkt_header.mode = ANIC_resp;
 
-		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
+		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
 		
 		ANIC_resp = ANIM_NONE;
 	}	
@@ -321,18 +324,22 @@ static void send_server(void) {
 	if (SETD_width) {
 		struct SETD_header pkt_header;
 		
-		LOG_INFO("sending width %u", SETD_width);	
-		
 		memset(&pkt_header, 0, sizeof(pkt_header));
 		memcpy(&pkt_header.opcode, "SETD", 4);
 
 		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
-		pkt_header.length = htonl(sizeof(pkt_header) +  2 - 8);
+		pkt_header.length = htonl(sizeof(pkt_header) +  4 - 8);
+		
+		u16_t height = GDS_GetHeight(display);
+		LOG_INFO("sending dimension %ux%u", SETD_width, height);	
 
 		SETD_width = htons(SETD_width);
-		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
-		send_packet((uint8_t*) &SETD_width, 2);
-
+		height = htons(height);
+		
+		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
+		send_packet((uint8_t *) &SETD_width, 2);
+		send_packet((uint8_t *) &height, 2);
+		
 		SETD_width = 0;
 	}	
 	
@@ -661,10 +668,10 @@ static void grfa_handler(u8_t *data, int len) {
 	int offset = htonl(pkt->offset);
 	int length = htonl(pkt->length);
 	
-	LOG_INFO("gfra l:%u o:%u s:%u", length, offset, size);
-				
 	// new grfa artwork, allocate memory
 	if (!offset) {	
+		artwork.x = htons(pkt->x);
+		artwork.y = htons(pkt->y);
 		if (artwork.data) free(artwork.data);
 		artwork.data = malloc(length);
 		artwork.size = 0;
@@ -674,8 +681,14 @@ static void grfa_handler(u8_t *data, int len) {
 	memcpy(artwork.data + offset, data + sizeof(struct grfa_packet), size);
 	artwork.size += size;
 	if (artwork.size == length) {
-		GDS_DrawJPEG(display, artwork.data, 0, 32, GDS_IMAGE_CENTER);		
-	}	
+		GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+		GDS_DrawJPEG(display, artwork.data, artwork.x, artwork.y, artwork.y < 32 ? (GDS_IMAGE_RIGHT | GDS_IMAGE_TOP) : GDS_IMAGE_CENTER);
+		free(artwork.data);
+		artwork.data = NULL;
+		artwork.size = 0;
+	} 
+	
+	LOG_INFO("gfra l:%u x:%hu, y:%hu, o:%u s:%u", length, artwork.x, artwork.y, offset, size);
 }
 
 /****************************************************************************************
@@ -820,7 +833,7 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 	
 	if (visu.mode) {
 		if (pkt->count >= 4) {
@@ -878,7 +891,7 @@ static void visu_handler( u8_t *data, int len) {
 		// reset bars maximum
 		for (int i = visu.n; --i >= 0;) visu.bars[i].max = 0;
 				
-		GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+		GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 		
 		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u,s:%.02f)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row, visu.spectrum_scale);
 	} else {
