@@ -33,8 +33,8 @@ sub initPlugin {
 	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
 	$log->info("Added class 100 for SqueezeESP32");
 	
-	Slim::Control::Request::subscribe(\&onNotification, [ ['newmetadata'] ] );
-	Slim::Control::Request::subscribe(\&onNotification, [ ['playlist'], ['open', 'newsong'] ]);
+	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
+	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 }
 
 sub onNotification {
