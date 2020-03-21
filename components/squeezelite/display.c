@@ -26,6 +26,7 @@
 #include "gds.h"
 #include "gds_text.h"
 #include "gds_draw.h"
+#include "gds_image.h"
 
 #pragma pack(push, 1)
 
@@ -59,6 +60,14 @@ struct grfg_packet {
 	u16_t  width;		// # of pixels of scrollable
 };
 
+struct grfa_packet {
+	char  opcode[4];
+	u32_t length;
+	u16_t x;
+	u16_t y;	
+	u32_t offset;
+};
+
 struct visu_packet {
 	char  opcode[4];
 	u8_t which;
@@ -77,6 +86,29 @@ struct visu_packet {
 			u32_t bars;
 			u32_t spectrum_scale;
 		};	
+		struct {
+			u32_t mono;
+			u32_t bandwidth;
+			u32_t preemph;	
+			struct {
+				u32_t pos;
+				u32_t width;
+				u32_t orient;
+				u32_t bar_width;
+				u32_t bar_space;
+				u32_t clipping;
+				u32_t bar_intens;
+				u32_t bar_cap_intens;
+			} channels[2];
+		};
+		struct {
+			u32_t mono;
+			u32_t style;
+			struct {
+				u32_t pos;
+				u32_t width;
+			} channels[2];
+		} classical_vu;	
 	};	
 };
 
@@ -130,7 +162,15 @@ static struct scroller_s {
 	u32_t width;
 } scroller;
 
+static struct {
+	u8_t *data;
+	u32_t size;
+	u16_t x, y;
+	bool enable;
+} artwork;
+
 #define MAX_BARS	32
+#define VISU_ESP32	0x10
 static EXT_RAM_ATTR struct {
 	int bar_gap, bar_width, bar_border;
 	struct {
@@ -142,6 +182,11 @@ static EXT_RAM_ATTR struct {
 	enum { VISU_BLANK, VISU_VUMETER, VISU_SPECTRUM, VISU_WAVEFORM } mode;
 	int speed, wake;	
 	float fft[FFT_LEN*2], samples[FFT_LEN*2], hanning[FFT_LEN];
+	struct {
+		u8_t *frame;
+		int width;
+		bool active;
+	} back;		
 } visu;
 
 #define ANIM_NONE		  0x00
@@ -174,6 +219,7 @@ static void grfe_handler( u8_t *data, int len);
 static void grfb_handler(u8_t *data, int len);
 static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
+static void grfa_handler(u8_t *data, int len);
 static void visu_handler(u8_t *data, int len);
 
 static void displayer_task(void* arg);
@@ -205,6 +251,33 @@ static void displayer_task(void* arg);
 			ANIM_SCREEN_2     0x08 # For scrollonce only, screen 2 was scrolling
 */
 
+/* classical visu not our specific version)
+ Parameters for the spectrum analyzer:
+   0 - Channels: stereo == 0, mono == 1
+   1 - Bandwidth: 0..22050Hz == 0, 0..11025Hz == 1
+   2 - Preemphasis in dB per KHz
+ Left channel parameters:
+   3 - Position in pixels
+   4 - Width in pixels
+   5 - orientation: left to right == 0, right to left == 1
+   6 - Bar width in pixels
+   7 - Bar spacing in pixels
+   8 - Clipping: show all subbands == 0, clip higher subbands == 1
+   9 - Bar intensity (greyscale): 1-3
+   10 - Bar cap intensity (greyscale): 1-3
+ Right channel parameters (not required for mono):
+   11-18 - same as left channel parameters
+
+ Parameters for the vumeter:
+   0 - Channels: stereo == 0, mono == 1
+   1 - Style: digital == 0, analog == 1
+ Left channel parameters:
+   2 - Position in pixels
+   3 - Width in pixels
+ Right channel parameters (not required for mono):
+   4-5 - same as left channel parameters
+*/
+
 /****************************************************************************************
  * 
  */
@@ -226,6 +299,7 @@ bool sb_display_init(void) {
 	// create visu configuration
 	visu.bar_gap = 1;
 	visu.speed = 100;
+	visu.back.frame = calloc(1, (displayer.width * displayer.height) / 8);
 	dsps_fft2r_init_fc32(visu.fft, FFT_LEN);
 	dsps_wind_hann_f32(visu.hanning, FFT_LEN);
 		
@@ -300,7 +374,7 @@ static void send_server(void) {
 		pkt_header.length = htonl(sizeof(pkt_header) - 8);
 		pkt_header.mode = ANIC_resp;
 
-		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
+		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
 		
 		ANIC_resp = ANIM_NONE;
 	}	
@@ -308,18 +382,22 @@ static void send_server(void) {
 	if (SETD_width) {
 		struct SETD_header pkt_header;
 		
-		LOG_INFO("sending width %u", SETD_width);	
-		
 		memset(&pkt_header, 0, sizeof(pkt_header));
 		memcpy(&pkt_header.opcode, "SETD", 4);
 
 		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
-		pkt_header.length = htonl(sizeof(pkt_header) +  2 - 8);
+		pkt_header.length = htonl(sizeof(pkt_header) +  4 - 8);
+		
+		u16_t height = GDS_GetHeight(display);
+		LOG_INFO("sending dimension %ux%u", SETD_width, height);	
 
 		SETD_width = htons(SETD_width);
-		send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
-		send_packet((uint8_t*) &SETD_width, 2);
-
+		height = htons(height);
+		
+		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
+		send_packet((uint8_t *) &SETD_width, 2);
+		send_packet((uint8_t *) &height, 2);
+		
 		SETD_width = 0;
 	}	
 	
@@ -360,6 +438,8 @@ static bool handler(u8_t *data, int len){
 		grfs_handler(data, len);		
 	} else if (!strncmp((char*) data, "grfg", 4)) {
 		grfg_handler(data, len);
+	} else if (!strncmp((char*) data, "grfa", 4)) {
+		grfa_handler(data, len);		
 	} else if (!strncmp((char*) data, "visu", 4)) {
 		visu_handler(data, len);
 	} else {
@@ -495,7 +575,7 @@ static void grfe_handler( u8_t *data, int len) {
 	scroller.active = false;
 	
 	// we are not in control or we are displaying visu on a small screen, do not do screen update
-	if (visu.mode && !visu.col && visu.row < SB_HEIGHT) {
+	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < SB_HEIGHT) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
@@ -509,6 +589,16 @@ static void grfe_handler( u8_t *data, int len) {
 	
 		// draw new frame, it might be less than full screen (small visu)
 		int width = ((len - sizeof(struct grfe_packet)) * 8) / displayer.height;
+		
+		// when doing screensaver, that frame becomes a visu background
+		if (!(visu.mode & VISU_ESP32)) {
+			visu.back.width = width;
+			memset(visu.back.frame, 0, (displayer.width * displayer.height) / 8);
+			memcpy(visu.back.frame, data + sizeof(struct grfe_packet), (width * displayer.height) / 8);
+			// this is a bit tricky but basically that checks if frame if full of 0
+			visu.back.active = *visu.back.frame || memcmp(visu.back.frame, visu.back.frame + 1, width - 1);
+		}
+		
 		GDS_DrawBitmapCBR(display, data + sizeof(struct grfe_packet), width, displayer.height, GDS_COLOR_WHITE);
 		GDS_Update(display);
 	}	
@@ -548,7 +638,7 @@ static void grfs_handler(u8_t *data, int len) {
 	int size = len - sizeof(struct grfs_packet);
 	int offset = htons(pkt->offset);
 	
-	LOG_DEBUG("gfrs s:%u d:%u p:%u sp:%u by:%hu m:%hu w:%hu o:%hu", 
+	LOG_DEBUG("grfs s:%u d:%u p:%u sp:%u by:%hu m:%hu w:%hu o:%hu", 
 				(int) pkt->screen,
 				(int) pkt->direction,	// 1=left, 2=right
 				htonl(pkt->pause),		// in ms	
@@ -572,9 +662,6 @@ static void grfs_handler(u8_t *data, int len) {
 		scroller.scroll.width = htons(pkt->width);
 		scroller.first = true;
 		scroller.overflow = false;
-		
-		// background excludes space taken by visu (if any)
-		scroller.back.width = displayer.width - ((visu.mode && visu.row < SB_HEIGHT) ? visu.width : 0);
 		
 		// set scroller steps & beginning
 		if (pkt->direction == 1) {
@@ -612,6 +699,7 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	// size of scrollable area (less than background)
 	scroller.width = htons(pkt->width);
+	scroller.back.width = ((len - sizeof(struct grfg_packet)) * 8) / displayer.height;
 	memcpy(scroller.back.frame, data + sizeof(struct grfg_packet), len - sizeof(struct grfg_packet));
 		
 	// update display asynchronously (frames are organized by columns)
@@ -636,15 +724,63 @@ static void grfg_handler(u8_t *data, int len) {
 	vTaskResume(displayer.task);
 }
 
+
+/****************************************************************************************
+ * Artwork
+ */
+static void grfa_handler(u8_t *data, int len) {
+	struct grfa_packet *pkt = (struct grfa_packet*) data;
+	int size = len - sizeof(struct grfa_packet);
+	int offset = htonl(pkt->offset);
+	int length = htonl(pkt->length);
+	
+	artwork.enable = (length != 0);
+	
+	// clean up if we are disabling previously enabled artwork
+	if (!artwork.enable) {
+		if (artwork.size) GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+		return;
+	}	
+	
+	// new grfa artwork, allocate memory
+	if (!offset) {	
+		// same trick to clean current/previous window
+		if (artwork.size) {
+			GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+			artwork.size = 0;
+		}
+		
+		// now use new parameters
+		artwork.x = htons(pkt->x);
+		artwork.y = htons(pkt->y);
+		if (artwork.data) free(artwork.data);
+		artwork.data = malloc(length);
+	}	
+	
+	// copy artwork data
+	memcpy(artwork.data + offset, data + sizeof(struct grfa_packet), size);
+	artwork.size += size;
+	if (artwork.size == length) {
+		GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+		GDS_DrawJPEG(display, artwork.data, artwork.x, artwork.y, artwork.y < SB_HEIGHT ? (GDS_IMAGE_RIGHT | GDS_IMAGE_TOP) : GDS_IMAGE_CENTER);
+		free(artwork.data);
+		artwork.data = NULL;
+	} 
+	
+	LOG_INFO("gfra l:%u x:%hu, y:%hu, o:%u s:%u", length, artwork.x, artwork.y, offset, size);
+}
+
 /****************************************************************************************
  * Update visualization bars
  */
 static void visu_update(void) {
 	// no need to protect against no woning the display as we are playing	
 	if (pthread_mutex_trylock(&visu_export.mutex)) return;
+	
+	int mode = visu.mode & ~VISU_ESP32;
 				
 	// not enough samples
-	if (visu_export.level < (visu.mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running) {
+	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running) {
 		pthread_mutex_unlock(&visu_export.mutex);
 		return;
 	}
@@ -654,7 +790,7 @@ static void visu_update(void) {
 	
 	if (visu_export.running) {
 					
-		if (visu.mode == VISU_VUMETER) {
+		if (mode == VISU_VUMETER) {
 			s16_t *iptr = visu_export.buffer;
 			
 			// calculate sum(L²+R²), try to not overflow at the expense of some precision
@@ -667,7 +803,7 @@ static void visu_update(void) {
 		
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
 			for (int i = visu.n; --i >= 0;) {	 
-				visu.bars[i].current = 32 * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> 1)) - 0.2543f);
+				visu.bars[i].current = SB_HEIGHT * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> 1)) - 0.2543f);
 				if (visu.bars[i].current > 31) visu.bars[i].current = 31;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
@@ -709,7 +845,7 @@ static void visu_update(void) {
 				}	
 			
 				// convert to dB and bars, same back-off
-				if (power) visu.bars[i].current = 32 * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
+				if (power) visu.bars[i].current = SB_HEIGHT * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
 				if (visu.bars[i].current > 31) visu.bars[i].current = 31;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}	
@@ -724,6 +860,11 @@ static void visu_update(void) {
 	int clear = 0;
 	for (int i = visu.n; --i >= 0;) clear = max(clear, visu.bars[i].max);
 	if (clear) GDS_ClearExt(display, false, false, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+	
+	// draw background if we are in screensaver mode
+	if (!(visu.mode & VISU_ESP32) && visu.back.active) {
+		GDS_DrawBitmapCBR(display, visu.back.frame, visu.back.width, displayer.height, GDS_COLOR_WHITE);
+	}	
 
 	// there is much more optimization to be done here, like not redrawing bars unless needed
 	for (int i = visu.n; --i >= 0;) {
@@ -778,37 +919,47 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 	
 	if (visu.mode) {
-		if (pkt->count >= 4) {
-			// small visu, then go were we are told to
-			pkt->height = htonl(pkt->height);
-			pkt->row = htonl(pkt->row);
-			pkt->col = htonl(pkt->col);
+		// these will be overidden if necessary
+		visu.col = visu.border = 0;
+		visu.width = displayer.width;				
+		
+		// what type of visu
+		if (visu.mode & VISU_ESP32) {
+			if (pkt->count >= 4) {
+				// more than 4 parameters, this is small visu, then go were we are told to
+				pkt->height = htonl(pkt->height);
+				pkt->row = htonl(pkt->row);
+				pkt->col = htonl(pkt->col);
 
-			visu.width = htonl(pkt->width);
-			visu.height = pkt->height ? pkt->height : SB_HEIGHT;
-			visu.col = pkt->col < 0 ? displayer.width + pkt->col : pkt->col;
-			visu.row = pkt->row < 0 ? GDS_GetHeight(display) + pkt->row : pkt->row;
-			visu.border =  htonl(pkt->border);
-			bars = htonl(pkt->bars);
-			visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
-			
-			// might have a race condition with scroller message, so update width in case
-			if (scroller.active) scroller.back.width = displayer.width - visu.width;
+				visu.width = htonl(pkt->width);
+				visu.height = pkt->height ? pkt->height : SB_HEIGHT;
+				visu.col = pkt->col < 0 ? displayer.width + pkt->col : pkt->col;
+				visu.row = pkt->row < 0 ? GDS_GetHeight(display) + pkt->row : pkt->row;
+				visu.border =  htonl(pkt->border);
+				bars = htonl(pkt->bars);
+				visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
+			} else {
+				// full screen visu, try to use bottom screen if available
+				visu.height = GDS_GetHeight(display) > SB_HEIGHT ? GDS_GetHeight(display) - SB_HEIGHT : GDS_GetHeight(display);
+				bars = htonl(pkt->full.bars);
+				visu.spectrum_scale = htonl(pkt->full.spectrum_scale) / 100.;
+				visu.row = GDS_GetHeight(display) - visu.height;			
+			}	
 		} else {
-			// full screen visu, try to use bottom screen if available
-			visu.width = displayer.width;
-			visu.height = GDS_GetHeight(display) > SB_HEIGHT ? GDS_GetHeight(display) - SB_HEIGHT : GDS_GetHeight(display);
-			visu.col = visu.border = 0;
-			visu.row = GDS_GetHeight(display) - visu.height;			
-			bars = htonl(pkt->full.bars);
-			visu.spectrum_scale = htonl(pkt->full.spectrum_scale) / 100.;
-		}
+			// classical (screensaver) mode, don't try to optimize screen usage & force some params
+			visu.row = 0;
+			visu.height = SB_HEIGHT;
+			visu.spectrum_scale = 0.25;				
+			if (artwork.enable && artwork.y < SB_HEIGHT) visu.width = artwork.x - 1;
+			if (visu.mode == VISU_SPECTRUM) bars = visu.width / (htonl(pkt->channels[0].bar_width) + htonl(pkt->channels[0].bar_space));
+			if (bars > MAX_BARS) bars = MAX_BARS;
+		}	
 		
 		// try to adapt to what we have
-		if (visu.mode == VISU_SPECTRUM) {
+		if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
 			visu.n = bars ? bars : MAX_BARS;
 			if (visu.spectrum_scale <= 0 || visu.spectrum_scale > 0.5) visu.spectrum_scale = 0.5;
 			spectrum_limits(0, visu.n, 0);
@@ -836,7 +987,7 @@ static void visu_handler( u8_t *data, int len) {
 		// reset bars maximum
 		for (int i = visu.n; --i >= 0;) visu.bars[i].max = 0;
 				
-		GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row - visu.height - 1);
+		GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 		
 		LOG_INFO("Visualizer with %u bars of width %d:%d:%d:%d (%w:%u,h:%u,c:%u,r:%u,s:%.02f)", visu.n, visu.bar_border, visu.bar_width, visu.bar_gap, visu.border, visu.width, visu.height, visu.col, visu.row, visu.spectrum_scale);
 	} else {

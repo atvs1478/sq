@@ -74,7 +74,7 @@ static void Update( struct GDS_Device* Device ) {
 			CurrentPage = p + 1;
 			
 			// actual write
-			Device->WriteData( Device, Private->Shadowbuffer + p*width + first, last - first + 1 );
+			Device->WriteData( Device, Private->Shadowbuffer + p*width + first, last - first + 1);
 		}
 	}	
 #else	
@@ -114,10 +114,6 @@ static bool Init( struct GDS_Device* Device ) {
 	// charge pump regulator, do direct init
 	Device->WriteCommand( Device, 0x8D );
 	Device->WriteCommand( Device, 0x14 ); 
-	
-	// set Clocks
-    Device->WriteCommand( Device, 0xD5 );
-    Device->WriteCommand( Device, ( 0x08 << 4 ) | 0x00 );
 			
 	// COM pins HW config (alternative:EN if 64, DIS if 32, remap:DIS) - some display might need something different
 	Device->WriteCommand( Device, 0xDA );
@@ -126,12 +122,6 @@ static bool Init( struct GDS_Device* Device ) {
 	// MUX Ratio
     Device->WriteCommand( Device, 0xA8 );
     Device->WriteCommand( Device, Device->Height - 1);
-	// Page & GDDRAM Start Column High/Low
-	/*
-    Device->WriteCommand( Device, 0x00 );
-	Device->WriteCommand( Device, 0x10 );
-	Device->WriteCommand( Device, 0xB0 );
-	*/
 	// Display Offset
     Device->WriteCommand( Device, 0xD3 );
     Device->WriteCommand( Device, 0 );
@@ -143,6 +133,9 @@ static bool Init( struct GDS_Device* Device ) {
 	Device->SetHFlip( Device, false );
 	// no Display Inversion
     Device->WriteCommand( Device, 0xA6 );
+	// set Clocks
+    Device->WriteCommand( Device, 0xD5 );
+    Device->WriteCommand( Device, ( 0x08 << 4 ) | 0x00 );
 	// set Adressing Mode Horizontal
 	Device->WriteCommand( Device, 0x20 );
 	Device->WriteCommand( Device, 0 );

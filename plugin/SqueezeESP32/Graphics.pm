@@ -14,6 +14,8 @@ my $VISUALIZER_NONE = 0;
 my $VISUALIZER_VUMETER = 1;
 my $VISUALIZER_SPECTRUM_ANALYZER = 2;
 my $VISUALIZER_WAVEFORM = 3;
+my $VISUALIZER_VUMETER_ESP32 = 0x11;
+my $VISUALIZER_SPECTRUM_ANALYZER_ESP32 = 0x12;
 
 {
 	#__PACKAGE__->mk_accessor('array', 'modes');
@@ -71,7 +73,12 @@ sub displayWidth {
 	}
 	
 	if ($display->widthOverride) {
-		return $display->widthOverride + ($display->modes->[$mode || 0]{_width} || 0);
+		my $artwork = $prefs->client($client)->get('artwork');
+		if ($artwork->{'enable'} && $artwork->{'y'} < 32 && $client->isPlaying) {
+			return $artwork->{x} + ($display->modes->[$mode || 0]{_width} || 0);
+		} else {
+			return $display->widthOverride + ($display->modes->[$mode || 0]{_width} || 0);
+		}	
 	} else {
 		return $display->modes->[$mode || 0]{width};
 	}	
@@ -100,9 +107,21 @@ sub build_modes {
 	my $client = shift->client;
 	my $cprefs = $prefs->client($client);
 	
-	my $width = shift || $cprefs->get('width') || 128;
+	my $width = $cprefs->get('width') || 128;
+	my $artwork = $cprefs->get('artwork');
+	
+	# if artwork is in main display, reduce width
+	$width = $artwork->{'x'} if $artwork->{'enable'} && $artwork->{y} < 32;
+	
 	my $small_VU = $cprefs->get('small_VU');
 	my $spectrum = $cprefs->get('spectrum');
+	
+	my $small_spectrum_pos = { x => $width - int ($spectrum->{small}->{size} * $width / 100), 
+						 width => int ($spectrum->{small}->{size} * $width / 100),
+			};
+	my $small_VU_pos = { x => $width - int ($small_VU * $width / 100), 
+						 width => int ($small_VU * $width / 100),
+			};		
 	
 	my @modes = (
 		# mode 0
@@ -135,41 +154,41 @@ sub build_modes {
 		params => [$VISUALIZER_NONE] },
 		# mode 7
 		{ desc => ['VISUALIZER_VUMETER_SMALL'],
-		bar => 0, secs => 0,  width => $width, _width => int -($small_VU*$width/100),
+		bar => 0, secs => 0,  width => $width, _width => -$small_VU_pos->{'width'},
 		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space)
-		params => [$VISUALIZER_VUMETER, int ($small_VU*$width/100), 32, int -($small_VU*$width/100), 0, 2] },
+		params => [$VISUALIZER_VUMETER_ESP32, $small_VU_pos->{'width'}, 32, $small_VU_pos->{'x'}, 0, 2] },
 		# mode 8
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER_SMALL'],
-		bar => 0, secs => 0,  width => $width, _width => int -($spectrum->{small}->{size}*$width/100),
-		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space, bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($spectrum->{small}->{size}*$width/100), 32, int -($spectrum->{small}->{size}*$width/100), 0, 2, int ($spectrum->{small}->{size}/100*$width/$spectrum->{small}->{band}), $spectrum->{scale}] },  
+		bar => 0, secs => 0,  width => $width, _width => -$small_spectrum_pos->{'width'},
+		# extra parameters (width, height, col (< 0 = from right), row (< 0 = from bottom), left_space, #bars, scale)
+		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, $small_spectrum_pos->{width}, 32, $small_spectrum_pos->{'x'}, 0, 2, $small_spectrum_pos->{'width'} / $spectrum->{small}->{band}, $spectrum->{scale}] },  
 		# mode 9	 
 		{ desc => ['VISUALIZER_VUMETER'],
 		bar => 0, secs => 0,  width => $width,
-		params => [$VISUALIZER_VUMETER] },
+		params => [$VISUALIZER_VUMETER_ESP32] },
 		# mode 10
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER'],
 		bar => 0, secs => 0,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
 		# mode 11	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
-		params => [$VISUALIZER_VUMETER] },
+		params => [$VISUALIZER_VUMETER_ESP32] },
 		# mode 12
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
+		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
 		# mode 13	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
-		params => [$VISUALIZER_VUMETER] },
+		params => [$VISUALIZER_VUMETER_ESP32] },
 		# mode 14
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
 		# extra parameters (bars)
-		params => [$VISUALIZER_SPECTRUM_ANALYZER, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	
+		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	
 	);
 	
 	return \@modes;

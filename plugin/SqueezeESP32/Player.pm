@@ -20,24 +20,32 @@ sub playerSettingsFrame {
 	
 	my $value;
 	my $id = unpack('C', $$data_ref);
-		        
-	# New SETD command 0xfe for display width
+	
+	# New SETD command 0xfe for display width & height
 	if ($id == 0xfe) { 
 		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
 			$prefs->client($client)->set('width', $value);
-			$client->display->modes($client->display->build_modes($value));
+			$client->display->modes($client->display->build_modes);
 			$client->display->widthOverride(1, $value);
 			$client->update;
 		} 
-		$log->info("Setting player width $value for ", $client->name);
+		my $height = (unpack('Cnn', $$data_ref))[2];
+		$prefs->client($client)->set('height', $height || 0);
+		$log->info("Setting player $value" . "x" . "$height for ", $client->name);
 	}
 	
 	$client->SUPER::playerSettingsFrame($data_ref);
 }
 
-sub hasScrolling  {
+sub hasScrolling {
 	return 1;
 }
+
+sub reconnect {
+	my $client = shift;
+	$client->pluginData('artwork_md5', '');
+	$client->SUPER::reconnect(@_);
+}	
 
 1;

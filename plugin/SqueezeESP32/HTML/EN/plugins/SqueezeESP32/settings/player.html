@@ -24,5 +24,14 @@
 		<input type="text" class="stdedit" name="pref_spectrum_full_band" id="spectrum_full_band" value="[% prefs.pref_spectrum.full.band %]" size="3">
 	[% END %]
 	
+	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_ARTWORK" desc="PLUGIN_SQUEEZEESP32_ARTWORK_DESC" %]
+		[% "PLUGIN_SQUEEZEESP32_ARTWORK_ENABLE" | string %]&nbsp
+		<input type="checkbox" name="pref_artwork_enable" [% IF prefs.pref_artwork.enable %] checked [% END %]>
+		[% "PLUGIN_SQUEEZEESP32_ARTWORK_X" | string %]&nbsp
+		<input type="text" class="stdedit" name="pref_artwork_x" id="artwork_x" value="[% prefs.pref_artwork.x %]" size="2">
+		[% "PLUGIN_SQUEEZEESP32_ARTWORK_Y" | string %]&nbsp
+		<input type="text" class="stdedit" name="pref_artwork_y" id="artwork_y" value="[% prefs.pref_artwork.y %]" size="2">
+	[% END %]
+	
 
 [% PROCESS settings/footer.html %]

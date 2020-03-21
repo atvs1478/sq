@@ -53,3 +53,19 @@ PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND
 		
 PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND_DESC
 	EN	The number of bands is the width of the screen divided by this factor
+	
+PLUGIN_SQUEEZEESP32_ARTWORK
+	EN	Artwork
+	
+PLUGIN_SQUEEZEESP32_ARTWORK_DESC
+	EN	When Y position is less than 32, then artwork is display at the right of the main screen and x defines the starting position
+	EN	Using artwork on less than 16-levels grayscale display if really poor quality
+
+PLUGIN_SQUEEZEESP32_ARTWORK_ENABLE
+	EN	Enable
+	
+PLUGIN_SQUEEZEESP32_ARTWORK_X
+	EN	X
+
+PLUGIN_SQUEEZEESP32_ARTWORK_Y
+	EN	Y
