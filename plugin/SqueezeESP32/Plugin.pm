@@ -50,7 +50,7 @@ sub onNotification {
 
 sub update_artwork {
     my $client  = shift;
-	my $force = shift || 0;
+	my $params = { force => shift || 0 };
 	my $cprefs = $prefs->client($client);
 	my $artwork = $cprefs->get('artwork');
 		
@@ -60,17 +60,17 @@ sub update_artwork {
 	$s = min($s, $cprefs->get('width') - $artwork->{'x'});
 	
 	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
-	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $force, \&send_artwork, undef, HTTP::Response->new);
+	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $params, \&send_artwork, undef, HTTP::Response->new);
 	
 	send_artwork($client, undef, \$body) if $body;
 }
 
 sub send_artwork {
-	my ($client, $force, $dataref) = @_;
+	my ($client, $params, $dataref) = @_;
 	
 	# I'm not sure why we are called so often, so only send when needed
 	my $md5 = md5($$dataref);
-	return if $client->pluginData('artwork_md5') eq $md5 && !$force;
+	return if $client->pluginData('artwork_md5') eq $md5 && !$params->{'force'};
 	
 	$client->pluginData('artwork', $dataref);
 	$client->pluginData('artwork_md5', $md5);
@@ -95,9 +95,10 @@ sub send_artwork {
 	}
 }	
 
-sub disable_artwork {
+sub config_artwork {
 	my ($client) = @_;
-	my $header = pack('N', 0);
+	my $artwork = $prefs->client($client)->get('artwork');
+	my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
 	$client->sendFrame( grfa => \$header );
 }
 

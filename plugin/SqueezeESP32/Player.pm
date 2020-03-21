@@ -13,6 +13,12 @@ sub model { 'squeezeesp32' }
 sub modelName { 'SqueezeESP32' }
 sub hasIR { 0 }
 
+sub init {
+	my $client = shift;
+	$client->SUPER::init(@_);
+	Plugins::SqueezeESP32::Plugin::config_artwork($client);
+}
+
 # Allow the player to define it's display width (and probably more)
 sub playerSettingsFrame {
 	my $client   = shift;

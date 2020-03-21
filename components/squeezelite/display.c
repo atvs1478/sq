@@ -735,12 +735,18 @@ static void grfa_handler(u8_t *data, int len) {
 	int length = htonl(pkt->length);
 	
 	artwork.enable = (length != 0);
-	
-	// clean up if we are disabling previously enabled artwork
-	if (!artwork.enable) {
-		if (artwork.size) GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+
+	// just a config or an actual artwork	
+	if (length < 32) {
+		if (artwork.enable) {
+			// this is just to specify artwork coordinates
+			artwork.x = htons(pkt->x);
+			artwork.y = htons(pkt->y);		
+		} else if (artwork.size) GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
+		
+		// done in any case
 		return;
-	}	
+	}
 	
 	// new grfa artwork, allocate memory
 	if (!offset) {	
@@ -1071,11 +1077,3 @@ static void displayer_task(void *args) {
 		visu.wake -= sleep;
 	}	
 }	
-			
-
-
-
-
-
-
-

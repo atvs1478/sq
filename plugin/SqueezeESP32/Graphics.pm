@@ -42,7 +42,10 @@ sub new {
 		
 	$display->init_accessor(	
 		modes => $display->build_modes,
-		vfdmodel => 'graphic-<width>x32',	# doesn't matter much
+		# Only seems to matter for screensaver and update to decide font. Not 
+		# any value is acceptable, so use Boom value which seems to be best 
+		# compromise
+		vfdmodel => 'graphic-160x32',	
 	);	
 	
 	return $display;
