@@ -1,3 +1,4 @@
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 function(___register_flash target_name sub_type)
 	partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ${sub_type}" "offset")
