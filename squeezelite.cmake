@@ -49,8 +49,7 @@ function(___create_new_target target_name)
 	add_dependencies(${target_elf} "recovery.elf")
 	
 	set_property(TARGET ${target_elf} PROPERTY RECOVERY_PREFIX app_${target_name})
-
-
+	set(ESPTOOLPY_ELF2IMAGE_OPTIONS --elf-sha256-offset 0xb0)
 
 	# Remove app_recovery so that app_squeezelite and dependencies are properly resolved
 	idf_build_get_property(bca BUILD_COMPONENT_ALIASES)
