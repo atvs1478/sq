@@ -26,7 +26,7 @@ sub playerSettingsFrame {
 		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
 			$prefs->client($client)->set('width', $value);
-			$client->display->modes($client->display->build_modes($value));
+			$client->display->modes($client->display->build_modes);
 			$client->display->widthOverride(1, $value);
 			$client->update;
 		} 
@@ -38,7 +38,7 @@ sub playerSettingsFrame {
 	$client->SUPER::playerSettingsFrame($data_ref);
 }
 
-sub hasScrolling  {
+sub hasScrolling {
 	return 1;
 }
 
@@ -47,11 +47,5 @@ sub reconnect {
 	$client->pluginData('artwork_md5', '');
 	$client->SUPER::reconnect(@_);
 }	
-
-sub directMetadata {
-	my $client = shift;
-	$client->SUPER::directMetadata(@_);
-	Slim::Control::Request::notifyFromArray( $client, [ 'newmetadata' ] );
-}
 
 1;

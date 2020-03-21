@@ -95,4 +95,10 @@ sub send_artwork {
 	}
 }	
 
+sub disable_artwork {
+	my ($client) = @_;
+	my $header = pack('N', 0);
+	$client->sendFrame( grfa => \$header );
+}
+
 1;
