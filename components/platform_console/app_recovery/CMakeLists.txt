@@ -1,13 +1,9 @@
 idf_component_register( SRC_DIRS .
 						INCLUDE_DIRS .   
+						PRIV_REQUIRES bootloader_support
  )
-#idf_build_get_property(IS_RECOVERY  0 )
-#target_link_options(__idf_platform_console PUBLIC $<$<EQUAL:${IS_RECOVERY},1>:${COMPONENT_LIB}>)
-#add_library(libcmd_squeezelite STATIC cmd_squeezelite.c )
-#__component_add_include_dirs(libcmd_squeezelite "${__INCLUDE_DIRS}" INTERFACE)
-#set_property(TARGET libcmd_squeezelite APPEND PROPERTY LINK_LIBRARIES console)
-#set_property(TARGET libcmd_squeezelite APPEND PROPERTY INTERFACE_LINK_LIBRARIES $<LINK_ONLY:console>)
-#
-#
-#add_library(librecovery STATIC recovery.c )
-#target_link_options(${COMPONENT_LIB} PUBLIC $<IF:${IS_RECOVERY},librecovery.a,libcmd_squeezelite.a>)						 
+ 
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=esp_app_desc")	
+idf_build_get_property(project_ver PROJECT_VER)
+string(SUBSTRING "${project_ver}" 0 31 PROJECT_VER_CUT)
+set_source_files_properties(recovery.c PROPERTIES COMPILE_DEFINITIONS "PROJECT_VER=\"${PROJECT_VER_CUT}\"; PROJECT_NAME=\"recovery\"")

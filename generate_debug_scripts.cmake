@@ -3,7 +3,7 @@ function(___output_debug_target bin_name )
 
     file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" cm_build_dir)
     if( "${bin_name}" STREQUAL "_" )
-    	set(debug_file "dbg_project_args" )
+    	set(debug_file "dbg_project" )
     else()
         set(debug_file "dbg_${bin_name}" )
     endif()
@@ -15,7 +15,7 @@ function(___output_debug_target bin_name )
     
 	file(READ ${flash_args_file} flash_args)
 
-
+	list(APPEND dbg_cmds "target remote :3333")
 	list(APPEND dbg_cmds "mon reset halt")
 	list(APPEND dbg_cmds "flushregs")
 	list(APPEND dbg_cmds "set remote hardware-watchpoint-limit 2")
@@ -38,14 +38,11 @@ function(___output_debug_target bin_name )
 			  	list(APPEND flash_dbg_cmds "${line_prefix}${found_bin} ${found_offset}")
 	  		endif()	  		
 	  		
-			if( ( "${found_bin}" MATCHES "${bin_name}" ) )
-			   list(APPEND dbg_cmds "mon esp32 appoffset ${found_offset}") 	  
+			if( ( "${found_bin}" MATCHES "${bin_name}" ) AND NOT ( "${bin_name}" STREQUAL "_" ) )
+			   list(APPEND dbg_cmds "mon esp32 appimage_offset  ${found_offset}") 	  
 			endif()
 	  endif()
 	endforeach()
-
-	list(APPEND dbg_cmds_end "mon reset halt")
-	list(APPEND dbg_cmds_end "flushregs")
 
 	list(APPEND full_dbg_cmds "${dbg_cmds}")
 	list(APPEND full_dbg_cmds "${dbg_cmds_end}")
@@ -57,9 +54,9 @@ function(___output_debug_target bin_name )
 	STRING(REGEX REPLACE  ";" "\n" full_dbg_cmds "${full_dbg_cmds}")
 	STRING(REGEX REPLACE  ";" "\n" full_flash_dbg_cmds "${full_flash_dbg_cmds}")
 
-	message("Writing: ${debug_file} with ${full_dbg_cmds}")
+#	message("Writing: ${debug_file} with ${full_dbg_cmds}")
 	file(WRITE "${debug_file}" "${full_dbg_cmds}")
-	message("Writing: ${flash_debug_file} with : ${full_flash_dbg_cmds}")
+#	message("Writing: ${flash_debug_file} with : ${full_flash_dbg_cmds}")
 	file(WRITE  "${flash_debug_file}" "${full_flash_dbg_cmds}")
   
 

@@ -1,26 +1,45 @@
 
-
-#include($ENV{IDF_PATH}/components/esptool_py/project_include.cmake)
-
-if(NOT SDKCONFIG OR NOT IDF_PATH  OR NOT IDF_TARGET )
-    message(FATAL_ERROR "squeezelite should not be made outside of the main project !")
-endif()
-
-
 function(___register_flash target_name sub_type)
 	partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ${sub_type}" "offset")
 	esptool_py_flash_project_args(${target_name} ${otaapp_offset} ${build_dir}/${target_name}.bin FLASH_IN_PROJECT)
 	esptool_py_custom_target(${target_name}-flash ${target_name} "${target_name}")
 endfunction()
+#
+# Removes the specified compile flag from the specified target.
+#   _target     - The target to remove the compile flag from
+#   _flag       - The compile flag to remove
+#
+# Pre: apply_global_cxx_flags_to_all_targets() must be invoked.
+#
+macro(remove_flag_from_target _target _flag)
+    get_target_property(_target_cxx_flags ${_target} COMPILE_OPTIONS)
+    if(_target_cxx_flags)
+        list(REMOVE_ITEM _target_cxx_flags ${_flag})
+        set_target_properties(${_target} PROPERTIES COMPILE_OPTIONS "${_target_cxx_flags}")
+    endif()
+endmacro()
+function(___print_list pref listcontent)
+	message("")
+	message("${pref}")
+	foreach(e  ${listcontent})
+	  message("${pref} ${e}")
+	endforeach()
+	message("")
+endfunction()
 
 function(___create_new_target target_name)
 	idf_build_get_property(build_dir BUILD_DIR)
+	file(TO_CMAKE_PATH "${IDF_PATH}" idf_path)
+
 	set(target_elf ${target_name}.elf)
+
 	
 	# Create a dummy file to work around CMake requirement of having a source
 	# file while adding an executable
+	
 	set(target_elf_src ${CMAKE_BINARY_DIR}/${target_name}_src.c)
 	add_custom_command(OUTPUT ${target_elf_src}
+		BUILD
 		COMMAND ${CMAKE_COMMAND} -E touch ${target_elf_src}
 	    VERBATIM)
 	
@@ -28,20 +47,30 @@ function(___create_new_target target_name)
 	add_executable(${target_elf} "${target_elf_src}")
 	add_dependencies(${target_elf} _${target_name}_elf)
 	add_dependencies(${target_elf} "recovery.elf")
-	set_property(TARGET ${target_elf} PROPERTY RECOVERY_BUILD 0 )
+	
 	set_property(TARGET ${target_elf} PROPERTY RECOVERY_PREFIX app_${target_name})
-	idf_build_get_property(bca BUILD_COMPONENT_ALIASES)            
+
+
+
+	# Remove app_recovery so that app_squeezelite and dependencies are properly resolved
+	idf_build_get_property(bca BUILD_COMPONENT_ALIASES)
+	list(REMOVE_ITEM bca "idf::app_recovery")
+	list(REMOVE_ITEM bca "idf::app_squeezelite")
 	target_link_libraries(${target_elf} ${bca})
+	target_link_libraries(${target_elf} idf::app_squeezelite)
 	set(target_name_mapfile "${target_name}.map")
 	target_link_libraries(${target_elf} "-Wl,--cref -Wl,--Map=${CMAKE_BINARY_DIR}/${target_name_mapfile}")
+
+#	idf_build_get_property(link_depends __LINK_DEPENDS)
+#	idf_build_get_property(link_options LINK_OPTIONS)
+#	idf_build_get_property(ldgen_libraries __LDGEN_LIBRARIES GENERATOR_EXPRESSION)	
+		
 	add_custom_command(
 			TARGET ${target_elf}
+			
 			POST_BUILD 
-	        COMMAND ${CMAKE_COMMAND} -E echo "Generated ${build_dir}/${target_name}.bin"
-		    #COMMAND echo ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${esptool_elf2image_args}
-		    #COMMAND echo ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${ESPTOOLPY_ELF2IMAGE_OPTIONS}
-	        COMMAND ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${ESPTOOLPY_ELF2IMAGE_OPTIONS}
-	            -o "${build_dir}/${target_name}.bin" "${target_name}.elf"
+			COMMAND ${CMAKE_COMMAND} -E echo "Generating ${build_dir}/${target_name}.bin" 
+			COMMAND ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${ESPTOOLPY_ELF2IMAGE_OPTIONS} -o "${build_dir}/${target_name}.bin" "${target_name}.elf"
 	        DEPENDS "${target_name}.elf" 
 	        WORKING_DIRECTORY ${build_dir}
 	        COMMENT "Generating binary image from built executable"
@@ -54,17 +83,30 @@ function(___create_new_target target_name)
 
 endfunction()
 
-
 ___create_new_target(squeezelite )
 ___register_flash(squeezelite ota_0)
 
-#add_custom_target(_jtag_scripts ALL 
-#	BYPRODUCTS flash_dbg_project_args
-#	COMMAND ${CMAKE_COMMAND} 
-#    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/build/partition_table/partition-table.bin"  )
+
 add_custom_target(_jtag_scripts  ALL
 					BYPRODUCTS "flash_dbg_project_args"  
 					POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/generate_debug_scripts.cmake")
+					COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/generate_debug_scripts.cmake"
+#					COMMAND ${CMAKE_COMMAND} --graphviz=graph.dot .
+#					$ sed -n 's/.*label="\(.*\)"\s.*/\1/p' graph.dot.foo > foo_dependencies.txt
+					)
+					
 add_dependencies(partition_table _jtag_scripts)
 
+idf_build_get_property(build_dir BUILD_DIR)
+add_custom_command(
+			TARGET recovery.elf
+			PRE_LINK
+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+	        VERBATIM
+)
+add_custom_command(
+			TARGET squeezelite.elf
+			PRE_LINK
+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+	        VERBATIM
+)

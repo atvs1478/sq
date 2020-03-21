@@ -10,9 +10,34 @@
 #include "pthread.h"
 #include "platform_esp32.h"
 #include "platform_config.h"
-
+#include "esp_app_format.h"
 static const char * TAG = "squeezelite_cmd";
 #define SQUEEZELITE_THREAD_STACK_SIZE (6*1024)
+
+
+
+const __attribute__((section(".rodata_desc"))) esp_app_desc_t esp_app_desc = {
+
+    .magic_word = ESP_APP_DESC_MAGIC_WORD,
+    .version = PROJECT_VER,
+    .project_name = PROJECT_NAME,
+    .idf_ver = IDF_VER,
+
+#ifdef CONFIG_BOOTLOADER_APP_SECURE_VERSION
+    .secure_version = CONFIG_BOOTLOADER_APP_SECURE_VERSION,
+#else
+    .secure_version = 0,
+#endif
+
+#ifdef CONFIG_APP_COMPILE_TIME_DATE
+    .time = __TIME__,
+    .date = __DATE__,
+#else
+    .time = "",
+    .date = "",
+#endif
+};
+
 extern int main(int argc, char **argv);
 static int launchsqueezelite(int argc, char **argv);
 pthread_t thread_squeezelite;
