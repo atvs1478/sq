@@ -1001,6 +1001,7 @@ static void visu_handler( u8_t *data, int len) {
 				pkt->row = htonl(pkt->row);
 				pkt->col = htonl(pkt->col);
 
+				visu.style = 0;
 				visu.width = htonl(pkt->width);
 				visu.height = pkt->height ? pkt->height : SB_HEIGHT;
 				visu.col = pkt->col < 0 ? displayer.width + pkt->col : pkt->col;
@@ -1018,7 +1019,7 @@ static void visu_handler( u8_t *data, int len) {
 					bars = htonl(pkt->full.bars);
 					visu.spectrum_scale = htonl(pkt->full.spectrum_scale) / 100.;
 				} else {
-					// select analogue/digital
+					// select analogue/digital style
 					visu.style = htonl(pkt->full.style);
 				}
 			}	
