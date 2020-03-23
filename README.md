@@ -90,6 +90,8 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 - 'format' can contain free text and any of the 3 keywords %artist%, %album%, %title%. Using that format string, the keywords are replaced by their value to build the string to be displayed. Note that the plain text following a keyword that happens to be empty during playback of a track will be removed. For example, if you have set format=%artist% - %title% and there is no artist in the metadata then only <title> will be displayed not " - <title>".
 
+You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
+
 ### Set GPIO
 The parameter "set_GPIO" is use to assign GPIO to various functions.
 
