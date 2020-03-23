@@ -210,7 +210,7 @@ my @extra = (
 	);		
 	
 	@modes = (@modes, @extra) if $cprefs->get('height') > 32;
-	
+		
 	return \@modes;
 }	
 
