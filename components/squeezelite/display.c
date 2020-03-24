@@ -589,29 +589,15 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		data += (VU_WIDTH - width) / 2 * VU_HEIGHT;	
 	}	
 
-	// this is RGB332, so pixel will be 3 bits deep
-	int depth = GDS_GetDepth(display);
+	// this is 8 bits grayscale
+	int scale = 8 - GDS_GetDepth(display);
 	
 	// use "fast" version as we are not beyond screen boundaries
-	if (depth < 3) {
-		int scale = 3 - depth;
-		for (int r = 0; r < width; r++) {
-			for (int c = 0; c < VU_HEIGHT; c++) {
-				int pixel = *data++;
-				pixel = ((((pixel & 0x3) * 11) << 1) + ((pixel >> 2) & 0x7) * 59 + (pixel >> 5) * 30 + 1) / 100;
-				GDS_DrawPixelFast(display, r + x, c + y, pixel >> scale);
-			}	
+	for (int r = 0; r < width; r++) {
+		for (int c = 0; c < VU_HEIGHT; c++) {
+			GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
 		}	
-	} else {	
-		int scale = depth - 3;
-		for (int r = 0; r < width; r++) {
-			for (int c = 0; c < VU_HEIGHT; c++) {
-				int pixel = *data++;
-				pixel = ((((pixel & 0x3) * 11) << 1) + ((pixel >> 2) & 0x7) * 59 + (pixel >> 5) * 30 + 1) / 100;
-				GDS_DrawPixelFast(display, r + x, c + y, pixel << scale);
-			}	
-		}	
-	} 		
+	}	
 	
 	// need to manually set dirty flag as DrawPixel does not do it
 	GDS_SetDirty(display);
@@ -934,7 +920,7 @@ static void visu_update(void) {
 			if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
 			else if (visu.bars[i].max) visu.bars[i].max--;
 			else if (!clear) continue;
-		
+			
 			for (int j = 0; j <= visu.bars[i].current; j += 2) 
 				GDS_DrawLine(display, x1, y1 - j, x1 + visu.bar_width - 1, y1 - j, GDS_COLOR_WHITE);
 			
