@@ -612,12 +612,13 @@ static void grfe_handler( u8_t *data, int len) {
 	
 	scroller.active = false;
 	
-	// we are not in control or we are displaying visu on a small screen, do not do screen update
+	// visu has priority when full screen on small screens
 	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < SB_HEIGHT) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
 	
+	// are we in control
 	if (displayer.owned) {
 		// did we have something that might have write on the bottom of a SB_HEIGHT+ display
 		if (displayer.dirty) {
@@ -732,9 +733,12 @@ static void grfg_handler(u8_t *data, int len) {
 	struct grfg_packet *pkt = (struct grfg_packet*) data;
 	
 	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
+
+	// on small screen, visu has priority when full screen	
+	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < SB_HEIGHT) return;
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-	
+		
 	// size of scrollable area (less than background)
 	scroller.width = htons(pkt->width);
 	scroller.back.width = ((len - sizeof(struct grfg_packet)) * 8) / displayer.height;
