@@ -703,7 +703,7 @@ static void *rtp_thread_func(void *arg) {
 				// better discard sync packets when roundtrip is suspicious
 				if (roundtrip > 100) {
 					// ask for another one only if we are not synced already
-					if (!(ctx->synchro.status & NTP_SYNC) rtp_request_timing(ctx);
+					if (!(ctx->synchro.status & NTP_SYNC)) rtp_request_timing(ctx);
 					LOG_WARN("[%p]: discarding NTP roundtrip of %u ms", ctx, roundtrip);
 					break;
 				}
