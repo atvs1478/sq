@@ -42,7 +42,10 @@ sub new {
 		
 	$display->init_accessor(	
 		modes => $display->build_modes,
-		vfdmodel => 'graphic-<width>x32',	# doesn't matter much
+		# Only seems to matter for screensaver and update to decide font. Not 
+		# any value is acceptable, so use Boom value which seems to be best 
+		# compromise
+		vfdmodel => 'graphic-160x32',	
 	);	
 	
 	return $display;
@@ -165,32 +168,49 @@ sub build_modes {
 		# mode 9	 
 		{ desc => ['VISUALIZER_VUMETER'],
 		bar => 0, secs => 0,  width => $width,
-		params => [$VISUALIZER_VUMETER_ESP32] },
-		# mode 10
+		params => [$VISUALIZER_VUMETER_ESP32, 0] },
+		# mode 10	
+		{ desc => ['VISUALIZER_ANALOG_VUMETER'],
+		bar => 0, secs => 0,  width => $width,
+		params => [$VISUALIZER_VUMETER_ESP32, 1] },
+		# mode 11
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER'],
 		bar => 0, secs => 0,  width => $width,
 		# extra parameters (bars)
 		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
-		# mode 11	 
+	);
+
+my @extra = (
+		# mode E1
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
-		params => [$VISUALIZER_VUMETER_ESP32] },
-		# mode 12
+		params => [$VISUALIZER_VUMETER_ESP32, 0] },
+		# mode E2	 
+		{ desc => ['VISUALIZER_ANALOG_VUMETER', 'AND', 'ELAPSED'],
+		bar => 0, secs => 1,  width => $width,
+		params => [$VISUALIZER_VUMETER_ESP32, 1] },
+		# mode E3
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'ELAPSED'],
 		bar => 0, secs => 1,  width => $width,
 		# extra parameters (bars)
 		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	  
-		# mode 13	 
+		# mode E4	 
 		{ desc => ['VISUALIZER_VUMETER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
-		params => [$VISUALIZER_VUMETER_ESP32] },
-		# mode 14
+		params => [$VISUALIZER_VUMETER_ESP32, 0] },
+		# mode E5
+		{ desc => ['VISUALIZER_ANALOG_VUMETER', 'AND', 'REMAINING'],
+		bar => 0, secs => -1,  width => $width,
+		params => [$VISUALIZER_VUMETER_ESP32, 1] },
+		# mode E6
 		{ desc => ['VISUALIZER_SPECTRUM_ANALYZER', 'AND', 'REMAINING'],
 		bar => 0, secs => -1,  width => $width,
 		# extra parameters (bars)
 		params => [$VISUALIZER_SPECTRUM_ANALYZER_ESP32, int ($width/$spectrum->{full}->{band}), $spectrum->{scale}] },	
-	);
+	);		
 	
+	@modes = (@modes, @extra) if $cprefs->get('height') > 32;
+		
 	return \@modes;
 }	
 

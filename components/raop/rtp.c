@@ -655,7 +655,7 @@ static void *rtp_thread_func(void *arg) {
 				u32_t remote_gap = NTP2MS(remote - ctx->timing.remote);
 
 				// try to get NTP every 3 sec or every time if we are not synced
-				if (!count-- || !(ctx->synchro.status && NTP_SYNC)) {
+				if (!count-- || !(ctx->synchro.status & NTP_SYNC)) {
 					rtp_request_timing(ctx);
 					count = 3;
 				}
@@ -701,9 +701,10 @@ static void *rtp_thread_func(void *arg) {
 				u64_t remote 	  =(((u64_t) ntohl(*(u32_t*)(pktp+16))) << 32) + ntohl(*(u32_t*)(pktp+20));
 				u32_t roundtrip   = gettime_ms() - reference;
 				
-				// better discard sync packets when roundtrip is suspicious and ask for another one
+				// better discard sync packets when roundtrip is suspicious
 				if (roundtrip > 100) {
-					rtp_request_timing(ctx);
+					// ask for another one only if we are not synced already
+					if (!(ctx->synchro.status & NTP_SYNC)) rtp_request_timing(ctx);
 					LOG_WARN("[%p]: discarding NTP roundtrip of %u ms", ctx, roundtrip);
 					break;
 				}

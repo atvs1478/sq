@@ -13,6 +13,12 @@ sub model { 'squeezeesp32' }
 sub modelName { 'SqueezeESP32' }
 sub hasIR { 0 }
 
+sub init {
+	my $client = shift;
+	$client->SUPER::init(@_);
+	Plugins::SqueezeESP32::Plugin::config_artwork($client);
+}
+
 # Allow the player to define it's display width (and probably more)
 sub playerSettingsFrame {
 	my $client   = shift;
@@ -26,13 +32,16 @@ sub playerSettingsFrame {
 		$value = (unpack('Cn', $$data_ref))[1];
 		if ($value > 100 && $value < 400) {
 			$prefs->client($client)->set('width', $value);
+			
+			my $height = (unpack('Cnn', $$data_ref))[2];
+			$prefs->client($client)->set('height', $height || 0);
+
 			$client->display->modes($client->display->build_modes);
 			$client->display->widthOverride(1, $value);
 			$client->update;
+			
+			$log->info("Setting player $value" . "x" . "$height for ", $client->name);
 		} 
-		my $height = (unpack('Cnn', $$data_ref))[2];
-		$prefs->client($client)->set('height', $height || 0);
-		$log->info("Setting player $value" . "x" . "$height for ", $client->name);
 	}
 	
 	$client->SUPER::playerSettingsFrame($data_ref);

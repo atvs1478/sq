@@ -59,7 +59,7 @@ sub handler {
 		if ($artwork->{'enable'}) {
 			Plugins::SqueezeESP32::Plugin::update_artwork($client, 1);
 		} else {
-			Plugins::SqueezeESP32::Plugin::disable_artwork($client);
+			Plugins::SqueezeESP32::Plugin::config_artwork($client);
 		}	
 	}
 	
