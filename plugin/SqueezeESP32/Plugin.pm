@@ -35,7 +35,21 @@ sub initPlugin {
 	
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
+	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
 }
+
+sub onStopClear {
+    my $request = shift;
+    my $client  = $request->client;
+	my $artwork = $prefs->client($client)->get('artwork');
+	
+	if ($client->model eq 'squeezeesp32' && $artwork->{'enable'}) {
+		my $reqstr = $request->getRequestString();
+		$log->info("artwork stop/clear $reqstr");
+		$client->pluginData('artwork_md5', '')
+	}	
+}
+
 
 sub onNotification {
     my $request = shift;
@@ -56,8 +70,7 @@ sub update_artwork {
 		
 	return unless $client->model eq 'squeezeesp32' && $artwork->{'enable'};
 
-	my $s = $artwork->{'y'} >= 32 ? $cprefs->get('height') - $artwork->{'y'} : 32;
-	$s = min($s, $cprefs->get('width') - $artwork->{'x'});
+	my $s = min($cprefs->get('height') - $artwork->{'y'}, $cprefs->get('width') - $artwork->{'x'});
 	
 	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
 	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $params, \&send_artwork, undef, HTTP::Response->new);

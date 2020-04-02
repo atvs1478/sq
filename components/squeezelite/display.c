@@ -73,12 +73,15 @@ struct visu_packet {
 	u8_t which;
 	u8_t count;
 	union {
-		union {
-			struct {
+		struct {
+			u32_t width;
+			union {
+				struct {
 				u32_t bars;
 				u32_t spectrum_scale;
-			};
-			u32_t style;	
+				};
+				u32_t style;	
+			};	
 		} full;	
 		struct {	
 			u32_t width;
@@ -613,22 +616,22 @@ static void grfe_handler( u8_t *data, int len) {
 	scroller.active = false;
 	
 	// visu has priority when full screen on small screens
-	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < SB_HEIGHT) {
+	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
 	
 	// are we in control
 	if (displayer.owned) {
-		// did we have something that might have write on the bottom of a SB_HEIGHT+ display
-		if (displayer.dirty) {
-			GDS_ClearExt(display, true);
+		// draw new frame, it might be less than full screen (small visu)
+		int width = ((len - sizeof(struct grfe_packet)) * 8) / displayer.height;
+
+		// did we have something that might have written on the bottom of a displayer's height + display
+		if (displayer.dirty || (artwork.enable && width == displayer.width && artwork.y < displayer.height)) {
+			GDS_Clear(display, GDS_COLOR_BLACK);
 			displayer.dirty = false;
 		}	
 	
-		// draw new frame, it might be less than full screen (small visu)
-		int width = ((len - sizeof(struct grfe_packet)) * 8) / displayer.height;
-		
 		// when doing screensaver, that frame becomes a visu background
 		if (!(visu.mode & VISU_ESP32)) {
 			visu.back.width = width;
@@ -735,7 +738,7 @@ static void grfg_handler(u8_t *data, int len) {
 	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
 
 	// on small screen, visu has priority when full screen	
-	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < SB_HEIGHT) return;
+	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) return;
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 		
@@ -755,7 +758,7 @@ static void grfg_handler(u8_t *data, int len) {
 	}	
 		
 	// now we can active scrolling, but only if we are not on a small screen
-	if (!visu.mode || visu.col || visu.row >= SB_HEIGHT) scroller.active = true;
+	if (!visu.mode || visu.col || visu.row >= displayer.height) scroller.active = true;
 		
 	// if we just got a content update, let the scroller manage the screen
 	LOG_DEBUG("resuming scrolling task");
@@ -811,7 +814,7 @@ static void grfa_handler(u8_t *data, int len) {
 	artwork.size += size;
 	if (artwork.size == length) {
 		GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
-		GDS_DrawJPEG(display, artwork.data, artwork.x, artwork.y, artwork.y < SB_HEIGHT ? (GDS_IMAGE_RIGHT | GDS_IMAGE_TOP) : GDS_IMAGE_CENTER);
+		GDS_DrawJPEG(display, artwork.data, artwork.x, artwork.y, artwork.y < displayer.height ? (GDS_IMAGE_RIGHT | GDS_IMAGE_TOP) : GDS_IMAGE_CENTER);
 		free(artwork.data);
 		artwork.data = NULL;
 	} 
@@ -852,7 +855,7 @@ static void visu_update(void) {
 		
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
 			for (int i = visu.n; --i >= 0;) {	 
-				visu.bars[i].current = SB_HEIGHT * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> 1)) - 0.2543f);
+				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> 1)) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
@@ -894,7 +897,7 @@ static void visu_update(void) {
 				}	
 			
 				// convert to dB and bars, same back-off
-				if (power) visu.bars[i].current = SB_HEIGHT * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
+				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/2*2)) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}	
@@ -934,11 +937,11 @@ static void visu_update(void) {
 			}	
 		}
 	} else if (displayer.width / 2 >  3 * VU_WIDTH / 4) {
-		draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, displayer.width / 2);
-		draw_VU(display, vu_bitmap, visu.bars[1].current, displayer.width / 2, visu.row, displayer.width / 2);
+		draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, visu.width / 2);
+		draw_VU(display, vu_bitmap, visu.bars[1].current, visu.width / 2, visu.row, visu.width / 2);
 	} else {
 		int level = (visu.bars[0].current + visu.bars[1].current) / 2;
-		draw_VU(display, vu_bitmap, level, 0, visu.row, displayer.width);		
+		draw_VU(display, vu_bitmap, level, 0, visu.row, visu.width);		
 	}	
 }
 
@@ -976,12 +979,11 @@ static void visu_handler( u8_t *data, int len) {
 	visu.mode = pkt->which;
 	
 	// little trick to clean the taller screens when switching visu 
-	if (visu.row >= SB_HEIGHT) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
+	if (visu.row >= displayer.height) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 	
 	if (visu.mode) {
 		// these will be overidden if necessary
 		visu.col = visu.border = 0;
-		visu.width = displayer.width;				
 		
 		// what type of visu
 		if (visu.mode & VISU_ESP32) {
@@ -993,7 +995,7 @@ static void visu_handler( u8_t *data, int len) {
 
 				visu.style = 0;
 				visu.width = htonl(pkt->width);
-				visu.height = pkt->height ? pkt->height : SB_HEIGHT;
+				visu.height = pkt->height ? pkt->height : displayer.height;
 				visu.col = pkt->col < 0 ? displayer.width + pkt->col : pkt->col;
 				visu.row = pkt->row < 0 ? GDS_GetHeight(display) + pkt->row : pkt->row;
 				visu.border =  htonl(pkt->border);
@@ -1001,7 +1003,8 @@ static void visu_handler( u8_t *data, int len) {
 				visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
 			} else {
 				// full screen visu, try to use bottom screen if available
-				visu.height = GDS_GetHeight(display) > SB_HEIGHT ? GDS_GetHeight(display) - SB_HEIGHT : GDS_GetHeight(display);
+				visu.width = htonl(pkt->full.width);
+				visu.height = GDS_GetHeight(display) > displayer.height ? GDS_GetHeight(display) - displayer.height : GDS_GetHeight(display);
 				visu.row = GDS_GetHeight(display) - visu.height;			
 				
 				// is this spectrum or analogue/digital
@@ -1016,22 +1019,27 @@ static void visu_handler( u8_t *data, int len) {
 		} else {
 			// classical (screensaver) mode, don't try to optimize screen usage & force some params
 			visu.row = 0;
-			visu.height = SB_HEIGHT;
+			visu.height = GDS_GetHeight(display);
+			visu.width = displayer.width;				
 			visu.spectrum_scale = 0.25;				
-			if (visu.mode == VISU_SPECTRUM) bars = visu.width / (htonl(pkt->channels[0].bar_width) + htonl(pkt->channels[0].bar_space));
-			else visu.style = htonl(pkt->classical_vu.style);
+			if (visu.mode == VISU_SPECTRUM) {
+				bars = visu.width / (htonl(pkt->channels[0].bar_width) + htonl(pkt->channels[0].bar_space));
+			} else {
+				visu.style = htonl(pkt->classical_vu.style);
+				if (visu.style) visu.row = visu.height - VU_HEIGHT;
+			}	
 			if (bars > MAX_BARS) bars = MAX_BARS;
 		}	
 		
 		// try to adapt to what we have
 		if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
 			visu.n = bars ? bars : MAX_BARS;
-			visu.max = displayer.height - 1;
+			visu.max = visu.height - 1;
 			if (visu.spectrum_scale <= 0 || visu.spectrum_scale > 0.5) visu.spectrum_scale = 0.5;
 			spectrum_limits(0, visu.n, 0);
 		} else {
 			visu.n = 2;
-			visu.max = visu.style ? (VU_COUNT - 1) : (displayer.height - 1);
+			visu.max = visu.style ? (VU_COUNT - 1) : (visu.height - 1);
 		}	
 		
 		do {
@@ -1039,14 +1047,14 @@ static void visu_handler( u8_t *data, int len) {
 			if (visu.bar_width > 0) break;
 		} while (--visu.n);	
 		visu.bar_border = (visu.width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
-		
+
 		// give up if not enough space
 		if (visu.bar_width < 0)	{
 			visu.mode = VISU_BLANK;
 			LOG_WARN("Not enough room for displaying visu");
 		} else {
 			// de-activate scroller if we are taking main screen
-			if (visu.row < SB_HEIGHT) scroller.active = false;
+			if (visu.row < displayer.height) scroller.active = false;
 			vTaskResume(displayer.task);
 		}	
 		visu.wake = 0;
