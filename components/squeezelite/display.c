@@ -183,6 +183,7 @@ static struct {
 #define VISU_ESP32	0x10
 static EXT_RAM_ATTR struct {
 	int bar_gap, bar_width, bar_border;
+	bool rotate;
 	struct {
 		int current, max;
 		int limit;
@@ -580,7 +581,7 @@ static void vfdc_handler( u8_t *_data, int bytes_read) {
 /****************************************************************************************
  * Display VU-Meter (lots of hard-coding)
  */
-void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x, int y, int width) {
+void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x, int y, int width, bool rotate) {
 	// VU data is by columns and vertical flip to allow block offset 
 	data += level * VU_WIDTH * VU_HEIGHT;
 	
@@ -596,10 +597,18 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 	int scale = 8 - GDS_GetDepth(display);
 	
 	// use "fast" version as we are not beyond screen boundaries
-	for (int r = 0; r < width; r++) {
-		for (int c = 0; c < VU_HEIGHT; c++) {
-			GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
+	if (visu.rotate) {
+		for (int r = 0; r < width; r++) {
+			for (int c = VU_HEIGHT; --c >= 0;) {
+				GDS_DrawPixelFast(display, c + x, r + y, *data++ >> scale);
+			}	
 		}	
+	} else {
+		for (int r = 0; r < width; r++) {
+			for (int c = 0; c < VU_HEIGHT; c++) {
+				GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
+			}	
+		}			
 	}	
 	
 	// need to manually set dirty flag as DrawPixel does not do it
@@ -921,35 +930,49 @@ static void visu_update(void) {
 	if (mode != VISU_VUMETER || !visu.style) {
 		// there is much more optimization to be done here, like not redrawing bars unless needed
 		for (int i = visu.n; --i >= 0;) {
-			int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
-			int y1 = visu.row + visu.height - 1;
-			
+			// update maximum
 			if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
 			else if (visu.bars[i].max) visu.bars[i].max--;
 			else if (!clear) continue;
 			
-			for (int j = 0; j <= visu.bars[i].current; j += 2) 
+			if (visu.rotate) {
+				int x1 = visu.col;
+				int y1 = visu.row + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
+
+				for (int j = 0; j <= visu.bars[i].current; j += 2) 
+					GDS_DrawLine(display, x1 + j, y1, x1 + j, y1 + visu.bar_width - 1, GDS_COLOR_WHITE);
+			
+				if (visu.bars[i].max > 2) {
+					GDS_DrawLine(display, x1 + visu.bars[i].max, y1, x1 + visu.bars[i].max, y1 + visu.bar_width - 1, GDS_COLOR_WHITE);			
+					if (visu.bars[i].max < visu.max - 1) GDS_DrawLine(display, x1 + visu.bars[i].max + 1, y1, x1 + visu.bars[i].max + 1, y1 + visu.bar_width - 1, GDS_COLOR_WHITE);			
+				}
+			} else {
+				int x1 = visu.col + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);
+				int y1 = visu.row + visu.height - 1;
+				for (int j = 0; j <= visu.bars[i].current; j += 2) 
 				GDS_DrawLine(display, x1, y1 - j, x1 + visu.bar_width - 1, y1 - j, GDS_COLOR_WHITE);
 			
-			if (visu.bars[i].max > 2) {
-				GDS_DrawLine(display, x1, y1 - visu.bars[i].max, x1 + visu.bar_width - 1, y1 - visu.bars[i].max, GDS_COLOR_WHITE);			
-				GDS_DrawLine(display, x1, y1 - visu.bars[i].max + 1, x1 + visu.bar_width - 1, y1 - visu.bars[i].max + 1, GDS_COLOR_WHITE);			
-			}	
+				if (visu.bars[i].max > 2) {
+					GDS_DrawLine(display, x1, y1 - visu.bars[i].max, x1 + visu.bar_width - 1, y1 - visu.bars[i].max, GDS_COLOR_WHITE);			
+					if (visu.bars[i].max < visu.max - 1) GDS_DrawLine(display, x1, y1 - visu.bars[i].max + 1, x1 + visu.bar_width - 1, y1 - visu.bars[i].max + 1, GDS_COLOR_WHITE);			
+				}
+			}
 		}
 	} else if (displayer.width / 2 >  3 * VU_WIDTH / 4) {
-		draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, visu.width / 2);
-		draw_VU(display, vu_bitmap, visu.bars[1].current, visu.width / 2, visu.row, visu.width / 2);
+		int width = visu.rotate ? visu.height : visu.width;
+		draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, width / 2, visu.rotate);
+		draw_VU(display, vu_bitmap, visu.bars[1].current, width / 2, visu.row, width / 2, visu.rotate);
 	} else {
 		int level = (visu.bars[0].current + visu.bars[1].current) / 2;
-		draw_VU(display, vu_bitmap, level, 0, visu.row, visu.width);		
+		draw_VU(display, vu_bitmap, level, 0, visu.row, visu.rotate ? visu.height : visu.width, visu.rotate);		
 	}	
 }
 
 
 /****************************************************************************************
- * Visu packet handler
+ * Calculate spectrum spread
  */
-void spectrum_limits(int min, int n, int pos) {
+static void spectrum_limits(int min, int n, int pos) {
 	if (n / 2) {
 		int step = ((DISPLAY_BW - min) * visu.spectrum_scale)  / (n/2);
 		visu.bars[pos].limit = min + step;
@@ -959,6 +982,29 @@ void spectrum_limits(int min, int n, int pos) {
 		visu.bars[pos].limit = DISPLAY_BW;
 	}	
 }
+
+/****************************************************************************************
+ * Fit visu
+ */
+static void visu_fit(int bars, int width, int height) {
+	// try to adapt to what we have
+	if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
+		visu.n = bars ? bars : MAX_BARS;
+		visu.max = height - 1;
+		if (visu.spectrum_scale <= 0 || visu.spectrum_scale > 0.5) visu.spectrum_scale = 0.5;
+		spectrum_limits(0, visu.n, 0);
+	} else {
+		visu.n = 2;
+		visu.max = (visu.style ? VU_COUNT : height) - 1;
+	}	
+		
+	do {
+		visu.bar_width = (width - visu.border - visu.bar_gap * (visu.n - 1)) / visu.n;
+		if (visu.bar_width > 0) break;
+	} while (--visu.n);	
+	
+	visu.bar_border = (width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
+}	
 
 /****************************************************************************************
  * Visu packet handler
@@ -984,6 +1030,7 @@ static void visu_handler( u8_t *data, int len) {
 	if (visu.mode) {
 		// these will be overidden if necessary
 		visu.col = visu.border = 0;
+		visu.rotate = false;
 		
 		// what type of visu
 		if (visu.mode & VISU_ESP32) {
@@ -1006,6 +1053,9 @@ static void visu_handler( u8_t *data, int len) {
 				visu.width = htonl(pkt->full.width);
 				visu.height = GDS_GetHeight(display) > displayer.height ? GDS_GetHeight(display) - displayer.height : GDS_GetHeight(display);
 				visu.row = GDS_GetHeight(display) - visu.height;			
+				
+				// try to estimate if we should rotate visu
+				if (visu.height > displayer.height && visu.height > 2*visu.width) visu.rotate = true;
 				
 				// is this spectrum or analogue/digital
 				if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
@@ -1031,22 +1081,9 @@ static void visu_handler( u8_t *data, int len) {
 			if (bars > MAX_BARS) bars = MAX_BARS;
 		}	
 		
-		// try to adapt to what we have
-		if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
-			visu.n = bars ? bars : MAX_BARS;
-			visu.max = visu.height - 1;
-			if (visu.spectrum_scale <= 0 || visu.spectrum_scale > 0.5) visu.spectrum_scale = 0.5;
-			spectrum_limits(0, visu.n, 0);
-		} else {
-			visu.n = 2;
-			visu.max = visu.style ? (VU_COUNT - 1) : (visu.height - 1);
-		}	
-		
-		do {
-			visu.bar_width = (visu.width - visu.border - visu.bar_gap * (visu.n - 1)) / visu.n;
-			if (visu.bar_width > 0) break;
-		} while (--visu.n);	
-		visu.bar_border = (visu.width - visu.border - (visu.bar_width + visu.bar_gap) * visu.n + visu.bar_gap) / 2;
+		// for rotate, swap width & height
+		if (visu.rotate) visu_fit(bars, visu.height, visu.width);
+		else visu_fit(bars, visu.width, visu.height);
 
 		// give up if not enough space
 		if (visu.bar_width < 0)	{
