@@ -210,7 +210,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 				ms = now - output.updated + ((output.frames_played_dmp - output.device_frames) * 10) / (RAOP_SAMPLE_RATE / 100);
 				error = ms - (now - raop_sync.start_time);
 				
-				LOG_INFO("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, ms - (now - raop_sync.start_time));
+				LOG_INFO("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, error);
 			} else {	
 				u32_t level = _buf_used(outputbuf);
 				

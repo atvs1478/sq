@@ -434,7 +434,7 @@ static void buffer_put_packet(rtp_t *ctx, seq_t seqno, unsigned rtptime, bool fi
 			ctx->flush_seqno = -1;
 			ctx->playing = true;
 			ctx->resent_req = ctx->resent_rec = ctx->silent_frames = ctx->discarded = 0;
-			playtime = ctx->synchro.time + (((s32_t)(rtptime - ctx->synchro.rtp)) * 1000) / RAOP_SAMPLE_RATE;
+			playtime = ctx->synchro.time + ((rtptime - ctx->synchro.rtp) * 10) / (RAOP_SAMPLE_RATE / 100);
 			ctx->cmd_cb(RAOP_PLAY, playtime);
 		} else {
 			pthread_mutex_unlock(&ctx->ab_mutex);
@@ -517,7 +517,7 @@ static void buffer_push_packet(rtp_t *ctx) {
 
 		// try to manage playtime so that we overflow as late as possible if we miss NTP (2^31 / 10 / 44100)
 		curframe = ctx->audio_buffer + BUFIDX(ctx->ab_read);
-		playtime = ctx->synchro.time + (((s32_t)(curframe->rtptime - ctx->synchro.rtp)) * 10) / (RAOP_SAMPLE_RATE / 100);
+		playtime = ctx->synchro.time + ((curframe->rtptime - ctx->synchro.rtp) * 10) / (RAOP_SAMPLE_RATE / 100);
 
 		if (now > playtime) {
 			LOG_DEBUG("[%p]: discarded frame now:%u missed by:%d (W:%hu R:%hu)", ctx, now, now - playtime, ctx->ab_write, ctx->ab_read);
