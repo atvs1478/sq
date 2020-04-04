@@ -62,11 +62,11 @@ void 		decode_restore(int external);
 // to be defined to nothing if you don't want to support these
 extern struct visu_export_s {
 	pthread_mutex_t mutex;
-	u32_t level, size, rate;
+	u32_t level, size, rate, gain;
 	s16_t *buffer;
 	bool running;
 } visu_export;
-void 		output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence);
+void 		output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain);
 void 		output_visu_init(log_level level);
 void 		output_visu_close(void);
 

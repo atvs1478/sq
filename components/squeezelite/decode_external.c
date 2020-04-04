@@ -207,7 +207,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			// first must make sure we started on time
 			if (raop_sync.win == SYNC_WIN_START) {
 				// how many ms have we really played
-				ms = now - output.updated + ((u64_t) (output.frames_played_dmp - output.device_frames) * 1000) / RAOP_SAMPLE_RATE;
+				ms = now - output.updated + ((output.frames_played_dmp - output.device_frames) * 10) / (RAOP_SAMPLE_RATE / 100);
 				error = ms - (now - raop_sync.start_time);
 				
 				LOG_INFO("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, ms - (now - raop_sync.start_time));

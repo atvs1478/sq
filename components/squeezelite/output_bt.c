@@ -121,7 +121,7 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 		memcpy(btout + oframes * BYTES_PER_FRAME, buf, out_frames * BYTES_PER_FRAME);
 	}
 	
-	output_visu_export((s16_t*) (btout + oframes * BYTES_PER_FRAME), out_frames, output.current_sample_rate, silence);
+	output_visu_export((s16_t*) (btout + oframes * BYTES_PER_FRAME), out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
 
 	return (int)out_frames;
 }

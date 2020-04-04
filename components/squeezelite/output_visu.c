@@ -29,7 +29,7 @@ static struct visu_export_s *visu = &visu_export;
 
 static log_level loglevel = lINFO;
 
-void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence) {
+void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain) {
 	
 	// no data to process
 	if (silence) {
@@ -50,6 +50,7 @@ void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool sil
 			visu->level += space / 2;
 			visu->running = true;
 			visu->rate = rate ? rate : 44100;
+			visu->gain = gain;
 		}
 		
 		// mutex must be released 		
