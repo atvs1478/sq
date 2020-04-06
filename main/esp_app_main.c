@@ -144,9 +144,9 @@ esp_log_level_t  get_log_level_from_char(char * level){
 void set_log_level(char * tag, char * level){
 	esp_log_level_set(tag, get_log_level_from_char(level));
 }
+
+
 esp_err_t update_certificates(){
-//	server_cert_pem_start
-//	server_cert_pem_end
 
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -155,28 +155,29 @@ esp_err_t update_certificates(){
 	ESP_LOGI(TAG,   "About to check if certificates need to be updated in flash");
 	esp_err = nvs_open_from_partition(settings_partition, certs_namespace, NVS_READWRITE, &handle);
 	if (esp_err != ESP_OK) {
-		ESP_LOGE(TAG,  "Unable to open name namespace %s. Error %s", certs_namespace, esp_err_to_name(esp_err));
+		LOG_SEND(MESSAGING_INFO,"Unable to update HTTPS certificates. Could not open NVS namespace %s. Error %s", certs_namespace, esp_err_to_name(esp_err));
 		return esp_err;
 	}
 
 	const esp_partition_t *running = esp_ota_get_running_partition();
 	if(running->subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY ){
 		ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", running->label, running->type, running->subtype, running->address);
-
 	}
 
 	if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
 		ESP_LOGI(TAG, "Running version: %s", running_app_info.version);
 	}
 
-
 	size_t len=0;
 	char *str=NULL;
 	bool changed=false;
 	if ( (esp_err= nvs_get_str(handle, certs_version, NULL, &len)) == ESP_OK) {
-		str=(char *)malloc(len);
-		if ( (esp_err = nvs_get_str(handle,  certs_version, str, &len)) == ESP_OK) {
-			ESP_LOGI(TAG,"String associated with key '%s' is %s", certs_version, str);
+		str=(char *)malloc(len+1);
+		if(str){
+			memset(str,0x00,len+1);
+			if ( (esp_err = nvs_get_str(handle,  certs_version, str, &len)) == ESP_OK) {
+				ESP_LOGI(TAG,"Certificate version: %s", str);
+			}
 		}
 	}
 	if(str!=NULL){
@@ -196,18 +197,20 @@ esp_err_t update_certificates(){
 
 		esp_err = nvs_set_blob(handle, certs_key, server_cert_pem_start, (server_cert_pem_end-server_cert_pem_start));
 		if(esp_err!=ESP_OK){
-			ESP_LOGE(TAG, "Failed to store certificate data: %s", esp_err_to_name(esp_err));
+			LOG_SEND_ERROR("Failed to store certificate data: %s", esp_err_to_name(esp_err));
 		}
 		else {
-			ESP_LOGI(TAG,"Updated stored https certificates");
 			esp_err = nvs_set_str(handle,  certs_version, running_app_info.version);
 			if(esp_err!=ESP_OK){
-				ESP_LOGE(TAG, "Failed to store app version: %s", esp_err_to_name(esp_err));
+				LOG_SEND_ERROR("Unable to update HTTPS Certificates version: %s",esp_err_to_name(esp_err));
 			}
 			else {
 				esp_err = nvs_commit(handle);
 				if(esp_err!=ESP_OK){
-					ESP_LOGE(TAG, "Failed to commit certificate changes: %s", esp_err_to_name(esp_err));
+					LOG_SEND_ERROR("Failed to commit certificates changes : %s",esp_err_to_name(esp_err));
+				}
+				else {
+					LOG_SEND_INFO("HTTPS Certificates were updated with version: %s",running_app_info.version);
 				}
 			}
 		}
@@ -227,19 +230,27 @@ const char * get_certificate(){
         size_t len;
         esp_err = nvs_get_blob(handle, certs_key, NULL, &len);
         if( esp_err == ESP_OK) {
-            blob = (char *)malloc(len);
+            blob = (char *)malloc(len+1);
+            if(!blob){
+            	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. %s","Memory allocation failed");
+        		return "";
+            }
+            memset(blob,0x00,len+1);
             esp_err = nvs_get_blob(handle, certs_key, blob, &len);
             if ( esp_err  == ESP_OK) {
-                printf("Blob associated with key '%s' is %d bytes long: \n", certs_key, len);
+            	ESP_LOGD(TAG,"Certificates content is %d bytes long: ", len);
+            }
+            else {
+            	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. Get blob failed: %s", esp_err_to_name(esp_err));
             }
         }
         else{
-        	ESP_LOGE(TAG,  "Unable to get the existing blob from namespace %s. [%s]", certs_namespace, esp_err_to_name(esp_err));
+        	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. Get blob failed: %s",esp_err_to_name(esp_err));
         }
         nvs_close(handle);
 	}
 	else{
-		ESP_LOGE(TAG,  "Unable to open name namespace %s. [%s]", certs_namespace, esp_err_to_name(esp_err));
+    	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. NVS name space %s open failed: %s",certs_namespace, esp_err_to_name(esp_err));
 	}
 	return blob;
 }
@@ -391,6 +402,7 @@ void app_main()
 
 	ESP_LOGI(TAG,"Initializing display");
 	display_init("SqueezeESP32");
+
 	if(is_recovery_running && display){
 		GDS_ClearExt(display, true);
 		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );

@@ -45,8 +45,7 @@ __attribute__( ( always_inline ) ) static inline void SwapInt( int* a, int* b ) 
     *a = Temp;
 }
 
-// un-comment if need to be instanciated for external callers
-extern inline void IRAM_ATTR GDS_DrawPixelFast( struct GDS_Device* Device, int X, int Y, int Color );
+
 extern inline void IRAM_ATTR GDS_DrawPixel( struct GDS_Device* Device, int X, int Y, int Color );
 
 void GDS_DrawHLine( struct GDS_Device* Device, int x, int y, int Width, int Color ) {

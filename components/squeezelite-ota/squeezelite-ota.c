@@ -6,6 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -38,6 +39,7 @@
 #include "platform_esp32.h"
 
 extern const char * get_certificate();
+#define IF_DISPLAY(x) if(display) { x; }
 
 #ifdef CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_1
 #define OTA_CORE 0
@@ -110,9 +112,7 @@ typedef struct _progress {
 } progress_t;
 
 static progress_t * loc_displayer_get_progress_dft(){
-	if(!display){
-		return;
-	}
+
 	int start_coord_offset=0;
 	static progress_t def={
 		.border_thickness = 2,
@@ -121,9 +121,9 @@ static progress_t * loc_displayer_get_progress_dft(){
 		};
 	def.bar_fill_height= def.bar_tot_height-(def.border_thickness*2);
 	def.border.x1=start_coord_offset+def.sides_margin;
-	def.border.x2=GDS_GetWidth(display)-def.sides_margin;
+	IF_DISPLAY(def.border.x2=GDS_GetWidth(display)-def.sides_margin);
 	// progress bar will be drawn at the bottom of the display
-	def.border.y2= GDS_GetHeight(display)-def.border_thickness;
+	IF_DISPLAY(	def.border.y2= GDS_GetHeight(display)-def.border_thickness);
 	def.border.y1= def.border.y2-def.bar_tot_height;
 	def.border.width=def.border.x2-def.border.x1;
 	def.border.height=def.border.y2-def.border.y1;
@@ -188,10 +188,7 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     }
     va_end(args);
     if(type!=MESSAGING_INFO){
-
-    	if(display) {
-    		GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg_str);
-    	}
+    	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg_str));
     }
 
     cJSON_AddStringToObject(msg,"ota_dsc",str_or_unknown(msg_str));
@@ -203,19 +200,6 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
 	cJSON_free(msg);
     _printMemStats();
 }
-//esp_err_t decode_alloc_ota_message(single_message_t * message, char * ota_dsc, uint8_t * ota_pct ){
-//	if(!message || !message->message) return ESP_ERR_INVALID_ARG;
-//	cJSON * json = cJSON_Parse(message->message);
-//	if(!json) return ESP_FAIL;
-//	if(ota_dsc) {
-//		ota_dsc = strdup(cJSON_GetObjectItem(json, "ota_dsc")?cJSON_GetStringValue(cJSON_GetObjectItem(json, "ota_dsc")):"");
-//	}
-//	if(ota_pct){
-//		*ota_pct = cJSON_GetObjectItem(json, "ota_pct")?cJSON_GetObjectItem(json, "ota_pct")->valueint:0;
-//	}
-//	cJSON_free(json);
-//	return ESP_OK;
-//}
 
 static void __attribute__((noreturn)) task_fatal_error(void)
 {
@@ -227,6 +211,37 @@ static void __attribute__((noreturn)) task_fatal_error(void)
     }
 }
 
+esp_err_t handle_http_on_data(esp_http_client_event_t *evt){
+
+	int http_status= esp_http_client_get_status_code(evt->client);
+	static char * recv_ptr=NULL;
+
+	if(http_status == 200){
+
+
+		if(!ota_status.bOTAStarted)
+		{
+			if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Downloading firmware");
+			ota_status.bOTAStarted = true;
+			ota_status.total_image_len=esp_http_client_get_content_length(evt->client);
+		    ota_status.bin_data= malloc(ota_status.total_image_len);
+		    if(ota_status.bin_data==NULL){
+				sendMessaging(MESSAGING_ERROR,"Error: buffer alloc error");
+				return ESP_FAIL;
+	   	    }
+		    recv_ptr=ota_status.bin_data;
+		}
+
+		// we're downloading the binary data file
+		if (!esp_http_client_is_chunked_response(evt->client)) {
+			memcpy(recv_ptr,evt->data,evt->data_len);
+			recv_ptr+=evt->data_len;
+		}
+
+	}
+
+	return ESP_OK;
+}
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
 // --------------
@@ -245,41 +260,35 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 //	char *header_value For HTTP_EVENT_ON_HEADER event_id, it’s store current http header value
 // --------------
     switch (evt->event_id) {
-
     case HTTP_EVENT_ERROR:
         ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
         _printMemStats();
-        //strncpy(ota_status,"HTTP_EVENT_ERROR",sizeof(ota_status)-1);
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-
-        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Connecting to URL...");
+        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"HTTP Connected");
         ota_status.total_image_len=0;
 		ota_status.actual_image_len=0;
 		ota_status.lastpct=0;
 		ota_status.remain_image_len=0;
 		ota_status.newpct=0;
 		gettimeofday(&ota_status.OTA_start, NULL);
-
-			break;
+		break;
     case HTTP_EVENT_HEADER_SENT:
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
         break;
     case HTTP_EVENT_ON_HEADER:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s",evt->header_key, evt->header_value);
-		if (strcasecmp(evt->header_key, "location") == 0) {
-        	ESP_LOGW(TAG,"OTA will redirect to url: %s",evt->header_value);
-        }
-        if (strcasecmp(evt->header_key, "content-length") == 0) {
-        	ota_status.total_image_len = atol(evt->header_value);
-        	 ESP_LOGW(TAG, "Content length found: %s, parsed to %d", evt->header_value, ota_status.total_image_len);
-        }
+//		if (strcasecmp(evt->header_key, "location") == 0) {
+//        	ESP_LOGW(TAG,"OTA will redirect to url: %s",evt->header_value);
+//        }
+//        if (strcasecmp(evt->header_key, "content-length") == 0) {
+//        	ota_status.total_image_len = atol(evt->header_value);
+//        	 ESP_LOGW(TAG, "Content length found: %s, parsed to %d", evt->header_value, ota_status.total_image_len);
+//        }
         break;
     case HTTP_EVENT_ON_DATA:
-    	if(!ota_status.bOTAStarted)  {
-    		ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, status_code=%d, len=%d",esp_http_client_get_status_code(evt->client), evt->data_len);
-    	}
+    	return handle_http_on_data(evt);
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
@@ -318,12 +327,14 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 	case OTA_TYPE_HTTP:
 		http_client_config.cert_pem =get_certificate();
 		http_client_config.event_handler = _http_event_handler;
-		http_client_config.disable_auto_redirect=true;
+		http_client_config.disable_auto_redirect=false;
 		http_client_config.skip_cert_common_name_check = false;
 		http_client_config.url = strdup(p_ota_thread_parms->url);
-		http_client_config.max_redirection_count = 3;
+		http_client_config.max_redirection_count = 4;
 		// buffer size below is for http read chunks
-		http_client_config.buffer_size = 1024 ;
+		http_client_config.buffer_size = 8192; //1024 ;
+		http_client_config.buffer_size_tx = 8192;
+		//http_client_config.timeout_ms = 5000;
 		break;
 	case OTA_TYPE_BUFFER:
 		ota_status.bin_data = p_ota_thread_parms->bin;
@@ -409,100 +420,6 @@ esp_err_t _erase_last_boot_app_partition(const esp_partition_t *ota_partition)
 	return ESP_OK;
 }
 
-static bool process_again(int status_code)
-{
-    switch (status_code) {
-        case HttpStatus_MovedPermanently:
-        case HttpStatus_Found:
-        case HttpStatus_Unauthorized:
-            return true;
-        default:
-            return false;
-    }
-    return false;
-}
-static esp_err_t _http_handle_response_code(esp_http_client_handle_t http_client, int status_code)
-{
-    esp_err_t err=ESP_OK;
-    if (status_code == HttpStatus_MovedPermanently || status_code == HttpStatus_Found ) {
-    	ESP_LOGW(TAG, "Handling HTTP redirection. ");
-        err = esp_http_client_set_redirection(http_client);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "URL redirection Failed. %s", esp_err_to_name(err));
-            return err;
-        }
-        ESP_LOGW(TAG, "Done Handling HTTP redirection. ");
-
-    } else if (status_code == HttpStatus_Unauthorized) {
-    	ESP_LOGW(TAG, "Handling Unauthorized. ");
-        esp_http_client_add_auth(http_client);
-    }
-    ESP_LOGD(TAG, "Redirection done, checking if we need to read the data. ");
-    if (process_again(status_code)) {
-    	//ESP_LOGD(TAG, "We have to read some more data. Allocating buffer size %u",ota_config.buffer_size+1);
-    	//char * local_buff = heap_caps_malloc(ota_status.buffer_size+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-
-//    	if(local_buff==NULL){
-//    		ESP_LOGE(TAG,"Failed to allocate internal memory buffer for http processing");
-//    		return ESP_ERR_NO_MEM;
-//    	}
-
-        while (1) {
-        	ESP_LOGD(TAG, "Reading data chunk. ");
-            int data_read = esp_http_client_read(http_client, ota_status.ota_write_data, ota_status.buffer_size);
-            if (data_read < 0) {
-                ESP_LOGE(TAG, "Error: SSL data read error");
-                err= ESP_FAIL;
-                break;
-            } else if (data_read == 0) {
-            	ESP_LOGD(TAG, "No more data. ");
-            	err= ESP_OK;
-            	break;
-            }
-        }
-        //FREE_RESET(local_buff);
-    }
-
-    return err;
-}
-static esp_err_t _http_connect(esp_http_client_handle_t http_client)
-{
-    esp_err_t err = ESP_FAIL;
-    int status_code, header_ret;
-    do {
-    	ESP_LOGI(TAG, "connecting the http client. ");
-        err = esp_http_client_open(http_client, 0);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
-            sendMessaging(MESSAGING_ERROR,"Failed to open HTTP connection: %s", esp_err_to_name(err));
-            return err;
-        }
-        ESP_LOGI(TAG, "Fetching headers");
-        header_ret = esp_http_client_fetch_headers(http_client);
-        if (header_ret < 0) {
-        	// Error found
-            sendMessaging(MESSAGING_ERROR,"Header fetch failed");
-            return header_ret;
-        }
-        ESP_LOGI(TAG, "HTTP Header fetch completed, found content length of %d",header_ret);
-        status_code = esp_http_client_get_status_code(http_client);
-        ESP_LOGD(TAG, "HTTP status code was %d",status_code);
-
-        err = _http_handle_response_code(http_client, status_code);
-        if (err != ESP_OK) {
-            sendMessaging(MESSAGING_ERROR,"HTTP connect error: %s", esp_err_to_name(err));
-            return err;
-        }
-
-    } while (process_again(status_code));
-
-    if(status_code >=400 && status_code <=900){
-    	sendMessaging(MESSAGING_ERROR,"Error: HTTP Status %d",status_code);
-    	err=ESP_FAIL;
-    }
-
-    return err;
-}
 void ota_task_cleanup(const char * message, ...){
 	ota_status.bOTAThreadStarted=false;
 	loc_displayer_progressbar(0);
@@ -522,35 +439,26 @@ void ota_task_cleanup(const char * message, ...){
 	task_fatal_error();
 }
 esp_err_t ota_buffer_all(){
-	int data_read=0;
-	esp_err_t err=ESP_OK;
+		esp_err_t err=ESP_OK;
 	if (ota_status.ota_type == OTA_TYPE_HTTP){
-		GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Downloading file");
-	    ota_http_client = esp_http_client_init(&http_client_config);
-	    if (ota_http_client == NULL) {
-	    	sendMessaging(MESSAGING_ERROR,"Error: Failed to initialize HTTP connection.");
-	        return ESP_FAIL;
-	    }
+		IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Downloading file"));
+		ota_http_client = esp_http_client_init(&http_client_config);
+		if (ota_http_client == NULL) {
+			sendMessaging(MESSAGING_ERROR,"Error: Failed to initialize HTTP connection.");
+			return ESP_FAIL;
+		}
 	    _printMemStats();
-	    // Open the http connection and follow any redirection
-	    err = _http_connect(ota_http_client);
-	    if (err != ESP_OK) {
-	       return err;
-	    }
+	    err =  esp_http_client_perform(ota_http_client);
+		if (err !=  ESP_OK) {
+			sendMessaging(MESSAGING_ERROR,"Error: Failed to execute HTTP download. %s",esp_err_to_name(err));
+			return ESP_FAIL;
+		}
+
 	    if(ota_status.total_image_len<=0){
 	    	sendMessaging(MESSAGING_ERROR,"Error: Invalid image length");
 	    	return ESP_FAIL;
 	    }
-	    ota_status.bin_data= malloc(ota_status.total_image_len);
-	    if(ota_status.bin_data==NULL){
-			sendMessaging(MESSAGING_ERROR,"Error: buffer alloc error");
-			return ESP_FAIL;
-   	    }
-		data_read = esp_http_client_read(ota_http_client, ota_status.bin_data, ota_status.total_image_len);
-		if(data_read != ota_status.total_image_len){
-			sendMessaging(MESSAGING_ERROR,"Error: Binary incomplete");
-			return ESP_FAIL;
-		}
+	    sendMessaging(MESSAGING_INFO,"Download success");
 	}
 	else {
 		gettimeofday(&ota_status.OTA_start, NULL);
@@ -605,7 +513,7 @@ esp_err_t ota_header_check(){
 		if (esp_ota_get_partition_description(ota_status.running, &running_app_info) == ESP_OK) {
 			ESP_LOGI(TAG, "Running recovery version: %s", running_app_info.version);
 		}
-
+		sendMessaging(MESSAGING_INFO,"New version is : %s",new_app_info.version);
 		esp_app_desc_t invalid_app_info;
 		if (esp_ota_get_partition_description(ota_status.last_invalid_app, &invalid_app_info) == ESP_OK) {
 			ESP_LOGI(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
@@ -626,10 +534,10 @@ void ota_task(void *pvParameter)
 {
 	esp_err_t err = ESP_OK;
     int data_read = 0;
-	GDS_TextSetFont(display,2,GDS_GetHeight(display)>32?&Font_droid_sans_fallback_15x17:&Font_droid_sans_fallback_11x13,-2);
-	GDS_ClearExt(display, true);
-	GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Firmware update");
-	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Initializing");
+    IF_DISPLAY(GDS_TextSetFont(display,2,GDS_GetHeight(display)>32?&Font_droid_sans_fallback_15x17:&Font_droid_sans_fallback_11x13,-2))
+    IF_DISPLAY(	GDS_ClearExt(display, true));
+	IF_DISPLAY(GDS_TextLine(display, 1, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Firmware update"));
+	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Initializing"));
 	loc_displayer_progressbar(0);
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     _printMemStats();
@@ -644,7 +552,6 @@ void ota_task(void *pvParameter)
 	}
 
 	_printMemStats();
-	ota_status.bOTAStarted = true;
 	sendMessaging(MESSAGING_INFO,"Starting OTA...");
 	err=ota_buffer_all();
 	if(err!=ESP_OK){
@@ -652,16 +559,16 @@ void ota_task(void *pvParameter)
 		return;
 	}
 
-
 	if(ota_header_check()!=ESP_OK){
 		ota_task_cleanup(NULL);
 		return;
 	}
 
 	/* Locate and erase ota application partition */
-	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
-	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Formatting partition");
 	sendMessaging(MESSAGING_INFO,"Formatting OTA partition");
+	ESP_LOGW(TAG,"****************  Expecting WATCHDOG errors below during flash erase. This is OK and not to worry about **************** ");
+	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Formatting partition"));
+
 	_printMemStats();
 	err=_erase_last_boot_app_partition(ota_status.ota_partition);
 	if(err!=ESP_OK){
@@ -681,7 +588,7 @@ void ota_task(void *pvParameter)
 		return;
 	}
 	ESP_LOGD(TAG, "esp_ota_begin succeeded");
-	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Writing image...");
+	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Writing image..."));
     while (ota_status.remain_image_len>0) {
 
     	data_read = ota_buffer_read();
@@ -730,9 +637,9 @@ void ota_task(void *pvParameter)
     if (err == ESP_OK) {
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
     	sendMessaging(MESSAGING_INFO,"Success!");
-    	GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Success!");
+    	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Success!"));
     	vTaskDelay(1500/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
-    	GDS_Clear(display,GDS_COLOR_BLACK);
+    	IF_DISPLAY(GDS_Clear(display,GDS_COLOR_BLACK));
         esp_restart();
     } else {
         ota_task_cleanup("Error: Unable to update boot partition [%s]",esp_err_to_name(err));

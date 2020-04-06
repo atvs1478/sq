@@ -32,7 +32,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 */
 
 #include "http_server_handlers.h"
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include "esp_http_server.h"
 #include "cmd_system.h"
 #include <inttypes.h>

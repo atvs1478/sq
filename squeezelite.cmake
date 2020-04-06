@@ -56,8 +56,11 @@ function(___create_new_target target_name)
 	idf_build_get_property(bca BUILD_COMPONENT_ALIASES)
 	list(REMOVE_ITEM bca "idf::app_recovery")
 	list(REMOVE_ITEM bca "idf::app_squeezelite")
+	
+	
 	target_link_libraries(${target_elf} ${bca})
 	target_link_libraries(${target_elf} idf::app_squeezelite)
+	
 	set(target_name_mapfile "${target_name}.map")
 	target_link_libraries(${target_elf} "-Wl,--cref -Wl,--Map=${CMAKE_BINARY_DIR}/${target_name_mapfile}")
 
@@ -67,7 +70,6 @@ function(___create_new_target target_name)
 		
 	add_custom_command(
 			TARGET ${target_elf}
-			
 			POST_BUILD 
 			COMMAND ${CMAKE_COMMAND} -E echo "Generating ${build_dir}/${target_name}.bin" 
 			COMMAND ${ESPTOOLPY} elf2image ${ESPTOOLPY_FLASH_OPTIONS} ${ESPTOOLPY_ELF2IMAGE_OPTIONS} -o "${build_dir}/${target_name}.bin" "${target_name}.elf"
@@ -102,11 +104,13 @@ add_custom_command(
 			TARGET recovery.elf
 			PRE_LINK
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+#			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol GDS_DrawPixelFast  ${build_dir}/esp-idf/display/libdisplay.a
 	        VERBATIM
 )
 add_custom_command(
 			TARGET squeezelite.elf
 			PRE_LINK
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+#			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol GDS_DrawPixelFast  ${build_dir}/esp-idf/display/libdisplay.a
 	        VERBATIM
 )

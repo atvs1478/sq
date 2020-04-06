@@ -203,7 +203,24 @@ esp_err_t messaging_post_to_queue(messaging_handle_t subscriber_handle, single_m
 	}
 	return ESP_OK;
 }
-void messaging_post_message(messaging_types type,messaging_classes msg_class, char *fmt, ...){
+	esp_err_t messaging_type_to_err_type(messaging_types type){
+		switch (type) {
+		case MESSAGING_INFO:
+			return ESP_LOG_INFO;
+			break;
+		case MESSAGING_ERROR:
+			return ESP_LOG_ERROR;
+			break;
+		case MESSAGING_WARNING:
+			return ESP_LOG_WARN;
+			break;
+		default:
+			return ESP_LOG_DEBUG;
+			break;
+		}
+		return ESP_LOG_DEBUG;
+	}
+void messaging_post_message(messaging_types type,messaging_classes msg_class, const char *fmt, ...){
 	single_message_t * message=NULL;
 	size_t msg_size=0;
 	size_t ln =0;

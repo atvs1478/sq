@@ -671,7 +671,7 @@ function getMessages() {
 	        	        if (ota_data.hasOwnProperty('ota_dsc') && ota_data['ota_dsc'] != ''){
 	        	            otadsc = ota_data['ota_dsc'];
 	        	            $("span#flash-status").html(otadsc);
-	        	            if (otadsc.match(/Error:/) || otapct > 95) {
+	        	            if (msg.type =="MESSAGING_ERROR"  || otapct > 95) {
 	        	                blockFlashButton = false;
 	        	                enableStatusTimer = true;
 	        	            }

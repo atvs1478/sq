@@ -595,7 +595,7 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 	// use "fast" version as we are not beyond screen boundaries
 	for (int r = 0; r < width; r++) {
 		for (int c = 0; c < VU_HEIGHT; c++) {
-			GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
+			GDS_DrawPixelFastExt(display, r + x, c + y, *data++ >> scale);
 		}	
 	}	
 	
