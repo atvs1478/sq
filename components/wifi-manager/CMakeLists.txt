@@ -6,4 +6,3 @@ idf_component_register( SRC_DIRS .
 						
 )
  
-#add_definitions(-DLOG_LOCAL_LEVEL=ESP_LOG_INFO)

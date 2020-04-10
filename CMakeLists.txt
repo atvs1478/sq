@@ -9,5 +9,6 @@ set_property(TARGET recovery.elf PROPERTY RECOVERY_PREFIX app_recovery )
 include(squeezelite.cmake)
 
 
+set(PROJECT_VER $ENV{PROJECT_VER})
   
-  
+#target_compile_definitions(__idf_squeezelite-ota PRIVATE -DLOG_LOCAL_LEVEL=ESP_LOG_VERBOSE)

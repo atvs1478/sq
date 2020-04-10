@@ -4,6 +4,12 @@ function(___register_flash target_name sub_type)
 	partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ${sub_type}" "offset")
 	esptool_py_flash_project_args(${target_name} ${otaapp_offset} ${build_dir}/${target_name}.bin FLASH_IN_PROJECT)
 	esptool_py_custom_target(${target_name}-flash ${target_name} "${target_name}")
+## IDF-V4.2+ 	idf_component_get_property(main_args esptool_py FLASH_ARGS)
+## IDF-V4.2+ 	idf_component_get_property(sub_args esptool_py FLASH_SUB_ARGS)
+## IDF-V4.2+    esptool_py_flash_target(${target_name}-flash "${main_args}" "${sub_args}")
+## IDF-V4.2+ 	esptool_py_flash_target_image(${target_name}-flash ${target_name} "${otaapp_offset}" "${build_dir}/${target_name}.bin")
+## IDF-V4.2+ 	esptool_py_flash_target_image(flash ${target_name} "${otaapp_offset}" "${build_dir}/${target_name}.bin")
+	
 endfunction()
 #
 # Removes the specified compile flag from the specified target.
@@ -56,8 +62,6 @@ function(___create_new_target target_name)
 	idf_build_get_property(bca BUILD_COMPONENT_ALIASES)
 	list(REMOVE_ITEM bca "idf::app_recovery")
 	list(REMOVE_ITEM bca "idf::app_squeezelite")
-	
-	
 	target_link_libraries(${target_elf} ${bca})
 	target_link_libraries(${target_elf} idf::app_squeezelite)
 	
@@ -104,13 +108,13 @@ add_custom_command(
 			TARGET recovery.elf
 			PRE_LINK
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
-#			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol GDS_DrawPixelFast  ${build_dir}/esp-idf/display/libdisplay.a
+## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/squeezelite/libsqueezelite.a
 	        VERBATIM
 )
 add_custom_command(
 			TARGET squeezelite.elf
 			PRE_LINK
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
-#			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol GDS_DrawPixelFast  ${build_dir}/esp-idf/display/libdisplay.a
+## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/app_recovery/libapp_recovery.a
 	        VERBATIM
 )

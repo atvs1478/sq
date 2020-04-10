@@ -22,7 +22,7 @@
 #include "platform_config.h"
 #include "nvs_utilities.h"
 #include "platform_esp32.h"
-
+#include "trace.h"
 #include <stdio.h>
 #include <string.h>
 #include "esp_system.h"
@@ -58,7 +58,7 @@ extern esp_err_t nvs_load_config();
 void config_raise_change(bool flag);
 cJSON_bool config_is_entry_changed(cJSON * entry);
 bool config_set_group_bit(int bit_num,bool flag);
-cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value);
+cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key,const void * value);
 static void vCallbackFunction( TimerHandle_t xTimer );
 void config_set_entry_changed_flag(cJSON * entry, cJSON_bool flag);
 #define IMPLEMENT_SET_DEFAULT(t,nt) void config_set_default_## t (const char *key, t  value){\
@@ -126,7 +126,7 @@ nvs_type_t  config_get_item_type(cJSON * entry){
 }
 
 
-cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key, void * value){
+cJSON * config_set_value_safe(nvs_type_t nvs_type, const char *key,  const void * value){
 	cJSON * entry = cJSON_CreateObject();
 
 	double numvalue = 0;
@@ -346,21 +346,24 @@ void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry){
 			char * entry_str = cJSON_PrintUnformatted(entry);
 			if(entry_str!=NULL){
 				ESP_LOGE(TAG, "requested value type string, config type is different. key: %s, value: %s, type %d, Object: \n%s",
-					entry_value->string,
-					entry_value->valuestring,
-					entry_value->type,
-					entry_str);
+						str_or_null(entry_value->string),
+						str_or_null(entry_value->valuestring),
+						entry_value->type,
+						str_or_null(entry_str));
 				free(entry_str);
 			}
 			else {
 				ESP_LOGE(TAG, "requested value type string, config type is different. key: %s, value: %s, type %d",
-					entry_value->string,
-					entry_value->valuestring,
-					entry_value->type);
+						str_or_null(entry_value->string),
+						str_or_null(entry_value->valuestring),
+						entry_value->type);
 			}
 		}
 		else {
-			value=(void *)strdup(cJSON_GetStringValue(entry_value));
+			size_t len=strlen(cJSON_GetStringValue(entry_value));
+			value=(void *)heap_caps_malloc(len+1, MALLOC_CAP_DMA);
+			memset(value,0x00,len+1);
+			memcpy(value,cJSON_GetStringValue(entry_value),len);
 			if(value==NULL){
 				char * entry_str = cJSON_PrintUnformatted(entry);
 				if(entry_str!=NULL){
@@ -380,7 +383,6 @@ void * config_safe_alloc_get_entry_value(nvs_type_t nvs_type, cJSON * entry){
 
 void config_commit_to_nvs(){
 	ESP_LOGI(TAG,"Committing configuration to nvs. Locking config object.");
-	ESP_LOGV(TAG,"config_commit_to_nvs. Locking config object.");
 	if(!config_lock(LOCK_MAX_WAIT/portTICK_PERIOD_MS)){
 		ESP_LOGE(TAG, "config_commit_to_nvs: Unable to lock config for commit ");
 		return ;
@@ -403,8 +405,14 @@ void config_commit_to_nvs(){
 			nvs_type_t type = config_get_entry_type(entry);
 			void * value = config_safe_alloc_get_entry_value(type, entry);
 			if(value!=NULL){
-				esp_err_t err = store_nvs_value(type,entry->string,value);
+				size_t len=strlen(entry->string);
+				char * key=(void *)heap_caps_malloc(len+1, MALLOC_CAP_DMA);
+				memset(key,0x00,len+1);
+				memcpy(key,entry->string,len);
+				esp_err_t err = store_nvs_value(type,key,value);
+				free(key);
 				free(value);
+
 				if(err!=ESP_OK){
 					char * entry_str = cJSON_PrintUnformatted(entry);
 					if(entry_str!=NULL){
@@ -440,6 +448,7 @@ void config_commit_to_nvs(){
 	config_raise_change(false);
 	ESP_LOGV(TAG,"config_commit_to_nvs. Releasing the lock object.");
 	config_unlock();
+	ESP_LOGI(TAG,"Done Committing configuration to nvs.");
 }
 bool config_has_changes(){
 	return  (xEventGroupGetBits(config_group) & CONFIG_NO_COMMIT_PENDING)==0;

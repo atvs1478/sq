@@ -40,7 +40,7 @@ var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
-
+var dblclickCounter=0; 
 var apList = null;
 var selectedSSID = "";
 var refreshAPInterval = null; 
@@ -208,7 +208,7 @@ $(document).ready(function(){
     
     $("input#autoexec-cb").on("click", function() {
         var data = { 'timestamp': Date.now() };
-        autoexec = (this.checked)?1:0;
+        autoexec = (this.checked)?"1":"0";
         data['config'] = {};
         data['config'] = {
             autoexec : {
@@ -548,6 +548,19 @@ $(document).ready(function(){
         html: true,
         placement : 'right',
     });
+    $('a[href^="#tab-firmware"]').dblclick(function () {
+    	dblclickCounter++;
+    	if(dblclickCounter>=2)
+    	{
+    		dblclickCounter=0;
+    		blockFlashButton=false;
+    		alert("Unocking flash button!");
+    	}
+    });    
+    $('a[href^="#tab-firmware"]').click(function () {
+    	// when navigating back to this table, reset the counter
+   		if(!this.classList.contains("active")) dblclickCounter=0;
+    });        
 });
 
 function setURL(button) {

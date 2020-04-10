@@ -34,6 +34,7 @@
 
 extern const char unknown_string_placeholder[];
 extern const char * str_or_unknown(const char * str);
+extern const char * str_or_null(const char * str);
 
 #ifndef FREE_AND_NULL
 #define FREE_AND_NULL(x) if(x) { free(x); x=NULL; }

@@ -31,7 +31,7 @@
 #include "esp_spi_flash.h"
 #include "esp_wifi.h"
 #include "esp_system.h"
-#include "esp_event_loop.h"
+#include <esp_event.h>
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "freertos/event_groups.h"
@@ -59,6 +59,7 @@ static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
 const char unknown_string_placeholder[] = "unknown";
+const char null_string_placeholder[] = "null";
 EventGroupHandle_t wifi_event_group;
 
 bool bypass_wifi_manager=false;
@@ -77,6 +78,7 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_github_pem_end");
 extern void services_init(void);
 extern void	display_init(char *welcome);
 const char * str_or_unknown(const char * str) { return (str?str:unknown_string_placeholder); }
+const char * str_or_null(const char * str) { return (str?str:null_string_placeholder); }
 bool is_recovery_running;
 /* brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event */
 void cb_connection_got_ip(void *pvParameter){
@@ -160,9 +162,7 @@ esp_err_t update_certificates(){
 	}
 
 	const esp_partition_t *running = esp_ota_get_running_partition();
-	if(running->subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY ){
-		ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", running->label, running->type, running->subtype, running->address);
-	}
+	ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", running->label, running->type, running->subtype, running->address);
 
 	if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
 		ESP_LOGI(TAG, "Running version: %s", running_app_info.version);
@@ -180,7 +180,9 @@ esp_err_t update_certificates(){
 			}
 		}
 	}
-	if(str!=NULL){
+	if(str!=NULL && running->subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
+		// If certificates were found in nvs, only update if we're not
+		// running recovery. This will prevent rolling back to an older version
 		if(strcmp((char *)running_app_info.version,(char *)str )){
 			// Versions are different
 			ESP_LOGW(TAG,"Found a different software version. Updating certificates");
@@ -230,7 +232,7 @@ const char * get_certificate(){
         size_t len;
         esp_err = nvs_get_blob(handle, certs_key, NULL, &len);
         if( esp_err == ESP_OK) {
-            blob = (char *)malloc(len+1);
+            blob = (char *) heap_caps_malloc(len+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
             if(!blob){
             	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. %s","Memory allocation failed");
         		return "";
@@ -371,7 +373,7 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
-	
+	wait_for_commit();
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
@@ -409,10 +411,10 @@ void app_main()
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "RECOVERY");
 	}
 
-	if(!is_recovery_running){
-		ESP_LOGI(TAG,"Checking if certificates need to be updated");
-		update_certificates();
-	}
+
+	ESP_LOGI(TAG,"Checking if certificates need to be updated");
+	update_certificates();
+
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");
 	fwurl = process_ota_url();
@@ -456,6 +458,7 @@ void app_main()
 		wifi_manager_set_callback(ORDER_START_AP, &start_telnet);
 		wifi_manager_set_callback(ORDER_CONNECT_STA, &start_telnet);
 	}
+
 	console_start();
 	if(fwurl && strlen(fwurl)>0){
 		if(is_recovery_running){

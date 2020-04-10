@@ -24,6 +24,7 @@
 #include <iphlpapi.h>
 #else
 #include "tcpip_adapter.h"
+// IDF-V4++ #include "esp_netif.h"
 #include <ctype.h>
 #endif
 

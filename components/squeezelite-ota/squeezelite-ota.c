@@ -19,8 +19,9 @@
 #include "nvs_flash.h"
 #include "cmd_system.h"
 #include "esp_err.h"
-#include "tcpip_adapter.h"
 #include "squeezelite-ota.h"
+#include "tcpip_adapter.h"
+// IDF-V4++ #include "esp_netif.h"
 #include "platform_config.h"
 #include <time.h>
 #include <sys/time.h>
@@ -64,10 +65,11 @@ typedef enum  {
 	OTA_TYPE_INVALID
 } ota_type_t;
 
-static struct {
-	uint32_t actual_image_len;
-	uint32_t total_image_len;
-	uint32_t remain_image_len;
+typedef struct  {
+	size_t actual_image_len;
+	float downloaded_image_len;
+	float total_image_len;
+	float remain_image_len;
 	ota_type_t ota_type;
 	char * ota_write_data;
 	char * bin_data;
@@ -75,6 +77,7 @@ static struct {
 	size_t buffer_size;
 	uint8_t lastpct;
 	uint8_t newpct;
+	uint8_t newdownloadpct;
 	struct timeval OTA_start;
 	bool bOTAThreadStarted;
     const esp_partition_t *configured;
@@ -82,7 +85,9 @@ static struct {
     const esp_partition_t * update_partition;
     const esp_partition_t* last_invalid_app ;
     const esp_partition_t * ota_partition;
-} ota_status;
+} ota_status_t;
+
+ota_status_t * ota_status;
 
 struct timeval tv;
 static esp_http_client_config_t http_client_config;
@@ -95,8 +100,12 @@ void _printMemStats(){
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
 uint8_t  ota_get_pct_complete(){
-	return ota_status.total_image_len==0?0:
-			(uint8_t)((float)ota_status.actual_image_len/(float)ota_status.total_image_len*100.0f);
+	return ota_status->total_image_len==0?0:
+			(uint8_t)((float)ota_status->actual_image_len/ota_status->total_image_len*100.0f);
+}
+uint8_t  ota_get_pct_downloaded(){
+	return ota_status->total_image_len==0?0:
+			(uint8_t)(ota_status->downloaded_image_len/ota_status->total_image_len*100.0f);
 }
 typedef struct  {
 	int x1,y1,x2,y2,width,height;
@@ -219,23 +228,34 @@ esp_err_t handle_http_on_data(esp_http_client_event_t *evt){
 	if(http_status == 200){
 
 
-		if(!ota_status.bOTAStarted)
+		if(!ota_status->bOTAStarted)
 		{
-			if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"Downloading firmware");
-			ota_status.bOTAStarted = true;
-			ota_status.total_image_len=esp_http_client_get_content_length(evt->client);
-		    ota_status.bin_data= malloc(ota_status.total_image_len);
-		    if(ota_status.bin_data==NULL){
+			sendMessaging(MESSAGING_INFO,"Downloading firmware");
+			ota_status->bOTAStarted = true;
+			ota_status->total_image_len=esp_http_client_get_content_length(evt->client);
+			ota_status->downloaded_image_len = 0;
+			ota_status->newdownloadpct = 0;
+		    ota_status->bin_data= malloc(ota_status->total_image_len);
+		    if(ota_status->bin_data==NULL){
 				sendMessaging(MESSAGING_ERROR,"Error: buffer alloc error");
 				return ESP_FAIL;
 	   	    }
-		    recv_ptr=ota_status.bin_data;
+		    recv_ptr=ota_status->bin_data;
 		}
 
 		// we're downloading the binary data file
 		if (!esp_http_client_is_chunked_response(evt->client)) {
 			memcpy(recv_ptr,evt->data,evt->data_len);
+			ota_status->downloaded_image_len +=evt->data_len;
 			recv_ptr+=evt->data_len;
+		}
+		if(ota_get_pct_downloaded()%5 == 0 && ota_get_pct_downloaded()%5!=ota_status->newdownloadpct) {
+			ota_status->newdownloadpct= ota_get_pct_downloaded();
+			loc_displayer_progressbar(ota_status->newdownloadpct);
+			gettimeofday(&tv, NULL);
+			uint32_t elapsed_ms= (tv.tv_sec-ota_status->OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status->OTA_start.tv_usec)/1000;
+			ESP_LOGI(TAG,"OTA download progress : %f/%f (%d pct), %f KB/s", ota_status->downloaded_image_len, ota_status->total_image_len, ota_status->newdownloadpct, elapsed_ms>0?ota_status->downloaded_image_len*1000/elapsed_ms/1024:0);
+			sendMessaging(MESSAGING_INFO,"Downloading firmware %%%3d.",ota_status->newdownloadpct);
 		}
 
 	}
@@ -266,13 +286,13 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-        if(ota_status.bOTAStarted) sendMessaging(MESSAGING_INFO,"HTTP Connected");
-        ota_status.total_image_len=0;
-		ota_status.actual_image_len=0;
-		ota_status.lastpct=0;
-		ota_status.remain_image_len=0;
-		ota_status.newpct=0;
-		gettimeofday(&ota_status.OTA_start, NULL);
+        if(ota_status->bOTAStarted) sendMessaging(MESSAGING_INFO,"HTTP Connected");
+        ota_status->total_image_len=0;
+		ota_status->actual_image_len=0;
+		ota_status->lastpct=0;
+		ota_status->remain_image_len=0;
+		ota_status->newpct=0;
+		gettimeofday(&ota_status->OTA_start, NULL);
 		break;
     case HTTP_EVENT_HEADER_SENT:
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
@@ -283,8 +303,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 //        	ESP_LOGW(TAG,"OTA will redirect to url: %s",evt->header_value);
 //        }
 //        if (strcasecmp(evt->header_key, "content-length") == 0) {
-//        	ota_status.total_image_len = atol(evt->header_value);
-//        	 ESP_LOGW(TAG, "Content length found: %s, parsed to %d", evt->header_value, ota_status.total_image_len);
+//        	ota_status->total_image_len = atol(evt->header_value);
+//        	 ESP_LOGW(TAG, "Content length found: %s, parsed to %d", evt->header_value, ota_status->total_image_len);
 //        }
         break;
     case HTTP_EVENT_ON_DATA:
@@ -304,26 +324,26 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 	memset(&http_client_config, 0x00, sizeof(http_client_config));
 	sendMessaging(MESSAGING_INFO,"Initializing...");
 	loc_displayer_progressbar(0);
-	ota_status.ota_type= OTA_TYPE_INVALID;
+	ota_status->ota_type= OTA_TYPE_INVALID;
 	if(p_ota_thread_parms->url !=NULL && strlen(p_ota_thread_parms->url)>0 ){
-		ota_status.ota_type= OTA_TYPE_HTTP;
+		ota_status->ota_type= OTA_TYPE_HTTP;
 	}
 	else if(p_ota_thread_parms->bin!=NULL && p_ota_thread_parms->length > 0) {
-		ota_status.ota_type= OTA_TYPE_BUFFER;
+		ota_status->ota_type= OTA_TYPE_BUFFER;
 	}
 
-	if(  ota_status.ota_type== OTA_TYPE_INVALID ){
+	if(  ota_status->ota_type== OTA_TYPE_INVALID ){
 		ESP_LOGE(TAG,"HTTP OTA called without a url or a binary buffer");
 		return ESP_ERR_INVALID_ARG;
 	}
 
-	ota_status.buffer_size = BUFFSIZE;
-	ota_status.ota_write_data = heap_caps_malloc(ota_status.buffer_size+1 , (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-	if(ota_status.ota_write_data== NULL){
+	ota_status->buffer_size = BUFFSIZE;
+	ota_status->ota_write_data = heap_caps_malloc(ota_status->buffer_size+1 , (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+	if(ota_status->ota_write_data== NULL){
 			ESP_LOGE(TAG,"Error allocating the ota buffer");
 			return ESP_ERR_NO_MEM;
 		}
-	switch (ota_status.ota_type) {
+	switch (ota_status->ota_type) {
 	case OTA_TYPE_HTTP:
 		http_client_config.cert_pem =get_certificate();
 		http_client_config.event_handler = _http_event_handler;
@@ -337,8 +357,8 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 		//http_client_config.timeout_ms = 5000;
 		break;
 	case OTA_TYPE_BUFFER:
-		ota_status.bin_data = p_ota_thread_parms->bin;
-		ota_status.total_image_len = p_ota_thread_parms->length;
+		ota_status->bin_data = p_ota_thread_parms->bin;
+		ota_status->total_image_len = p_ota_thread_parms->length;
 		break;
 	default:
 		return ESP_FAIL;
@@ -421,7 +441,7 @@ esp_err_t _erase_last_boot_app_partition(const esp_partition_t *ota_partition)
 }
 
 void ota_task_cleanup(const char * message, ...){
-	ota_status.bOTAThreadStarted=false;
+	ota_status->bOTAThreadStarted=false;
 	loc_displayer_progressbar(0);
 	if(message!=NULL){
 	    va_list args;
@@ -429,18 +449,18 @@ void ota_task_cleanup(const char * message, ...){
 		sendMessaging(MESSAGING_ERROR,message, args);
 	    va_end(args);
 	}
-	FREE_RESET(ota_status.ota_write_data);
-	FREE_RESET(ota_status.bin_data);
+	FREE_RESET(ota_status->ota_write_data);
+	FREE_RESET(ota_status->bin_data);
 	if(ota_http_client!=NULL) {
 		esp_http_client_cleanup(ota_http_client);
 		ota_http_client=NULL;
 	}
-	ota_status.bOTAStarted = false;
+	ota_status->bOTAStarted = false;
 	task_fatal_error();
 }
 esp_err_t ota_buffer_all(){
 		esp_err_t err=ESP_OK;
-	if (ota_status.ota_type == OTA_TYPE_HTTP){
+	if (ota_status->ota_type == OTA_TYPE_HTTP){
 		IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Downloading file"));
 		ota_http_client = esp_http_client_init(&http_client_config);
 		if (ota_http_client == NULL) {
@@ -454,68 +474,68 @@ esp_err_t ota_buffer_all(){
 			return ESP_FAIL;
 		}
 
-	    if(ota_status.total_image_len<=0){
+	    if(ota_status->total_image_len<=0){
 	    	sendMessaging(MESSAGING_ERROR,"Error: Invalid image length");
 	    	return ESP_FAIL;
 	    }
 	    sendMessaging(MESSAGING_INFO,"Download success");
 	}
 	else {
-		gettimeofday(&ota_status.OTA_start, NULL);
+		gettimeofday(&ota_status->OTA_start, NULL);
 	}
-	ota_status.remain_image_len=ota_status.total_image_len;
+	ota_status->remain_image_len=ota_status->total_image_len;
 
 	return err;
 }
 int ota_buffer_read(){
 	int data_read=0;
-	if(ota_status.remain_image_len >ota_status.buffer_size){
-		data_read = ota_status.buffer_size;
+	if(ota_status->remain_image_len >ota_status->buffer_size){
+		data_read = ota_status->buffer_size;
 	} else {
-		data_read = ota_status.remain_image_len;
+		data_read = ota_status->remain_image_len;
 	}
-	memcpy(ota_status.ota_write_data, &ota_status.bin_data[ota_status.actual_image_len], data_read);
+	memcpy(ota_status->ota_write_data, &ota_status->bin_data[ota_status->actual_image_len], data_read);
 
-	ota_status.actual_image_len += data_read;
-	ota_status.remain_image_len -= data_read;
+	ota_status->actual_image_len += data_read;
+	ota_status->remain_image_len -= data_read;
 	return data_read;
 }
 esp_err_t ota_header_check(){
 	esp_app_desc_t new_app_info;
     esp_app_desc_t running_app_info;
 
-    ota_status.configured = esp_ota_get_boot_partition();
-    ota_status.running = esp_ota_get_running_partition();
-    ota_status.last_invalid_app= esp_ota_get_last_invalid_partition();
-    ota_status.ota_partition = _get_ota_partition(ESP_PARTITION_SUBTYPE_APP_OTA_0);
+    ota_status->configured = esp_ota_get_boot_partition();
+    ota_status->running = esp_ota_get_running_partition();
+    ota_status->last_invalid_app= esp_ota_get_last_invalid_partition();
+    ota_status->ota_partition = _get_ota_partition(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 
-    ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", ota_status.running->label, ota_status.running->type, ota_status.running->subtype, ota_status.running->address);
-    if (ota_status.total_image_len > ota_status.ota_partition->size){
-    	ota_task_cleanup("Error: Image size too large to fit in partition.");
+    ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", ota_status->running->label, ota_status->running->type, ota_status->running->subtype, ota_status->running->address);
+    if (ota_status->total_image_len > ota_status->ota_partition->size){
+    	ota_task_cleanup("Error: Image size (%d) too large to fit in partition (%d).",ota_status->ota_partition->size,ota_status->total_image_len );
         return ESP_FAIL;
 	}
-	if(ota_status.ota_partition == NULL){
+	if(ota_status->ota_partition == NULL){
 		ESP_LOGE(TAG,"Unable to locate OTA application partition. ");
         ota_task_cleanup("Error: OTA partition not found");
         return ESP_FAIL;
 	}
-    if (ota_status.configured != ota_status.running) {
-        ESP_LOGW(TAG, "Configured OTA boot partition at offset 0x%08x, but running from offset 0x%08x", ota_status.configured->address, ota_status.running->address);
+    if (ota_status->configured != ota_status->running) {
+        ESP_LOGW(TAG, "Configured OTA boot partition at offset 0x%08x, but running from offset 0x%08x", ota_status->configured->address, ota_status->running->address);
         ESP_LOGW(TAG, "(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)");
     }
     ESP_LOGI(TAG, "Next ota update partition is: [%s] subtype %d at offset 0x%x",
-    		ota_status.update_partition->label, ota_status.update_partition->subtype, ota_status.update_partition->address);
+    		ota_status->update_partition->label, ota_status->update_partition->subtype, ota_status->update_partition->address);
 
-    if (ota_status.total_image_len >= IMAGE_HEADER_SIZE) {
+    if (ota_status->total_image_len >= IMAGE_HEADER_SIZE) {
 		// check current version with downloading
-		memcpy(&new_app_info, &ota_status.bin_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
+		memcpy(&new_app_info, &ota_status->bin_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
 		ESP_LOGI(TAG, "New firmware version: %s", new_app_info.version);
-		if (esp_ota_get_partition_description(ota_status.running, &running_app_info) == ESP_OK) {
+		if (esp_ota_get_partition_description(ota_status->running, &running_app_info) == ESP_OK) {
 			ESP_LOGI(TAG, "Running recovery version: %s", running_app_info.version);
 		}
 		sendMessaging(MESSAGING_INFO,"New version is : %s",new_app_info.version);
 		esp_app_desc_t invalid_app_info;
-		if (esp_ota_get_partition_description(ota_status.last_invalid_app, &invalid_app_info) == ESP_OK) {
+		if (esp_ota_get_partition_description(ota_status->last_invalid_app, &invalid_app_info) == ESP_OK) {
 			ESP_LOGI(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
 		}
 
@@ -542,7 +562,7 @@ void ota_task(void *pvParameter)
 	ESP_LOGD(TAG, "HTTP ota Thread started");
     _printMemStats();
 
-    ota_status.update_partition = esp_ota_get_next_update_partition(NULL);
+    ota_status->update_partition = esp_ota_get_next_update_partition(NULL);
 
 	ESP_LOGI(TAG,"Initializing OTA configuration");
 	err = init_config(pvParameter);
@@ -570,7 +590,7 @@ void ota_task(void *pvParameter)
 	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Formatting partition"));
 
 	_printMemStats();
-	err=_erase_last_boot_app_partition(ota_status.ota_partition);
+	err=_erase_last_boot_app_partition(ota_status->ota_partition);
 	if(err!=ESP_OK){
 		ota_task_cleanup("Error: Unable to erase last APP partition. (%s)",esp_err_to_name(err));
 		return;
@@ -582,35 +602,36 @@ void ota_task(void *pvParameter)
 	// Call OTA Begin with a small partition size - this minimizes the time spent in erasing partition,
 	// which was already done above
     esp_ota_handle_t update_handle = 0 ;
-	err = esp_ota_begin(ota_status.ota_partition, 512, &update_handle);
+    gettimeofday(&ota_status->OTA_start, NULL);
+	err = esp_ota_begin(ota_status->ota_partition, 512, &update_handle);
 	if (err != ESP_OK) {
 		ota_task_cleanup("esp_ota_begin failed (%s)", esp_err_to_name(err));
 		return;
 	}
 	ESP_LOGD(TAG, "esp_ota_begin succeeded");
 	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Writing image..."));
-    while (ota_status.remain_image_len>0) {
+    while (ota_status->remain_image_len>0) {
 
     	data_read = ota_buffer_read();
         if (data_read <= 0) {
             ota_task_cleanup("Error: Data read error");
             return;
         } else if (data_read > 0) {
-            err = esp_ota_write( update_handle, (const void *)ota_status.ota_write_data, data_read);
+            err = esp_ota_write( update_handle, (const void *)ota_status->ota_write_data, data_read);
             if (err != ESP_OK) {
                 ota_task_cleanup("Error: OTA Partition write failure. (%s)",esp_err_to_name(err));
                 return;
             }
-            ESP_LOGD(TAG, "Written image length %d", ota_status.actual_image_len);
+            ESP_LOGD(TAG, "Written image length %d", ota_status->actual_image_len);
 
-			if(ota_get_pct_complete()%5 == 0) ota_status.newpct = ota_get_pct_complete();
-			if(ota_status.lastpct!=ota_status.newpct ) {
-				loc_displayer_progressbar(ota_status.newpct);
+			if(ota_get_pct_complete()%5 == 0) ota_status->newpct = ota_get_pct_complete();
+			if(ota_status->lastpct!=ota_status->newpct ) {
+				loc_displayer_progressbar(ota_status->newpct);
 				gettimeofday(&tv, NULL);
-				uint32_t elapsed_ms= (tv.tv_sec-ota_status.OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status.OTA_start.tv_usec)/1000;
-				ESP_LOGI(TAG,"OTA progress : %d/%d (%d pct), %d KB/s", ota_status.actual_image_len, ota_status.total_image_len, ota_status.newpct, elapsed_ms>0?ota_status.actual_image_len*1000/elapsed_ms/1024:0);
-				sendMessaging(MESSAGING_INFO,"Writing binary file.");
-				ota_status.lastpct=ota_status.newpct;
+				uint32_t elapsed_ms= (tv.tv_sec-ota_status->OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status->OTA_start.tv_usec)/1000;
+				ESP_LOGI(TAG,"OTA progress : %d/%.0f (%d pct), %d KB/s", ota_status->actual_image_len, ota_status->total_image_len, ota_status->newpct, elapsed_ms>0?ota_status->actual_image_len*1000/elapsed_ms/1024:0);
+				sendMessaging(MESSAGING_INFO,"Writing binary file %%%3d.",ota_status->newpct);
+				ota_status->lastpct=ota_status->newpct;
 			}
 			taskYIELD();
 
@@ -620,8 +641,8 @@ void ota_task(void *pvParameter)
         }
     }
 
-    ESP_LOGI(TAG, "Total Write binary data length: %d", ota_status.actual_image_len);
-    if (ota_status.total_image_len != ota_status.actual_image_len) {
+    ESP_LOGI(TAG, "Total Write binary data length: %d", ota_status->actual_image_len);
+    if (ota_status->total_image_len != ota_status->actual_image_len) {
         ota_task_cleanup("Error: Error in receiving complete file");
         return;
     }
@@ -633,7 +654,7 @@ void ota_task(void *pvParameter)
         return;
      }
     _printMemStats();
-    err = esp_ota_set_boot_partition(ota_status.ota_partition);
+    err = esp_ota_set_boot_partition(ota_status->ota_partition);
     if (err == ESP_OK) {
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
     	sendMessaging(MESSAGING_INFO,"Success!");
@@ -652,12 +673,14 @@ void ota_task(void *pvParameter)
 esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t length){
 	int ret = 0;
 	uint16_t stack_size, task_priority;
-    if(ota_status.bOTAThreadStarted){
+
+	if(ota_status && ota_status->bOTAThreadStarted){
 		ESP_LOGE(TAG,"OTA Already started. ");
 		return ESP_FAIL;
 	}
-	memset(&ota_status, 0x00, sizeof(ota_status));
-	ota_status.bOTAThreadStarted=true;
+	ota_status = heap_caps_malloc(sizeof(ota_status_t) , (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+	memset(ota_status, 0x00, sizeof(ota_status_t));
+	ota_status->bOTAThreadStarted=true;
 
 	if(bin_url){
 		ota_thread_parms.url =strdup(bin_url);
@@ -689,7 +712,8 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
   	}
 
   	ESP_LOGD(TAG,"OTA task stack size %d, priority %d (%d %s ESP_TASK_MAIN_PRIO)",stack_size , task_priority, abs(task_priority-ESP_TASK_MAIN_PRIO), task_priority-ESP_TASK_MAIN_PRIO>0?"above":"below");
-    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", stack_size , (void *)&ota_thread_parms, task_priority, NULL, OTA_CORE);
+//    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", stack_size , (void *)&ota_thread_parms, task_priority, NULL, OTA_CORE);
+    ret=xTaskCreate(&ota_task, "ota_task", stack_size , (void *)&ota_thread_parms, task_priority, NULL);
     if (ret != pdPASS)  {
             ESP_LOGI(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;

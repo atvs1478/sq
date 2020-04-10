@@ -41,8 +41,10 @@ Contains the freeRTOS task and all necessary support
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include <esp_event.h>
 #include "esp_event_loop.h"
 #include "tcpip_adapter.h"
+// IDF-V4++ #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
@@ -71,12 +73,14 @@ Contains the freeRTOS task and all necessary support
 #endif
 
 #define STR_OR_BLANK(p) p==NULL?"":p
+BaseType_t wifi_manager_task;
 
 /* objects used to manipulate the main queue of events */
 QueueHandle_t wifi_manager_queue;
 SemaphoreHandle_t wifi_manager_json_mutex = NULL;
 SemaphoreHandle_t wifi_manager_sta_ip_mutex = NULL;
 char *wifi_manager_sta_ip = NULL;
+#define STA_IP_LEN sizeof(char) * IP4ADDR_STRLEN_MAX
 bool bHasConnected=false;
 uint16_t ap_num = MAX_AP_NUM;
 wifi_ap_record_t *accessp_records=NULL;
@@ -148,6 +152,7 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
+
 char * get_disconnect_code_desc(uint8_t reason){
 	switch (reason) {
 		case 1	: return "UNSPECIFIED"; break;
@@ -195,6 +200,9 @@ void set_host_name(){
 		if((err=tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, host_name)) !=ESP_OK){
 			ESP_LOGE(TAG,  "Unable to set host name. Error: %s",esp_err_to_name(err));
 		}
+//		if((err=tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, host_name)) !=ESP_OK){
+//			ESP_LOGE(TAG,  "Unable to set host name. Error: %s",esp_err_to_name(err));
+//		}
 		free(host_name);
 	}
 
@@ -267,8 +275,9 @@ void wifi_manager_init_wifi(){
 	if (gpio36_39_used) {
 		ESP_LOGW(TAG, "GPIO 36 or 39 are in use, need to disable WiFi PowerSave!");
 		esp_wifi_set_ps(WIFI_PS_NONE); 
-		}	
+		}
     ESP_ERROR_CHECK( esp_wifi_start() );
+
     taskYIELD();
     ESP_LOGD(TAG,   "Initializing wifi. done");
 }
@@ -302,7 +311,7 @@ void wifi_manager_start(){
 	}
 
 	ESP_LOGD(TAG,   "About to set the STA IP String to 0.0.0.0");
-	wifi_manager_sta_ip = (char*)malloc(sizeof(char) * IP4ADDR_STRLEN_MAX);
+	wifi_manager_sta_ip = (char*)malloc(STA_IP_LEN);
 	wifi_manager_safe_update_sta_ip_string(NULL);
 
 	ESP_LOGD(TAG,   "Getting release url ");
@@ -319,7 +328,7 @@ void wifi_manager_start(){
 
 	/* start wifi manager task */
 	ESP_LOGD(TAG,   "Creating wifi manager task");
-	xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
+	wifi_manager_task= xTaskCreate(&wifi_manager, "wifi_manager", 4096, NULL, WIFI_MANAGER_TASK_PRIORITY, &task_wifi_manager);
 }
 
 
@@ -485,9 +494,9 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
 			ESP_ERROR_CHECK(tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info));
-			cJSON_AddItemToObject(ip_info_cjson, "ip", cJSON_CreateString(ip4addr_ntoa(&ip_info.ip)));
-			cJSON_AddItemToObject(ip_info_cjson, "netmask", cJSON_CreateString(ip4addr_ntoa(&ip_info.netmask)));
-			cJSON_AddItemToObject(ip_info_cjson, "gw", cJSON_CreateString(ip4addr_ntoa(&ip_info.gw)));
+			cJSON_AddItemToObject(ip_info_cjson, "ip", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.ip)));
+			cJSON_AddItemToObject(ip_info_cjson, "netmask", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.netmask)));
+			cJSON_AddItemToObject(ip_info_cjson, "gw", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.gw)));
 		}
 	}
 	ESP_LOGV(TAG,  "wifi_manager_generate_ip_info_json done");
@@ -674,9 +683,13 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 			case WIFI_EVENT_STA_WPS_ER_PIN:
 				ESP_LOGD(TAG,  "WIFI_EVENT_STA_WPS_ER_PIN");
 				break;
-			case WIFI_EVENT_AP_STACONNECTED: /* a user disconnected from the SoftAP */
-				ESP_LOGI(TAG,   "WIFI_EVENT_AP_STACONNECTED");
+			case WIFI_EVENT_AP_STACONNECTED:{ /* a user disconnected from the SoftAP */
+				wifi_event_ap_staconnected_t * stac = (wifi_event_ap_staconnected_t *)event_data;
+				char * mac = get_mac_string(stac->mac);
+				ESP_LOGI(TAG,   "WIFI_EVENT_AP_STACONNECTED. aid: %d, mac: %s",stac->aid,STR_OR_BLANK(mac));
+				FREE_AND_NULL(mac);
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
+			}
 				break;
 			case WIFI_EVENT_AP_STADISCONNECTED:
 				ESP_LOGI(TAG,   "WIFI_EVENT_AP_STADISCONNECTED");
@@ -788,19 +801,15 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 //		    		Whether the assigned IP has changed or not
 
 				ip_event_got_ip_t * s =(ip_event_got_ip_t*)event_data;
-				tcpip_adapter_if_t index = s->if_index;
-				char * ip=strdup(ip4addr_ntoa(&(s->ip_info.ip)));
-				char * gw=strdup(ip4addr_ntoa(&(s->ip_info.gw)));
-				char * nm=strdup(ip4addr_ntoa(&(s->ip_info.netmask)));
-				ESP_LOGI(TAG,   "SYSTEM_EVENT_STA_GOT_IP. IP=%s, Gateway=%s, NetMask=%s, Interface: %s %s",
-						ip,
-						gw,
-						nm,
-						index==TCPIP_ADAPTER_IF_STA?"TCPIP_ADAPTER_IF_STA":index==TCPIP_ADAPTER_IF_AP?"TCPIP_ADAPTER_IF_AP":index==TCPIP_ADAPTER_IF_ETH?"TCPIP_ADAPTER_IF_ETH":"Unknown",
+				//tcpip_adapter_if_t index = s->if_index;
+				const tcpip_adapter_ip_info_t *ip_info = &s->ip_info;
+				ESP_LOGI(TAG,   "SYSTEM_EVENT_STA_GOT_IP. IP="IPSTR", Gateway="IPSTR", NetMask="IPSTR", %s",
+						IP2STR(&ip_info->ip),
+						IP2STR(&ip_info->gw),
+						IP2STR(&ip_info->netmask),
 								s->ip_changed?"Address was changed":"Address unchanged");
-				FREE_AND_NULL(ip);
-				FREE_AND_NULL(gw);
-				FREE_AND_NULL(nm);
+				// todo: if ip address was changed, we probably need to restart, as all sockets
+				// will become abnormal
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_WIFI_CONNECTED_BIT);
 				last_connected = esp_timer_get_time();
 
@@ -977,6 +986,8 @@ void wifi_manager_register_handlers(){
 void wifi_manager_config_ap(){
 	/* SoftAP - Wifi Access Point configuration setup */
 		tcpip_adapter_ip_info_t info;
+		esp_err_t err=ESP_OK;
+		tcpip_adapter_dhcp_status_t state;
 		memset(&info, 0x00, sizeof(info));
 		char * value = NULL;
 		wifi_config_t ap_config = {
@@ -985,8 +996,12 @@ void wifi_manager_config_ap(){
 			},
 		};
 		ESP_LOGI(TAG,  "Configuring Access Point.");
-		ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP)); 	/* stop AP DHCP server */
 
+		ESP_LOGI(TAG,"Stopping DHCP on interface ");
+		if((err= tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGW(TAG,  "Stopping DHCP failed. Error %s",esp_err_to_name(err));
+		}
 		/*
 		 * Set access point mode IP adapter configuration
 		 */
@@ -1010,8 +1025,10 @@ void wifi_manager_config_ap(){
 		FREE_AND_NULL(value);
 
 		ESP_LOGD(TAG,  "Setting tcp_ip info for interface TCPIP_ADAPTER_IF_AP");
-		ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info));
-
+		if((err=tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &info))!=ESP_OK){
+			ESP_LOGE(TAG,  "Setting tcp_ip info for interface TCPIP_ADAPTER_IF_AP. Error %s",esp_err_to_name(err));
+			return;
+		}
 		/*
 		 * Set Access Point configuration
 		 */
@@ -1046,19 +1063,49 @@ void wifi_manager_config_ap(){
 		ESP_LOGI(TAG,  "Max Connections: %d", ap_config.ap.max_connection);
 		ESP_LOGI(TAG,  "Beacon interval: %d", ap_config.ap.beacon_interval);
 
-		ESP_LOGD(TAG,  "Starting dhcps on interface TCPIP_ADAPTER_IF_AP");
-		ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP)); /* start AP DHCP server */
+		ESP_LOGD(TAG,  "");
+		if((err= esp_wifi_set_mode(WIFI_MODE_APSTA))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGE(TAG,  "Setting wifi mode as WIFI_MODE_APSTA failed. Error %s",esp_err_to_name(err));
+			return;
+		}
 
-		ESP_LOGD(TAG,  "Setting wifi mode as WIFI_MODE_APSTA");
-		ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+
 		ESP_LOGD(TAG,  "Setting wifi AP configuration for WIFI_IF_AP");
-		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+		if((err= esp_wifi_set_config(WIFI_IF_AP, &ap_config))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGE(TAG,  "Setting wifi AP configuration for WIFI_IF_AP failed. Error %s",esp_err_to_name(err));
+			return;
+		}
+
+
 		ESP_LOGD(TAG,  "Setting wifi bandwidth (%d) for WIFI_IF_AP",DEFAULT_AP_BANDWIDTH);
-		ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, DEFAULT_AP_BANDWIDTH));
+		if((err=esp_wifi_set_bandwidth(WIFI_IF_AP, DEFAULT_AP_BANDWIDTH))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGE(TAG,  "Setting wifi bandwidth for WIFI_IF_AP failed. Error %s",esp_err_to_name(err));
+			return;
+		}
+
 		ESP_LOGD(TAG,  "Setting wifi power save (%d) for WIFI_IF_AP",DEFAULT_STA_POWER_SAVE);
-		ESP_ERROR_CHECK(esp_wifi_set_ps(DEFAULT_STA_POWER_SAVE));
+
+		if((err=esp_wifi_set_ps(DEFAULT_STA_POWER_SAVE))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGE(TAG,  "Setting wifi power savefor WIFI_IF_AP failed. Error %s",esp_err_to_name(err));
+			return;
+		}
+
+		ESP_LOGD(TAG,  "Starting dhcps on interface TCPIP_ADAPTER_IF_AP");
+
+		if((err=tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP))!=ESP_OK) 	/* stop AP DHCP server */
+		{
+			ESP_LOGE(TAG, "Starting dhcp on TCPIP_ADAPTER_IF_AP failed. Error %s",esp_err_to_name(err));
+			return;
+		}
+
 		ESP_LOGD(TAG,  "Done configuring Soft Access Point");
 		dns_server_start();
+
 
 }
 
@@ -1067,6 +1114,7 @@ void wifi_manager( void * pvParameters ){
 	BaseType_t xStatus;
 	EventBits_t uxBits;
 	uint8_t	retries = 0;
+	esp_err_t err=ESP_OK;
 
 	/* start http server */
 	http_server_start();
@@ -1084,10 +1132,17 @@ void wifi_manager( void * pvParameters ){
 				/* As input param, it stores max AP number ap_records can hold. As output param, it receives the actual AP number this API returns.
 				 * As a consequence, ap_num MUST be reset to MAX_AP_NUM at every scan */
 				ESP_LOGD(TAG,  "Getting AP list records");
-				ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
+				if((err=esp_wifi_scan_get_ap_num(&ap_num))!=ESP_OK) {
+					ESP_LOGE(TAG,  "Failed to retrieve scan results count. Error %s",esp_err_to_name(err));
+					break;
+				}
+
 				if(ap_num>0){
 					accessp_records = (wifi_ap_record_t*)malloc(sizeof(wifi_ap_record_t) * ap_num);
-					ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, accessp_records));
+					if((err=esp_wifi_scan_get_ap_records(&ap_num, accessp_records))!=ESP_OK) {
+						ESP_LOGE(TAG,  "Failed to retrieve scan results list. Error %s",esp_err_to_name(err));
+						break;
+					}
 					/* make sure the http server isn't trying to access the list while it gets refreshed */
 					ESP_LOGD(TAG,  "Preparing to build ap JSON list");
 					if(wifi_manager_lock_json_buffer( pdMS_TO_TICKS(1000) )){
@@ -1212,14 +1267,23 @@ void wifi_manager( void * pvParameters ){
 					if( WIFI_MODE_APSTA != mode && WIFI_MODE_STA !=mode ){
 						// the soft ap is not started, so let's set the WiFi mode to STA
 						ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - setting mode WIFI_MODE_STA");
-						ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+						if((err=esp_wifi_set_mode(WIFI_MODE_STA))!=ESP_OK) {
+							ESP_LOGE(TAG,  "Failed to set wifi mode to STA. Error %s",esp_err_to_name(err));
+							break;
+						}
 					}
 					ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - setting config for WIFI_IF_STA");
-					ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()));
+					if((err=esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()))!=ESP_OK) {
+						ESP_LOGE(TAG,  "Failed to set STA configuration. Error %s",esp_err_to_name(err));
+						break;
+					}
 
 					set_host_name();
 					ESP_LOGI(TAG,  "Wifi Connecting...");
-					ESP_ERROR_CHECK(esp_wifi_connect());
+					if((err=esp_wifi_connect())!=ESP_OK) {
+						ESP_LOGE(TAG,  "Failed to initiate wifi connection. Error %s",esp_err_to_name(err));
+						break;
+					}
 				}
 
 				/* callback */

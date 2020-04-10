@@ -6,7 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include <stdio.h>
 #include "cmd_i2ctools.h"
 #include "argtable3/argtable3.h"
@@ -506,6 +506,10 @@ static int do_i2cconfig_cmd(int argc, char **argv)
 			ESP_LOGI(TAG,"Starting the i2c driver.");
 			if((err=i2c_master_driver_install())!=ESP_OK){
 				 res=1;
+			}
+			else
+			{
+				ESP_LOGI(TAG,"i2c driver successfully started.");
 			}
 		}
 		else {
