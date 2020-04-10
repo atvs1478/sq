@@ -721,27 +721,5 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
     return ESP_OK;
 }
 
-esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length)
-{
-	if(is_recovery_running){
-		return process_recovery_ota(bin_url,bin_buffer,length);
-	}
-	if(!bin_url){
-		ESP_LOGE(TAG,"missing URL parameter. Unable to start OTA");
-		return ESP_ERR_INVALID_ARG;
-	}
-	ESP_LOGW(TAG, "Called to update the firmware from url: %s",bin_url);
-	if(config_set_value(NVS_TYPE_STR, "fwurl", bin_url) != ESP_OK){
-		ESP_LOGE(TAG,"Failed to save the OTA url into nvs cache");
-		return ESP_FAIL;
-	}
 
-	if(!wait_for_commit()){
-		ESP_LOGW(TAG,"Unable to commit configuration. ");
-	}
 
-	ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
-	return guided_factory();
-	return ESP_OK;
-
-}

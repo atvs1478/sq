@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "esp_console.h"
 #include "esp_pthread.h"
+#include "../cmd_system.h"
 #include "argtable3/argtable3.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -11,6 +12,7 @@
 #include "platform_esp32.h"
 #include "platform_config.h"
 #include "esp_app_format.h"
+extern esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t length);
 static const char * TAG = "squeezelite_cmd";
 #define SQUEEZELITE_THREAD_STACK_SIZE (6*1024)
 
@@ -145,5 +147,26 @@ void register_squeezelite(){
 		.argtable = &squeezelite_args
 	};
 	ESP_ERROR_CHECK( esp_console_cmd_register(&launch_squeezelite) );
+
+}
+esp_err_t start_ota(const char * bin_url, char * bin_buffer, uint32_t length)
+{
+	if(!bin_url){
+		ESP_LOGE(TAG,"missing URL parameter. Unable to start OTA");
+		return ESP_ERR_INVALID_ARG;
+	}
+	ESP_LOGW(TAG, "Called to update the firmware from url: %s",bin_url);
+	if(config_set_value(NVS_TYPE_STR, "fwurl", bin_url) != ESP_OK){
+		ESP_LOGE(TAG,"Failed to save the OTA url into nvs cache");
+		return ESP_FAIL;
+	}
+
+	if(!wait_for_commit()){
+		ESP_LOGW(TAG,"Unable to commit configuration. ");
+	}
+
+	ESP_LOGW(TAG, "Rebooting to recovery to complete the installation");
+	return guided_factory();
+	return ESP_OK;
 
 }

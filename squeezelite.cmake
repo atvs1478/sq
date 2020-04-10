@@ -36,6 +36,7 @@ endfunction()
 
 function(___create_new_target target_name)
 	idf_build_get_property(build_dir BUILD_DIR)
+	idf_build_get_property(python PYTHON)
 	file(TO_CMAKE_PATH "${IDF_PATH}" idf_path)
 
 	set(target_elf ${target_name}.elf)
@@ -87,6 +88,36 @@ function(___create_new_target target_name)
         "${build_dir}/${target_name_mapfile}" "${build_dir}/${target_elf_src}" )
         
 
+
+
+ 
+    set(idf_size ${python} ${IDF_PATH}/tools/idf_size.py)
+    if(DEFINED OUTPUT_JSON AND OUTPUT_JSON)
+        list(APPEND idf_size "--json")
+    endif()
+
+    # Add size targets, depend on map file, run idf_size.py
+    message(STATUS "adding new target : idf.py size-${target_name}")
+    add_custom_target(size-${target_name}
+        DEPENDS ${target_elf}
+        COMMAND ${idf_size} ${target_name_mapfile}
+        )
+    message(STATUS "adding new target : idf.py size-files-${target_name}")
+    add_custom_target(size-files-${target_name}
+        DEPENDS ${target_elf}
+        COMMAND ${idf_size} --files ${target_name_mapfile}
+        )
+    message(STATUS "adding new target : idf.py size-components-${target_name}")
+    add_custom_target(size-components-${target_name}
+        DEPENDS ${target_elf}
+        COMMAND ${idf_size} --archives ${target_name_mapfile}
+        )
+
+    unset(idf_size)
+    
+    
+
+
 endfunction()
 
 ___create_new_target(squeezelite )
@@ -108,13 +139,17 @@ add_custom_command(
 			TARGET recovery.elf
 			PRE_LINK
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+#			COMMAND xtensa-esp32-elf-objcopy  --strip-symbol start_ota  ${build_dir}/esp-idf/app_squeezelite/libapp_squeezelite.a
 ## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/squeezelite/libsqueezelite.a
 	        VERBATIM
 )
 add_custom_command(
 			TARGET squeezelite.elf
 			PRE_LINK
+#			COMMAND xtensa-esp32-elf-objcopy  --strip-symbol start_ota  ${build_dir}/esp-idf/app_recovery/libapp_recovery.a
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
 ## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/app_recovery/libapp_recovery.a
 	        VERBATIM
 )
+
+
