@@ -218,7 +218,8 @@ menu "Squeezelite-ESP32"
 			default ""
 			help
 				Set GPIO for rotary encoder (quadrature phase). See README on SqueezeESP32 project's GitHub for more details
-				A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]				
+				A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
+								
 	endmenu
 	menu "LED configuration"
 		visible if !SQUEEZEAMP
