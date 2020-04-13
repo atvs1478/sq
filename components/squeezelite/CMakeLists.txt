@@ -12,6 +12,7 @@ idf_component_register( SRC_DIRS . external a1s tas57xx
 						 			services 
 						 			raop   
 						 			display
+						 			tools
 						 EMBED_FILES vu.data
 )
 
