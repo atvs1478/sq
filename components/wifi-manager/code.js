@@ -643,16 +643,19 @@ function rssiToIcon(rssi){
 
 function refreshAP(force){
     if (!enableAPTimer && !force) return;
-    $.getJSON( "/ap.json", function( data ) {
-        if(data.length > 0){
-            //sort by signal strength
-            data.sort(function (a, b) {
-                var x = a["rssi"]; var y = b["rssi"];
-                return ((x < y) ? 1 : ((x > y) ? -1 : 0));
-            });
-            apList = data;
-            refreshAPHTML(apList);
-        }
+    $.getJSON( "/scan.json", async function( data ) {
+        await sleep(2000);
+        $.getJSON( "/ap.json", function( data ) {
+            if(data.length > 0){
+                //sort by signal strength
+                data.sort(function (a, b) {
+                    var x = a["rssi"]; var y = b["rssi"];
+                    return ((x < y) ? 1 : ((x > y) ? -1 : 0));
+                });
+                apList = data;
+                refreshAPHTML(apList);
+            }
+        });
     });
 }
 
@@ -974,4 +977,8 @@ function showMessage(message, severity, age=0) {
 
 function inRange(x, min, max) {
     return ((x-min)*(x-max) <= 0);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
