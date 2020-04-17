@@ -643,16 +643,19 @@ function rssiToIcon(rssi){
 
 function refreshAP(force){
     if (!enableAPTimer && !force) return;
-    $.getJSON( "/ap.json", function( data ) {
-        if(data.length > 0){
-            //sort by signal strength
-            data.sort(function (a, b) {
-                var x = a["rssi"]; var y = b["rssi"];
-                return ((x < y) ? 1 : ((x > y) ? -1 : 0));
-            });
-            apList = data;
-            refreshAPHTML(apList);
-        }
+    $.getJSON( "/scan.json", async function( data ) {
+        await sleep(2000);
+        $.getJSON( "/ap.json", function( data ) {
+            if(data.length > 0){
+                //sort by signal strength
+                data.sort(function (a, b) {
+                    var x = a["rssi"]; var y = b["rssi"];
+                    return ((x < y) ? 1 : ((x > y) ? -1 : 0));
+                });
+                apList = data;
+                refreshAPHTML(apList);
+            }
+        });
     });
 }
 
@@ -667,8 +670,8 @@ function refreshAPHTML(data){
 }
 
 function getMessages() {
-	   $.getJSON("/messages.json?1", function(data) {
-	        data.forEach(function(msg) {
+	   $.getJSON("/messages.json?1", async function(data) {
+            for (const msg of data) {
 	        	var msg_age = msg["current_time"] - msg["sent_time"];
 				var msg_time  = new Date();
 				msg_time.setTime( msg_time.getTime() - msg_age );
@@ -701,7 +704,7 @@ function getMessages() {
 	        			});
 	        			break;
 	        		case "MESSAGING_CLASS_SYSTEM":
-	        			showMessage(msg["message"], msg["type"],msg_age);
+	        			var r = await showMessage(msg["message"], msg["type"],msg_age);
 
                         $("#syslogTable").append(
                             "<tr class='"+msg["type"]+"'>"+
@@ -713,8 +716,7 @@ function getMessages() {
 				default:
 					break;
 				}	
-	        });
-	        
+           } 
 	    })
 	    .fail(function(xhr, ajaxOptions, thrownError) {
 	        console.log(xhr.status);
@@ -961,16 +963,22 @@ function showMessage(message, severity, age=0) {
     }
     	
     $('#message').html(message);
-    $("#content").fadeTo("slow", 0.3, function() {
-        $("#message").show(500).delay(5000).hide(500, function() {
-            $("#content").fadeTo("slow", 1.0);
+    return new Promise(function(resolve, reject) {
+        $("#content").fadeTo("slow", 0.3, function() {
+            $("#message").show(500).delay(5000).hide(500, function() {
+                $("#content").fadeTo("slow", 1.0, function() {
+                    resolve(true);
+                });
+            });
         });
     });
+
 }
 
 function inRange(x, min, max) {
     return ((x-min)*(x-max) <= 0);
 }
 
-    
-    
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
