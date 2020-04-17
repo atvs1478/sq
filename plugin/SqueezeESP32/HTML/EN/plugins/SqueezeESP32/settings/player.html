@@ -32,6 +32,42 @@
 		[% "PLUGIN_SQUEEZEESP32_ARTWORK_Y" | string %]&nbsp
 		<input type="text" class="stdedit" name="pref_artwork_y" id="artwork_y" value="[% prefs.pref_artwork.y %]" size="2">
 	[% END %]
-	
 
+	<hr>	
+	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_EQUALIZER" desc="" %]
+	[% END %]
+	
+	[% WRAPPER settingSection %]
+		[% WRAPPER settingGroup title='31Hz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.0" id="pref_eq.0" value="[% prefs.pref_eq.0 %]" size="2"">
+		[% END %]
+		[% WRAPPER settingGroup title='62Hz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.1" id="pref_eq.1" value="[% prefs.pref_eq.1 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='125Hz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.2" id="pref_eq.2" value="[% prefs.pref_eq.2 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='250Hz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.3" id="pref_eq.3" value="[% prefs.pref_eq.3 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='500Hz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.4" id="pref_eq.4" value="[% prefs.pref_eq.4 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='1kHz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.5" id="pref_eq.5" value="[% prefs.pref_eq.5 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='2kHz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.6" id="pref_eq.6" value="[% prefs.pref_eq.6 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='4kHz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.7" id="pref_eq.7" value="[% prefs.pref_eq.7 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='8kHz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.8" id="pref_eq.8" value="[% prefs.pref_eq.8 %]" size="2">
+		[% END %]
+		[% WRAPPER settingGroup title='16kHz' desc="" %]
+			<input type="text" class="stdedit sliderInput_-13_20" name="pref_eq.9" id="pref_eq.9" value="[% prefs.pref_eq.9 %]" size="2">
+		[% END %]
+	[% END %]
+	
 [% PROCESS settings/footer.html %]
