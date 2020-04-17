@@ -141,6 +141,7 @@ add_custom_command(
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
 #			COMMAND xtensa-esp32-elf-objcopy  --strip-symbol start_ota  ${build_dir}/esp-idf/app_squeezelite/libapp_squeezelite.a
 ## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/squeezelite/libsqueezelite.a
+			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol find_command_by_name ${build_dir}/esp-idf/console/libconsole.a
 	        VERBATIM
 )
 add_custom_command(
@@ -148,6 +149,7 @@ add_custom_command(
 			PRE_LINK
 #			COMMAND xtensa-esp32-elf-objcopy  --strip-symbol start_ota  ${build_dir}/esp-idf/app_recovery/libapp_recovery.a
 			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol esp_app_desc  ${build_dir}/esp-idf/app_update/libapp_update.a
+			COMMAND xtensa-esp32-elf-objcopy  --globalize-symbol find_command_by_name ${build_dir}/esp-idf/console/libconsole.a			
 ## IDF-V4.2+			COMMAND xtensa-esp32-elf-objcopy  --weaken-symbol main  ${build_dir}/esp-idf/app_recovery/libapp_recovery.a
 	        VERBATIM
 )

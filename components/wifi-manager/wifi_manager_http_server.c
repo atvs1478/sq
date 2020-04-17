@@ -58,6 +58,9 @@ void register_regular_handlers(httpd_handle_t server){
 	httpd_uri_t messages_get = { .uri = "/messages.json", .method = HTTP_GET, .handler = messages_get_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &messages_get);
 
+	httpd_uri_t commands_get = { .uri = "/commands.json", .method = HTTP_GET, .handler = console_cmd_get_handler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &commands_get);
+
 	httpd_uri_t config_post = { .uri = "/config.json", .method = HTTP_POST, .handler = config_post_handler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &config_post);
 	httpd_uri_t connect_post = { .uri = "/connect.json", .method = HTTP_POST, .handler = connect_post_handler, .user_ctx = rest_context };

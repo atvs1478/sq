@@ -30,6 +30,8 @@
 #include "esp_sleep.h"
 #include "driver/uart.h"            // for the uart driver access
 #include "messaging.h"				  
+#include "platform_console.h"
+
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
@@ -92,6 +94,7 @@ static void register_version()
         .hint = NULL,
         .func = &get_version,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -228,6 +231,7 @@ static void register_restart()
         .hint = NULL,
         .func = &restart,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 static void register_restart_ota()
@@ -238,6 +242,7 @@ static void register_restart_ota()
         .hint = NULL,
         .func = &restart_ota,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -249,6 +254,7 @@ static void register_factory_boot()
         .hint = NULL,
         .func = &restart_factory,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 /** 'free' command prints available heap memory */
@@ -267,6 +273,7 @@ static void register_free()
         .hint = NULL,
         .func = &free_mem,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -286,6 +293,7 @@ static void register_heap()
         .hint = NULL,
         .func = &heap_size,
     };
+    cmd_to_json(&heap_cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&heap_cmd) );
 
 }
@@ -320,6 +328,7 @@ static void register_tasks()
         .hint = NULL,
         .func = &tasks_info,
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -390,6 +399,7 @@ static void register_deep_sleep()
         .func = &deep_sleep,
         .argtable = &deep_sleep_args
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -486,5 +496,6 @@ static void register_light_sleep()
         .argtable = &light_sleep_args
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    cmd_to_json(&cmd);
 }
 

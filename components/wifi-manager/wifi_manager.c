@@ -987,7 +987,6 @@ void wifi_manager_config_ap(){
 	/* SoftAP - Wifi Access Point configuration setup */
 		tcpip_adapter_ip_info_t info;
 		esp_err_t err=ESP_OK;
-		tcpip_adapter_dhcp_status_t state;
 		memset(&info, 0x00, sizeof(info));
 		char * value = NULL;
 		wifi_config_t ap_config = {

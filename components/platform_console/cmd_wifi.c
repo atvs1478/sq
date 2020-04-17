@@ -34,6 +34,8 @@
 #include "led.h"
 extern bool bypass_wifi_manager;
 #define JOIN_TIMEOUT_MS (10000)
+#include "platform_console.h"
+
 
 extern EventGroupHandle_t wifi_event_group;
 extern const int CONNECTED_BIT;
@@ -45,6 +47,11 @@ static struct {
     struct arg_str *password;
     struct arg_end *end;
 } join_args;
+
+
+
+// todo: implement access point config - cmd_to_json(&i2cdetect_cmd);
+
 
 ///** Arguments used by 'join' function */
 //static struct {

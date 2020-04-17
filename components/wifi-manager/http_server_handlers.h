@@ -60,7 +60,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "lwip/priv/tcp_priv.h"
 #include "lwip/priv/tcpip_priv.h"
 #include "esp_vfs.h"
-
+#include "esp_console.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,7 +91,7 @@ esp_err_t recovery_post_handler(httpd_req_t *req);
 esp_err_t flash_post_handler(httpd_req_t *req);
 esp_err_t status_get_handler(httpd_req_t *req);
 esp_err_t messages_get_handler(httpd_req_t *req);
-
+esp_err_t console_cmd_get_handler(httpd_req_t *req);
 esp_err_t ap_scan_handler(httpd_req_t *req);
 esp_err_t redirect_ev_handler(httpd_req_t *req);
 esp_err_t redirect_200_ev_handler(httpd_req_t *req);

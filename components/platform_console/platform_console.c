@@ -26,7 +26,7 @@
 #include "esp_pthread.h"
 #include "cmd_decl.h"
 #include "wifi_manager.h"
-
+#include "trace.h"
 #include "platform_config.h"
 #include "telnet.h"
 
@@ -53,7 +53,71 @@ const char* recovery_prompt = LOG_COLOR_E "recovery-squeezelite-esp32> " LOG_RES
 #define MOUNT_PATH "/data"
 #define HISTORY_PATH MOUNT_PATH "/history.txt"
 void run_command(char * line);
-
+#define ADD_TO_JSON(o,t,n) if (t->n) cJSON_AddStringToObject(o,QUOTE(n),t->n);
+#define ADD_PARMS_TO_CMD(o,t,n) { cJSON * parms = ParmsToJSON(&t.n->hdr); if(parms) cJSON_AddItemToObject(o,QUOTE(n),parms); }
+cJSON * cmdList;
+cJSON * get_cmd_list(){
+	return cmdList;
+}
+cJSON * ParmsToJSON(struct arg_hdr * * argtable){
+	if(!argtable) return NULL;
+	cJSON * arg_list = cJSON_CreateArray();
+	struct arg_hdr * *table = (struct arg_hdr * *)argtable;
+	int tabindex = 0;
+	while (!(table[tabindex]->flag & ARG_TERMINATOR))
+	{
+		cJSON * entry = cJSON_CreateObject();
+		ADD_TO_JSON(entry,table[tabindex],datatype);
+		ADD_TO_JSON(entry,table[tabindex],glossary);
+		ADD_TO_JSON(entry,table[tabindex],longopts);
+		ADD_TO_JSON(entry,table[tabindex],shortopts);
+		cJSON_AddBoolToObject(entry, "isoptional", table[tabindex]->flag & ARG_HASOPTVALUE);
+		cJSON_AddBoolToObject(entry, "hasvalue", table[tabindex]->flag & ARG_HASVALUE);
+		cJSON_AddItemToArray(arg_list, entry);
+		tabindex++;
+	}
+	return arg_list;
+}
+esp_err_t cmd_to_json(const esp_console_cmd_t *cmd)
+{
+	if(!cmdList){
+		cmdList=cJSON_CreateObject();
+	}
+    if (cmd->command == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strchr(cmd->command, ' ') != NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    cJSON * jsoncmd = cJSON_CreateObject();
+    ADD_TO_JSON(jsoncmd,cmd,help);
+    ADD_TO_JSON(jsoncmd,cmd,hint);
+    if(cmd->argtable){
+    	cJSON_AddItemToObject(jsoncmd,"argtable",ParmsToJSON(cmd->argtable));
+    }
+    if (cmd->hint) {
+    	cJSON_AddStringToObject(jsoncmd, "hint", cmd->hint);
+    }
+    else if (cmd->argtable) {
+        /* Generate hint based on cmd->argtable */
+        char *buf = NULL;
+        size_t buf_size = 0;
+        FILE *f = open_memstream(&buf, &buf_size);
+        if (f != NULL) {
+            arg_print_syntax(f, cmd->argtable, NULL);
+            fclose(f);
+        }
+        cJSON_AddStringToObject(jsoncmd, "hint", buf);
+        free(buf);
+    }
+    char * b=cJSON_Print(jsoncmd);
+    if(b){
+    	ESP_LOGI(TAG,"Adding command table %s",b);
+    	free(b);
+    }
+    cJSON_AddItemToObject(cmdList, cmd->command,jsoncmd);
+    return ESP_OK;
+}
 void process_autoexec(){
 	int i=1;
 	char autoexec_name[21]={0};

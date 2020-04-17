@@ -25,6 +25,7 @@ extern "C" {
 #include "cmd_nvs.h"
 #include "nvs.h"
 #include "nvs_utilities.h"
+#include "platform_console.h"
 
 
 
@@ -547,6 +548,14 @@ void register_nvs()
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_namespace_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_wifimanager_cmd));
+    cmd_to_json(&list_entries_cmd);
+    cmd_to_json(&set_cmd);
+    cmd_to_json(&get_cmd);
+    cmd_to_json(&erase_cmd);
+    cmd_to_json(&erase_namespace_cmd);
+    cmd_to_json(&erase_wifimanager_cmd);
+
+
 
 }
 #ifdef __cplusplus

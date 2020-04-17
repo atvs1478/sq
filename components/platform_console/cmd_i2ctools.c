@@ -11,13 +11,13 @@
 #include "cmd_i2ctools.h"
 #include "argtable3/argtable3.h"
 #include "driver/i2c.h"
-#include "esp_console.h"
+#include "platform_console.h"
 #include "esp_log.h"
 #include "string.h"
 #include "stdio.h"
 #include "platform_config.h"
 #include "accessors.h"
-
+#include "trace.h"
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
 #define WRITE_BIT I2C_MASTER_WRITE  /*!< I2C master write */
@@ -798,6 +798,8 @@ static void register_i2c_set_display(){
 			.func = &do_i2c_show_display,
 			.argtable = NULL
 	};
+	cmd_to_json(&i2c_set_display);
+	cmd_to_json(&i2c_show_display);
 	ESP_ERROR_CHECK(esp_console_cmd_register(&i2c_set_display));
 	ESP_ERROR_CHECK(esp_console_cmd_register(&i2c_show_display));
 }
@@ -810,6 +812,7 @@ static void register_i2cdectect(void)
         .func = &do_i2cdetect_cmd,
         .argtable = NULL
     };
+    cmd_to_json(&i2cdetect_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cdetect_cmd));
 }
 
@@ -826,6 +829,7 @@ static void register_i2cget(void)
         .func = &do_i2cget_cmd,
         .argtable = &i2cget_args
     };
+    cmd_to_json(&i2cget_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cget_cmd));
 }
 
@@ -843,6 +847,7 @@ static void register_i2cset(void)
         .func = &do_i2cset_cmd,
         .argtable = &i2cset_args
     };
+    cmd_to_json(&i2cset_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cset_cmd));
 }
 
@@ -860,6 +865,7 @@ static void register_i2cdump(void)
         .func = &do_i2cdump_cmd,
         .argtable = &i2cdump_args
     };
+    cmd_to_json(&i2cdump_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cdump_cmd));
 }
 
@@ -874,6 +880,7 @@ static void register_i2ccheck(){
         .func = &do_i2c_check,
         .argtable = &i2ccheck_args
     };
+    cmd_to_json(&cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
@@ -889,8 +896,10 @@ static void register_i2cstop(){
         .func = &do_i2c_stop,
         .argtable = &i2cstop_args
     };
+    cmd_to_json(&i2cconfig_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cconfig_cmd));
 }
+
 
 static void register_i2cconfig(void)
 {
@@ -907,6 +916,7 @@ static void register_i2cconfig(void)
         .func = &do_i2cconfig_cmd,
         .argtable = &i2cconfig_args
     };
+    cmd_to_json(&i2cconfig_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cconfig_cmd));
 }
 

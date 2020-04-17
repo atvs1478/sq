@@ -52,6 +52,9 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "messaging.h"
 #include "platform_esp32.h"
 #include "trace.h"
+#include "esp_console.h"
+#include "argtable3/argtable3.h"
+#include "platform_console.h"
 
 #define HTTP_STACK_SIZE	(5*1024)
 const char str_na[]="N/A";
@@ -459,6 +462,28 @@ esp_err_t ap_scan_handler(httpd_req_t *req){
 	if(err == ESP_OK){
 		httpd_resp_send(req, (const char *)empty, HTTPD_RESP_USE_STRLEN);
 	}
+	return err;
+}
+
+esp_err_t console_cmd_get_handler(httpd_req_t *req){
+    ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+    if(!is_user_authenticated(req)){
+    	// todo:  redirect to login page
+    	// return ESP_OK;
+    }
+    /* if we can get the mutex, write the last version of the AP list */
+	esp_err_t err = set_content_type_from_req(req);
+	cJSON * cmdlist = get_cmd_list();
+	char * json_buffer = cJSON_Print(cmdlist);
+	if(json_buffer){
+		httpd_resp_send(req, (const char *)json_buffer, HTTPD_RESP_USE_STRLEN);
+		free(json_buffer);
+	}
+	else{
+		ESP_LOGD_LOC(TAG,  "Error retrieving command json string. ");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to format command");
+	}
+	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
 	return err;
 }
 esp_err_t ap_get_handler(httpd_req_t *req){
