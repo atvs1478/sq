@@ -1,39 +1,42 @@
 [% PROCESS settings/header.html %]
 
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_WIDTH" desc="PLUGIN_SQUEEZEESP32_WIDTH_DESC" %]
-		<!--<input type="text" readonly class="stdedit" name="pref_width" id="width" value="[% prefs.pref_width %]" size="3">-->
-		[% prefs.pref_width %]
-	[% END %]
+	[% IF prefs.pref_width %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_WIDTH" desc="PLUGIN_SQUEEZEESP32_WIDTH_DESC" %]
+			<!--<input type="text" readonly class="stdedit" name="pref_width" id="width" value="[% prefs.pref_width %]" size="3">-->
+			[% prefs.pref_width %]
+		[% END %]
 	
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SMALL_VU" desc="PLUGIN_SQUEEZEESP32_SMALL_VU_DESC" %]
-		<input type="number" min="10" max= "50" step="5"class="stdedit" name="pref_small_VU" id="small_VU" value="[% prefs.pref_small_VU %]" size="3">
-	[% END %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SMALL_VU" desc="PLUGIN_SQUEEZEESP32_SMALL_VU_DESC" %]
+			<input type="number" min="10" max= "50" step="5"class="stdedit" name="pref_small_VU" id="small_VU" value="[% prefs.pref_small_VU %]" size="3">
+		[% END %]
 	
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE" desc="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC" %]
-		<input type="number" min="10" max= "50" step="5" class="stdedit" name="pref_spectrum_scale" id="spectrum_scale" value="[% prefs.pref_spectrum.scale %]" size="3">
-	[% END %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE" desc="PLUGIN_SQUEEZEESP32_SPECTRUM_SCALE_DESC" %]
+			<input type="number" min="10" max= "50" step="5" class="stdedit" name="pref_spectrum_scale" id="spectrum_scale" value="[% prefs.pref_spectrum.scale %]" size="3">
+		[% END %]
 	
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM" desc="PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_DESC" %]
-		[% "PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_SIZE" | string %]&nbsp
-		<input type="number" min="10" max= "50" step="5"class="stdedit" name="pref_spectrum_small_size" id="spectrum_small_size" value="[% prefs.pref_spectrum.small.size %]" size="3">
-		[% "PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_BAND" | string %]&nbsp
-		<input type="text" class="stdedit" name="pref_spectrum_small_band" id="spectrum_small_band" value="[% prefs.pref_spectrum.small.band %]" size="3">
-	[% END %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM" desc="PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_DESC" %]
+			[% "PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_SIZE" | string %]&nbsp
+			<input type="number" min="10" max= "50" step="5"class="stdedit" name="pref_spectrum_small_size" id="spectrum_small_size" value="[% prefs.pref_spectrum.small.size %]" size="3">
+			[% "PLUGIN_SQUEEZEESP32_SMALL_SPECTRUM_BAND" | string %]&nbsp
+			<input type="text" class="stdedit" name="pref_spectrum_small_band" id="spectrum_small_band" value="[% prefs.pref_spectrum.small.band %]" size="3">
+		[% END %]
 	
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND" desc="PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND_DESC" %]
-		<input type="text" class="stdedit" name="pref_spectrum_full_band" id="spectrum_full_band" value="[% prefs.pref_spectrum.full.band %]" size="3">
-	[% END %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND" desc="PLUGIN_SQUEEZEESP32_FULL_SPECTRUM_BAND_DESC" %]
+			<input type="text" class="stdedit" name="pref_spectrum_full_band" id="spectrum_full_band" value="[% prefs.pref_spectrum.full.band %]" size="3">
+		[% END %]
 	
-	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_ARTWORK" desc="PLUGIN_SQUEEZEESP32_ARTWORK_DESC" %]
-		[% "PLUGIN_SQUEEZEESP32_ARTWORK_ENABLE" | string %]&nbsp
-		<input type="checkbox" name="pref_artwork_enable" [% IF prefs.pref_artwork.enable %] checked [% END %]>
-		[% "PLUGIN_SQUEEZEESP32_ARTWORK_X" | string %]&nbsp
-		<input type="text" class="stdedit" name="pref_artwork_x" id="artwork_x" value="[% prefs.pref_artwork.x %]" size="2">
-		[% "PLUGIN_SQUEEZEESP32_ARTWORK_Y" | string %]&nbsp
-		<input type="text" class="stdedit" name="pref_artwork_y" id="artwork_y" value="[% prefs.pref_artwork.y %]" size="2">
-	[% END %]
+		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_ARTWORK" desc="PLUGIN_SQUEEZEESP32_ARTWORK_DESC" %]
+			[% "PLUGIN_SQUEEZEESP32_ARTWORK_ENABLE" | string %]&nbsp
+			<input type="checkbox" name="pref_artwork_enable" [% IF prefs.pref_artwork.enable %] checked [% END %]>
+			[% "PLUGIN_SQUEEZEESP32_ARTWORK_X" | string %]&nbsp
+			<input type="text" class="stdedit" name="pref_artwork_x" id="artwork_x" value="[% prefs.pref_artwork.x %]" size="2">
+			[% "PLUGIN_SQUEEZEESP32_ARTWORK_Y" | string %]&nbsp
+			<input type="text" class="stdedit" name="pref_artwork_y" id="artwork_y" value="[% prefs.pref_artwork.y %]" size="2">
+		[% END %]
 
-	<hr>	
+		<hr>	
+	[% END %]	
+	
 	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_EQUALIZER" desc="" %]
 	[% END %]
 	

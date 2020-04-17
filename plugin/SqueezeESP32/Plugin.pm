@@ -36,6 +36,7 @@ sub initPlugin {
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
+	Slim::Control::Request::subscribe( \&onPlayer,[ ['client'], [ 'new', 'reconnect' ] ] );
 }
 
 sub onStopClear {
@@ -50,6 +51,17 @@ sub onStopClear {
 	}	
 }
 
+sub onPlayer {
+    my $request = shift;
+    my $client  = $request->client;
+
+    if ($client->model eq 'squeezeesp32') {
+		$prefs->client($client)->init( { 
+					eq => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+				} );
+		Plugins::SqueezeESP32::Plugin::send_equalizer($client);
+	}
+}
 
 sub onNotification {
     my $request = shift;

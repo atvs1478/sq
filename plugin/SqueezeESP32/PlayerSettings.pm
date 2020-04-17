@@ -21,7 +21,7 @@ sub needsClient {
 
 sub validFor {
 	my ($class, $client) = @_;
-	return $client->model eq 'squeezeesp32' && $client->displayWidth;
+	return $client->model eq 'squeezeesp32';
 }
 
 sub page {
@@ -40,45 +40,51 @@ sub handler {
 	my ($cprefs, @prefs) = $class->prefs($client);
 	
 	if ($paramRef->{'saveSettings'}) {
-		$cprefs->set('small_VU', $paramRef->{'pref_small_VU'});
-		my $spectrum =	{	scale => $paramRef->{'pref_spectrum_scale'},
-							small => { 	size => $paramRef->{'pref_spectrum_small_size'}, 
-										band => $paramRef->{'pref_spectrum_small_band'} },
-							full  => { 	band => $paramRef->{'pref_spectrum_full_band'} },
-				};
-		$cprefs->set('spectrum', $spectrum);
-		my $artwork =	{	enable => $paramRef->{'pref_artwork_enable'},
-							x => $paramRef->{'pref_artwork_x'}, 
-							y => $paramRef->{'pref_artwork_y'},
-				};
-		$cprefs->set('artwork', $artwork);				
-		$client->display->modes($client->display->build_modes);
-		$client->display->update;
+		if ($client->displayWidth) {
+			$cprefs->set('small_VU', $paramRef->{'pref_small_VU'});
+			my $spectrum =	{	scale => $paramRef->{'pref_spectrum_scale'},
+								small => { 	size => $paramRef->{'pref_spectrum_small_size'}, 
+											band => $paramRef->{'pref_spectrum_small_band'} },
+								full  => { 	band => $paramRef->{'pref_spectrum_full_band'} },
+					};
+			$cprefs->set('spectrum', $spectrum);
+			
+			my $artwork =	{	enable => $paramRef->{'pref_artwork_enable'},
+								x => $paramRef->{'pref_artwork_x'}, 
+								y => $paramRef->{'pref_artwork_y'},
+					};
+			$cprefs->set('artwork', $artwork);				
+			$client->display->modes($client->display->build_modes);
+			$client->display->update;
+		
+			# force update or disable artwork
+			if ($artwork->{'enable'}) {
+				Plugins::SqueezeESP32::Plugin::update_artwork($client, 1);
+			} else {
+				Plugins::SqueezeESP32::Plugin::config_artwork($client);
+			}	
+		}	
 		
 		my $eq = $cprefs->get('eq');
 		for my $i (0 .. $#{$eq}) {
 			$eq->[$i] = $paramRef->{"pref_eq.$i"};
 		}
 		$cprefs->set('eq', $eq);
-		Plugins::SqueezeESP32::Plugin::send_equalizer($client);
-		
-		# force update or disable artwork
-		if ($artwork->{'enable'}) {
-			Plugins::SqueezeESP32::Plugin::update_artwork($client, 1);
-		} else {
-			Plugins::SqueezeESP32::Plugin::config_artwork($client);
-		}	
+		Plugins::SqueezeESP32::Plugin::send_equalizer($client);		
 	}
 	
-	# as there is nothing captured, we need to re-set these variables
-	$paramRef->{'pref_width'} = $cprefs->get('width');
+	if ($client->displayWidth) {
+		# as there is nothing captured, we need to re-set these variables
+		$paramRef->{'pref_width'} = $cprefs->get('width'); 
 	
-	# here I don't know why you need to set again spectrum which is a reference
-	# to a hash. Using $paramRef->{prefs} does not work either. It seems that 
-	# some are copies of value, some are references, can't figure out. This whole
-	# logic of "Settings" is beyond me and I really hate it
-	$paramRef->{'pref_spectrum'} = $cprefs->get('spectrum');
-	$paramRef->{'pref_artwork'} = $cprefs->get('artwork');
+		# here I don't know why you need to set again spectrum which is a reference
+		# to a hash. Using $paramRef->{prefs} does not work either. It seems that 
+		# some are copies of value, some are references, can't figure out. This whole
+		# logic of "Settings" is beyond me and I really hate it
+		$paramRef->{'pref_spectrum'} = $cprefs->get('spectrum');
+		$paramRef->{'pref_artwork'} = $cprefs->get('artwork');
+	}
+	
 	$paramRef->{'pref_eq'} = $cprefs->get('eq');
 	
 	return $class->SUPER::handler($client, $paramRef);
