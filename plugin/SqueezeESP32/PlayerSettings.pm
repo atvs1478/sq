@@ -30,7 +30,7 @@ sub page {
 
 sub prefs {
 	my ($class, $client) = @_;
-	my @prefs = qw(width small_VU spectrum artwork);
+	my @prefs = qw(width small_VU spectrum artwork eq);
 	return ($prefs->client($client), @prefs);
 }
 
@@ -55,6 +55,13 @@ sub handler {
 		$client->display->modes($client->display->build_modes);
 		$client->display->update;
 		
+		my $eq = $cprefs->get('eq');
+		for my $i (0 .. $#{$eq}) {
+			$eq->[$i] = $paramRef->{"pref_eq.$i"};
+		}
+		$cprefs->set('eq', $eq);
+		Plugins::SqueezeESP32::Plugin::send_equalizer($client);
+		
 		# force update or disable artwork
 		if ($artwork->{'enable'}) {
 			Plugins::SqueezeESP32::Plugin::update_artwork($client, 1);
@@ -72,6 +79,7 @@ sub handler {
 	# logic of "Settings" is beyond me and I really hate it
 	$paramRef->{'pref_spectrum'} = $cprefs->get('spectrum');
 	$paramRef->{'pref_artwork'} = $cprefs->get('artwork');
+	$paramRef->{'pref_eq'} = $cprefs->get('eq');
 	
 	return $class->SUPER::handler($client, $paramRef);
 }

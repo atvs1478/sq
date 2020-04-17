@@ -19,9 +19,12 @@
  *
  */
 #include "squeezelite.h"
+#include "equalizer.h"
 
 extern struct outputstate output;
 extern struct buffer *outputbuf;
+
+static bool (*slimp_handler_chain)(u8_t *data, int len);
 
 #define FRAME_BLOCK MAX_SILENCE_FRAMES
 
@@ -47,10 +50,38 @@ static log_level loglevel;
 static bool (*volume_cb)(unsigned left, unsigned right);
 static void (*close_cb)(void);
 
+#pragma pack(push, 1)
+struct eqlz_packet {
+	char  opcode[4];
+};
+#pragma pack(pop)
+
+static bool handler(u8_t *data, int len){
+	bool res = true;
+	
+	if (!strncmp((char*) data, "eqlz", 4)) {
+		s8_t *gain = (s8_t*) (data + sizeof(struct eqlz_packet));
+		LOG_INFO("got equalizer %d", len);
+		// update will be done at next opportunity
+		equalizer_update(gain);
+	} else {
+		res = false;
+	}
+	
+	// chain protocol handlers (bitwise or is fine)
+	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
+	
+	return res;
+}
+
 void output_init_embedded(log_level level, char *device, unsigned output_buf_size, char *params, 
 						  unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;						
 	LOG_INFO("init device: %s", device);
+	
+	// chain handlers
+	slimp_handler_chain = slimp_handler;
+	slimp_handler = handler;
 	
 	memset(&output, 0, sizeof(output));
 	output_init_common(level, device, output_buf_size, rates, idle);

@@ -15,6 +15,12 @@ sub hasIR { 0 }
 
 sub init {
 	my $client = shift;
+	
+	$prefs->client($client)->init( { 
+		eq => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+		}
+	);	
+	
 	$client->SUPER::init(@_);
 	Plugins::SqueezeESP32::Plugin::config_artwork($client);
 }
@@ -55,6 +61,7 @@ sub reconnect {
 	my $client = shift;
 	$client->pluginData('artwork_md5', '');
 	$client->SUPER::reconnect(@_);
+	Plugins::SqueezeESP32::Plugin::send_equalizer($client);
 }	
 
 1;
