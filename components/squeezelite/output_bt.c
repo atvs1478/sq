@@ -21,6 +21,7 @@
  
 #include "driver/gpio.h"
 #include "squeezelite.h"
+#include "equalizer.h"
 #include "perf_trace.h"
 #include "config.h"
 
@@ -84,6 +85,7 @@ void output_close_bt(void) {
 	running = false;
 	UNLOCK;
 	hal_bluetooth_stop();
+	equalizer_close();
 }	
 
 static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
@@ -155,6 +157,8 @@ int32_t output_bt_data(uint8_t *data, int32_t len) {
 		SET_MIN_MAX(wanted_len, under);
 	}
 	output.frames_in_process = len-wanted_len;
+	
+	equalizer_process(data, (len - wanted_len) * BYTES_PER_FRAME, output.current_sample_rate);
 
 	UNLOCK;
 	SET_MIN_MAX(TIME_MEASUREMENT_GET(start_timer),lock_out_time);

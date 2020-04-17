@@ -53,6 +53,7 @@ sure that using rate_delay would fix that
 #include "monitor.h"
 #include "config.h"
 #include "accessors.h"
+#include "equalizer.h"
 #include "globdefs.h"
 
 #define LOCK   mutex_lock(outputbuf->mutex)
@@ -137,7 +138,7 @@ static void jack_handler(bool inserted) {
 /****************************************************************************************
  * amp GPIO
  */
-void set_amp_gpio(int gpio, char *value) {
+static void set_amp_gpio(int gpio, char *value) {
 	if (!strcasecmp(value, "amp")) {
 		amp_gpio = gpio;
 		
@@ -314,6 +315,8 @@ void output_close_i2s(void) {
 	i2s_driver_uninstall(CONFIG_I2S_NUM);
 	free(obuf);
 	
+	equalizer_close();
+	
 	adac->deinit();
 }
 
@@ -483,8 +486,14 @@ static void *output_thread_i2s(void *arg) {
 			i2s_config.sample_rate = output.current_sample_rate;
 			i2s_set_sample_rates(CONFIG_I2S_NUM, spdif ? i2s_config.sample_rate * 2 : i2s_config.sample_rate);
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
+			
+			equalizer_close();
+			equalizer_open(output.current_sample_rate);
 			//return;
 		}
+		
+		// run equalizer
+		equalizer_process(obuf, oframes * bytes_per_frame, output.current_sample_rate);
 		
 		// we assume that here we have been able to entirely fill the DMA buffers
 		if (spdif) {

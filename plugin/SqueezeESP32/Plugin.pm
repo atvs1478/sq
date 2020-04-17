@@ -56,8 +56,6 @@ sub onNotification {
     my $client  = $request->client;
 	
 	my $reqstr     = $request->getRequestString();
-	$log->info("artwork update notification $reqstr");
-	#my $path = $request->getParam('_path');
 
 	update_artwork($client);
 }
@@ -107,6 +105,14 @@ sub send_artwork {
 		$length = length $$dataref;
 	}
 }	
+
+sub send_equalizer {
+	my ($client) = @_;
+	my $equalizer = $prefs->client($client)->get('eq');
+	my $size = @$equalizer;
+	my $data = pack("c[$size]", @{$equalizer});
+	$client->sendFrame( eqlz => \$data );
+}
 
 sub config_artwork {
 	my ($client) = @_;

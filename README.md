@@ -330,6 +330,7 @@ See squeezlite command line, but keys options are
 	- per mad & few others, edit configure and change $ac_link to add -c (faking link)
 	- change ac_files to remove ''
 	- add DEPS_CFLAGS and DEPS_LIBS to avoid pkg-config to be required
+	- stack consumption can be very high with some codec variants, so set NONTHREADSAFE_PSEUDOSTACK and GLOBAL_STACK_SIZE=32000 and unset VAR_ARRAYS in config.h
 - better use helixaac			
 - set IDF_PATH=/home/esp-idf
 - set ESPPORT=COM9
