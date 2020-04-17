@@ -13,6 +13,7 @@ idf_component_register( SRC_DIRS . external a1s tas57xx
 						 			raop   
 						 			display
 						 			tools
+						 			audio
 						 EMBED_FILES vu.data
 )
 

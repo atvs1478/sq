@@ -539,6 +539,7 @@ $(document).ready(function(){
     //first time the page loads: attempt to get the connection status and start the wifi scan
     refreshAP(false);
     getConfig();
+    getCommands();
 
     //start timers
     startCheckStatusInterval();
@@ -885,6 +886,19 @@ function checkStatus(){
             }
         }
         blockAjax = false;
+    })
+    .fail(function(xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+        if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
+        blockAjax = false;
+    });
+}
+
+
+function getCommands() {
+    $.getJSON("/commands.json", function(data) {
+        console.log(data);
     })
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);

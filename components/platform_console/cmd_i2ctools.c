@@ -383,9 +383,6 @@ static int do_i2c_set_display(int argc, char **argv)
 		return 0;
 	}
 
-
-
-
 	/* Check "--address" option */
 	if (i2cdisp_args.address->count) {
 		address=i2cdisp_args.address->ival[0];
@@ -778,10 +775,10 @@ static void register_i2c_set_display(){
 	i2cdisp_args.height = arg_int0("h", "height", "<n>", "Set the display height");
 	i2cdisp_args.name = arg_str0("t", "type", "<I2C|SPI>", "Set the display type. default I2C");
 	i2cdisp_args.driver = arg_str0("d", "driver", "<string>", "Set the display driver name. Default SSD1306");
-	i2cdisp_args.clear = arg_litn(NULL, "clear", 0, 1, "clear configuration and return");
-	i2cdisp_args.hflip = arg_litn(NULL, "hf", 0, 1, "Flip picture horizontally");
-	i2cdisp_args.vflip = arg_litn(NULL, "vf", 0, 1, "Flip picture vertically");
-	i2cdisp_args.rotate = arg_litn("r", "rotate", 0, 1, "Rotate the picture 180 deg");
+	i2cdisp_args.clear = arg_lit0(NULL, "clear", "clear configuration and return");
+	i2cdisp_args.hflip = arg_lit0(NULL, "hf", "Flip picture horizontally");
+	i2cdisp_args.vflip = arg_lit0(NULL, "vf", "Flip picture vertically");
+	i2cdisp_args.rotate = arg_lit0("r", "rotate", "Rotate the picture 180 deg");
 	i2cdisp_args.end = arg_end(8);
 	const esp_console_cmd_t i2c_set_display= {
 	 		.command = "setdisplay",
@@ -903,11 +900,11 @@ static void register_i2cstop(){
 
 static void register_i2cconfig(void)
 {
-    i2cconfig_args.port = arg_int0("p", "port", "<0|1>", "Set the I2C bus port number");
-    i2cconfig_args.freq = arg_int0("f", "freq", "<Hz>", "Set the frequency(Hz) of I2C bus. e.g. 100000");
-    i2cconfig_args.sda = arg_int0("d", "sda", "<gpio>", "Set the gpio for I2C SDA. e.g. 19");
-    i2cconfig_args.scl = arg_int0("c", "scl", "<gpio>", "Set the gpio for I2C SCL. e.g. 18");
-    i2cconfig_args.load = arg_litn("l", "load", 0, 1, "load existing configuration and return");
+    i2cconfig_args.port = arg_int0("p", "port", "0|1", "Set the I2C bus port number");
+    i2cconfig_args.freq = arg_int0("f", "freq", "int", "Set the frequency(Hz) of I2C bus. e.g. 100000");
+    i2cconfig_args.sda = arg_int0("d", "sda", "int", "Set the gpio for I2C SDA. e.g. 19");
+    i2cconfig_args.scl = arg_int0("c", "scl", "int", "Set the gpio for I2C SCL. e.g. 18");
+    i2cconfig_args.load = arg_lit0("l", "load", "load existing configuration and return");
     i2cconfig_args.end = arg_end(4);
     const esp_console_cmd_t i2cconfig_cmd = {
         .command = "i2cconfig",

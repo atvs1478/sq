@@ -71,7 +71,7 @@ cJSON * ParmsToJSON(struct arg_hdr * * argtable){
 		ADD_TO_JSON(entry,table[tabindex],glossary);
 		ADD_TO_JSON(entry,table[tabindex],longopts);
 		ADD_TO_JSON(entry,table[tabindex],shortopts);
-		cJSON_AddBoolToObject(entry, "isoptional", table[tabindex]->flag & ARG_HASOPTVALUE);
+		cJSON_AddBoolToObject(entry, "checkbox", (table[tabindex]->flag & ARG_HASOPTVALUE)==0 && (table[tabindex]->flag & ARG_HASVALUE)==0);
 		cJSON_AddBoolToObject(entry, "hasvalue", table[tabindex]->flag & ARG_HASVALUE);
 		cJSON_AddItemToArray(arg_list, entry);
 		tabindex++;
