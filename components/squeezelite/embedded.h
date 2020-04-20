@@ -59,6 +59,9 @@ void 		register_external(void);
 void 		deregister_external(void);
 void 		decode_restore(int external);
 
+// must provide or define as 0xffff
+u16_t		get_RSSI(void);
+
 // to be defined to nothing if you don't want to support these
 extern struct visu_export_s {
 	pthread_mutex_t mutex;
