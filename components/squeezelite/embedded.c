@@ -23,6 +23,7 @@
 #include "esp_pthread.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
 
 void get_mac(u8_t mac[]) {
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -58,3 +59,11 @@ void embedded_init(void) {
 	sb_controls_init();
 	if (sb_display_init()) custom_player_id = 100;
 }
+
+u16_t get_RSSI(void) {
+    wifi_ap_record_t wifidata;
+    esp_wifi_sta_get_ap_info(&wifidata);
+	// we'll assume dBm, -30 to -100
+    if (wifidata.primary != 0) return 100 + wifidata.rssi + 30;
+    else return 0xffff;
+}	

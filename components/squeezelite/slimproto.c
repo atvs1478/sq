@@ -183,7 +183,11 @@ static void sendSTAT(const char *event, u32_t server_timestamp) {
 	packN(&pkt.stream_buffer_size, status.stream_size);
 	packN(&pkt.bytes_received_H, (u64_t)status.stream_bytes >> 32);
 	packN(&pkt.bytes_received_L, (u64_t)status.stream_bytes & 0xffffffff);
+#if EMBEDDED
+	packn(&pkt.signal_strength, get_RSSI());
+#else 
 	pkt.signal_strength = 0xffff;
+#endif	
 	packN(&pkt.jiffies, now);
 	packN(&pkt.output_buffer_size, status.output_size);
 	packN(&pkt.output_buffer_fullness, status.output_full);

@@ -45,11 +45,18 @@ void equalizer_open(u32_t sample_rate) {
 	equalizer.update = false;
     
 	if (equalizer.handle) {
-		LOG_INFO("equalizer initialized");
+		bool active = false;
+		
 		for (int i = 0; i < EQ_BANDS; i++) {
 			esp_equalizer_set_band_value(equalizer.handle, equalizer.gain[i], i, 0);
 			esp_equalizer_set_band_value(equalizer.handle, equalizer.gain[i], i, 1);
+			active |= equalizer.gain[i] != 0;
 		}
+		
+		// do not activate equalizer if all gain are 0
+		if (!active) equalizer_close();
+		
+		LOG_INFO("equalizer initialized %u", active);
 	} else {
 		LOG_WARN("can't init equalizer");
 	}	
