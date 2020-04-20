@@ -328,5 +328,3 @@ See squeezlite command line, but keys options are
 - If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
 	-  git submodule update --init --recursive
 
-
-
