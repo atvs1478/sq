@@ -86,10 +86,6 @@ function(___create_new_target target_name)
 	set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
         ADDITIONAL_MAKE_CLEAN_FILES
         "${build_dir}/${target_name_mapfile}" "${build_dir}/${target_elf_src}" )
-        
-
-
-
  
     set(idf_size ${python} ${IDF_PATH}/tools/idf_size.py)
     if(DEFINED OUTPUT_JSON AND OUTPUT_JSON)
@@ -97,17 +93,19 @@ function(___create_new_target target_name)
     endif()
 
     # Add size targets, depend on map file, run idf_size.py
-    message(STATUS "adding new target : idf.py size-${target_name}")
+    
+    message(STATUS "adding new target (from build folder): size-${target_name}")
     add_custom_target(size-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} ${target_name_mapfile}
         )
-    message(STATUS "adding new target : idf.py size-files-${target_name}")
+
+    message(STATUS "adding new target (from build folder): ninja size-files-${target_name}")
     add_custom_target(size-files-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} --files ${target_name_mapfile}
         )
-    message(STATUS "adding new target : idf.py size-components-${target_name}")
+    message(STATUS "adding new target (from build folder): size-components-${target_name}")
     add_custom_target(size-components-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} --archives ${target_name_mapfile}
