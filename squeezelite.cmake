@@ -1,9 +1,11 @@
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-function(___register_flash target_name sub_type)
+function(___register_flash partition_name sub_type)
+
+    message(STATUS "Adding new build target (from build folder): ninja ${partition_name}-flash")
 	partition_table_get_partition_info(otaapp_offset "--partition-type app --partition-subtype ${sub_type}" "offset")
-	esptool_py_flash_project_args(${target_name} ${otaapp_offset} ${build_dir}/${target_name}.bin FLASH_IN_PROJECT)
-	esptool_py_custom_target(${target_name}-flash ${target_name} "${target_name}")
+	esptool_py_flash_project_args(${partition_name} ${otaapp_offset} ${build_dir}/${partition_name}.bin FLASH_IN_PROJECT )
+	esptool_py_custom_target(${partition_name}-flash ${partition_name} "${build_dir}/${partition_name}.bin")
 ## IDF-V4.2+ 	idf_component_get_property(main_args esptool_py FLASH_ARGS)
 ## IDF-V4.2+ 	idf_component_get_property(sub_args esptool_py FLASH_SUB_ARGS)
 ## IDF-V4.2+    esptool_py_flash_target(${target_name}-flash "${main_args}" "${sub_args}")
@@ -94,18 +96,18 @@ function(___create_new_target target_name)
 
     # Add size targets, depend on map file, run idf_size.py
     
-    message(STATUS "adding new target (from build folder): size-${target_name}")
+    message(STATUS "Adding new build target (from build folder): ninja size-${target_name}")
     add_custom_target(size-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} ${target_name_mapfile}
         )
 
-    message(STATUS "adding new target (from build folder): ninja size-files-${target_name}")
+    message(STATUS "Adding new build target (from build folder): ninja size-files-${target_name}")
     add_custom_target(size-files-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} --files ${target_name_mapfile}
         )
-    message(STATUS "adding new target (from build folder): size-components-${target_name}")
+    message(STATUS "Adding new build target (from build folder): ninja size-components-${target_name}")
     add_custom_target(size-components-${target_name}
         DEPENDS ${target_elf}
         COMMAND ${idf_size} --archives ${target_name_mapfile}
