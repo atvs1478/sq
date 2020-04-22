@@ -460,6 +460,19 @@ $(document).ready(function(){
         $("#releaseTable").html("");
         $.getJSON(releaseURL, function(data) {
             var i=0;
+            var branches = [];
+            data.forEach(function(release) {
+                var [ver, idf, cfg, branch] = release.name.split('#');
+                if (!branches.includes(branch)) {
+                    branches.push(branch);
+                }
+            });
+            var fwb;
+            branches.forEach(function(branch) {
+                fwb += '<option value="' + branch + '">' + branch + '</option>';
+            });
+            $("#fwbranch").append(fwb);
+
             data.forEach(function(release) {
                 var url = '';
                 release.assets.forEach(function(asset) {
@@ -522,6 +535,20 @@ $(document).ready(function(){
                 });
             });
         }
+    });
+
+    $("#fwbranch").change(function(e) {
+        var branch = this.value;
+        var re = new RegExp('^'+branch+'$', "gi");
+        $("tr.release").addClass("hide");
+        $("tr.release").each(function(tr){
+            $(this).find('td').each (function() {
+                console.log($(this).html());
+                if ($(this).html().match(re)) {
+                    $(this).parent().removeClass('hide');
+                }
+            });
+        });
     });
 
     $('#boot-button').on("click", function(){
