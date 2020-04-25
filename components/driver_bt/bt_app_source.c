@@ -50,7 +50,6 @@ static const char * art_a2dp_connecting[]= {"\n",
 static void bt_app_av_state_connecting(uint16_t event, void *param);
 
 
-#define A2DP_TIMER_INIT connecting_timeout = esp_timer_get_time() +(CONFIG_A2DP_CONNECT_TIMEOUT_MS * 1000)
 #define IS_A2DP_TIMER_OVER esp_timer_get_time() >= connecting_timeout
 
 static void filter_inquiry_scan_result(esp_bt_gap_cb_param_t *param);
@@ -542,7 +541,15 @@ static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
         /* create and start heart beat timer */
         do {
             int tmr_id = 0;
-            s_tmr = xTimerCreate("connTmr", (CONFIG_A2DP_CONTROL_DELAY_MS / portTICK_RATE_MS),
+            uint16_t ctr_delay_ms=CONFIG_A2DP_CONTROL_DELAY_MS;
+            char * value = config_alloc_get_default(NVS_TYPE_STR, "a2dp_ctrld", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS), 0);
+			if(value!=NULL){
+				ESP_LOGI(TAG,  "A2DP ctrl delay: %s", value);
+				ctr_delay_ms=atoi(value);
+			}
+			FREE_AND_NULL(value);
+
+            s_tmr = xTimerCreate("connTmr", ( ctr_delay_ms/ portTICK_RATE_MS),
                                pdTRUE, (void *)tmr_id, a2d_app_heart_beat);
             xTimerStart(s_tmr, portMAX_DELAY);
         } while (0);
@@ -672,8 +679,16 @@ static void bt_app_av_state_unconnected(uint16_t event, void *param)
 			ESP_LOGI(TAG,"%s",art_a2dp_connecting[l]);
 		}
 		ESP_LOGI(TAG,"Device: %s", s_peer_bdname);
+		int64_t connecting_timeout_offset=CONFIG_A2DP_CONNECT_TIMEOUT_MS;
 		if(esp_a2d_source_connect(s_peer_bda)==ESP_OK) {
-			A2DP_TIMER_INIT;
+			char * value = config_alloc_get_default(NVS_TYPE_STR, "a2dp_ctmt", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS), 0);
+			if(value!=NULL){
+				ESP_LOGI(TAG,  "A2DP pairing timeout: %s", value);
+				connecting_timeout_offset=atoi(value);
+			}
+			FREE_AND_NULL(value);
+
+			connecting_timeout = esp_timer_get_time() +(connecting_timeout_offset * 1000);
 			s_a2d_state = APP_AV_STATE_CONNECTING;
 		}
 		else {

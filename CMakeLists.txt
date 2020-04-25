@@ -12,3 +12,4 @@ include(squeezelite.cmake)
 set(PROJECT_VER $ENV{PROJECT_VER})
   
 #target_compile_definitions(__idf_squeezelite-ota PRIVATE -DLOG_LOCAL_LEVEL=ESP_LOG_VERBOSE)
+target_compile_definitions(__idf_driver_bt PRIVATE -DLOG_LOCAL_LEVEL=ESP_LOG_VERBOSE)
