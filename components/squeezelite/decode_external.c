@@ -43,15 +43,15 @@ static bool enable_bt_sink;
 static bool enable_airplay;
 
 #define RAOP_OUTPUT_SIZE 	(RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
-#define SYNC_WIN_RUN	32
+#define SYNC_WIN_SLOW	32
 #define SYNC_WIN_CHECK	8
-#define SYNC_WIN_START	2
+#define SYNC_WIN_FAST	2
 
 static raop_event_t	raop_state;
 
 static EXT_RAM_ATTR struct {
-	bool enabled;
-	int sum, count, win, errors[SYNC_WIN_RUN];
+	bool enabled, init;
+	int sum, count, win, errors[SYNC_WIN_SLOW];
 	s32_t len;
 	u32_t start_time, playtime;
 } raop_sync;
@@ -182,6 +182,21 @@ static void raop_sink_data_handler(const uint8_t *data, uint32_t len, u32_t play
 }	
 
 /****************************************************************************************
+ * AirPlay apply sync
+ */
+static void resync(int error) {
+	if (error < 0) {
+		output.skip_frames = -(error * RAOP_SAMPLE_RATE) / 1000;
+		output.state = OUTPUT_SKIP_FRAMES;					
+		LOG_INFO("skipping %u frames (count:%d)", output.skip_frames, raop_sync.count);
+	} else {
+		output.pause_frames = (error * RAOP_SAMPLE_RATE) / 1000;
+		output.state = OUTPUT_PAUSE_FRAMES;
+		LOG_INFO("pausing for %u frames (count: %d)", output.pause_frames, raop_sync.count);
+	}
+}	
+
+/****************************************************************************************
  * AirPlay sink command handler
  */
 static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
@@ -202,15 +217,21 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			u32_t ms, now = gettime_ms();
 			int error;
 									
-			if (!raop_sync.enabled || output.state < OUTPUT_RUNNING || output.frames_played_dmp < output.device_frames) break;
+			if (!raop_sync.enabled || output.state != OUTPUT_RUNNING || output.frames_played_dmp < output.device_frames) break;
 			
-			// first must make sure we started on time
-			if (raop_sync.win == SYNC_WIN_START) {
+			// do one (only one) time-based adjustement in case we started totally off)
+			if (raop_sync.init) {
 				// how many ms have we really played
 				ms = now - output.updated + ((output.frames_played_dmp - output.device_frames) * 10) / (RAOP_SAMPLE_RATE / 100);
 				error = ms - (now - raop_sync.start_time);
-				
+				resync(error);
+											
 				LOG_INFO("backend played %u, desired %u, (delta:%d)", ms, now - raop_sync.start_time, error);
+					
+				raop_sync.init = false;
+				raop_sync.win = SYNC_WIN_FAST;
+				raop_sync.sum = raop_sync.count = 0 ;
+				memset(raop_sync.errors, 0, sizeof(raop_sync.errors));
 			} else {	
 				u32_t level = _buf_used(outputbuf);
 				
@@ -224,37 +245,24 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 					LOG_INFO("head local:%d, remote:%d (delta:%d)", ms, raop_sync.playtime - now, error);
 					LOG_INFO("obuf:%u, sync_len:%u, devframes:%u, inproc:%u", _buf_used(outputbuf), raop_sync.len, output.device_frames, output.frames_in_process);
 				}	
-			}	
 			
-			// calculate sum, error and update sliding window
-			raop_sync.errors[raop_sync.count++ % raop_sync.win] = error;
-			raop_sync.sum += error;
-			error = raop_sync.sum / min(raop_sync.count, raop_sync.win);
+				// calculate sum, error and update sliding window
+				raop_sync.errors[raop_sync.count++ % raop_sync.win] = error;
+				raop_sync.sum += error;
+				error = raop_sync.sum / min(raop_sync.count, raop_sync.win);
 			
-			// move to normal mode if possible
-			if (raop_sync.win == SYNC_WIN_START && raop_sync.count >= SYNC_WIN_START && abs(error) < 10) {
-				raop_sync.win = SYNC_WIN_RUN;
-				LOG_INFO("switching to slow sync mode %u", raop_sync.win);
-			}	
+				// move to normal mode if possible
+				if (raop_sync.win == SYNC_WIN_FAST && raop_sync.count >= SYNC_WIN_FAST && abs(error) < 10) {
+					raop_sync.win = SYNC_WIN_SLOW;
+					LOG_INFO("switching to slow sync mode %u", raop_sync.win);
+				}	
 
-			// wait till e have enough data or there is a strong deviation
-			if ((raop_sync.count >= raop_sync.win && abs(error) > 10) || (raop_sync.count >= SYNC_WIN_CHECK && abs(error) > 100)) { 
-			
-				// correct if needed
-				if (error < 0) {
-					output.skip_frames = -(error * RAOP_SAMPLE_RATE) / 1000;
-					output.state = OUTPUT_SKIP_FRAMES;					
-					LOG_INFO("skipping %u frames (count:%d)", output.skip_frames, raop_sync.count);
-				} else {
-					output.pause_frames = (error * RAOP_SAMPLE_RATE) / 1000;
-					output.state = OUTPUT_PAUSE_FRAMES;
-					LOG_INFO("pausing for %u frames (count: %d)", output.pause_frames, raop_sync.count);
-				}
-
-				// reset sliding window		
-				raop_sync.sum = raop_sync.count = 0;
-				memset(raop_sync.errors, 0, sizeof(raop_sync.errors));
-											
+				// wait till we have enough data or there is a strong deviation
+				if ((raop_sync.count >= raop_sync.win && abs(error) > 10) || (raop_sync.count >= SYNC_WIN_CHECK && abs(error) > 100)) {
+					resync(error);
+					raop_sync.sum = raop_sync.count = 0;
+					memset(raop_sync.errors, 0, sizeof(raop_sync.errors));
+				}	
 			}	
 
 			break;
@@ -271,9 +279,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 		case RAOP_STREAM:
 			LOG_INFO("Stream", NULL);
 			raop_state = event;
-			raop_sync.win = SYNC_WIN_START;
-			raop_sync.sum = raop_sync.count = 0 ;
-			memset(raop_sync.errors, 0, sizeof(raop_sync.errors));
+			raop_sync.init = true;
 			raop_sync.enabled = !strcasestr(output.device, "BT");
 			output.next_sample_rate = output.current_sample_rate = RAOP_SAMPLE_RATE;
 			break;
