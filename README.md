@@ -228,10 +228,11 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<strong>Currently this project requires a specific combination of IDF 4 with gcc 5.2. You'll have to implement the gcc 5.2 toolchain from an IDF 3.2 install into the IDF 4 directory in order to successfully compile it</strong>
+<strong>Currently this project requires a specific combination of IDF 3.x (insert link here ...) with gcc 5.2. You'll have to implement the gcc 5.2 toolchain</strong>
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
 And then copying the i2s.c patch file from this repo over to the esp-idf folder
+You alos need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
