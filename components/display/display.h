@@ -41,6 +41,8 @@ enum displayer_time_e 	{ DISPLAYER_ELAPSED, DISPLAYER_REMAINING };
 
 enum display_bus_cmd_e { DISPLAY_BUS_TAKE, DISPLAY_BUS_GIVE };
 bool (*display_bus)(void *from, enum display_bus_cmd_e cmd);
+char * display_conf_get_driver_name(char * driver);
+bool display_is_valid_driver(char * driver);
 
 void displayer_scroll(char *string, int speed, int pause);
 void displayer_control(enum displayer_cmd_e cmd, ...);

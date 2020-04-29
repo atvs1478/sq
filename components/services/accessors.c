@@ -14,8 +14,11 @@
 #include "platform_config.h"
 #include "accessors.h"
 #include "globdefs.h"
+#include "display.h"
 
 static const char *TAG = "services";
+static char *i2c_name="I2C";
+static char *spi_name="SPI";
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -32,6 +35,43 @@ esp_err_t config_i2c_set(const i2c_config_t * config, int port){
 		free(config_buffer);
 	}
 	return ESP_OK;
+}
+
+void config_display_free(display_config_t ** disp ){
+	if(disp && *disp){
+		free((*disp)->drivername);
+		free((*disp)->type);
+		free(*disp);
+		*disp=NULL;
+	}
+}
+
+const display_config_t * config_display_get(){
+	static display_config_t dstruct;
+	char *config = config_alloc_get(NVS_TYPE_STR, "display_config");
+	if (!config) {
+		return NULL;
+	}
+
+	char * p=NULL;
+
+	if ((p = strcasestr(config, "driver")) != NULL){
+		dstruct.drivername = display_conf_get_driver_name(strchr(p, '=') + 1);
+	}
+
+	dstruct.drivername=dstruct.drivername?dstruct.drivername:"SSD1306";
+	if ((p = strcasestr(config, "width")) != NULL) dstruct.width = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "height")) != NULL) dstruct.height = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "reset")) != NULL) dstruct.RST_pin = atoi(strchr(p, '=') + 1);
+	dstruct.i2c_system_port=i2c_system_port;
+	if (strstr(config, "I2C") ) dstruct.type=i2c_name;
+	if ((p = strcasestr(config, "address")) != NULL) dstruct.address = atoi(strchr(p, '=') + 1);
+	if (strstr(config, "SPI") ) dstruct.type=spi_name;
+	if ((p = strcasestr(config, "cs")) != NULL) dstruct.CS_pin = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "speed")) != NULL) dstruct.speed = atoi(strchr(p, '=') + 1);
+	dstruct.hflip= strcasestr(config, "HFlip") ? true : false;
+	dstruct.vflip= strcasestr(config, "VFlip") ? true : false;
+	return &dstruct;
 }
 
 /****************************************************************************************

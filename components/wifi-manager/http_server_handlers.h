@@ -92,6 +92,7 @@ esp_err_t flash_post_handler(httpd_req_t *req);
 esp_err_t status_get_handler(httpd_req_t *req);
 esp_err_t messages_get_handler(httpd_req_t *req);
 esp_err_t console_cmd_get_handler(httpd_req_t *req);
+esp_err_t console_cmd_post_handler(httpd_req_t *req);
 esp_err_t ap_scan_handler(httpd_req_t *req);
 esp_err_t redirect_ev_handler(httpd_req_t *req);
 esp_err_t redirect_200_ev_handler(httpd_req_t *req);

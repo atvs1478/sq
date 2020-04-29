@@ -32,6 +32,20 @@ var task_state_t = {
 		 4 : "eDeleted"				
 
 }
+var escapeHTML = function(unsafe) {
+	  return unsafe.replace(/[&<"']/g, function(m) {
+	    switch (m) {
+	      case '&':
+	        return '&amp;';
+	      case '<':
+	        return '&lt;';
+	      case '"':
+	        return '&quot;';
+	      default:
+	        return '&#039;';
+	    }
+	  });
+	};
 var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
 var recovery = false;
 var enableAPTimer = true;
@@ -737,7 +751,7 @@ function getMessages() {
                         $("#syslogTable").append(
                             "<tr class='"+msg["type"]+"'>"+
                                 "<td>"+msg_time.toLocaleString()+"</td>"+
-                                "<td>"+msg["message"]+"</td>"+
+                                "<td>"+escapeHTML(msg["message"]).replace(/\n/g, '<br />')+"</td>"+
                             "</tr>"
                         );
 	        			break;
@@ -921,15 +935,124 @@ function checkStatus(){
         blockAjax = false;
     });
 }
+function runCommand(button) {
+	pardiv = button.parentNode.parentNode;
+	fields=document.getElementById("flds-"+button.value);
+	cmdstring=button.value+' ';
+	if(fields){
+		hint = pardiv.hint;
+		allfields=fields.getElementsByTagName("input");
+		for (i = 0; i < allfields.length; i++) {
+			attr=allfields[i].attributes;
+			qts='';
+			opt='';
+			optspacer=' ';
+			
+			if (attr.longopts.value!== "undefined"){
+				opt+= '--' + attr.longopts.value;
+				optspacer='=';
+			}
+			else if(attr.shortopts.value!== "undefined"){
+				opt= '-' + attr.shortopts.value; 
+			}
+
+			if(attr.hasvalue.value== "true" ){
+				if(allfields[i].value!=''){
+					qts = (/\s/.test(allfields[i].value))?'"':'';
+					cmdstring+=opt+optspacer+qts +allfields[i].value +qts+ ' ';
+				}
+			}
+			else {
+				// this is a checkbox
+				if(allfields[i].checked) cmdstring+=opt+ ' ';	
+			}
+		}
+	}
+	console.log(cmdstring);
+
+	var data = { 'timestamp': Date.now() };
+	data['command'] = cmdstring;
+	
+	$.ajax({
+		url: '/commands.json',
+		dataType: 'text',
+		method: 'POST',
+		cache: false,
+		contentType: 'application/json; charset=utf-8',
+		data:  JSON.stringify(data),
+		error: function (xhr, ajaxOptions, thrownError) {
+			console.log(xhr.status);
+			console.log(thrownError);
+			if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
+		}
+	});
+	enableStatusTimer = true;
+}
 
 
 function getCommands() {
     $.getJSON("/commands.json", function(data) {
         console.log(data);
+		innerhtml='';
+		
+		data.commands.forEach(function(command) {
+			innerhtml+='<tr><td>';
+			innerhtml+=escapeHTML(command.help).replace(/\n/g, '<br />')+'<br>';
+			innerhtml+='<div >';
+			if(command.hasOwnProperty("argtable")){
+			innerhtml+='<table class="table table-hover" id="flds-'+command.name+'"><tbody>';
+				command.argtable.forEach(function (arg){
+					innerhtml+="<tr>";
+					ctrlname=command.name+'-'+arg.longopts;
+					innerhtml+='<td><label for="'+ctrlname+'">'+ arg.glossary+'</label></td>';
+					ctrltype="text";
+					if(arg.checkbox){
+						ctrltype="checkbox";
+					}
+					curvalue=data.values?.[command.name]?.[arg.longopts] || '';
+					placeholder=arg?.datatype || '';
+					innerhtml+='<td><input type="'+ctrltype+'" id="'+ctrlname+'" name="'+ctrlname+'" placeholder="'+placeholder+'" hasvalue="'+arg.hasvalue+'"   ';
+					
+
+					innerhtml+='datatype="'+arg.datatype+'" ';
+					innerhtml+='hasvalue='+arg.hasvalue+' ';
+					innerhtml+='longopts="'+arg.longopts+'" ';
+					innerhtml+='shortopts="'+arg.shortopts+'" ';
+					innerhtml+='checkbox='+arg.checkbox+' ';
+
+					
+					
+					if(arg.checkbox){
+						if(curvalue=data.values?.[command.name]?.[arg.longopts] ){
+							innerhtml+='checked=true ';							
+						}
+						else{
+							innerhtml+='checked=false ';							
+						}
+							
+
+						innerhtml+='></input></td>';
+					}
+					else {
+						innerhtml+='value="'+curvalue+'" ';
+						innerhtml+='></input></td>'+ curvalue.length>0?'<td>last: '+curvalue+'</td>':'';
+					}
+					
+					innerhtml+="</tr>";
+				});
+			innerhtml+='</tbody></table><br>';
+			
+			}
+			innerhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" value="'+command.name+'" onclick="runCommand(this);"></div></div><td></tr>';
+
+            });		
+		$("#commands-list").append(innerhtml);
+		
     })
     .fail(function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
         console.log(thrownError);
+        $("#commands-list").empty();
         if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
         blockAjax = false;
     });

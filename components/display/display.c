@@ -56,6 +56,14 @@ static EXT_RAM_ATTR struct {
 	TickType_t tick;
 } displayer;
 
+static const char *known_drivers[] = {"SH1106",
+		"SSD1306",
+		"SSD1322",
+		"SSD1326",
+		"SSD1327",
+		"SSD1675",
+		NULL
+	};
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
@@ -71,7 +79,7 @@ void display_init(char *welcome) {
 
 	if (!config) {
 		ESP_LOGI(TAG, "no display");
-		return false;
+		return;
 	}	
 	
 	int width = -1, height = -1;
@@ -376,4 +384,19 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 	
 	xSemaphoreGive(displayer.mutex);
 	va_end(args);
+}
+
+/****************************************************************************************
+ *
+ */
+bool display_is_valid_driver(char * driver){
+	return display_conf_get_driver_name(driver)!=NULL;
+}
+char * display_conf_get_driver_name(char * driver){
+	for(uint8_t i=0;known_drivers[i]!=NULL && strlen(known_drivers[i])>0;i++ ){
+		if(strcasestr(driver,known_drivers[i])){
+			return known_drivers[i];
+		}
+	}
+	return NULL;
 }

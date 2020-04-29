@@ -190,7 +190,7 @@ esp_err_t update_certificates(){
 		}
 		free(str);
 	}
-	else {
+	else if(str==NULL){
 		ESP_LOGW(TAG,"No certificate found. Adding certificates");
 		changed=true;
 	}
@@ -199,20 +199,20 @@ esp_err_t update_certificates(){
 
 		esp_err = nvs_set_blob(handle, certs_key, server_cert_pem_start, (server_cert_pem_end-server_cert_pem_start));
 		if(esp_err!=ESP_OK){
-			LOG_SEND_ERROR("Failed to store certificate data: %s", esp_err_to_name(esp_err));
+			log_send_messaging(MESSAGING_ERROR,"Failed to store certificate data: %s", esp_err_to_name(esp_err));
 		}
 		else {
 			esp_err = nvs_set_str(handle,  certs_version, running_app_info.version);
 			if(esp_err!=ESP_OK){
-				LOG_SEND_ERROR("Unable to update HTTPS Certificates version: %s",esp_err_to_name(esp_err));
+				log_send_messaging(MESSAGING_ERROR,"Unable to update HTTPS Certificates version: %s",esp_err_to_name(esp_err));
 			}
 			else {
 				esp_err = nvs_commit(handle);
 				if(esp_err!=ESP_OK){
-					LOG_SEND_ERROR("Failed to commit certificates changes : %s",esp_err_to_name(esp_err));
+					log_send_messaging(MESSAGING_ERROR,"Failed to commit certificates changes : %s",esp_err_to_name(esp_err));
 				}
 				else {
-					LOG_SEND_INFO("HTTPS Certificates were updated with version: %s",running_app_info.version);
+					log_send_messaging(MESSAGING_INFO,"HTTPS Certificates were updated with version: %s",running_app_info.version);
 				}
 			}
 		}
@@ -234,7 +234,7 @@ const char * get_certificate(){
         if( esp_err == ESP_OK) {
             blob = (char *) heap_caps_malloc(len+1, (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
             if(!blob){
-            	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. %s","Memory allocation failed");
+            	log_send_messaging(MESSAGING_ERROR,"Unable to retrieve HTTPS certificates. %s","Memory allocation failed");
         		return "";
             }
             memset(blob,0x00,len+1);
@@ -243,16 +243,16 @@ const char * get_certificate(){
             	ESP_LOGD(TAG,"Certificates content is %d bytes long: ", len);
             }
             else {
-            	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. Get blob failed: %s", esp_err_to_name(esp_err));
+            	log_send_messaging(MESSAGING_ERROR,"Unable to retrieve HTTPS certificates. Get blob failed: %s", esp_err_to_name(esp_err));
             }
         }
         else{
-        	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. Get blob failed: %s",esp_err_to_name(esp_err));
+        	log_send_messaging(MESSAGING_ERROR,"Unable to retrieve HTTPS certificates. Get blob failed: %s",esp_err_to_name(esp_err));
         }
         nvs_close(handle);
 	}
 	else{
-    	LOG_SEND_ERROR("Unable to retrieve HTTPS certificates. NVS name space %s open failed: %s",certs_namespace, esp_err_to_name(esp_err));
+    	log_send_messaging(MESSAGING_ERROR,"Unable to retrieve HTTPS certificates. NVS name space %s open failed: %s",certs_namespace, esp_err_to_name(esp_err));
 	}
 	return blob;
 }

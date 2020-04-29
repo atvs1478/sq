@@ -25,6 +25,8 @@
 #include "soc/rtc_cntl_reg.h"
 #include "esp32/rom/uart.h"
 #include "sdkconfig.h"
+#include "platform_console.h"
+#include "messaging.h"
 
 static const char * TAG = "ota";
 extern esp_err_t start_ota(const char * bin_url);
@@ -35,9 +37,8 @@ static struct {
 /* 'heap' command prints minumum heap size */
 static int perform_ota_update(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &ota_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&ota_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, ota_args.end, argv[0]);
         return 1;
     }
 

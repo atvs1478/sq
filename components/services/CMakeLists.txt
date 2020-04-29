@@ -1,6 +1,6 @@
 idf_component_register(SRC_DIRS .
 						INCLUDE_DIRS . 
-						REQUIRES json tools platform_config
+						REQUIRES json tools platform_config display
 
 )
 

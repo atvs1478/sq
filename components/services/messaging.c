@@ -245,3 +245,20 @@ void messaging_post_message(messaging_types type,messaging_classes msg_class, co
 	return;
 
 }
+void log_send_messaging(messaging_types msgtype,const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	size_t ln = vsnprintf(NULL, 0, fmt, va)+1;
+	char * message_txt = malloc(ln);
+	if(message_txt){
+		vsprintf(message_txt, fmt, va);
+		va_end(va);
+		ESP_LOG_LEVEL_LOCAL(messaging_type_to_err_type(msgtype),tag, "%s",message_txt);
+		messaging_post_message(msgtype, MESSAGING_CLASS_SYSTEM, message_txt );
+		free(message_txt);
+	}
+	else{
+		ESP_LOGE(tag, "Memory allocation failed while sending message");
+	}
+
+}

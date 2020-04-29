@@ -72,17 +72,19 @@ static int get_version(int argc, char **argv)
 {
     esp_chip_info_t info;
     esp_chip_info(&info);
-    printf("IDF Version:%s\r\n", esp_get_idf_version());
-    printf("Chip info:\r\n");
-    printf("\tmodel:%s\r\n", info.model == CHIP_ESP32 ? "ESP32" : "Unknow");
-    printf("\tcores:%d\r\n", info.cores);
-    printf("\tfeature:%s%s%s%s%d%s\r\n",
-           info.features & CHIP_FEATURE_WIFI_BGN ? "/802.11bgn" : "",
-           info.features & CHIP_FEATURE_BLE ? "/BLE" : "",
-           info.features & CHIP_FEATURE_BT ? "/BT" : "",
-           info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:" : "/External-Flash:",
-           spi_flash_get_chip_size() / (1024 * 1024), " MB");
-    printf("\trevision number:%d\r\n", info.revision);
+    log_send_messaging(MESSAGING_INFO,
+    "IDF Version:%s\r\n"
+    "Chip info:\r\n"
+    "\tmodel:%s\r\n"
+    "\tcores:%d\r\n"
+    "\tfeature:%s%s%s%s%d%s\r\n"
+    "\trevision number:%d\r\n",
+		esp_get_idf_version(), info.model == CHIP_ESP32 ? "ESP32" : "Unknow", info.cores,
+		info.features & CHIP_FEATURE_WIFI_BGN ? "/802.11bgn" : "",
+		info.features & CHIP_FEATURE_BLE ? "/BLE" : "",
+		info.features & CHIP_FEATURE_BT ? "/BT" : "",
+		info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:" : "/External-Flash:",
+		spi_flash_get_chip_size() / (1024 * 1024), " MB", info.revision);
     return 0;
 }
 
@@ -105,9 +107,9 @@ esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 {
 if(is_recovery_running){
 	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
-		ESP_LOGW(TAG,"RECOVERY application is already active");
+		log_send_messaging(MESSAGING_WARNING,"RECOVERY application is already active");
 		if(!wait_for_commit()){
-			ESP_LOGW(TAG,"Unable to commit configuration. ");
+			log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 		}
 		
 		vTaskDelay(750/ portTICK_PERIOD_MS);
@@ -117,9 +119,9 @@ if(is_recovery_running){
 }
 else {
 	if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
-		ESP_LOGW(TAG,"SQUEEZELITE application is already active");
+		log_send_messaging(MESSAGING_WARNING,"SQUEEZELITE application is already active");
 		if(!wait_for_commit()){
-			ESP_LOGW(TAG,"Unable to commit configuration. ");
+			log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 		}
 		
 		vTaskDelay(750/ portTICK_PERIOD_MS);
@@ -129,13 +131,12 @@ else {
 }
 	esp_err_t err = ESP_OK;
 	bool bFound=false;
-    ESP_LOGI(TAG, "Looking for partition type %u",partition_subtype);
+    log_send_messaging(MESSAGING_INFO, "Looking for partition type %u",partition_subtype);
     const esp_partition_t *partition;
 	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, partition_subtype, NULL);
 
 	if(it == NULL){
-		ESP_LOGE(TAG,"Unable initialize partition iterator!");
-		messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Reboot failed. Cannot iterate through partitions");
+		log_send_messaging(MESSAGING_ERROR,"Reboot failed. Cannot iterate through partitions");
 	}
 	else
 	{
@@ -144,31 +145,29 @@ else {
 		ESP_LOGD(TAG, "Releasing partition iterator");
 		esp_partition_iterator_release(it);
 		if(partition != NULL){
-			ESP_LOGI(TAG, "Found application partition %s sub type %u", partition->label,partition_subtype);
+			log_send_messaging(MESSAGING_INFO, "Found application partition %s sub type %u", partition->label,partition_subtype);
 			err=esp_ota_set_boot_partition(partition);
 			if(err!=ESP_OK){
-				ESP_LOGE(TAG,"Unable to set partition as active for next boot. %s",esp_err_to_name(err));
 				bFound=false;
-				messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"Unable to select partition for reboot: %s",esp_err_to_name(err));
+				log_send_messaging(MESSAGING_ERROR,"Unable to select partition for reboot: %s",esp_err_to_name(err));
 			}
 			else{
-				ESP_LOGW(TAG, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);
+				log_send_messaging(MESSAGING_WARNING, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);
 				bFound=true;
 				messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Reboot failed. Cannot iterate through partitions");
 			}
 		}
 		else
 		{
-			ESP_LOGE(TAG,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
-			messaging_post_message(MESSAGING_ERROR,MESSAGING_CLASS_SYSTEM,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
+			log_send_messaging(MESSAGING_ERROR,"partition type %u not found!  Unable to reboot to recovery.",partition_subtype);
 
 		}
 		ESP_LOGD(TAG, "Yielding to other processes");
 		taskYIELD();
 		if(bFound) {
-			ESP_LOGW(TAG,"Configuration %s changes. ",config_has_changes()?"has":"does not have");
+			log_send_messaging(MESSAGING_WARNING,"Configuration %s changes. ",config_has_changes()?"has":"does not have");
 			if(!wait_for_commit()){
-				ESP_LOGW(TAG,"Unable to commit configuration. ");
+				log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 			}
 			vTaskDelay(750/ portTICK_PERIOD_MS);
 			esp_restart();
@@ -180,9 +179,9 @@ else {
 
 static int restart(int argc, char **argv)
 {
-	ESP_LOGW(TAG, "\n\nPerforming a simple restart to the currently active partition.");
+	log_send_messaging(MESSAGING_WARNING, "\n\nPerforming a simple restart to the currently active partition.");
 	if(!wait_for_commit()){
-		ESP_LOGW(TAG,"Unable to commit configuration. ");
+		log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 	}
     vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
@@ -191,9 +190,9 @@ static int restart(int argc, char **argv)
 
 void simple_restart()
 {
-	ESP_LOGW(TAG,"\n\n Called to perform a simple system reboot.");
+	log_send_messaging(MESSAGING_WARNING,"\n\n Called to perform a simple system reboot.");
 	if(!wait_for_commit()){
-		ESP_LOGW(TAG,"Unable to commit configuration. ");
+		log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 	}
 
 											   
@@ -202,24 +201,24 @@ void simple_restart()
 }
 
 esp_err_t guided_restart_ota(){
-	ESP_LOGW(TAG,"\n\nCalled for a reboot to OTA Application");
+	log_send_messaging(MESSAGING_WARNING,"\n\nCalled for a reboot to OTA Application");
     guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 esp_err_t guided_factory(){
-	ESP_LOGW(TAG,"\n\nCalled for a reboot to recovery application");
+	log_send_messaging(MESSAGING_WARNING,"\n\nCalled for a reboot to recovery application");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 static int restart_factory(int argc, char **argv)
 {
-	ESP_LOGW(TAG, "Executing guided boot into recovery");
+	log_send_messaging(MESSAGING_WARNING, "Executing guided boot into recovery");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
 static int restart_ota(int argc, char **argv)
 {
-	ESP_LOGW(TAG, "Executing guided boot into ota app 0");
+	log_send_messaging(MESSAGING_WARNING, "Executing guided boot into ota app 0");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
@@ -261,7 +260,7 @@ static void register_factory_boot()
 
 static int free_mem(int argc, char **argv)
 {
-    printf("%d\n", esp_get_free_heap_size());
+	log_send_messaging(MESSAGING_INFO,"%d", esp_get_free_heap_size());
     return 0;
 }
 
@@ -281,7 +280,7 @@ static void register_free()
 static int heap_size(int argc, char **argv)
 {
     uint32_t heap_size = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
-    ESP_LOGI(TAG, "min heap size: %u", heap_size);
+    log_send_messaging(MESSAGING_INFO, "min heap size: %u", heap_size);
     return 0;
 }
 
@@ -289,7 +288,7 @@ static void register_heap()
 {
     const esp_console_cmd_t heap_cmd = {
         .command = "heap",
-        .help = "Get minimum size of free heap memory that was available during program execution",
+        .help = "Get minimum size of free heap memory found during execution",
         .hint = NULL,
         .func = &heap_size,
     };
@@ -306,16 +305,16 @@ static int tasks_info(int argc, char **argv)
     const size_t bytes_per_task = 40; /* see vTaskList description */
     char *task_list_buffer = malloc(uxTaskGetNumberOfTasks() * bytes_per_task);
     if (task_list_buffer == NULL) {
-        ESP_LOGE(TAG, "failed to allocate buffer for vTaskList output");
+    	log_send_messaging(MESSAGING_ERROR, "failed to allocate buffer for vTaskList output");
         return 1;
     }
-    fputs("Task Name\tStatus\tPrio\tHWM\tTask#", stdout);
+    log_send_messaging(MESSAGING_INFO,"Task Name\tStatus\tPrio\tHWM\tTask#"
 #ifdef CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID
-    fputs("\tAffinity", stdout);
+    "\tAffinity"
 #endif
-    fputs("\n", stdout);
+    "\n");
     vTaskList(task_list_buffer);
-    fputs(task_list_buffer, stdout);
+    log_send_messaging(MESSAGING_INFO,"%s", task_list_buffer);
     free(task_list_buffer);
     return 0;
 }
@@ -328,7 +327,6 @@ static void register_tasks()
         .hint = NULL,
         .func = &tasks_info,
     };
-    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -346,31 +344,30 @@ static struct {
 
 static int deep_sleep(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &deep_sleep_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&deep_sleep_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, deep_sleep_args.end, argv[0]);
         return 1;
     }
     if (deep_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * deep_sleep_args.wakeup_time->ival[0];
-        ESP_LOGI(TAG, "Enabling timer wakeup, timeout=%lluus", timeout);
+        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
         ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
     }
     if (deep_sleep_args.wakeup_gpio_num->count) {
         int io_num = deep_sleep_args.wakeup_gpio_num->ival[0];
         if (!rtc_gpio_is_valid_gpio(io_num)) {
-            ESP_LOGE(TAG, "GPIO %d is not an RTC IO", io_num);
+        	log_send_messaging(MESSAGING_ERROR, "GPIO %d is not an RTC IO", io_num);
             return 1;
         }
         int level = 0;
         if (deep_sleep_args.wakeup_gpio_level->count) {
             level = deep_sleep_args.wakeup_gpio_level->ival[0];
             if (level != 0 && level != 1) {
-                ESP_LOGE(TAG, "Invalid wakeup level: %d", level);
+            	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
                 return 1;
             }
         }
-        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level",
+        log_send_messaging(MESSAGING_INFO, "Enabling wakeup on GPIO%d, wakeup on %s level",
                  io_num, level ? "HIGH" : "LOW");
 
         ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, level) );
@@ -399,7 +396,6 @@ static void register_deep_sleep()
         .func = &deep_sleep,
         .argtable = &deep_sleep_args
     };
-    cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
@@ -414,30 +410,29 @@ static struct {
 
 static int light_sleep(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &light_sleep_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&light_sleep_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, light_sleep_args.end, argv[0]);
         return 1;
     }
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     if (light_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * light_sleep_args.wakeup_time->ival[0];
-        ESP_LOGI(TAG, "Enabling timer wakeup, timeout=%lluus", timeout);
+        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
         ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
     }
     int io_count = light_sleep_args.wakeup_gpio_num->count;
     if (io_count != light_sleep_args.wakeup_gpio_level->count) {
-        ESP_LOGE(TAG, "Should have same number of 'io' and 'io_level' arguments");
+    	log_send_messaging(MESSAGING_INFO,  "Should have same number of 'io' and 'io_level' arguments");
         return 1;
     }
     for (int i = 0; i < io_count; ++i) {
         int io_num = light_sleep_args.wakeup_gpio_num->ival[i];
         int level = light_sleep_args.wakeup_gpio_level->ival[i];
         if (level != 0 && level != 1) {
-            ESP_LOGE(TAG, "Invalid wakeup level: %d", level);
+        	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
             return 1;
         }
-        ESP_LOGI(TAG, "Enabling wakeup on GPIO%d, wakeup on %s level",
+        log_send_messaging(MESSAGING_INFO,  "Enabling wakeup on GPIO%d, wakeup on %s level",
                  io_num, level ? "HIGH" : "LOW");
 
         ESP_ERROR_CHECK( gpio_wakeup_enable(io_num, level ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL) );
@@ -446,7 +441,7 @@ static int light_sleep(int argc, char **argv)
         ESP_ERROR_CHECK( esp_sleep_enable_gpio_wakeup() );
     }
     if (CONFIG_ESP_CONSOLE_UART_NUM <= UART_NUM_1) {
-        ESP_LOGI(TAG, "Enabling UART wakeup (press ENTER to exit light sleep)");
+    	log_send_messaging(MESSAGING_INFO,  "Enabling UART wakeup (press ENTER to exit light sleep)");
         ESP_ERROR_CHECK( uart_set_wakeup_threshold(CONFIG_ESP_CONSOLE_UART_NUM, 3) );
         ESP_ERROR_CHECK( esp_sleep_enable_uart_wakeup(CONFIG_ESP_CONSOLE_UART_NUM) );
     }
@@ -469,7 +464,7 @@ static int light_sleep(int argc, char **argv)
         cause_str = "unknown";
         printf("%d\n", cause);
     }
-    ESP_LOGI(TAG, "Woke up from: %s", cause_str);
+    log_send_messaging(MESSAGING_INFO, "Woke up from: %s", cause_str);
     return 0;
 }
 
@@ -496,6 +491,5 @@ static void register_light_sleep()
         .argtable = &light_sleep_args
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
-    cmd_to_json(&cmd);
 }
 

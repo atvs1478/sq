@@ -158,9 +158,8 @@ static int set_auto_connect(int argc, char **argv)
 }
 static int connect(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &join_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&join_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, join_args.end, argv[0]);
         return 1;
     }
     ESP_LOGI(__func__, "Connecting to '%s'",

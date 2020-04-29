@@ -30,6 +30,7 @@
 #include "platform_config.h"
 #include "telnet.h"
 
+#include "messaging.h"
 
 #include "config.h"
 pthread_t thread_console;
@@ -56,8 +57,36 @@ void run_command(char * line);
 #define ADD_TO_JSON(o,t,n) if (t->n) cJSON_AddStringToObject(o,QUOTE(n),t->n);
 #define ADD_PARMS_TO_CMD(o,t,n) { cJSON * parms = ParmsToJSON(&t.n->hdr); if(parms) cJSON_AddItemToObject(o,QUOTE(n),parms); }
 cJSON * cmdList;
+cJSON * values_fn_list;
 cJSON * get_cmd_list(){
-	return cmdList;
+	cJSON * element;
+	cJSON * values=cJSON_CreateObject();
+	cJSON * list = cJSON_CreateObject();
+	cJSON_AddItemReferenceToObject(list,"commands",cmdList);
+	cJSON_AddItemToObject(list,"values",values);
+	cJSON_ArrayForEach(element,cmdList){
+		cJSON * name = cJSON_GetObjectItem(element,"name");
+		cJSON * vals_fn = cJSON_GetObjectItem(values_fn_list,cJSON_GetStringValue(name));
+		if(vals_fn!=NULL ){
+			parm_values_fn_t *parm_values_fn = (parm_values_fn_t *)strtoul(cJSON_GetStringValue(vals_fn), NULL, 16);;
+
+			if(parm_values_fn){
+				cJSON_AddItemToObject(values,cJSON_GetStringValue(name),parm_values_fn());
+			}
+		}
+	}
+	return list;
+}
+
+struct arg_end *getParmsEnd(struct arg_hdr * * argtable){
+	if(!argtable) return NULL;
+	struct arg_hdr * *table = (struct arg_hdr * *)argtable;
+	int tabindex = 0;
+	while (!(table[tabindex]->flag & ARG_TERMINATOR))
+	{
+		tabindex++;
+	}
+	return (struct arg_end *)table[tabindex];
 }
 cJSON * ParmsToJSON(struct arg_hdr * * argtable){
 	if(!argtable) return NULL;
@@ -78,11 +107,19 @@ cJSON * ParmsToJSON(struct arg_hdr * * argtable){
 	}
 	return arg_list;
 }
-esp_err_t cmd_to_json(const esp_console_cmd_t *cmd)
-{
+
+esp_err_t cmd_to_json(const esp_console_cmd_t *cmd){
+	return cmd_to_json_with_cb(cmd, NULL);
+}
+
+esp_err_t cmd_to_json_with_cb(const esp_console_cmd_t *cmd, parm_values_fn_t parm_values_fn){
 	if(!cmdList){
-		cmdList=cJSON_CreateObject();
+		cmdList=cJSON_CreateArray();
 	}
+	if(!values_fn_list){
+		values_fn_list=cJSON_CreateObject();
+	}
+
     if (cmd->command == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -92,6 +129,13 @@ esp_err_t cmd_to_json(const esp_console_cmd_t *cmd)
     cJSON * jsoncmd = cJSON_CreateObject();
     ADD_TO_JSON(jsoncmd,cmd,help);
     ADD_TO_JSON(jsoncmd,cmd,hint);
+	if(parm_values_fn){
+		char addr[11]={0};
+		snprintf(addr,sizeof(addr),"%lx",(unsigned long)parm_values_fn);
+		cJSON_AddStringToObject(values_fn_list,cmd->command,addr);
+	}
+	cJSON_AddBoolToObject(jsoncmd,"hascb",parm_values_fn!=NULL);
+
     if(cmd->argtable){
     	cJSON_AddItemToObject(jsoncmd,"argtable",ParmsToJSON(cmd->argtable));
     }
@@ -105,18 +149,37 @@ esp_err_t cmd_to_json(const esp_console_cmd_t *cmd)
         FILE *f = open_memstream(&buf, &buf_size);
         if (f != NULL) {
             arg_print_syntax(f, cmd->argtable, NULL);
+            fflush(f);
             fclose(f);
         }
         cJSON_AddStringToObject(jsoncmd, "hint", buf);
-        free(buf);
+        FREE_AND_NULL(buf);
     }
+    cJSON_AddStringToObject(jsoncmd, "name", cmd->command);
     char * b=cJSON_Print(jsoncmd);
     if(b){
-    	ESP_LOGI(TAG,"Adding command table %s",b);
+    	ESP_LOGD(TAG,"Adding command table %s",b);
     	free(b);
     }
-    cJSON_AddItemToObject(cmdList, cmd->command,jsoncmd);
+    cJSON_AddItemToArray(cmdList, jsoncmd);
     return ESP_OK;
+}
+int arg_parse_msg(int argc, char **argv, struct arg_hdr ** args){
+    int nerrors = arg_parse(argc, argv, (void **)args);
+
+    if (nerrors != 0) {
+    	char *buf = NULL;
+		size_t buf_size = 0;
+		FILE *f = open_memstream(&buf, &buf_size);
+		if (f != NULL) {
+			arg_print_errors(f, getParmsEnd(args), argv[0]);
+			fflush (f);
+			log_send_messaging(MESSAGING_ERROR,"%s", buf);
+		}
+        fclose(f);
+        FREE_AND_NULL(buf);
+    }
+    return nerrors;
 }
 void process_autoexec(){
 	int i=1;

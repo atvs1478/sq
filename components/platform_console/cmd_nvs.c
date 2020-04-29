@@ -26,7 +26,7 @@ extern "C" {
 #include "nvs.h"
 #include "nvs_utilities.h"
 #include "platform_console.h"
-
+#include "messaging.h"
 
 
 static const char *ARG_TYPE_STR = "type can be: i8, u8, i16, u16 i32, u32 i64, u64, str, blob";
@@ -71,7 +71,7 @@ static esp_err_t store_blob(nvs_handle nvs, const char *key, const char *str_val
     size_t blob_len = str_len / 2;
 
     if (str_len % 2) {
-        ESP_LOGE(TAG, "Blob data must contain even number of characters");
+    	log_send_messaging(MESSAGING_ERROR, "Blob data must contain even number of characters");
         return ESP_ERR_NVS_TYPE_MISMATCH;
     }
 
@@ -89,7 +89,7 @@ static esp_err_t store_blob(nvs_handle nvs, const char *key, const char *str_val
         } else if (ch >= 'a' && ch <= 'f') {
             value = ch - 'a' + 10;
         } else {
-            ESP_LOGE(TAG, "Blob data contain invalid character");
+        	log_send_messaging(MESSAGING_ERROR, "Blob data contain invalid character");
             free(blob);
             return ESP_ERR_NVS_TYPE_MISMATCH;
         }
@@ -188,10 +188,10 @@ static esp_err_t set_value_in_nvs(const char *key, const char *str_type, const c
     }
 
     if (err == ESP_OK) {
-    	ESP_LOGI(TAG, "Set value ok. Committing '%s'", key);
+    	log_send_messaging(MESSAGING_INFO, "Set value ok. Committing '%s'", key);
         err = nvs_commit(nvs);
         if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Value stored under key '%s'", key);
+        	log_send_messaging(MESSAGING_INFO, "Value stored under key '%s'", key);
         }
     }
 
@@ -219,51 +219,51 @@ static esp_err_t get_value_from_nvs(const char *key, const char *str_type)
         int8_t value;
         err = nvs_get_i8(nvs, key, &value);
         if (err == ESP_OK) {
-            printf("Value associated with key '%s' is %d \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %d \n", key, value);
         }
     } else if (type == NVS_TYPE_U8) {
         uint8_t value;
         err = nvs_get_u8(nvs, key, &value);
         if (err == ESP_OK) {
-            printf("Value associated with key '%s' is %u \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %u \n", key, value);
         }
     } else if (type == NVS_TYPE_I16) {
         int16_t value;
         err = nvs_get_i16(nvs, key, &value);
         if (err == ESP_OK) {
-            printf("Value associated with key '%s' is %d \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %d \n", key, value);
         }
     } else if (type == NVS_TYPE_U16) {
         uint16_t value;
         if ((err = nvs_get_u16(nvs, key, &value)) == ESP_OK) {
-            printf("Value associated with key '%s' is %u", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %u", key, value);
         }
     } else if (type == NVS_TYPE_I32) {
         int32_t value;
         if ((err = nvs_get_i32(nvs, key, &value)) == ESP_OK) {
-            printf("Value associated with key '%s' is %d \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %d \n", key, value);
         }
     } else if (type == NVS_TYPE_U32) {
         uint32_t value;
         if ((err = nvs_get_u32(nvs, key, &value)) == ESP_OK) {
-            printf("Value associated with key '%s' is %u \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %u \n", key, value);
         }
     } else if (type == NVS_TYPE_I64) {
         int64_t value;
         if ((err = nvs_get_i64(nvs, key, &value)) == ESP_OK) {
-            printf("Value associated with key '%s' is %lld \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %lld \n", key, value);
         }
     } else if (type == NVS_TYPE_U64) {
         uint64_t value;
         if ( (err = nvs_get_u64(nvs, key, &value)) == ESP_OK) {
-            printf("Value associated with key '%s' is %llu \n", key, value);
+        	log_send_messaging(MESSAGING_INFO,"Value associated with key '%s' is %llu \n", key, value);
         }
     } else if (type == NVS_TYPE_STR) {
         size_t len=0;
         if ( (err = nvs_get_str(nvs, key, NULL, &len)) == ESP_OK) {
             char *str = (char *)malloc(len);
             if ( (err = nvs_get_str(nvs, key, str, &len)) == ESP_OK) {
-                printf("String associated with key '%s' is %s \n", key, str);
+            	log_send_messaging(MESSAGING_INFO,"String associated with key '%s' is %s \n", key, str);
             }
             free(str);
         }
@@ -272,7 +272,7 @@ static esp_err_t get_value_from_nvs(const char *key, const char *str_type)
         if ( (err = nvs_get_blob(nvs, key, NULL, &len)) == ESP_OK) {
             char *blob = (char *)malloc(len);
             if ( (err = nvs_get_blob(nvs, key, blob, &len)) == ESP_OK) {
-                printf("Blob associated with key '%s' is %d bytes long: \n", key, len);
+            	log_send_messaging(MESSAGING_INFO,"Blob associated with key '%s' is %d bytes long: \n", key, len);
                 print_blob(blob, len);
             }
             free(blob);
@@ -293,7 +293,7 @@ static esp_err_t erase(const char *key)
         if (err == ESP_OK) {
             err = nvs_commit(nvs);
             if (err == ESP_OK) {
-                ESP_LOGI(TAG, "Value with key '%s' erased", key);
+            	log_send_messaging(MESSAGING_INFO, "Value with key '%s' erased", key);
             }
         }
         nvs_close(nvs);
@@ -314,7 +314,7 @@ static esp_err_t erase_all(const char *name)
         }
     }
 
-    ESP_LOGI(TAG, "Namespace '%s' was %s erased", name, (err == ESP_OK) ? "" : "not");
+    log_send_messaging(MESSAGING_INFO, "Namespace '%s' was %s erased", name, (err == ESP_OK) ? "" : "not");
     nvs_close(nvs);
     return ESP_OK;
 }
@@ -322,22 +322,19 @@ static esp_err_t erase_all(const char *name)
 static int set_value(int argc, char **argv)
 {
 	ESP_LOGD(TAG, "%s %u - Parsing keys ",__func__,__LINE__);
-    int nerrors = arg_parse(argc, argv, (void **) &set_args);
-
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&set_args);
     if (nerrors != 0) {
-    	ESP_LOGE(TAG, "%s %u - Error Parsing keys ",__func__,__LINE__);
-        arg_print_errors(stderr, set_args.end, argv[0]);
         return 1;
     }
 
     const char *key = set_args.key->sval[0];
     const char *type = set_args.type->sval[0];
     const char *values = set_args.value->sval[0];
-    ESP_LOGI(TAG, "Setting '%s' (type %s)", key,type);
+    log_send_messaging(MESSAGING_INFO, "Setting '%s' (type %s)", key,type);
     esp_err_t err = set_value_in_nvs(key, type, values);
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s", esp_err_to_name(err));
+    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -347,9 +344,8 @@ static int set_value(int argc, char **argv)
 
 static int get_value(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &get_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&get_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, get_args.end, argv[0]);
         return 1;
     }
 
@@ -359,7 +355,7 @@ static int get_value(int argc, char **argv)
     esp_err_t err = get_value_from_nvs(key, type);
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s", esp_err_to_name(err));
+    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -368,9 +364,8 @@ static int get_value(int argc, char **argv)
 
 static int erase_value(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &erase_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&erase_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, erase_args.end, argv[0]);
         return 1;
     }
 
@@ -379,7 +374,7 @@ static int erase_value(int argc, char **argv)
     esp_err_t err = erase(key);
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s", esp_err_to_name(err));
+    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -388,9 +383,8 @@ static int erase_value(int argc, char **argv)
 
 static int erase_namespace(int argc, char **argv)
 {
-    int nerrors = arg_parse(argc, argv, (void **) &erase_all_args);
+	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&erase_all_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, erase_all_args.end, argv[0]);
         return 1;
     }
 
@@ -398,7 +392,7 @@ static int erase_namespace(int argc, char **argv)
 
     esp_err_t err = erase_all(name);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s", esp_err_to_name(err));
+    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -417,11 +411,11 @@ static int erase_wifi_manager(int argc, char **argv)
 	}
 	nvs_close(nvs);
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "wifi manager configuration was not erase. %s", esp_err_to_name(err));
+		log_send_messaging(MESSAGING_ERROR,  "wifi manager configuration was not erase. %s", esp_err_to_name(err));
 		return 1;
 	}
 	else {
-		ESP_LOGW(TAG, "Wifi manager configuration was erased");
+		log_send_messaging(MESSAGING_WARNING,  "Wifi manager configuration was erased");
 	}
 	return 0;
 }
@@ -433,7 +427,7 @@ static int list(const char *part, const char *name, const char *str_type)
 
     nvs_iterator_t it = nvs_entry_find(part, NULL, type);
     if (it == NULL) {
-        ESP_LOGE(TAG, "No such enty was found");
+    	log_send_messaging(MESSAGING_ERROR, "No such enty was found");
         return 1;
     }
 
@@ -442,7 +436,7 @@ static int list(const char *part, const char *name, const char *str_type)
         nvs_entry_info(it, &info);
         it = nvs_entry_next(it);
 
-        printf("namespace '%s', key '%s', type '%s' \n",
+        log_send_messaging(MESSAGING_INFO, "namespace '%s', key '%s', type '%s' \n",
                info.namespace_name, info.key, type_to_str(info.type));
     } while (it != NULL);
 
@@ -454,9 +448,8 @@ static int list_entries(int argc, char **argv)
     list_args.namespace->sval[0] = "";
     list_args.type->sval[0] = "";
 
-    int nerrors = arg_parse(argc, argv, (void **) &list_args);
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&list_args);
     if (nerrors != 0) {
-        arg_print_errors(stderr, list_args.end, argv[0]);
         return 1;
     }
 
@@ -548,14 +541,6 @@ void register_nvs()
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_namespace_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&erase_wifimanager_cmd));
-    cmd_to_json(&list_entries_cmd);
-    cmd_to_json(&set_cmd);
-    cmd_to_json(&get_cmd);
-    cmd_to_json(&erase_cmd);
-    cmd_to_json(&erase_namespace_cmd);
-    cmd_to_json(&erase_wifimanager_cmd);
-
-
 
 }
 #ifdef __cplusplus

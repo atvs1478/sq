@@ -80,7 +80,7 @@ union sockaddr_aligned {
     struct sockaddr_in  sin;
     struct sockaddr_in6 sin6;
 } aligned_sockaddr_t;
-
+esp_err_t post_handler_buff_receive(httpd_req_t * req);
 static const char redirect_payload1[]="<html><head><title>Redirecting to Captive Portal</title><meta http-equiv='refresh' content='0; url=";
 static const char redirect_payload2[]="'></head><body><p>Please wait, refreshing.  If page does not refresh, click <a href='";
 static const char redirect_payload3[]="'>here</a> to login.</p></body></html>";
@@ -483,6 +483,54 @@ esp_err_t console_cmd_get_handler(httpd_req_t *req){
 		ESP_LOGD_LOC(TAG,  "Error retrieving command json string. ");
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to format command");
 	}
+	cJSON_free(cmdlist);
+	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
+	return err;
+}
+esp_err_t console_cmd_post_handler(httpd_req_t *req){
+	char success[]="{}";
+	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
+	bool bOTA=false;
+	char * otaURL=NULL;
+	esp_err_t err = post_handler_buff_receive(req);
+	if(err!=ESP_OK){
+		return err;
+	}
+	if(!is_user_authenticated(req)){
+		// todo:  redirect to login page
+		// return ESP_OK;
+	}
+	err = set_content_type_from_req(req);
+	if(err != ESP_OK){
+		return err;
+	}
+
+	char *command= ((rest_server_context_t *)(req->user_ctx))->scratch;
+
+	cJSON *root = cJSON_Parse(command);
+	if(root == NULL){
+		ESP_LOGE_LOC(TAG, "Parsing command. Received content was: %s",command);
+		httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed command json.  Unable to parse content.");
+		return ESP_FAIL;
+	}
+	char * root_str = cJSON_Print(root);
+	if(root_str!=NULL){
+		ESP_LOGD(TAG, "Processing command item: \n%s", root_str);
+		free(root_str);
+	}
+	cJSON *item=cJSON_GetObjectItemCaseSensitive(root, "command");
+	if(!item){
+		ESP_LOGE_LOC(TAG, "Command not found. Received content was: %s",command);
+		httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed command json.  Unable to parse content.");
+		err = ESP_FAIL;
+	}
+	else{
+		// navigate to the first child of the config structure
+		run_command(cJSON_GetStringValue(item));
+	}
+
+	httpd_resp_send(req, (const char *)success, strlen(success));
+
 	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
 	return err;
 }
