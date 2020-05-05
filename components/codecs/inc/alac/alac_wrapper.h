@@ -1,7 +1,6 @@
 /*****************************************************************************
  * alac_wrapper.h: ALAC coder wrapper
  *
- /* 
  * (c) Philippe G. 2019, philippe_44@outlook.com
  *
  * This software is released under the MIT License.
