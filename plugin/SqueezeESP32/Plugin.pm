@@ -43,8 +43,9 @@ sub initPlugin {
 	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
 	main::INFOLOG && $log->is_info && $log->info("Added class 100 for SqueezeESP32");
 
-	Slim::Control::Request::subscribe( \&onNotification, [ ['newmetadata'] ] );
-	Slim::Control::Request::subscribe( \&onNotification, [ ['playlist'], ['open', 'newsong'] ]);
+	# Note for some forgetful know-it-all: we need to wrap the callback to make it unique. Otherwise subscriptions would overwrite each other.
+	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
+	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
 
 	# the custom player class is only initialized if it has a display - thus we need to listen to connect events in order to initializes other player prefs
