@@ -39,8 +39,35 @@
 	[% END %]
 
 	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_EQUALIZER" desc="" %]
+		<div>[% "PLUGIN_SQUEEZEESP32_EQUALIZER_SAVE" | string %]</div>
 	[% END %]
 
+	<script TYPE="text/javascript">
+		if (Ext) {
+			Ext.onReady(function () {
+				new Ext.util.TaskRunner().start({
+					run: checkEq,
+					interval: 1000
+				});
+			});
+
+			function checkEq() {
+				var eqValues = [];
+				this.lastValues = this.lastValues || [];
+
+				for (var x = 0; x < 10; x++) {
+					eqValues[x] = Ext.get('pref_equalizer.' + x).dom.value || 0;
+				}
+
+				if (eqValues.join() != this.lastValues.join()) {
+					this.lastValues = eqValues;
+					SqueezeJS.Controller.request({
+						params: ['[% playerid %]', ['squeezeesp32', 'seteq', eqValues.join()]]
+					});
+				}
+			}
+		}
+	</script>
 	[% WRAPPER settingSection %]
 		[% WRAPPER settingGroup title='31Hz' desc="" %]
 			<input type="text" class="stdedit sliderInput_-13_20" name="pref_equalizer.0" id="pref_equalizer.0" value="[% pref_equalizer.0 %]" size="2"">
