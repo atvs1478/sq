@@ -179,7 +179,7 @@ While the config named "buttons_remap"
  {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"BCTRLS_UP"}}]
 ``` 
 Defines two buttons
-- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
+- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one described above
 - second on GPIO 5, active low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
 
 Below is a difficult but functional 2-buttons interface for your decoding pleasure
