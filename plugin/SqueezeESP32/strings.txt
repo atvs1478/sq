@@ -97,3 +97,6 @@ PLUGIN_SQUEEZEESP32_EQUALIZER
 	DE	Parametrischer Equalizer
 	EN	Parametric equalizer
 
+PLUGIN_SQUEEZEESP32_EQUALIZER_SAVE
+	DE	Bitte speichern Sie die Equalizer Einstellungen, falls das Gerät diese dauerhaft verwenden soll. Ansonsten werden sie beim nächsten Start zurückgesetzt.
+	EN	Don't forget to save the Equalizer settings if you want them to stick. Otherwise they'll be reset next time you restart the device.
