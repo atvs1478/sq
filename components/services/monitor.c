@@ -140,24 +140,28 @@ bool spkfault_svc (void) {
 /****************************************************************************************
  * 
  */
-void set_jack_gpio(int gpio, char *value) {
+#ifndef CONFIG_JACK_LOCKED
+static void set_jack_gpio(int gpio, char *value) {
 	if (strcasestr(value, "jack")) {
 		char *p;
 		jack.gpio = gpio;	
 		if ((p = strchr(value, ':')) != NULL) jack.active = atoi(p + 1);
 	}	
 }
+#endif
 
 /****************************************************************************************
  * 
  */
-void set_spkfault_gpio(int gpio, char *value) {
+#ifndef CONFIG_SPKFAULT_LOCKED
+static void set_spkfault_gpio(int gpio, char *value) {
 	if (strcasestr(value, "spkfault")) {
 		char *p;
 		spkfault.gpio = gpio;	
 		if ((p = strchr(value, ':')) != NULL) spkfault.active = atoi(p + 1);
 	}	
 }
+#endif
 
 /****************************************************************************************
  * 

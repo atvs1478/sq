@@ -87,41 +87,49 @@ static EXT_RAM_ATTR struct {
 	bool updated;
 } s_metadata;	
 
-static void bt_volume_up(void) {
+static void bt_volume_up(bool pressed) {
+	if (!pressed) return;
 	// volume UP/DOWN buttons are not supported by iPhone/Android
 	volume_set_by_local_host(s_volume < 127-3 ? s_volume + 3 : 127);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 	ESP_LOGI(BT_AV_TAG, "BT volume up %u", s_volume);
 }
 
-static void bt_volume_down(void) {
+static void bt_volume_down(bool pressed) {
+	if (!pressed) return;
 	// volume UP/DOWN buttons are not supported by iPhone/Android
 	volume_set_by_local_host(s_volume > 3 ? s_volume - 3 : 0);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 }
 
-static void bt_toggle(void) {
+static void bt_toggle(bool pressed) {
+	if (!pressed) return;
 	if (s_audio == AUDIO_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	else esp_avrc_ct_send_passthrough_cmd(tl++, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
-static void bt_play(void) {
+static void bt_play(bool pressed) {
+	if (!pressed) return;
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PLAY, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
-static void bt_pause(void) {
+static void bt_pause(bool pressed) {
+	if (!pressed) return;
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_PAUSE, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
-static void bt_stop(void) {
+static void bt_stop(bool pressed) {
+	if (!pressed) return;
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
-static void bt_prev(void) {
+static void bt_prev(bool pressed) {
+	if (!pressed) return;
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_BACKWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
-static void bt_next(void) {
+static void bt_next(bool pressed) {
+	if (!pressed) return;
 	esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_FORWARD, ESP_AVRC_PT_CMD_STATE_PRESSED);
 }
 
@@ -297,7 +305,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 				// force metadata update
 				update_metadata(true);
 				
-				actrls_set(controls, NULL);
+				actrls_set(controls, false, NULL, actrls_ir_action);
 			} else {
 				// if decoder is busy, stop it (would be better to not ACK this command, but don't know how)
 				esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);	

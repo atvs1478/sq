@@ -15,6 +15,8 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 
+mutex_type slimp_mutex;
+
 void get_mac(u8_t mac[]) {
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
 }
@@ -46,6 +48,7 @@ extern bool sb_display_init(void);
 u8_t custom_player_id = 12;
 
 void embedded_init(void) {
+	mutex_create(slimp_mutex);
 	sb_controls_init();
 	if (sb_display_init()) custom_player_id = 100;
 }

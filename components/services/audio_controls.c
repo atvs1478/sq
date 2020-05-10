@@ -17,6 +17,7 @@
 #include "cJSON.h"
 #include "buttons.h"
 #include "config.h"
+#include "accessors.h"
 #include "audio_controls.h"
 
 typedef esp_err_t (actrls_config_map_handler) (const cJSON * member, actrls_config_t *cur_config,uint32_t offset);
@@ -32,6 +33,9 @@ static esp_err_t actrls_process_int (const cJSON * member, actrls_config_t *cur_
 static esp_err_t actrls_process_type (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
 static esp_err_t actrls_process_bool (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
 static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *cur_config, uint32_t offset);
+
+static esp_err_t actrls_init_json(const char *profile_name, bool create);
+static void control_rotary_handler(void *client, rotary_event_e event, bool long_press);
 
 static const actrls_config_map_t actrls_config_map[] =
 		{
@@ -61,10 +65,87 @@ static actrls_config_t *json_config;
 cJSON * control_profiles = NULL;
 static actrls_t default_controls, current_controls;
 static actrls_hook_t *default_hook, *current_hook;
+static bool default_raw_controls, current_raw_controls;
+static actrls_ir_handler_t *default_ir_handler, *current_ir_handler;
+
 static struct {
 	bool long_state;
 	bool volume_lock;
 } rotary;
+
+static const struct ir_action_map_s{
+		uint32_t code;
+		actrls_action_e action;
+} ir_action_map[] = {	
+	{0x7689b04f, BCTRLS_DOWN}, {0x7689906f, BCTRLS_LEFT}, {0x7689d02f, BCTRLS_RIGHT}, {0x7689e01f, BCTRLS_UP},
+	{0x768900ff, ACTRLS_VOLDOWN}, {0x7689807f, ACTRLS_VOLUP}, 
+	{0x7689c03f, ACTRLS_PREV}, {0x7689a05f, ACTRLS_NEXT},
+	{0x768920df, ACTRLS_PAUSE}, {0x768910ef, ACTRLS_PLAY},
+	{0x00, 0x00},
+};
+
+/****************************************************************************************
+ * This function can be called to map IR codes to default actions
+ */
+bool actrls_ir_action(uint16_t addr, uint16_t cmd) {
+	uint32_t code = (addr << 16) | cmd;
+	struct ir_action_map_s const *map = ir_action_map;
+	
+	while (map->code && map->code != code) map++;
+	
+	if (map->code && current_controls[map->action]) {
+		current_controls[map->action](true);
+		return true;
+	} else {
+		return false;	
+	}	
+}
+
+/****************************************************************************************
+ * 
+ */
+static void ir_handler(uint16_t addr, uint16_t cmd) {
+	ESP_LOGD(TAG, "recaived IR %04hx:%04hx", addr, cmd);
+	if (current_ir_handler) current_ir_handler(addr, cmd);
+}
+
+/****************************************************************************************
+ * 
+ */
+static void set_ir_gpio(int gpio, char *value) {
+	if (!strcasecmp(value, "ir") ) {
+		create_infrared(gpio, ir_handler);
+	}	
+}	
+ 
+/****************************************************************************************
+ * 
+ */
+esp_err_t actrls_init(const char *profile_name) {
+	esp_err_t err = ESP_OK;
+	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+	
+	if (config && *config) {
+		char *p;
+		int A = -1, B = -1, SW = -1, longpress = 0;
+		
+		// parse config
+		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
+		if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
+				
+		// create rotary (no handling of long press)
+		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
+	}
+	
+	// set infrared GPIO if any
+	parse_set_GPIO(set_ir_gpio);
+	
+	if (!err) return actrls_init_json(profile_name, true);
+	else return err;
+}
 
 /****************************************************************************************
  * 
@@ -73,6 +154,13 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 	actrls_config_t *key = (actrls_config_t*) client;
 	actrls_action_detail_t  action_detail;
 
+	// in raw mode, we just do normal action press *and* release, there is no longpress nor shift
+	if (current_raw_controls) {
+		ESP_LOGD(TAG, "calling action %u in raw mode", key->normal[0].action);
+		if (current_controls[key->normal[0].action]) (*current_controls[key->normal[0].action])(event == BUTTON_PRESSED);
+		return;
+	}
+	
 	switch(press) {
 	case BUTTON_NORMAL:
 		if (long_press) action_detail = key->longpress[event == BUTTON_PRESSED ? 0 : 1];
@@ -87,7 +175,7 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 		break;
 	}
 	
-	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event,action_detail.action);
+	ESP_LOGD(TAG, "control gpio:%u press:%u long:%u event:%u action:%u", key->gpio, press, long_press, event, action_detail.action);
 
 	// stop here if control hook served the request
 	if (current_hook && (*current_hook)(key->gpio, action_detail.action, event, press, long_press)) return;
@@ -114,7 +202,7 @@ static void control_handler(void *client, button_event_e event, button_press_e p
 		}	
 	} else if (action_detail.action != ACTRLS_NONE) {
 		ESP_LOGD(TAG, "calling action %u", action_detail.action);
-		if (current_controls[action_detail.action]) (*current_controls[action_detail.action])();
+		if (current_controls[action_detail.action]) (*current_controls[action_detail.action])(event == BUTTON_PRESSED);
 	}	
 }
 
@@ -123,6 +211,15 @@ static void control_handler(void *client, button_event_e event, button_press_e p
  */
 static void control_rotary_handler(void *client, rotary_event_e event, bool long_press) {
 	actrls_action_e action = ACTRLS_NONE;
+	bool pressed = true;
+	
+	// in raw mode, we just pass rotary events
+	if (current_raw_controls) {
+		if (event == ROTARY_LEFT) (*current_controls[KNOB_LEFT])(true);
+		else if (event == ROTARY_RIGHT) (*current_controls[KNOB_RIGHT])(true);
+		else (*current_controls[KNOB_PUSH])(event == ROTARY_PRESSED);
+		return;
+	}
 	
 	switch(event) {
 	case ROTARY_LEFT:
@@ -144,17 +241,7 @@ static void control_rotary_handler(void *client, rotary_event_e event, bool long
 		break;
 	}
 	
-	if (action != ACTRLS_NONE) (*current_controls[action])();
-}
-
-/****************************************************************************************
- * 
- */
-esp_err_t actrls_init(int n, const actrls_config_t *config) {
-	for (int i = 0; i < n; i++) {
-		button_create((void*) (config + i), config[i].gpio, config[i].type, config[i].pull, config[i].debounce, control_handler, config[i].long_press, config[i].shifter_gpio);
-	}
-	return ESP_OK;
+	if (action != ACTRLS_NONE) (*current_controls[action])(pressed);
 }
 
 /****************************************************************************************
@@ -361,30 +448,13 @@ static void actrls_defaults(actrls_config_t *config) {
 /****************************************************************************************
  * 
  */
-esp_err_t actrls_init_json(const char *profile_name, bool create) {
+static esp_err_t actrls_init_json(const char *profile_name, bool create) {
 	esp_err_t err = ESP_OK;
 	actrls_config_t *cur_config = NULL;
 	actrls_config_t *config_root = NULL;
+	char *config;
 	const cJSON *button;
 	
-	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
-	if (config && *config) {
-		char *p;
-		int A = -1, B = -1, SW = -1, longpress = 0;
-		
-		// parse config
-		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
-		if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
-				
-		// create rotary (no handling of long press)
-		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
-	}
-			
-	if (config) free(config);	
-		
 	if (!profile_name || !*profile_name) return ESP_OK;
 	
 	config = config_alloc_get_default(NVS_TYPE_STR, profile_name, NULL, 0);
@@ -416,8 +486,9 @@ esp_err_t actrls_init_json(const char *profile_name, bool create) {
 				esp_err_t loc_err = actrls_process_button(button, cur_config);
 				err = (err == ESP_OK) ? loc_err : err;
 				if (loc_err == ESP_OK) {
-					if (create) button_create((void*) cur_config, cur_config->gpio,cur_config->type, cur_config->pull,cur_config->debounce,
-									control_handler, cur_config->long_press, cur_config->shifter_gpio);
+					if (create) button_create((void*) cur_config, cur_config->gpio,cur_config->type, 
+												cur_config->pull,cur_config->debounce, control_handler, 
+												cur_config->long_press, cur_config->shifter_gpio);
 				} else {
 					ESP_LOGE(TAG,"Error parsing button structure.  Button will not be registered.");
 				}
@@ -439,18 +510,22 @@ esp_err_t actrls_init_json(const char *profile_name, bool create) {
 /****************************************************************************************
  *
  */
-void actrls_set_default(const actrls_t controls, actrls_hook_t *hook) {
+void actrls_set_default(const actrls_t controls, bool raw_controls, actrls_hook_t *hook, actrls_ir_handler_t *ir_handler) {
 	memcpy(default_controls, controls, sizeof(actrls_t));
 	memcpy(current_controls, default_controls, sizeof(actrls_t));
 	default_hook = current_hook = hook;
+	default_raw_controls = current_raw_controls = raw_controls;
+	default_ir_handler = current_ir_handler = ir_handler;
 }
 
 /****************************************************************************************
  * 
  */
-void actrls_set(const actrls_t controls, actrls_hook_t *hook) {
+void actrls_set(const actrls_t controls, bool raw_controls, actrls_hook_t *hook, actrls_ir_handler_t *ir_handler) {
 	memcpy(current_controls, controls, sizeof(actrls_t));
 	current_hook = hook;
+	current_raw_controls = raw_controls;
+	current_ir_handler = ir_handler;
 }
 
 /****************************************************************************************
@@ -459,4 +534,6 @@ void actrls_set(const actrls_t controls, actrls_hook_t *hook) {
 void actrls_unset(void) {
 	memcpy(current_controls, default_controls, sizeof(actrls_t));
 	current_hook = default_hook;
+	current_raw_controls = default_raw_controls;
+	current_ir_handler = default_ir_handler;
 }

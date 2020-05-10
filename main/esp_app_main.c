@@ -284,6 +284,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
 	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "lms_ctrls_raw");
+	config_set_default(NVS_TYPE_STR, "lms_ctrls_raw", "n", 0);
+	
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value %s", "rotary_config", CONFIG_ROTARY_ENCODER);
 	config_set_default(NVS_TYPE_STR, "rotary_config", CONFIG_ROTARY_ENCODER, 0);
 
@@ -392,7 +395,7 @@ void app_main()
 
 	ESP_LOGD(TAG,"Getting audio control mapping ");
 	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
-	if (actrls_init_json(actrls_config, true) == ESP_OK) {
+	if (actrls_init(actrls_config) == ESP_OK) {
 		ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
 	} else {
 		ESP_LOGD(TAG,"No audio control buttons");

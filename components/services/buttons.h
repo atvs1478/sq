@@ -7,6 +7,8 @@
  */
 
 #pragma once
+
+#include "infrared.h"
  
 // button type (pressed = LOW or HIGH, matches GPIO level)
 #define BUTTON_LOW 		0
@@ -32,3 +34,5 @@ typedef enum { ROTARY_LEFT, ROTARY_RIGHT, ROTARY_PRESSED, ROTARY_RELEASED } rota
 typedef void (*rotary_handler)(void *id, rotary_event_e event, bool long_press);
 
 bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handler handler);
+
+bool create_infrared(int gpio, infrared_handler handler);
