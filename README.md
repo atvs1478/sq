@@ -99,7 +99,7 @@ The IR codes are send "as is" to LMS, so only a Logitech SB remote from Boom, Cl
 
 In AirPlay and Bluetooth mode, only these native remotes are supported, I've not added the option to make your own mapping
 
-See "set GPIO" below to set the GPIO associated to infrared receiver. 
+See "set GPIO" below to set the GPIO associated to infrared receiver (option "ir"). 
 
 ### Set GPIO
 The parameter "set_GPIO" is use to assign GPIO to various functions.
@@ -111,6 +111,8 @@ The \<amp\> parameter can use used to assign a GPIO that will be set to 1 when p
 If you have an audio jack that supports insertion (use :0 or :1 to set the level when inserted), you can specify which GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
 
 You can set the Green and Red status led as well with their respective active state (:0 or :1)
+
+The \<ir\> parameter set the GPIO associated to an IR receiver. No need to add pullup or capacitor
 
 Syntax is:
 
