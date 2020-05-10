@@ -15,7 +15,7 @@ static log_level loglevel = lINFO;
 #define DOWN_OFS	0x10000
 #define UP_OFS		0x20000
 
-// numbers are simply 0..9
+// numbers are simply 0..9 but are not used
 
 // arrow_right.down	= 0001000e seems to be missing ...
 enum { 	BUTN_POWER_FRONT = 0X0A, BUTN_ARROW_UP, BUTN_ARROW_DOWN, BUTN_ARROW_LEFT, BUTN_KNOB_PUSH, BUTN_SEARCH,
