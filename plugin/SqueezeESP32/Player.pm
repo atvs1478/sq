@@ -54,6 +54,10 @@ sub hasScrolling {
 	return 1;
 }
 
+sub hasIR { 
+	return 1; 
+}
+
 sub update_artwork {
 	my $client = shift;
 	my $cprefs = $prefs->client($client);
