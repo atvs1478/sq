@@ -274,7 +274,9 @@ static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
 	server_ip = ip;
 	server_hport = hport;
 	server_cport = cport;
+	
 	LOG_INFO("notified server %s hport %hu cport %hu", inet_ntoa(ip), hport, cport);
+	
 	if (chained_notify) (*chained_notify)(ip, hport, cport);
 }
 
