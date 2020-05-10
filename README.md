@@ -97,7 +97,7 @@ You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and o
 
 The IR codes are send "as is" to LMS, so only a Logitech SB remote from Boom, Classic or Touch will work. I think the file Slim_Devices_Remote.ir in the "server" directory of LMS can be modified to adapt to other codes, but I've not tried that.
 
-In AirPlay and Bluetooth mode, only these native remote are supported, I've not added the option to make your own mapping
+In AirPlay and Bluetooth mode, only these native remotes are supported, I've not added the option to make your own mapping
 
 See "set GPIO" below to set the GPIO associated to infrared receiver. 
 
