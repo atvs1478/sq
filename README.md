@@ -93,7 +93,7 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
 
 ### Infrared
-You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pin that needs to be connected, no pullup, no filtering capacitor, it's a straight connection.
+You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
 
 The IR codes are send "as is" to LMS, so only a Logitech SB remote from Boom, Classic or Touch will work. I think the file Slim_Devices_Remote.ir in the "server" directory of LMS can be modified to adapt to other codes, but I've not tried that.
 
