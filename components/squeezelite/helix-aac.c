@@ -441,9 +441,8 @@ static decode_state helixaac_decode(void) {
 	bytes = bytes_wrap - bytes;
 	endstream = false;
 
-	// mp4 end of chunk - skip to next offset
 	if (a->chunkinfo && a->chunkinfo[a->nextchunk].offset && a->sample++ == a->chunkinfo[a->nextchunk].sample) {
-
+		// mp4 end of chunk - skip to next offset
 		if (a->chunkinfo[a->nextchunk].offset > a->pos) {
 			u32_t skip = a->chunkinfo[a->nextchunk].offset - a->pos;
 			if (skip != bytes) {
@@ -460,15 +459,12 @@ static decode_state helixaac_decode(void) {
 			LOG_ERROR("error: need to skip backwards!");
 			endstream = true;
 		}
-
-	// adts and mp4 when not at end of chunk 
 	} else if (bytes > 0) {
-
+		// adts and mp4 when not at end of chunk 
 		_buf_inc_readp(streambuf, bytes);
 		a->pos += bytes;
-
-	// error which doesn't advance streambuf - end
 	} else {
+		// error which doesn't advance streambuf - end
 		endstream = true;
 	}
 
