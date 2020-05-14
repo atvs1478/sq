@@ -330,7 +330,7 @@ static decode_state helixaac_decode(void) {
 	u8_t *sptr;
 	bool endstream;
 	frames_t frames;
-
+	
 	LOCK_S;
 	bytes_total = _buf_used(streambuf);
 	bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
@@ -418,15 +418,14 @@ static decode_state helixaac_decode(void) {
 		}
 	}
 
-	if (bytes_wrap < WRAPBUF_LEN && bytes_total > WRAPBUF_LEN) {
+	if (bytes_wrap < WRAPBUF_LEN && (bytes_total > WRAPBUF_LEN || stream.state <= DISCONNECT)) {
 		// make a local copy of frames which may have wrapped round the end of streambuf
 		memcpy(a->wrap_buf, streambuf->readp, bytes_wrap);
-		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, WRAPBUF_LEN - bytes_wrap);
+		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, min(WRAPBUF_LEN, bytes_total) - bytes_wrap);
 		
 		sptr = a->wrap_buf;
-		bytes = bytes_wrap = WRAPBUF_LEN;
+		bytes = bytes_wrap = min(WRAPBUF_LEN, bytes_total);
 	} else {
-
 		sptr = streambuf->readp;
 		bytes = bytes_wrap;
 	}
@@ -517,7 +516,7 @@ static decode_state helixaac_decode(void) {
 		frames_t f;
 		frames_t count;
 		ISAMPLE_T *optr;
-
+		
 		IF_DIRECT(
 			f = _buf_cont_write(outputbuf) / BYTES_PER_FRAME;
 			optr = (ISAMPLE_T *)outputbuf->writep;
@@ -559,7 +558,7 @@ static decode_state helixaac_decode(void) {
 			if (frames) LOG_ERROR("unhandled case");
 		);
 	}
-
+	
 	UNLOCK_O_direct;
 
 	return DECODE_RUNNING;
