@@ -389,19 +389,25 @@ static decode_state helixaac_decode(void) {
 		}
 
 		if (found == 1) {
-
-			LOG_INFO("samplerate: %u channels: %u", samplerate, channels);
-			bytes_total = _buf_used(streambuf);
-			bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
-
 			LOCK_O;
-			LOG_INFO("setting track_start");
 			output.next_sample_rate = decode_newstream(samplerate, output.supported_rates);
 			IF_DSD( output.next_fmt = PCM; )
 			output.track_start = outputbuf->writep;
 			if (output.fade_mode) _checkfade(true);
 			decode.new_stream = false;
 			UNLOCK_O;
+			
+			LOG_INFO("setting track start, samplerate: %u channels: %u", samplerate, channels);
+			
+			bytes_total = _buf_used(streambuf);
+			bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
+
+			// come back later if we don' thave enough data			
+			if (bytes_total < WRAPBUF_LEN) {
+				UNLOCK_S;
+				LOG_INFO("need more audio data");
+				return DECODE_RUNNING;
+			}
 
 		} else if (found == -1) {
 
@@ -418,8 +424,9 @@ static decode_state helixaac_decode(void) {
 		}
 	}
 
-	if (bytes_wrap < WRAPBUF_LEN && (bytes_total > WRAPBUF_LEN || stream.state <= DISCONNECT)) {
-		// make a local copy of frames which may have wrapped round the end of streambuf
+	// we always have at least WRAPBUF_LEN unless it's the end of a stream
+	if (bytes_wrap < WRAPBUF_LEN) {
+		// build a linear buffer if we are crossing the end of streambuf
 		memcpy(a->wrap_buf, streambuf->readp, bytes_wrap);
 		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, min(WRAPBUF_LEN, bytes_total) - bytes_wrap);
 		
