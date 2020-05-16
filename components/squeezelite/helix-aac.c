@@ -572,13 +572,15 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 
 	a->type = size;
 	a->pos = a->consume = a->sample = a->nextchunk = 0;
-
+	
 	if (a->chunkinfo) {
 		free(a->chunkinfo);
 	}
+	
 	if (a->stsc) {
 		free(a->stsc);
 	}
+	
 	a->chunkinfo = NULL;
 	a->stsc = NULL;
 	a->skip = 0;
@@ -587,12 +589,14 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 	a->empty = false;
 
 	if (a->hAac) {
-		HAAC(a, FlushCodec, a->hAac);
+		// always free decoder as flush only works when no parameter has changed
+		HAAC(a, FreeDecoder, a->hAac);			
 	} else {
-		a->hAac = HAAC(a, InitDecoder);	
 		a->write_buf = malloc(FRAME_BUF * BYTES_PER_FRAME);
 		a->wrap_buf = malloc(WRAPBUF_LEN);
 	}
+	
+	a->hAac = HAAC(a, InitDecoder);	
 }
 
 static void helixaac_close(void) {
