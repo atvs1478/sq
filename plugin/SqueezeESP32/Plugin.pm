@@ -4,8 +4,6 @@ use strict;
 
 use base qw(Slim::Plugin::Base);
 
-use Digest::MD5 qw(md5);
-use List::Util qw(min);
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 use Slim::Web::ImageProxy;
@@ -16,121 +14,108 @@ my $log = Slim::Utils::Log->addLogCategory({
 	'category'     => 'plugin.squeezeesp32',
 	'defaultLevel' => 'INFO',
 	'description'  => Slim::Utils::Strings::string('SqueezeESP32'),
-}); 
+});
+
+# migrate 'eq' pref, as that's a reserved word and could cause problems in the future
+$prefs->migrateClient(1, sub {
+	my ($cprefs, $client) = @_;
+	$cprefs->set('equalizer', $cprefs->get('eq'));
+	$cprefs->remove('eq');
+	1;
+});
+
+$prefs->setChange(sub {
+	send_equalizer($_[2]);
+}, 'equalizer');
 
 sub initPlugin {
 	my $class = shift;
-	
+
 	if ( main::WEBUI ) {
 		require Plugins::SqueezeESP32::PlayerSettings;
 		Plugins::SqueezeESP32::PlayerSettings->new;
-		
+
 		# require Plugins::SqueezeESP32::Settings;
 		# Plugins::SqueezeESP32::Settings->new;
 	}
-	
+
 	$class->SUPER::initPlugin(@_);
 	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
-	$log->info("Added class 100 for SqueezeESP32");
-	
+	main::INFOLOG && $log->is_info && $log->info("Added class 100 for SqueezeESP32");
+
+	# register a command to set the EQ - without saving the values! Send params as single comma separated list of values
+	Slim::Control::Request::addDispatch(['squeezeesp32', 'seteq', '_eq'], [1, 0, 0, \&setEQ]);
+
+	# Note for some forgetful know-it-all: we need to wrap the callback to make it unique. Otherwise subscriptions would overwrite each other.
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
+
+	# the custom player class is only initialized if it has a display - thus we need to listen to connect events in order to initializes other player prefs
 	Slim::Control::Request::subscribe( \&onPlayer,[ ['client'], [ 'new', 'reconnect' ] ] );
 }
 
 sub onStopClear {
-    my $request = shift;
-    my $client  = $request->client;
-	my $artwork = $prefs->client($client)->get('artwork');
-	
-	if ($client->model eq 'squeezeesp32' && $artwork->{'enable'}) {
-		my $reqstr = $request->getRequestString();
-		$log->info("artwork stop/clear $reqstr");
-		$client->pluginData('artwork_md5', '')
-	}	
+	my $request = shift;
+	my $client  = $request->client || return;
+
+	if ($client->isa('Plugins::SqueezeESP32::Player')) {
+		$client->clear_artwork($request);
+	}
 }
 
 sub onPlayer {
-    my $request = shift;
-    my $client  = $request->client;
+	my $request = shift;
+	my $client  = $request->client || return;
 
-    if ($client->model eq 'squeezeesp32') {
-		$prefs->client($client)->init( { 
-					eq => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-				} );
-		Plugins::SqueezeESP32::Plugin::send_equalizer($client);
+	if ($client->model eq 'squeezeesp32') {
+		main::INFOLOG && $log->is_info && $log->info("SqueezeESP player connected: " . $client->id);
+
+		$prefs->client($client)->init( {
+			equalizer => [(0) x 10],
+		} );
+		send_equalizer($client);
 	}
 }
 
 sub onNotification {
-    my $request = shift;
-    my $client  = $request->client;
-	
-	my $reqstr     = $request->getRequestString();
+	my $request = shift;
+	my $client  = $request->client || return;
 
-	update_artwork($client);
-}
-
-sub update_artwork {
-    my $client  = shift;
-	my $params = { force => shift || 0 };
-	my $cprefs = $prefs->client($client);
-	my $artwork = $cprefs->get('artwork');
-		
-	return unless $client->model eq 'squeezeesp32' && $artwork->{'enable'};
-
-	my $s = min($cprefs->get('height') - $artwork->{'y'}, $cprefs->get('width') - $artwork->{'x'});
-	
-	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
-	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $params, \&send_artwork, undef, HTTP::Response->new);
-	
-	send_artwork($client, undef, \$body) if $body;
-}
-
-sub send_artwork {
-	my ($client, $params, $dataref) = @_;
-	
-	# I'm not sure why we are called so often, so only send when needed
-	my $md5 = md5($$dataref);
-	return if $client->pluginData('artwork_md5') eq $md5 && !$params->{'force'};
-	
-	$client->pluginData('artwork', $dataref);
-	$client->pluginData('artwork_md5', $md5);
-	
-	my $artwork = $prefs->client($client)->get('artwork');
-	my $length = length $$dataref;
-	my $offset = 0;
-	
-	$log->info("got resized artwork (length: ", length $$dataref, ")");
-	
-	my $header = pack('Nnn', $length, $artwork->{'x'}, $artwork->{'y'});
-	
-	while ($length > 0) {
-		$length = 1280 if $length > 1280;
-		$log->info("sending grfa $length");
-			
-		my $data = $header . pack('N', $offset) . substr( $$dataref, 0, $length, '' );
-			
-		$client->sendFrame( grfa => \$data );
-		$offset += $length;			
-		$length = length $$dataref;
+	if ($client->isa('Plugins::SqueezeESP32::Player')) {
+		$client->update_artwork();
 	}
-}	
+}
+
+sub setEQ {
+	my $request = shift;
+
+	# check this is the correct command.
+	if ($request->isNotCommand([['squeezeesp32'],['seteq']])) {
+		$request->setStatusBadDispatch();
+		return;
+	}
+
+	# get our parameters
+	my $client   = $request->client();
+	my @eqParams = split(/,/, $request->getParam('_eq') || '');
+
+	for (my $x = 0; $x < 10; $x++) {
+		$eqParams[$x] ||= 0;
+	}
+
+	send_equalizer($client, \@eqParams);
+}
 
 sub send_equalizer {
-	my ($client) = @_;
-	my $equalizer = $prefs->client($client)->get('eq');
-	my $size = @$equalizer;
-	my $data = pack("c[$size]", @{$equalizer});
-	$client->sendFrame( eqlz => \$data );
-}
+	my ($client, $equalizer) = @_;
 
-sub config_artwork {
-	my ($client) = @_;
-	my $artwork = $prefs->client($client)->get('artwork');
-	my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
-	$client->sendFrame( grfa => \$header );
+	if ($client->model eq 'squeezeesp32') {
+		$equalizer ||= $prefs->client($client)->get('equalizer') || [(0) x 10];
+		my $size = @$equalizer;
+		my $data = pack("c[$size]", @{$equalizer});
+		$client->sendFrame( eqlz => \$data );
+	}
 }
 
 1;

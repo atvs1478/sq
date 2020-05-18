@@ -19,7 +19,7 @@
 #include "platform_config.h"
 #include "trace.h"
 
-static const char * TAG = "platform";
+static const char * TAG = "bt_app_source";
 
 extern int32_t 	output_bt_data(uint8_t *data, int32_t len);
 extern void 	output_bt_tick(void);

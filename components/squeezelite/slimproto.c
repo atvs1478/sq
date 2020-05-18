@@ -67,6 +67,10 @@ event_event wake_e;
 #define UNLOCK_O mutex_unlock(outputbuf->mutex)
 #define LOCK_D   mutex_lock(decode.mutex)
 #define UNLOCK_D mutex_unlock(decode.mutex)
+#if !EMBEDDED
+#define LOCK_P
+#define UNLOCK_P
+#endif 
 #if IR
 #define LOCK_I   mutex_lock(ir.mutex)
 #define UNLOCK_I mutex_unlock(ir.mutex)
@@ -149,11 +153,12 @@ static void sendHELO(bool reconnect, const char *fixed_cap, const char *var_cap,
 	LOG_INFO("mac: %02x:%02x:%02x:%02x:%02x:%02x", pkt.mac[0], pkt.mac[1], pkt.mac[2], pkt.mac[3], pkt.mac[4], pkt.mac[5]);
 
 	LOG_INFO("cap: %s%s%s", base_cap, fixed_cap, var_cap);
-
+	LOCK_P;
 	send_packet((u8_t *)&pkt, sizeof(pkt));
 	send_packet((u8_t *)base_cap, strlen(base_cap));
 	send_packet((u8_t *)fixed_cap, strlen(fixed_cap));
 	send_packet((u8_t *)var_cap, strlen(var_cap));
+	UNLOCK_P;
 }
 
 static void sendSTAT(const char *event, u32_t server_timestamp) {
@@ -205,7 +210,9 @@ static void sendSTAT(const char *event, u32_t server_timestamp) {
 				   ms_played - now + status.stream_start, status.device_frames * 1000 / status.current_sample_rate, now - status.updated);
 	}
 
+	LOCK_P;
 	send_packet((u8_t *)&pkt, sizeof(pkt));
+	UNLOCK_P;
 }
 
 static void sendDSCO(disconnect_code disconnect) {
@@ -218,7 +225,9 @@ static void sendDSCO(disconnect_code disconnect) {
 
 	LOG_DEBUG("DSCO: %d", disconnect);
 
+	LOCK_P;
 	send_packet((u8_t *)&pkt, sizeof(pkt));
+	UNLOCK_P;
 }
 
 static void sendRESP(const char *header, size_t len) {
@@ -229,9 +238,11 @@ static void sendRESP(const char *header, size_t len) {
 	pkt_header.length = htonl(sizeof(pkt_header) + len - 8);
 
 	LOG_DEBUG("RESP");
-
+	
+	LOCK_P;
 	send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
 	send_packet((u8_t *)header, len);
+	UNLOCK_P;
 }
 
 static void sendMETA(const char *meta, size_t len) {
@@ -243,8 +254,10 @@ static void sendMETA(const char *meta, size_t len) {
 
 	LOG_DEBUG("META");
 
+	LOCK_P;
 	send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
 	send_packet((u8_t *)meta, len);
+	UNLOCK_P;
 }
 
 static void sendSETDName(const char *name) {
@@ -258,8 +271,10 @@ static void sendSETDName(const char *name) {
 
 	LOG_DEBUG("set playername: %s", name);
 
+	LOCK_P;
 	send_packet((u8_t *)&pkt_header, sizeof(pkt_header));
 	send_packet((u8_t *)name, strlen(name) + 1);
+	UNLOCK_P;
 }
 
 #if IR
@@ -274,8 +289,9 @@ void sendIR(u32_t code, u32_t ts) {
 	pkt.ir_code = htonl(code);
 
 	LOG_DEBUG("IR: ir code: 0x%x ts: %u", code, ts);
-
+	LOCK_P;
 	send_packet((u8_t *)&pkt, sizeof(pkt));
+	UNLOCK_P;
 }
 #endif
 

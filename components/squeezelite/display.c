@@ -1,19 +1,8 @@
 /* 
- *  (c) 2004,2006 Richard Titmuss for SlimProtoLib 
  *  (c) Philippe G. 2019, philippe_44@outlook.com
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  This software is released under the MIT License.
+ *  https://opensource.org/licenses/MIT
  *
  */
 
@@ -208,23 +197,20 @@ extern const uint8_t vu_bitmap[]   asm("_binary_vu_data_start");
 #define ANIM_SCREEN_1     0x04 
 #define ANIM_SCREEN_2     0x08 
 
-static u8_t ANIC_resp = ANIM_NONE;
-static uint16_t SETD_width;
-
 #define SCROLL_STACK_SIZE	(3*1024)
 #define LINELEN				40
 
 static log_level loglevel = lINFO;
 
 static bool (*slimp_handler_chain)(u8_t *data, int len);
-static void (*slimp_loop_chain)(void);
 static void (*notify_chain)(in_addr_t ip, u16_t hport, u16_t cport);
 static bool (*display_bus_chain)(void *from, enum display_bus_cmd_e cmd);
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static void server(in_addr_t ip, u16_t hport, u16_t cport);
-static void send_server(void);
+static void sendSETD(u16_t width, u16_t height);
+static void sendANIC(u8_t code);
 static bool handler(u8_t *data, int len);
 static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd);
 static void vfdc_handler( u8_t *_data, int bytes_read);
@@ -234,7 +220,6 @@ static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
 static void grfa_handler(u8_t *data, int len);
 static void visu_handler(u8_t *data, int len);
-
 static void displayer_task(void* arg);
 
 /* scrolling undocumented information
@@ -304,11 +289,13 @@ bool sb_display_init(void) {
 		return false;
 	}	
 	
+	// inform LMS of our screen dimensions
+	sendSETD(GDS_GetWidth(display), GDS_GetHeight(display));
+	
 	// need to force height to 32 maximum
 	displayer.width = GDS_GetWidth(display);
 	displayer.height = min(GDS_GetHeight(display), SB_HEIGHT);
-	SETD_width = displayer.width;
-
+	
 	// create visu configuration
 	visu.bar_gap = 1;
 	visu.speed = 100;
@@ -329,9 +316,6 @@ bool sb_display_init(void) {
 	// chain handlers
 	slimp_handler_chain = slimp_handler;
 	slimp_handler = handler;
-	
-	slimp_loop_chain = slimp_loop;
-	slimp_loop = send_server;
 	
 	notify_chain = server_notify;
 	server_notify = server;
@@ -369,52 +353,44 @@ static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd) {
 	else return true;
 }
 
-
 /****************************************************************************************
- * Send message to server (ANIC at that time)
+ * Send ANImation Complete
  */
-static void send_server(void) {
-	/* 
-	 This complication is needed as we cannot send direclty to LMS, because 
-	 send_packet is not thread safe. So must subscribe to slimproto busy loop
-	 end send from there
-	*/ 
-	if (ANIC_resp != ANIM_NONE) {
-		struct ANIC_header pkt_header;
+static void sendANIC(u8_t code) {
+	struct ANIC_header pkt_header;
 
-		memset(&pkt_header, 0, sizeof(pkt_header));
-		memcpy(&pkt_header.opcode, "ANIC", 4);
-		pkt_header.length = htonl(sizeof(pkt_header) - 8);
-		pkt_header.mode = ANIC_resp;
+	memset(&pkt_header, 0, sizeof(pkt_header));
+	memcpy(&pkt_header.opcode, "ANIC", 4);
+	pkt_header.length = htonl(sizeof(pkt_header) - 8);
+	pkt_header.mode = code;
 
-		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
+	LOCK_P;
+	send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
+	UNLOCK_P;
+}	
 		
-		ANIC_resp = ANIM_NONE;
-	}	
-	
-	if (SETD_width) {
-		struct SETD_header pkt_header;
+/****************************************************************************************
+ * Send SETD for width
+ */
+static void sendSETD(u16_t width, u16_t height) {
+	struct SETD_header pkt_header;
 		
-		memset(&pkt_header, 0, sizeof(pkt_header));
-		memcpy(&pkt_header.opcode, "SETD", 4);
+	memset(&pkt_header, 0, sizeof(pkt_header));
+	memcpy(&pkt_header.opcode, "SETD", 4);
 
-		pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
-		pkt_header.length = htonl(sizeof(pkt_header) +  4 - 8);
+	pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
+	pkt_header.length = htonl(sizeof(pkt_header) +  4 - 8);
 		
-		u16_t height = GDS_GetHeight(display);
-		LOG_INFO("sending dimension %ux%u", SETD_width, height);	
+	LOG_INFO("sending dimension %ux%u", width, height);	
 
-		SETD_width = htons(SETD_width);
-		height = htons(height);
+	width = htons(width);
+	height = htons(height);
 		
-		send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
-		send_packet((uint8_t *) &SETD_width, 2);
-		send_packet((uint8_t *) &height, 2);
-		
-		SETD_width = 0;
-	}	
-	
-	if (slimp_loop_chain) (*slimp_loop_chain)();
+	LOCK_P;
+	send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
+	send_packet((uint8_t *) &width, 2);
+	send_packet((uint8_t *) &height, 2);
+	UNLOCK_P;
 }
 
 /****************************************************************************************
@@ -427,10 +403,12 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
 	if (displayer.owned) GDS_TextPos(display, GDS_FONT_DEFAULT, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg);
-	SETD_width = displayer.width;
 	displayer.dirty = true;
 	
 	xSemaphoreGive(displayer.mutex);
+	
+	// inform new LMS server of our capabilities
+	sendSETD(displayer.width, GDS_GetHeight(display));
 	
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
@@ -1152,8 +1130,7 @@ static void displayer_task(void *args) {
 				
 				// see if we need to pause or if we are done 				
 				if (scroller.mode) {
-					// can't call directly send_packet from slimproto as it's not re-entrant
-					ANIC_resp = ANIM_SCROLL_ONCE | ANIM_SCREEN_1;
+					sendANIC(ANIM_SCROLL_ONCE | ANIM_SCREEN_1);
 					LOG_INFO("scroll-once terminated");
 				} else {
 					scroller.wake = scroller.pause;

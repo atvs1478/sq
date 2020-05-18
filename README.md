@@ -92,6 +92,15 @@ The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay a
 
 You can install the excellent plugin "Music Information Screen" which is super useful to tweak the layout for these small displays.
 
+### Infrared
+You can use any IR receiver compatible with NEC protocol (38KHz). Vcc, GND and output are the only pins that need to be connected, no pullup, no filtering capacitor, it's a straight connection.
+
+The IR codes are send "as is" to LMS, so only a Logitech SB remote from Boom, Classic or Touch will work. I think the file Slim_Devices_Remote.ir in the "server" directory of LMS can be modified to adapt to other codes, but I've not tried that.
+
+In AirPlay and Bluetooth mode, only these native remotes are supported, I've not added the option to make your own mapping
+
+See "set GPIO" below to set the GPIO associated to infrared receiver (option "ir"). 
+
 ### Set GPIO
 The parameter "set_GPIO" is use to assign GPIO to various functions.
 
@@ -103,10 +112,12 @@ If you have an audio jack that supports insertion (use :0 or :1 to set the level
 
 You can set the Green and Red status led as well with their respective active state (:0 or :1)
 
+The \<ir\> parameter set the GPIO associated to an IR receiver. No need to add pullup or capacitor
+
 Syntax is:
 
 ```
-<gpio>=Vcc|GND|amp|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
+<gpio>=Vcc|GND|amp|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 ### Rotary Encoder
@@ -121,6 +132,8 @@ A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
 ```
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
+
+See also the "IMPORTANT NOTE" on the "Buttons" section
 
 ### Buttons
 Buttons are described using a JSON string with the following syntax
@@ -158,7 +171,7 @@ Where \<action\> is either the name of another configuration to load (remap) or 
 ```
 ACTRLS_NONE, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, ACTRLS_PLAY, 
 ACTRLS_PAUSE, ACTRLS_STOP, ACTRLS_REW, ACTRLS_FWD, ACTRLS_PREV, ACTRLS_NEXT, 
-BCTRLS_PUSH, BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,
+BCTRLS_UP, BCTRLS_DOWN, BCTRLS_LEFT, BCTRLS_RIGHT,
 KNOB_LEFT, KNOB_RIGHT, KNOB_PUSH
 ```
 				
@@ -179,7 +192,7 @@ While the config named "buttons_remap"
  {"gpio":5,"type":"BUTTON_LOW","pull":true,"shifter_gpio":4,"normal":{"pressed":"BCTRLS_UP"}}]
 ``` 
 Defines two buttons
-- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one descrobed above
+- first on GPIO 4, active low. When pressed, it triggers a navigation down command. When pressed more than 1000ms, it changes the button configuration for the one described above
 - second on GPIO 5, active low. When pressed it triggers a navigation up command. That button, in that configuration, has no shift option
 
 Below is a difficult but functional 2-buttons interface for your decoding pleasure
@@ -207,6 +220,12 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
  "longshifted":{"pressed":"BCTRLS_LEFT"}}
 ]
 ```
+<strong>IMPORTANT NOTE</strong>: LMS also supports the possibility to send 'raw' button codes. It's a bit complicated, so bear with me. Buttons can either be processed by SqueezeESP32 and mapped to a "function" like play/pause or they can be just sent to LMS as plain (raw) code and the full logic of press/release/longpress is handled by LMS, you don't have any control on that.
+
+The benefit of the "raw" mode is that you can build a player which is as close as possible to a Boom (e.g.) but you can't use the remapping function nor longress or shift logics to do your own mapping when you have a limited set of buttons. In 'raw' mode, all you really need to define is the mapping between the gpio and the button. As far as LMS is concerned, any other option in these JSON payloads does not matter. Now, when you use BT or AirPlay, the full JSON construct described above fully applies, so the shift, longpress, remapping options still work. 
+
+There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
+
 ### Battery / ADC
 The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
 ```

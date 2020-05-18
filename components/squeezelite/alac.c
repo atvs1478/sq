@@ -358,7 +358,7 @@ static decode_state alac_decode(void) {
 		return DECODE_COMPLETE;
 	}
 
-	// enough data for coding
+	// is there enough data for decoding
 	if (bytes < block_size) {
 		UNLOCK_S;
 		return DECODE_RUNNING;

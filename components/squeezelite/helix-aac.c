@@ -330,7 +330,7 @@ static decode_state helixaac_decode(void) {
 	u8_t *sptr;
 	bool endstream;
 	frames_t frames;
-
+	
 	LOCK_S;
 	bytes_total = _buf_used(streambuf);
 	bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
@@ -389,19 +389,25 @@ static decode_state helixaac_decode(void) {
 		}
 
 		if (found == 1) {
-
-			LOG_INFO("samplerate: %u channels: %u", samplerate, channels);
-			bytes_total = _buf_used(streambuf);
-			bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
-
 			LOCK_O;
-			LOG_INFO("setting track_start");
 			output.next_sample_rate = decode_newstream(samplerate, output.supported_rates);
 			IF_DSD( output.next_fmt = PCM; )
 			output.track_start = outputbuf->writep;
 			if (output.fade_mode) _checkfade(true);
 			decode.new_stream = false;
 			UNLOCK_O;
+			
+			LOG_INFO("setting track start, samplerate: %u channels: %u", samplerate, channels);
+			
+			bytes_total = _buf_used(streambuf);
+			bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
+
+			// come back later if we don' thave enough data			
+			if (bytes_total < WRAPBUF_LEN) {
+				UNLOCK_S;
+				LOG_INFO("need more audio data");
+				return DECODE_RUNNING;
+			}
 
 		} else if (found == -1) {
 
@@ -418,15 +424,15 @@ static decode_state helixaac_decode(void) {
 		}
 	}
 
-	if (bytes_wrap < WRAPBUF_LEN && bytes_total > WRAPBUF_LEN) {
-		// make a local copy of frames which may have wrapped round the end of streambuf
+	// we always have at least WRAPBUF_LEN unless it's the end of a stream
+	if (bytes_wrap < WRAPBUF_LEN) {
+		// build a linear buffer if we are crossing the end of streambuf
 		memcpy(a->wrap_buf, streambuf->readp, bytes_wrap);
-		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, WRAPBUF_LEN - bytes_wrap);
+		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, min(WRAPBUF_LEN, bytes_total) - bytes_wrap);
 		
 		sptr = a->wrap_buf;
-		bytes = bytes_wrap = WRAPBUF_LEN;
+		bytes = bytes_wrap = min(WRAPBUF_LEN, bytes_total);
 	} else {
-
 		sptr = streambuf->readp;
 		bytes = bytes_wrap;
 	}
@@ -442,9 +448,8 @@ static decode_state helixaac_decode(void) {
 	bytes = bytes_wrap - bytes;
 	endstream = false;
 
-	// mp4 end of chunk - skip to next offset
 	if (a->chunkinfo && a->chunkinfo[a->nextchunk].offset && a->sample++ == a->chunkinfo[a->nextchunk].sample) {
-
+		// mp4 end of chunk - skip to next offset
 		if (a->chunkinfo[a->nextchunk].offset > a->pos) {
 			u32_t skip = a->chunkinfo[a->nextchunk].offset - a->pos;
 			if (skip != bytes) {
@@ -461,15 +466,12 @@ static decode_state helixaac_decode(void) {
 			LOG_ERROR("error: need to skip backwards!");
 			endstream = true;
 		}
-
-	// adts and mp4 when not at end of chunk 
 	} else if (bytes > 0) {
-
+		// adts and mp4 when not at end of chunk 
 		_buf_inc_readp(streambuf, bytes);
 		a->pos += bytes;
-
-	// error which doesn't advance streambuf - end
 	} else {
+		// error which doesn't advance streambuf - end
 		endstream = true;
 	}
 
@@ -517,7 +519,7 @@ static decode_state helixaac_decode(void) {
 		frames_t f;
 		frames_t count;
 		ISAMPLE_T *optr;
-
+		
 		IF_DIRECT(
 			f = _buf_cont_write(outputbuf) / BYTES_PER_FRAME;
 			optr = (ISAMPLE_T *)outputbuf->writep;
@@ -559,7 +561,7 @@ static decode_state helixaac_decode(void) {
 			if (frames) LOG_ERROR("unhandled case");
 		);
 	}
-
+	
 	UNLOCK_O_direct;
 
 	return DECODE_RUNNING;
@@ -570,13 +572,15 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 
 	a->type = size;
 	a->pos = a->consume = a->sample = a->nextchunk = 0;
-
+	
 	if (a->chunkinfo) {
 		free(a->chunkinfo);
 	}
+	
 	if (a->stsc) {
 		free(a->stsc);
 	}
+	
 	a->chunkinfo = NULL;
 	a->stsc = NULL;
 	a->skip = 0;
@@ -585,12 +589,14 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 	a->empty = false;
 
 	if (a->hAac) {
-		HAAC(a, FlushCodec, a->hAac);
+		// always free decoder as flush only works when no parameter has changed
+		HAAC(a, FreeDecoder, a->hAac);			
 	} else {
-		a->hAac = HAAC(a, InitDecoder);	
 		a->write_buf = malloc(FRAME_BUF * BYTES_PER_FRAME);
 		a->wrap_buf = malloc(WRAPBUF_LEN);
 	}
+	
+	a->hAac = HAAC(a, InitDecoder);	
 }
 
 static void helixaac_close(void) {

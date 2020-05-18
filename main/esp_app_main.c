@@ -4,18 +4,8 @@
  *  (c) Sebastien 2019
  *      Philippe G. 2019, philippe_44@outlook.com
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  This software is released under the MIT License.
+ *  https://opensource.org/licenses/MIT
  *
  */
 
@@ -323,6 +313,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value ","actrls_config");
 	config_set_default(NVS_TYPE_STR, "actrls_config", "", 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "lms_ctrls_raw");
+	config_set_default(NVS_TYPE_STR, "lms_ctrls_raw", "n", 0);
+	
 	ESP_LOGD(TAG,"Registering default Audio control board type %s, value %s", "rotary_config", CONFIG_ROTARY_ENCODER);
 	config_set_default(NVS_TYPE_STR, "rotary_config", CONFIG_ROTARY_ENCODER, 0);
 
@@ -441,7 +434,7 @@ void app_main()
 
 	ESP_LOGD(TAG,"Getting audio control mapping ");
 	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
-	if (actrls_init_json(actrls_config, true) == ESP_OK) {
+	if (actrls_init(actrls_config) == ESP_OK) {
 		ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
 	} else {
 		ESP_LOGD(TAG,"No audio control buttons");

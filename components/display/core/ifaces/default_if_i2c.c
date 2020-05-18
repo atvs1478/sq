@@ -21,6 +21,7 @@ static int I2CWait;
 
 static const int GDS_I2C_COMMAND_MODE = 0x80;
 static const int GDS_I2C_DATA_MODE = 0x40;
+static const int i2c_timeout_value=2000;
 
 static bool I2CDefaultWriteBytes( int Address, bool IsCommand, const uint8_t* Data, size_t DataLength );
 static bool I2CDefaultWriteCommand( struct GDS_Device* Device, uint8_t Command );
@@ -49,6 +50,9 @@ bool GDS_I2CInit( int PortNumber, int SDA, int SCL, int Speed ) {
 
 		ESP_ERROR_CHECK_NONFATAL( i2c_param_config( I2CPortNumber, &Config ), return false );
 		ESP_ERROR_CHECK_NONFATAL( i2c_driver_install( I2CPortNumber, Config.mode, 0, 0, 0 ), return false );
+		printf("Setting timeout value to %d",i2c_timeout_value);
+		i2c_set_timeout(I2CPortNumber,  (I2C_APB_CLK_FREQ /(2500000))* i2c_timeout_value);
+
 	}	
 
     return true;

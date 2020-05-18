@@ -32,42 +32,50 @@ static log_level *loglevel = &raop_loglevel;
 static struct raop_ctx_s *raop;
 static raop_cmd_vcb_t cmd_handler_chain;
 
-static void raop_volume_up(void) {
+static void raop_volume_up(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_VOLUME_UP, NULL);
 	LOG_INFO("AirPlay volume up");
 }
 
-static void raop_volume_down(void) {
+static void raop_volume_down(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_VOLUME_DOWN, NULL);
 	LOG_INFO("AirPlay volume down");
 }
 
-static void raop_toggle(void) {
+static void raop_toggle(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_TOGGLE, NULL);
 	LOG_INFO("AirPlay play/pause");
 }
 
-static void raop_pause(void) {
+static void raop_pause(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_PAUSE, NULL);
 	LOG_INFO("AirPlay pause");
 }
 
-static void raop_play(void) {
+static void raop_play(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_PLAY, NULL);
 	LOG_INFO("AirPlay play");
 }
 
-static void raop_stop(void) {
+static void raop_stop(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_STOP, NULL);
 	LOG_INFO("AirPlay stop");
 }
 
-static void raop_prev(void) {
+static void raop_prev(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_PREV, NULL);
 	LOG_INFO("AirPlay previous");
 }
 
-static void raop_next(void) {
+static void raop_next(bool pressed) {
+	if (!pressed) return;
 	raop_cmd(raop, RAOP_NEXT, NULL);
 	LOG_INFO("AirPlay next");
 }
@@ -99,7 +107,7 @@ static bool cmd_handler(raop_event_t event, ...) {
 	// now handle events for display
 	switch(event) {
 	case RAOP_SETUP:
-		actrls_set(controls, NULL);
+		actrls_set(controls, false, NULL, actrls_ir_action);
 		displayer_control(DISPLAYER_ACTIVATE, "AIRPLAY");
 		break;
 	case RAOP_PLAY:

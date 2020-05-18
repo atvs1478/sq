@@ -1,18 +1,8 @@
 /* 
  *  (c) Philippe G. 2019, philippe_44@outlook.com
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  This software is released under the MIT License.
+ *  https://opensource.org/licenses/MIT
  *
  */
  
@@ -28,9 +18,10 @@ typedef enum { 	ACTRLS_NONE = -1, ACTRLS_VOLUP, ACTRLS_VOLDOWN, ACTRLS_TOGGLE, A
 				ACTRLS_REMAP, ACTRLS_MAX 
 		} actrls_action_e;
 
-typedef void (*actrls_handler)(void);
+typedef void (*actrls_handler)(bool pressed);
 typedef actrls_handler actrls_t[ACTRLS_MAX - ACTRLS_NONE - 1];
 typedef bool actrls_hook_t(int gpio, actrls_action_e action, button_event_e event, button_press_e press, bool long_press);
+typedef bool actrls_ir_handler_t(uint16_t addr, uint16_t cmd);
 
 // BEWARE any change to struct below must be mapped to actrls_config_map
 typedef struct {
@@ -47,14 +38,16 @@ typedef struct actrl_config_s {
 	actrls_action_detail_t normal[2], longpress[2], shifted[2], longshifted[2];	// [0] keypressed, [1] keyreleased
 } actrls_config_t;
 
-esp_err_t actrls_init(int n, const actrls_config_t *config);
-esp_err_t actrls_init_json(const char *profile_name, bool create);
+esp_err_t actrls_init(const char *profile_name);
 
 /* 
 Set hook function to non-null to be set your own direct managemet function, 
 which should return true if it managed the control request, false if the
 normal handling should be done
+The add_release boolean forces a release event to be sent if a press action has been 
+set, whether a release action has been set or not
 */
-void actrls_set_default(const actrls_t controls, actrls_hook_t *hook);
-void actrls_set(const actrls_t controls, actrls_hook_t *hook);
+void actrls_set_default(const actrls_t controls, bool raw_controls, actrls_hook_t *hook, actrls_ir_handler_t *ir_handler);
+void actrls_set(const actrls_t controls, bool raw_controls, actrls_hook_t *hook, actrls_ir_handler_t *ir_handler);
 void actrls_unset(void);
+bool actrls_ir_action(uint16_t addr, uint16_t code);

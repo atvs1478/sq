@@ -3,18 +3,8 @@
  *
  *  (c) Philippe G. 2019, philippe_44@outlook.com
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  This software is released under the MIT License.
+ *  https://opensource.org/licenses/MIT
  *
  */
  
@@ -30,6 +20,7 @@
 #include "esp_log.h"
 #include "esp_task.h"
 #include "driver/gpio.h"
+#include "driver/rmt.h"
 #include "buttons.h"
 #include "rotary_encoder.h"
 #include "globdefs.h"
@@ -66,10 +57,28 @@ static struct {
 	rotary_handler handler;
 } rotary;
 
+static struct {
+	RingbufHandle_t rb;
+	infrared_handler handler;
+} infrared;
+
 static xQueueHandle button_evt_queue;
-static QueueSetHandle_t button_queue_set;
+static QueueSetHandle_t common_queue_set;
 
 static void buttons_task(void* arg);
+
+/****************************************************************************************
+ * Start task needed by button,s rotaty and infrared
+ */
+static void common_task_init(void) {
+	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+	static EXT_RAM_ATTR StackType_t xStack[BUTTON_STACK_SIZE] __attribute__ ((aligned (4)));
+	
+	if (!common_queue_set) {
+		common_queue_set = xQueueCreateSet(BUTTON_QUEUE_LEN + 1);
+		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+	}
+ }	
 
 /****************************************************************************************
  * GPIO low-level handler
@@ -117,8 +126,8 @@ static void buttons_task(void* arg) {
     while (1) {
 		QueueSetMemberHandle_t xActivatedMember;
 
-		// wait on button and rotary queues
-		if ((xActivatedMember = xQueueSelectFromSet( button_queue_set, portMAX_DELAY )) == NULL) continue;
+		// wait on button, rotary and infrared queues 
+		if ((xActivatedMember = xQueueSelectFromSet( common_queue_set, portMAX_DELAY )) == NULL) continue;
 		
 		if (xActivatedMember == button_evt_queue) {
 			struct button_s button;
@@ -160,7 +169,7 @@ static void buttons_task(void* arg) {
 				// button is a copy, so need to go to real context
 				button.self->shifting = false;
 			}
-		} else {
+		} else if (xActivatedMember == rotary.queue) {
 			rotary_encoder_event_t event = { 0 };
 			
 			// received a rotary event
@@ -171,6 +180,9 @@ static void buttons_task(void* arg) {
 			
 			rotary.handler(rotary.client, event.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? 
 										  ROTARY_RIGHT : ROTARY_LEFT, false);   
+		} else {
+			// this is IR
+			infrared_receive(infrared.rb, infrared.handler);
 		}	
     }
 }	
@@ -186,18 +198,14 @@ void dummy_handler(void *id, button_event_e event, button_press_e press) {
  * Create buttons 
  */
 void button_create(void *client, int gpio, int type, bool pull, int debounce, button_handler handler, int long_press, int shifter_gpio) { 
-	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
-	static EXT_RAM_ATTR StackType_t xStack[BUTTON_STACK_SIZE] __attribute__ ((aligned (4)));
-
 	if (n_buttons >= MAX_BUTTONS) return;
 
 	ESP_LOGI(TAG, "Creating button using GPIO %u, type %u, pull-up/down %u, long press %u shifter %d", gpio, type, pull, long_press, shifter_gpio);
 
 	if (!n_buttons) {
 		button_evt_queue = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(struct button_s));
-		if (!button_queue_set) button_queue_set = xQueueCreateSet(BUTTON_QUEUE_LEN + 1);
-		xQueueAddToSet( button_evt_queue, button_queue_set );
-		xTaskCreateStatic( (TaskFunction_t) buttons_task, "buttons_thread", BUTTON_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+		common_task_init();
+		xQueueAddToSet( button_evt_queue, common_queue_set );
 	}
 	
 	// just in case this structure is allocated in a future release
@@ -350,8 +358,8 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
     rotary.queue = rotary_encoder_create_queue();
     rotary_encoder_set_queue(&rotary.info, rotary.queue);
 	
-	if (!button_queue_set) button_queue_set = xQueueCreateSet(BUTTON_QUEUE_LEN + 1);
-	xQueueAddToSet( rotary.queue, button_queue_set );
+	common_task_init();
+	xQueueAddToSet( rotary.queue, common_queue_set );
 
 	// create companion button if rotary has a switch
 	if (SW != -1) button_create(id, SW, BUTTON_LOW, true, 0, rotary_button_handler, long_press, -1);
@@ -359,4 +367,19 @@ bool create_rotary(void *id, int A, int B, int SW, int long_press, rotary_handle
 	ESP_LOGI(TAG, "Creating rotary encoder A:%d B:%d, SW:%d", A, B, SW);
 	
 	return true;
+}	
+
+/****************************************************************************************
+ * Create Infrared
+ */
+bool create_infrared(int gpio, infrared_handler handler) {
+	// initialize IR infrastructure
+	infrared_init(&infrared.rb, gpio);
+	infrared.handler = handler;
+	
+	// join the queue set
+	common_task_init();
+	xRingbufferAddToQueueSetRead(infrared.rb, common_queue_set);
+	
+	return (infrared.rb != NULL);
 }	

@@ -61,6 +61,10 @@ void		embedded_init(void);
 void 		register_external(void);
 void 		deregister_external(void);
 void 		decode_restore(int external);
+// used when other client wants to use slimproto socket to send messages
+extern mutex_type slimp_mutex;
+#define LOCK_P   mutex_lock(slimp_mutex)
+#define UNLOCK_P mutex_unlock(slimp_mutex)
 
 // must provide or define as 0xffff
 u16_t		get_RSSI(void);
@@ -80,5 +84,5 @@ void 		output_visu_close(void);
 bool		(*slimp_handler)(u8_t *data, int len);
 void 		(*slimp_loop)(void);
 void 		(*server_notify)(in_addr_t ip, u16_t hport, u16_t cport);
-				   
+	   
 #endif // EMBEDDED_H
