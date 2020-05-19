@@ -247,15 +247,16 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<strong>Currently this project requires a specific combination of IDF 3.x (insert link here ...) with gcc 5.2. You'll have to implement the gcc 5.2 toolchain</strong>
+<strong>Currently this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2. You should use a gcc 5.2 toolchain, althoigh you can try a more recent version but this is not what we use so far</strong>
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
 And then copying the i2s.c patch file from this repo over to the esp-idf folder
-You alos need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
+You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
+
+We are (2020-05-20) working to move to a proper / consistent toolchain with IDF 4.0 - this is the "cmake" version.
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
-- for all libraries, add -mlongcalls. 
 - make defconfig
 (Note: You can also copy over config files from the build-scripts folder to ./sdkconfig)
 Then adapt the config file to your wifi/BT/I2C device (can also be done on the command line)
