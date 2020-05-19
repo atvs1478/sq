@@ -247,7 +247,7 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<strong>Currently this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2. You should use a gcc 5.2 toolchain, althoigh you can try a more recent version but this is not what we use so far</strong>
+<strong>Currently this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2. You should use a gcc 5.2 toolchain, although you can try a more recent version but this is not what we use so far</strong>
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
 And then copying the i2s.c patch file from this repo over to the esp-idf folder
@@ -289,7 +289,7 @@ python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port 
  
 # Configuration
 1/ setup WiFi
-- Boot the esp, look for a new wifi access point showing up and connect to it.  Default build ssid and passwords are "squeezelite"/"squeezelite". 
+- Boot the esp, look for a new wifi access point showing up and connect to it. Default build ssid and passwords are "squeezelite"/"squeezelite". 
 - Once connected, navigate to 192.168.4.1 
 - Wait for the list of access points visible from the device to populate in the web page.
 - Choose an access point and enter any credential as needed
