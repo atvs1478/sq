@@ -253,7 +253,7 @@ You can install IDF manually on Linux or Windows (using the Subsystem for Linux)
 And then copying the i2s.c patch file from this repo over to the esp-idf folder
 You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
 
-We are (2020-05-20) working to move to a proper / consistent toolchain with IDF 4.0 - this is the "cmake" version.
+We are (2020-05-20) working to move to a proper / consistent toolchain with IDF 4.0 - this is the "master-cmake" version.
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
@@ -336,8 +336,7 @@ See squeezlite command line, but keys options are
 
 ## Additional misc notes to do you build
 - as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
-- for all libraries, add -mlongcalls.
-- audio libraries are complicated to rebuild, open an issue if you really want to
+- for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
 - libfaad does not really support real time, but if you want to try
 	- -O3 -DFIXED_POINT -DSMALL_STACK
