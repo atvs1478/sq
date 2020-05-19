@@ -3,7 +3,7 @@
   <defaultState>enabled</defaultState>
   <email>philippe_44@outlook.com</email>
   <targetApplication>
-    <minVersion>7.5</minVersion>
+    <minVersion>7.9</minVersion>
     <maxVersion>*</maxVersion>
     <id>SlimServer</id>
   </targetApplication>
