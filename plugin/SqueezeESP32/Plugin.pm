@@ -13,7 +13,7 @@ my $prefs = preferences('plugin.squeezeesp32');
 my $log = Slim::Utils::Log->addLogCategory({
 	'category'     => 'plugin.squeezeesp32',
 	'defaultLevel' => 'INFO',
-	'description'  => Slim::Utils::Strings::string('SqueezeESP32'),
+	'description'  => 'PLUGIN_SQUEEZEESP32',
 });
 
 # migrate 'eq' pref, as that's a reserved word and could cause problems in the future
