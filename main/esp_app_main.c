@@ -138,7 +138,7 @@ void set_log_level(char * tag, char * level){
 }
 
 
-esp_err_t update_certificates(){
+esp_err_t update_certificates(bool force){
 
 	nvs_handle handle;
 	esp_err_t esp_err;
@@ -185,7 +185,7 @@ esp_err_t update_certificates(){
 		changed=true;
 	}
 
-	if(changed){
+	if(changed || force){
 
 		esp_err = nvs_set_blob(handle, certs_key, server_cert_pem_start, (server_cert_pem_end-server_cert_pem_start));
 		if(esp_err!=ESP_OK){
@@ -415,7 +415,7 @@ void app_main()
 
 
 	ESP_LOGI(TAG,"Checking if certificates need to be updated");
-	update_certificates();
+	update_certificates(false);
 
 
 	ESP_LOGD(TAG,"Getting firmware OTA URL (if any)");

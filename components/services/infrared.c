@@ -39,7 +39,7 @@ static const char* TAG = "IR";
 /****************************************************************************************
  * 
  */
-inline bool nec_check_in_range(int duration_ticks, int target_us, int margin_us) {
+static bool nec_check_in_range(int duration_ticks, int target_us, int margin_us) {
     if(( NEC_ITEM_DURATION(duration_ticks) < (target_us + margin_us))
         && ( NEC_ITEM_DURATION(duration_ticks) > (target_us - margin_us))) {
         return true;

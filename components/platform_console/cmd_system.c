@@ -48,6 +48,7 @@ static void register_deep_sleep();
 static void register_light_sleep();
 static void register_factory_boot();
 static void register_restart_ota();
+static void register_update_certs();
 #if WITH_TASKS_INFO
 static void register_tasks();
 #endif
@@ -60,6 +61,7 @@ void register_system()
     register_restart();
     register_deep_sleep();
     register_light_sleep();
+    register_update_certs();
     register_factory_boot();
     register_restart_ota();
 #if WITH_TASKS_INFO
@@ -331,6 +333,24 @@ static void register_tasks()
 }
 
 #endif // WITH_TASKS_INFO
+
+extern esp_err_t update_certificates(bool force);
+static int force_update_cert(int argc, char **argv){
+	return update_certificates(true)==ESP_OK;
+}
+
+static void register_update_certs()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "update_certificates",
+        .help = "Force updating the certificates from binary",
+        .hint = NULL,
+        .func = &force_update_cert,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
+
 
 /** 'deep_sleep' command puts the chip into deep sleep mode */
 

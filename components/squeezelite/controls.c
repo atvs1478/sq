@@ -7,7 +7,7 @@
  */
 
 #include "squeezelite.h"
-#include "config.h"
+#include "platform_config.h"
 #include "audio_controls.h"
 
 static log_level loglevel = lINFO;
