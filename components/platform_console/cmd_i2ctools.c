@@ -597,9 +597,11 @@ static int do_i2cdump_cmd(int argc, char **argv)
         log_send_messaging(MESSAGING_ERROR, "Wrong read size. Only support 1,2,4");
         return 1;
     }
-    esp_err_t ret = i2c_initialize_driver_from_config();
-	if(ret!=ESP_OK) return 0;
-
+    i2c_load_configuration();
+    if(i2c_gpio_scl==-1 ||i2c_gpio_sda ==-1){
+     	log_send_messaging(MESSAGING_ERROR,"i2c set failed. i2c needs to be configured first.");
+     	return 0;
+    }
     char *buf = NULL;
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
@@ -611,7 +613,7 @@ static int do_i2cdump_cmd(int argc, char **argv)
     uint8_t data_addr;
     uint8_t data[4];
     int32_t block[16];
-    fprintf(f,"    00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f"
+    fprintf(f,"\n    00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f"
            "    0123456789abcdef\r\n");
     for (int i = 0; i < 128; i += 16) {
         fprintf(f,"%02x: ", i);
@@ -686,10 +688,11 @@ static int do_i2cset_cmd(int argc, char **argv)
     /* Check data: "-d" option */
     int len = i2cset_args.data->count;
 
-    i2c_master_driver_initialize();
-	if(i2c_master_driver_install()!=ESP_OK){
-		 return 1;
-	}
+    i2c_load_configuration();
+    if(i2c_gpio_scl==-1 ||i2c_gpio_sda ==-1){
+    	log_send_messaging(MESSAGING_ERROR,"i2c set failed. i2c needs to be configured first.");
+    	return 0;
+    }
 
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
@@ -717,7 +720,6 @@ static int do_i2cset_cmd(int argc, char **argv)
 
 static int do_i2cget_cmd(int argc, char **argv)
 {
-	esp_err_t err=ESP_OK;
     int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&i2cget_args);
     if (nerrors != 0) {
         return 0;
@@ -737,13 +739,11 @@ static int do_i2cget_cmd(int argc, char **argv)
     }
 
 
-    if((err=i2c_master_driver_initialize())!=ESP_OK){
-    	log_send_messaging(MESSAGING_ERROR,"Error initializing i2c driver. %s",esp_err_to_name(err));
-      	return 1;
-     }
-	if((err=i2c_master_driver_install())!=ESP_OK){
-		 return 1;
-	}
+    i2c_load_configuration();
+    if(i2c_gpio_scl==-1 ||i2c_gpio_sda ==-1){
+    	log_send_messaging(MESSAGING_ERROR,"i2c set failed. i2c needs to be configured first.");
+    	return 0;
+    }
 	char *buf = NULL;
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
@@ -798,11 +798,12 @@ static int do_i2cdetect_cmd(int argc, char **argv)
 {
 	uint8_t matches[128]={};
 	int last_match=0;
-	esp_err_t ret = i2c_initialize_driver_from_config();
-	if(ret!=ESP_OK) {
-		log_send_messaging(MESSAGING_ERROR,"i2c driver init failed.");
-		return 0;
-	}
+	esp_err_t ret = ESP_OK;
+    i2c_load_configuration();
+    if(i2c_gpio_scl==-1 ||i2c_gpio_sda ==-1){
+    	log_send_messaging(MESSAGING_ERROR,"i2c set failed. i2c needs to be configured first.");
+    	return 0;
+    }
     uint8_t address;
     char *buf = NULL;
 	size_t buf_size = 0;
@@ -813,7 +814,7 @@ static int do_i2cdetect_cmd(int argc, char **argv)
 	}
 
 
-    fprintf(f,"     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\r\n");
+    fprintf(f,"\n     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\r\n");
     for (int i = 0; i < 128 ; i += 16) {
         fprintf(f,"%02x: ", i);
         for (int j = 0; j < 16 ; j++) {
@@ -953,6 +954,7 @@ static void register_i2cset(void)
     cmd_to_json(&i2cset_cmd);
     ESP_ERROR_CHECK(esp_console_cmd_register(&i2cset_cmd));
 }
+
 
 
 
