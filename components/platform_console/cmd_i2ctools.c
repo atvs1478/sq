@@ -49,6 +49,7 @@ static struct {
 
 static struct {
     struct arg_int *chip_address;
+    struct arg_int *port;
     struct arg_int *register_address;
     struct arg_int *data;
     struct arg_end *end;
@@ -593,6 +594,11 @@ static int do_i2cdump_cmd(int argc, char **argv)
     if (i2cdump_args.size->count) {
         size = i2cdump_args.size->ival[0];
     }
+    i2c_port_t loc_i2c_port=i2c_port;
+    if (i2cset_args.port->count && i2c_get_port(i2cset_args.port->ival[0], &loc_i2c_port) != ESP_OK) {
+    	return 0;
+    }
+
     if (size != 1 && size != 2 && size != 4) {
         log_send_messaging(MESSAGING_ERROR, "Wrong read size. Only support 1,2,4");
         return 1;
@@ -631,7 +637,7 @@ static int do_i2cdump_cmd(int argc, char **argv)
             }
             i2c_master_read_byte(cmd, data + size - 1, NACK_VAL);
             i2c_master_stop(cmd);
-            esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, 50 / portTICK_RATE_MS);
+            esp_err_t ret = i2c_master_cmd_begin(loc_i2c_port, cmd, 50 / portTICK_RATE_MS);
             i2c_cmd_link_delete(cmd);
             if (ret == ESP_OK) {
                 for (int k = 0; k < size; k++) {
@@ -685,6 +691,12 @@ static int do_i2cset_cmd(int argc, char **argv)
     if (i2cset_args.register_address->count) {
         data_addr = i2cset_args.register_address->ival[0];
     }
+
+    i2c_port_t loc_i2c_port=i2c_port;
+    if (i2cset_args.port->count && i2c_get_port(i2cset_args.port->ival[0], &loc_i2c_port) != ESP_OK) {
+    	return 0;
+    }
+
     /* Check data: "-d" option */
     int len = i2cset_args.data->count;
 
@@ -704,7 +716,7 @@ static int do_i2cset_cmd(int argc, char **argv)
         i2c_master_write_byte(cmd, i2cset_args.data->ival[i], ACK_CHECK_EN);
     }
     i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    esp_err_t ret = i2c_master_cmd_begin(loc_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if (ret == ESP_OK) {
     	log_send_messaging(MESSAGING_INFO, "i2c Write OK");
@@ -737,6 +749,10 @@ static int do_i2cget_cmd(int argc, char **argv)
     if (i2cget_args.data_length->count) {
         len = i2cget_args.data_length->ival[0];
     }
+    i2c_port_t loc_i2c_port=i2c_port;
+    if (i2cset_args.port->count && i2c_get_port(i2cset_args.port->ival[0], &loc_i2c_port) != ESP_OK) {
+    	return 0;
+    }
 
 
     i2c_load_configuration();
@@ -765,7 +781,7 @@ static int do_i2cget_cmd(int argc, char **argv)
     }
     i2c_master_read_byte(cmd, data + len - 1, NACK_VAL);
     i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    esp_err_t ret = i2c_master_cmd_begin(loc_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if (ret == ESP_OK) {
         for (int i = 0; i < len; i++) {
@@ -804,6 +820,11 @@ static int do_i2cdetect_cmd(int argc, char **argv)
     	log_send_messaging(MESSAGING_ERROR,"i2c set failed. i2c needs to be configured first.");
     	return 0;
     }
+    i2c_port_t loc_i2c_port=i2c_port;
+    if (i2cset_args.port->count && i2c_get_port(i2cset_args.port->ival[0], &loc_i2c_port) != ESP_OK) {
+    	return 0;
+    }
+
     uint8_t address;
     char *buf = NULL;
 	size_t buf_size = 0;
@@ -823,7 +844,7 @@ static int do_i2cdetect_cmd(int argc, char **argv)
             i2c_master_start(cmd);
             i2c_master_write_byte(cmd, (address << 1) | WRITE_BIT, ACK_CHECK_EN);
             i2c_master_stop(cmd);
-            ret = i2c_master_cmd_begin(i2c_port, cmd, 50 / portTICK_RATE_MS);
+            ret = i2c_master_cmd_begin(loc_i2c_port, cmd, 50 / portTICK_RATE_MS);
             i2c_cmd_link_delete(cmd);
             if (ret == ESP_OK) {
                 fprintf(f,"%02x ", address);
@@ -943,6 +964,8 @@ static void register_i2cset(void)
     i2cset_args.chip_address = arg_int1("c", "chip", "<chip_addr>", "Specify the address of the chip on that bus");
     i2cset_args.register_address = arg_int0("r", "register", "<register_addr>", "Specify the address on that chip to read from");
     i2cset_args.data = arg_intn(NULL, NULL, "<data>", 0, 256, "Specify the data to write to that data address");
+    i2cset_args.port = arg_intn("p","port","<n>",0,1,"Specify the i2c port (0|2)");
+
     i2cset_args.end = arg_end(2);
     const esp_console_cmd_t i2cset_cmd = {
         .command = "i2cset",
