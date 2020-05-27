@@ -10,16 +10,17 @@ Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includ
 
 The board showed above has the following IO set
 - amplifier: GPIO21
-- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed width dipswitches)
+- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed with dip switches)
 - key1: not sure, something with GPIO36
 - jack insertion: GPIO39 (inserted low)
 - LED: GPIO22 (active low)
+(note that GPIO need pullups)
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
 - a button mapping: 
 ```
-[{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
+[{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
 ```
 
 ### ESP32-WROVER + I2S DAC
