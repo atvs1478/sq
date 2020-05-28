@@ -88,7 +88,7 @@ sub displayWidth {
 }
 
 sub brightnessMap {
-	return (65535, 10, 50, 100, 200);
+	return (0 .. 5);
 }
 
 =comment

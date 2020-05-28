@@ -646,12 +646,13 @@ static void grfb_handler(u8_t *data, int len) {
 	pkt->brightness = htons(pkt->brightness);
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-	
-	if (pkt->brightness < 0) {
+
+	// LMS driver sends 0..5 value, we assume driver is highly log
+	if (pkt->brightness <= 0) {
 		GDS_DisplayOff(display); 
 	} else {
 		GDS_DisplayOn(display);
-		GDS_SetContrast(display, pkt->brightness);
+		GDS_SetContrast(display, 255 * powf(pkt->brightness / 5.0f, 3));
 	}
 	
 	xSemaphoreGive(displayer.mutex);
