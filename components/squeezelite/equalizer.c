@@ -26,14 +26,16 @@ static struct {
  * open equalizer
  */
 void equalizer_open(u32_t sample_rate) {
+	// in any case, need to clear update flag
+	equalizer.update = false;
+	
 	if (sample_rate != 11025 && sample_rate != 22050 && sample_rate != 44100 && sample_rate != 48000) {
 		LOG_WARN("equalizer only supports 11025, 22050, 44100 and 48000 sample rates, not %u", sample_rate);
 		return;
 	}	
 	
 	equalizer.handle = esp_equalizer_init(2, sample_rate, EQ_BANDS, 0);
-	equalizer.update = false;
-    
+	    
 	if (equalizer.handle) {
 		bool active = false;
 		
