@@ -50,7 +50,7 @@ var releaseURL = 'https://api.github.com/repos/sle118/squeezelite-esp32/releases
 var recovery = false;
 var enableAPTimer = true;
 var enableStatusTimer = true;
-var commandHeader = 'squeezelite -b 500:2000 -d all=info ';
+var commandHeader = 'squeezelite -b 500:2000 -d all=info -C 30 -W';
 var pname, ver, otapct, otadsc;
 var blockAjax = false;
 var blockFlashButton = false;
