@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -36,6 +38,7 @@ static esp_err_t actrls_process_action (const cJSON * member, actrls_config_t *c
 
 static esp_err_t actrls_init_json(const char *profile_name, bool create);
 static void control_rotary_handler(void *client, rotary_event_e event, bool long_press);
+static void rotary_timer( TimerHandle_t xTimer );
 
 static const actrls_config_map_t actrls_config_map[] =
 		{
@@ -71,6 +74,9 @@ static actrls_ir_handler_t *default_ir_handler, *current_ir_handler;
 static struct {
 	bool long_state;
 	bool volume_lock;
+	TimerHandle_t timer;
+	bool click_pending;
+	int left_count;
 } rotary;
 
 static const struct ir_action_map_s{
@@ -133,8 +139,16 @@ esp_err_t actrls_init(const char *profile_name) {
 		if ((p = strcasestr(config, "A")) != NULL) A = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "B")) != NULL) B = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(config, "SW")) != NULL) SW = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
-		if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
+		if ((p = strcasestr(config, "knobonly")) != NULL) {
+			p = strchr(p, '=');
+			int double_press = p ? atoi(p + 1) : 350;
+			rotary.timer = xTimerCreate("knobTimer", double_press / portTICK_RATE_MS, pdFALSE, NULL, rotary_timer);
+			longpress = 500;
+			ESP_LOGI(TAG, "single knob navigation %d", double_press);
+		} else {
+			if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
+			if ((p = strcasestr(config, "longpress")) != NULL) longpress = 1000;
+		}	
 				
 		// create rotary (no handling of long press)
 		err = create_rotary(NULL, A, B, SW, longpress, control_rotary_handler) ? ESP_OK : ESP_FAIL;
@@ -223,17 +237,42 @@ static void control_rotary_handler(void *client, rotary_event_e event, bool long
 	
 	switch(event) {
 	case ROTARY_LEFT:
-		if (rotary.long_state) action = ACTRLS_PREV;
+		if (rotary.timer) {
+			if (rotary.left_count) {
+				action = KNOB_LEFT;
+				// need to add a left button the first time
+				if (rotary.left_count == 1) (*current_controls[KNOB_LEFT])(true);
+			}
+			xTimerStart(rotary.timer, 20 / portTICK_RATE_MS);
+			rotary.left_count++;
+		}
+		else if (rotary.long_state) action = ACTRLS_PREV;
 		else if (rotary.volume_lock) action = ACTRLS_VOLDOWN;
 		else action = KNOB_LEFT;
 		break;
 	case ROTARY_RIGHT:
-		if (rotary.long_state) action = ACTRLS_NEXT;
+		if (rotary.timer) {
+			if (rotary.left_count == 1) {
+				action = ACTRLS_PAUSE;
+				rotary.left_count = 0;
+				xTimerStop(rotary.timer, 0);
+			} else action = KNOB_RIGHT;
+		}	
+		else if (rotary.long_state) action = ACTRLS_NEXT;
 		else if (rotary.volume_lock) action = ACTRLS_VOLUP;
 		else action = KNOB_RIGHT;
 		break;
 	case ROTARY_PRESSED:
-		if (long_press)	rotary.long_state = !rotary.long_state;
+		if (rotary.timer) {
+			if (long_press) action = ACTRLS_PLAY;
+			else if (rotary.click_pending) {
+				action = BCTRLS_LEFT;
+				xTimerStop(rotary.timer, 0);
+			} 
+			else xTimerStart(rotary.timer, 20 / portTICK_RATE_MS);
+			rotary.click_pending = !rotary.click_pending;
+		} 
+		else if (long_press) rotary.long_state = !rotary.long_state;
 		else if (rotary.volume_lock) action = ACTRLS_TOGGLE;
 		else action = KNOB_PUSH;
 		break;
@@ -242,6 +281,19 @@ static void control_rotary_handler(void *client, rotary_event_e event, bool long
 	}
 	
 	if (action != ACTRLS_NONE) (*current_controls[action])(pressed);
+}
+
+/****************************************************************************************
+ * 
+ */
+static void rotary_timer( TimerHandle_t xTimer ) {
+	if (rotary.click_pending) {
+		(*current_controls[KNOB_PUSH])(true);
+		rotary.click_pending = false;
+	} else if (rotary.left_count) {
+		if (rotary.left_count == 1) (*current_controls[KNOB_LEFT])(true);
+		rotary.left_count = 0;
+	}
 }
 
 /****************************************************************************************

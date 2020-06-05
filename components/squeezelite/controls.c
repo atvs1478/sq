@@ -49,6 +49,7 @@ struct IR_header {
 static in_addr_t server_ip;
 static u16_t server_hport;
 static u16_t server_cport;
+static int cli_sock = -1;
 static u8_t mac[6];
 static void	(*chained_notify)(in_addr_t, u16_t, u16_t);
 static bool raw_mode;
@@ -243,37 +244,43 @@ const actrls_t LMS_controls = {
  * 
  */
 static void cli_send_cmd(char *cmd) {
-	char packet[64];
-	struct sockaddr_in addr;
-	socklen_t addrlen = sizeof(addr);
-	int len, sock = socket(AF_INET, SOCK_STREAM, 0);
+	char packet[96];
+	int len;
 	
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = server_ip;
-	addr.sin_port = htons(server_cport);
-
-	if (connect(sock, (struct sockaddr *) &addr, addrlen) < 0) {
-		LOG_ERROR("unable to connect to server %s:%hu with cli", inet_ntoa(server_ip), server_cport);
-		return;
-	}
-
 	len = sprintf(packet, "%02x:%02x:%02x:%02x:%02x:%02x %s\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], cmd);
 	LOG_DEBUG("sending command %s at %s:%hu", packet, inet_ntoa(server_ip), server_cport);
 		
-	if (send(sock, packet, len, 0) < 0) {
+	if (send(cli_sock, packet, len, MSG_DONTWAIT) < 0) {
 		LOG_WARN("cannot send CLI %s", packet);
 	}
-
-	closesocket(sock);
+	
+	// need to empty the RX buffer otherwise we'll lock the TCP/IP stack
+	len = recv(cli_sock, packet, 96, MSG_DONTWAIT);
 }
 
 /****************************************************************************************
  * Notification when server changes
  */
 static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
+	struct sockaddr_in addr;
+	socklen_t addrlen = sizeof(addr);
+	
 	server_ip = ip;
 	server_hport = hport;
 	server_cport = cport;
+	
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = server_ip;
+	addr.sin_port = htons(server_cport);
+	
+	// close existing CLI connection and open new one
+	if (cli_sock >= 0) closesocket(cli_sock);
+	cli_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (connect(cli_sock, (struct sockaddr *) &addr, addrlen) < 0) {
+		LOG_ERROR("unable to connect to server %s:%hu with cli", inet_ntoa(server_ip), server_cport);
+		cli_sock = -1;
+	}
 	
 	LOG_INFO("notified server %s hport %hu cport %hu", inet_ntoa(ip), hport, cport);
 	
