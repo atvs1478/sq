@@ -124,12 +124,21 @@ You can define the defaults for jack, spkfault leds at compile time but nvs para
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
-Encoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. Using the option 'volume' makes it hard-coded to volume down/up/play toggle all the time (even in LMS). The option 'longpress' allows an alternate mode when SW is long-pressed. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes.
+Encoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay. Using the option 'volume' makes it hard-coded to volume down/up/play toggle all the time (even in LMS). The option 'longpress' allows an alternate mode when SW is long-pressed. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes (the main mode actual behavior depends on 'volume').
+
+There is also the possibility to use 'knobonly' option (exclusive with 'volume' and 'longpress'). This mode attempts to offer a single knob full validation which is a bit contorded due to LMS UI's principles. Left, Right and Press obey to LMS's navigation rules and especially Press always goes to lower submenu item, even when navigating in the Music Library. That causes a challenge as there is no 'Play', 'Back' or 'Pause' button. Workaround are as of below:
+- longpress is 'Play'
+- double press is 'Back' (Left in LMS's terminology). 
+- a quick left-right movement on the encoder is 'Pause' 
+
+The speed of double click (or left-right) can be set using the optional parameter of 'knobonly'. This is not a perfect solution, and other ideas are welcome. Be aware that the longer you set double click speed, the less responsive the interface will be. The reason is that I need to wait for that delay before deciding if it's a single or double click. It can also make menu navigation "hesitations" being easoly interpreted as 'Pause'
+
+Remember when the 'lms_raw_control' (see below) is activated, none of these options apply, the sent codes are simply just raw button codes
 
 Use parameter rotary_config with the following syntax:
 
 ```
-A=<gpio>,B=<gpio>[,SW=gpio>[,volume][,longpress]]
+A=<gpio>,B=<gpio>[,SW=gpio>[[,knobonly[=<ms>]|[,volume][,longpress]]
 ```
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
