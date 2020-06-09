@@ -51,13 +51,14 @@ static const char *known_drivers[] = {"SH1106",
 		"SSD1326",
 		"SSD1327",
 		"SSD1675",
+		"ILI9341",
 		NULL
 	};
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, ILI9341_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect,ILI9341_Detect, NULL };
 
 /****************************************************************************************
  * 

@@ -40,6 +40,7 @@
 
 static const char * TAG = "cmd_system";
 
+static void register_setbtsource();
 static void register_free();
 static void register_heap();
 static void register_version();
@@ -55,6 +56,7 @@ static void register_tasks();
 extern BaseType_t wifi_manager_task;
 void register_system()
 {
+	register_setbtsource();
     register_free();
     register_heap();
     register_version();
@@ -264,6 +266,89 @@ static int free_mem(int argc, char **argv)
 {
 	log_send_messaging(MESSAGING_INFO,"%d", esp_get_free_heap_size());
     return 0;
+}
+
+static struct {
+    struct arg_str *a2dp_dev_name;
+    struct arg_str *a2dp_sink_name;
+    struct arg_str *wakeup_gpio_level;
+    struct arg_str *bt_sink_pin;
+    struct arg_str *enable_bt_sink;
+    struct arg_end *end;
+} set_btsource_args;
+
+static int do_set_btsource(int argc, char **argv)
+{
+//	a2dp_dev_name;
+//	a2dp_sink_name;
+//	wakeup_gpio_level;
+//	bt_sink_pin;
+//	enable_bt_sink;
+
+
+
+//	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&deep_sleep_args);
+//    if (nerrors != 0) {
+//        return 1;
+//    }
+//    if (deep_sleep_args.wakeup_time->count) {
+//        uint64_t timeout = 1000ULL * deep_sleep_args.wakeup_time->ival[0];
+//        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
+//        ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
+//    }
+//    if (deep_sleep_args.wakeup_gpio_num->count) {
+//        int io_num = deep_sleep_args.wakeup_gpio_num->ival[0];
+//        if (!rtc_gpio_is_valid_gpio(io_num)) {
+//        	log_send_messaging(MESSAGING_ERROR, "GPIO %d is not an RTC IO", io_num);
+//            return 1;
+//        }
+//        int level = 0;
+//        if (deep_sleep_args.wakeup_gpio_level->count) {
+//            level = deep_sleep_args.wakeup_gpio_level->ival[0];
+//            if (level != 0 && level != 1) {
+//            	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
+//                return 1;
+//            }
+//        }
+//        log_send_messaging(MESSAGING_INFO, "Enabling wakeup on GPIO%d, wakeup on %s level",
+//                 io_num, level ? "HIGH" : "LOW");
+//
+//        ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, level) );
+//    }
+//    rtc_gpio_isolate(GPIO_NUM_12);
+//    esp_deep_sleep_start();
+	return 0;
+}
+
+
+
+static void register_setbtsource(){
+
+//	a2dp_dev_name;
+//	a2dp_sink_name;
+//	wakeup_gpio_level;
+//	bt_sink_pin;
+//	enable_bt_sink;
+//
+//    set_btsource_args.wakeup_time =
+//        arg_int0("t", "time", "<t>", "Wake up time, ms");
+//    set_btsource_args.wakeup_gpio_num =
+//        arg_int0(NULL, "io", "<n>",
+//                 "If specified, wakeup using GPIO with given number");
+//    set_btsource_args.wakeup_gpio_level =
+//        arg_int0(NULL, "io_level", "<0|1>", "GPIO level to trigger wakeup");
+//    set_btsource_args.end = arg_end(3);
+//
+//    const esp_console_cmd_t cmd = {
+//        .command = "deep_sleep",
+//        .help = "Enter deep sleep mode. "
+//        "Two wakeup modes are supported: timer and GPIO. "
+//        "If no wakeup option is specified, will sleep indefinitely.",
+//        .hint = NULL,
+//        .func = &do_set_btsource,
+//        .argtable = &set_btsource_args
+//    };
+//    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
 static void register_free()

@@ -5,7 +5,11 @@ idf_component_register( SRCS cmd_squeezelite.c
 						
 
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=feof")
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=log")
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=fdopen")
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=fileno")
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=fstat")
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=lround")
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=esp_app_desc")
 
 idf_build_get_property(project_ver PROJECT_VER)

@@ -10,16 +10,17 @@ Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includ
 
 The board showed above has the following IO set
 - amplifier: GPIO21
-- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed width dipswitches)
+- key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed with dip switches)
 - key1: not sure, something with GPIO36
 - jack insertion: GPIO39 (inserted low)
 - LED: GPIO22 (active low)
+(note that GPIO need pullups)
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
 - a button mapping: 
 ```
-[{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
+[{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
 ```
 
 ### ESP32-WROVER + I2S DAC
@@ -249,11 +250,19 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
+<<<<<<< HEAD
 Follow the instructions from https://docs.espressif.com/projects/esp-idf/en/v4.0/get-started/index.html to install the esp-idf v4.0. This is the currently supported release of the espressif software development system. 
+=======
+<strong>Currently the master branch of this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2 (toolschain dated 20181001)
+If you want to use a more recent version of gcc and IDF (4.0 stable), move to cmake-master branch</strong>
+
+You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
+And then copying the i2s.c patch file from this repo over to the esp-idf folder
+You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
+>>>>>>> refs/remotes/origin/master
 
 ## Building Squeezelite-esp32
 MOST IMPORTANT: create the right default config file
-- for all libraries, add -mlongcalls. 
 - make defconfig
 (Note: You can also copy over config files from the build-scripts folder to ./sdkconfig)
 Then adapt the config file to your wifi/BT/I2C device (can also be done on the command line)
@@ -268,7 +277,7 @@ idf.py -p PORT [-b BAUD] monitor
 
 # Configuration
 1/ setup WiFi
-- Boot the esp, look for a new wifi access point showing up and connect to it.  Default build ssid and passwords are "squeezelite"/"squeezelite". 
+- Boot the esp, look for a new wifi access point showing up and connect to it. Default build ssid and passwords are "squeezelite"/"squeezelite". 
 - Once connected, navigate to 192.168.4.1 
 - Wait for the list of access points visible from the device to populate in the web page.
 - Choose an access point and enter any credential as needed
@@ -315,8 +324,7 @@ See squeezlite command line, but keys options are
 
 ## Additional misc notes to do you build
 - as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
-- for all libraries, add -mlongcalls.
-- audio libraries are complicated to rebuild, open an issue if you really want to
+- for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
 - libfaad does not really support real time, but if you want to try
 	- -O3 -DFIXED_POINT -DSMALL_STACK
