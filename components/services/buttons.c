@@ -303,7 +303,7 @@ void *button_remap(void *client, int gpio, button_handler handler, int long_pres
 		}	
 	}	
 	
-	// huh
+	// don't know what we are doing here
 	if (!button) return NULL;	
 	
 	prev_client = button->client;
