@@ -156,7 +156,7 @@ static int read_mp4_header(unsigned long *samplerate_p, unsigned char *channels_
 			info.sampRateCore = (*ptr++ & 0x07) << 1;
 			info.sampRateCore |= (*ptr >> 7) & 0x01;
 			info.sampRateCore = rates[info.sampRateCore];
-			info.nChans = *ptr >> 3;
+			info.nChans = (*ptr & 0x7f) >> 3;
 			*channels_p = info.nChans;
 			*samplerate_p = info.sampRateCore;
 			HAAC(a, SetRawBlockParams, a->hAac, 0, &info); 
