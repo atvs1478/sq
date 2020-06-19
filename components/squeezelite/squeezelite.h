@@ -544,6 +544,7 @@ void _buf_inc_readp(struct buffer *buf, unsigned by);
 void _buf_inc_writep(struct buffer *buf, unsigned by);
 void buf_flush(struct buffer *buf);
 void _buf_flush(struct buffer *buf);
+void _buf_unwrap(struct buffer *buf, size_t cont);
 void buf_adjust(struct buffer *buf, size_t mod);
 void _buf_resize(struct buffer *buf, size_t size);
 void buf_init(struct buffer *buf, size_t size);
