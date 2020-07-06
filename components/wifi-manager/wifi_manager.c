@@ -335,7 +335,7 @@ void wifi_manager_start(){
 esp_err_t wifi_manager_save_sta_config(){
 	nvs_handle handle;
 	esp_err_t esp_err;
-	ESP_LOGI(TAG,   "About to save config to flash");
+	ESP_LOGD(TAG,   "About to save config to flash");
 
 	if(wifi_manager_config_sta){
 		esp_err = nvs_open(wifi_manager_nvs_namespace, NVS_READWRITE, &handle);
@@ -396,14 +396,14 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		memset(buff,0x00,sizeof(uint8_t) * sz);
 		esp_err = nvs_get_blob(handle, "ssid", buff, &sz);
 		if(esp_err != ESP_OK){
-			ESP_LOGI(TAG,  "No ssid found in nvs.");
+			ESP_LOGD(TAG,  "No ssid found in nvs.");
 			FREE_AND_NULL(buff);
 			nvs_close(handle);
 			return false;
 		}
 		memcpy(wifi_manager_config_sta->sta.ssid, buff, sizeof(wifi_manager_config_sta->sta.ssid));
 		FREE_AND_NULL(buff);
-		ESP_LOGI(TAG,   "wifi_manager_fetch_wifi_sta_config: ssid:%s ",wifi_manager_config_sta->sta.ssid);
+		ESP_LOGD(TAG,   "wifi_manager_fetch_wifi_sta_config: ssid:%s ",wifi_manager_config_sta->sta.ssid);
 
 				/* password */
 		sz = sizeof(wifi_manager_config_sta->sta.password);
@@ -416,7 +416,7 @@ bool wifi_manager_fetch_wifi_sta_config(){
 		}
 		else {
 			memcpy(wifi_manager_config_sta->sta.password, buff, sizeof(wifi_manager_config_sta->sta.password));
-			ESP_LOGI(TAG,   "wifi_manager_fetch_wifi_sta_config: password:%s",wifi_manager_config_sta->sta.password);
+			ESP_LOGD(TAG,   "wifi_manager_fetch_wifi_sta_config: password:%s",wifi_manager_config_sta->sta.password);
 		}
 		FREE_AND_NULL(buff);
 		nvs_close(handle);
@@ -577,7 +577,7 @@ void wifi_manager_unlock_sta_ip_string(){
 void wifi_manager_safe_update_sta_ip_string(struct ip4_addr * ip4){
 	if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
 		strcpy(wifi_manager_sta_ip, ip4!=NULL?ip4addr_ntoa(ip4):"0.0.0.0");
-		ESP_LOGI(TAG,   "Set STA IP String to: %s", wifi_manager_sta_ip);
+		ESP_LOGD(TAG,   "Set STA IP String to: %s", wifi_manager_sta_ip);
 		wifi_manager_unlock_sta_ip_string();
 	}
 }
@@ -620,7 +620,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     if(event_base== WIFI_EVENT){
 		switch(event_id) {
 			case WIFI_EVENT_WIFI_READY:
-				ESP_LOGI(TAG,   "WIFI_EVENT_WIFI_READY");
+				ESP_LOGD(TAG,   "WIFI_EVENT_WIFI_READY");
 				break;
 
 			case WIFI_EVENT_SCAN_DONE:
@@ -630,7 +630,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				break;
 
 			case WIFI_EVENT_STA_AUTHMODE_CHANGE:
-				ESP_LOGI(TAG,   "WIFI_EVENT_STA_AUTHMODE_CHANGE");
+				ESP_LOGD(TAG,   "WIFI_EVENT_STA_AUTHMODE_CHANGE");
 //		        	structwifi_event_sta_authmode_change_t
 //		        	Argument structure for WIFI_EVENT_STA_AUTHMODE_CHANGE event
 //
@@ -645,7 +645,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
 
 			case WIFI_EVENT_AP_START:
-				ESP_LOGI(TAG,   "WIFI_EVENT_AP_START");
+				ESP_LOGD(TAG,   "WIFI_EVENT_AP_START");
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STARTED_BIT);
 				break;
 
@@ -686,22 +686,22 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 			case WIFI_EVENT_AP_STACONNECTED:{ /* a user disconnected from the SoftAP */
 				wifi_event_ap_staconnected_t * stac = (wifi_event_ap_staconnected_t *)event_data;
 				char * mac = get_mac_string(stac->mac);
-				ESP_LOGI(TAG,   "WIFI_EVENT_AP_STACONNECTED. aid: %d, mac: %s",stac->aid,STR_OR_BLANK(mac));
+				ESP_LOGD(TAG,   "WIFI_EVENT_AP_STACONNECTED. aid: %d, mac: %s",stac->aid,STR_OR_BLANK(mac));
 				FREE_AND_NULL(mac);
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 			}
 				break;
 			case WIFI_EVENT_AP_STADISCONNECTED:
-				ESP_LOGI(TAG,   "WIFI_EVENT_AP_STADISCONNECTED");
+				ESP_LOGD(TAG,   "WIFI_EVENT_AP_STADISCONNECTED");
 				xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
 				break;
 
 			case WIFI_EVENT_STA_START:
-				ESP_LOGI(TAG,   "WIFI_EVENT_STA_START");
+				ESP_LOGD(TAG,   "WIFI_EVENT_STA_START");
 				break;
 
 			case WIFI_EVENT_STA_STOP:
-				ESP_LOGI(TAG,   "WIFI_EVENT_STA_STOP");
+				ESP_LOGD(TAG,   "WIFI_EVENT_STA_STOP");
 				break;
 
 			case WIFI_EVENT_STA_CONNECTED:{
@@ -730,7 +730,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				wifi_event_sta_connected_t * s =(wifi_event_sta_connected_t*)event_data;
 				char * bssid = get_mac_string(s->bssid);
 				char * ssid = strdup((char*)s->ssid);
-				ESP_LOGI(TAG,   "WIFI_EVENT_STA_CONNECTED. Channel: %d, Access point: %s, BSSID: %s ", s->channel, STR_OR_BLANK(ssid), (bssid));
+				ESP_LOGD(TAG,   "WIFI_EVENT_STA_CONNECTED. Channel: %d, Access point: %s, BSSID: %s ", s->channel, STR_OR_BLANK(ssid), (bssid));
 				FREE_AND_NULL(bssid);
 				FREE_AND_NULL(ssid);
 
@@ -756,7 +756,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 //		    		reason of disconnection
 				wifi_event_sta_disconnected_t * s =(wifi_event_sta_disconnected_t*)event_data;
 				char * bssid = get_mac_string(s->bssid);
-				ESP_LOGI(TAG,   "WIFI_EVENT_STA_DISCONNECTED. From BSSID: %s, reason code: %d (%s)", STR_OR_BLANK(bssid),s->reason, get_disconnect_code_desc(s->reason));
+				ESP_LOGD(TAG,   "WIFI_EVENT_STA_DISCONNECTED. From BSSID: %s, reason code: %d (%s)", STR_OR_BLANK(bssid),s->reason, get_disconnect_code_desc(s->reason));
 				FREE_AND_NULL(bssid);
 				if(last_connected>0) total_connected_time+=((esp_timer_get_time()-last_connected)/(1000*1000));
 				last_connected = 0;
@@ -819,16 +819,16 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 			}
 				break;
 			case IP_EVENT_STA_LOST_IP:
-				ESP_LOGI(TAG,   "IP_EVENT_STA_LOST_IP");
+				ESP_LOGD(TAG,   "IP_EVENT_STA_LOST_IP");
 				break;
 			case IP_EVENT_AP_STAIPASSIGNED:
-				ESP_LOGI(TAG,   "IP_EVENT_AP_STAIPASSIGNED");
+				ESP_LOGD(TAG,   "IP_EVENT_AP_STAIPASSIGNED");
 				break;
 			case IP_EVENT_GOT_IP6:
-				ESP_LOGI(TAG,   "IP_EVENT_GOT_IP6");
+				ESP_LOGD(TAG,   "IP_EVENT_GOT_IP6");
 				break;
 			case IP_EVENT_ETH_GOT_IP:
-				ESP_LOGI(TAG,   "IP_EVENT_ETH_GOT_IP");
+				ESP_LOGD(TAG,   "IP_EVENT_ETH_GOT_IP");
 				break;
 			default:
 				break;
@@ -996,7 +996,7 @@ void wifi_manager_config_ap(){
 		};
 		ESP_LOGI(TAG,  "Configuring Access Point.");
 
-		ESP_LOGI(TAG,"Stopping DHCP on interface ");
+		ESP_LOGD(TAG,"Stopping DHCP on interface ");
 		if((err= tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP))!=ESP_OK) 	/* stop AP DHCP server */
 		{
 			ESP_LOGW(TAG,  "Stopping DHCP failed. Error %s",esp_err_to_name(err));
@@ -1006,19 +1006,19 @@ void wifi_manager_config_ap(){
 		 */
 		value = config_alloc_get_default(NVS_TYPE_STR, "ap_ip_address", DEFAULT_AP_IP, 0);
 		if(value!=NULL){
-			ESP_LOGI(TAG,  "IP Address: %s", value);
+			ESP_LOGD(TAG,  "IP Address: %s", value);
 			inet_pton(AF_INET,value, &info.ip); /* access point is on a static IP */
 		}
 		FREE_AND_NULL(value);
 		value = config_alloc_get_default(NVS_TYPE_STR, "ap_ip_gateway", CONFIG_DEFAULT_AP_GATEWAY, 0);
 		if(value!=NULL){
-			ESP_LOGI(TAG,  "Gateway: %s", value);
+			ESP_LOGD(TAG,  "Gateway: %s", value);
 			inet_pton(AF_INET,value, &info.gw); /* access point is on a static IP */
 		}
 		FREE_AND_NULL(value);
 		value = config_alloc_get_default(NVS_TYPE_STR, "ap_ip_netmask", CONFIG_DEFAULT_AP_NETMASK, 0);
 		if(value!=NULL){
-			ESP_LOGI(TAG,  "Netmask: %s", value);
+			ESP_LOGD(TAG,  "Netmask: %s", value);
 			inet_pton(AF_INET,value, &info.netmask); /* access point is on a static IP */
 		}
 		FREE_AND_NULL(value);
@@ -1047,7 +1047,7 @@ void wifi_manager_config_ap(){
 
 		value = config_alloc_get_default(NVS_TYPE_STR, "ap_channel", STR(CONFIG_DEFAULT_AP_CHANNEL), 0);
 		if(value!=NULL){
-			ESP_LOGI(TAG,  "Channel: %s", value);
+			ESP_LOGD(TAG,  "Channel: %s", value);
 			ap_config.ap.channel=atoi(value);
 		}
 		FREE_AND_NULL(value);
@@ -1057,10 +1057,10 @@ void wifi_manager_config_ap(){
 		ap_config.ap.max_connection = DEFAULT_AP_MAX_CONNECTIONS;
 		ap_config.ap.beacon_interval = DEFAULT_AP_BEACON_INTERVAL;
 
-		ESP_LOGI(TAG,  "Auth Mode: %d", ap_config.ap.authmode);
-		ESP_LOGI(TAG,  "SSID Hidden: %d", ap_config.ap.ssid_hidden);
-		ESP_LOGI(TAG,  "Max Connections: %d", ap_config.ap.max_connection);
-		ESP_LOGI(TAG,  "Beacon interval: %d", ap_config.ap.beacon_interval);
+		ESP_LOGD(TAG,  "Auth Mode: %d", ap_config.ap.authmode);
+		ESP_LOGD(TAG,  "SSID Hidden: %d", ap_config.ap.ssid_hidden);
+		ESP_LOGD(TAG,  "Max Connections: %d", ap_config.ap.max_connection);
+		ESP_LOGD(TAG,  "Beacon interval: %d", ap_config.ap.beacon_interval);
 
 		ESP_LOGD(TAG,  "");
 		if((err= esp_wifi_set_mode(WIFI_MODE_APSTA))!=ESP_OK) 	/* stop AP DHCP server */
@@ -1196,14 +1196,14 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case ORDER_LOAD_AND_RESTORE_STA:
-				ESP_LOGI(TAG,   "MESSAGE: ORDER_LOAD_AND_RESTORE_STA. About to fetch wifi STA configuration");
+				ESP_LOGD(TAG,   "MESSAGE: ORDER_LOAD_AND_RESTORE_STA. About to fetch wifi STA configuration");
 				if(wifi_manager_fetch_wifi_sta_config()){
 					ESP_LOGI(TAG,   "Saved wifi found on startup. Will attempt to connect.");
 					wifi_manager_send_message(ORDER_CONNECT_STA, (void*)CONNECTION_REQUEST_RESTORE_CONNECTION);
 				}
 				else{
 					/* no wifi saved: start soft AP! This is what should happen during a first run */
-					ESP_LOGI(TAG,   "No saved wifi found on startup. Starting access point.");
+					ESP_LOGD(TAG,   "No saved wifi found on startup. Starting access point.");
 					wifi_manager_send_message(ORDER_START_AP, NULL);
 				}
 
@@ -1213,7 +1213,7 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case ORDER_CONNECT_STA:
-				ESP_LOGI(TAG,   "MESSAGE: ORDER_CONNECT_STA - Begin");
+				ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - Begin");
 
 				/* very important: precise that this connection attempt is specifically requested.
 				 * Param in that case is a boolean indicating if the request was made automatically
@@ -1231,7 +1231,7 @@ void wifi_manager( void * pvParameters ){
 					//todo:  support static ip address
 //					if(wifi_settings.sta_static_ip) {
 //						// There's a static ip address configured, so
-//						ESP_LOGI(TAG,   "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
+//						ESP_LOGD(TAG,   "Assigning static ip to STA interface. IP: %s , GW: %s , Mask: %s",
 //										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.ip),
 //										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.gw),
 //										ip4addr_ntoa(&wifi_settings.sta_static_ip_config.netmask));
@@ -1247,7 +1247,7 @@ void wifi_manager( void * pvParameters ){
 						ESP_LOGD(TAG,   "wifi_manager: Checking if DHCP client for STA interface is running");
 						ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
 						if (status!=TCPIP_ADAPTER_DHCP_STARTED) {
-							ESP_LOGI(TAG,   "wifi_manager: Start DHCP client for STA interface");
+							ESP_LOGD(TAG,   "wifi_manager: Start DHCP client for STA interface");
 							ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
 //						}
 					}
@@ -1293,14 +1293,14 @@ void wifi_manager( void * pvParameters ){
 			case EVENT_STA_DISCONNECTED:{
 				wifi_event_sta_disconnected_t disc_event;
 
-				ESP_LOGI(TAG,   "MESSAGE: EVENT_STA_DISCONNECTED");
+				ESP_LOGD(TAG,   "MESSAGE: EVENT_STA_DISCONNECTED");
 				if(msg.param == NULL){
 					ESP_LOGE(TAG,  "MESSAGE: EVENT_STA_DISCONNECTED - expected parameter not found!");
 				}
 				else{
 					memcpy(&disc_event,(wifi_event_sta_disconnected_t*)msg.param,sizeof(disc_event));
 					free(msg.param);
-					ESP_LOGI(TAG,   "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d (%s)", disc_event.reason, get_disconnect_code_desc(disc_event.reason));
+					ESP_LOGD(TAG,   "MESSAGE: EVENT_STA_DISCONNECTED with Reason code: %d (%s)", disc_event.reason, get_disconnect_code_desc(disc_event.reason));
 				}
 
 				/* this even can be posted in numerous different conditions
@@ -1371,7 +1371,7 @@ void wifi_manager( void * pvParameters ){
 
 				}
 				else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT){
-					ESP_LOGI(TAG,   "WiFi disconnected by user");
+					ESP_LOGD(TAG,   "WiFi disconnected by user");
 					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
 
@@ -1426,7 +1426,7 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case ORDER_START_AP:
-				ESP_LOGI(TAG,   "MESSAGE: ORDER_START_AP");
+				ESP_LOGD(TAG,   "MESSAGE: ORDER_START_AP");
 				wifi_manager_config_ap();
 				ESP_LOGD(TAG,  "AP Starting, requesting wifi scan.");
 				wifi_manager_scan_async();
@@ -1435,7 +1435,7 @@ void wifi_manager( void * pvParameters ){
 				break;
 
 			case EVENT_STA_GOT_IP:
-				ESP_LOGI(TAG,   "MESSAGE: EVENT_STA_GOT_IP");
+				ESP_LOGD(TAG,   "MESSAGE: EVENT_STA_GOT_IP");
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 
@@ -1485,7 +1485,7 @@ void wifi_manager( void * pvParameters ){
 				}
 				break;
 			case ORDER_DISCONNECT_STA:
-				ESP_LOGI(TAG,   "MESSAGE: ORDER_DISCONNECT_STA. Calling esp_wifi_disconnect()");
+				ESP_LOGD(TAG,   "MESSAGE: ORDER_DISCONNECT_STA. Calling esp_wifi_disconnect()");
 
 				/* precise this is coming from a user request */
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);

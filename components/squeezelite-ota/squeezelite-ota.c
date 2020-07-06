@@ -369,7 +369,7 @@ esp_err_t init_config(ota_thread_parms_t * p_ota_thread_parms){
 }
 esp_partition_t * _get_ota_partition(esp_partition_subtype_t subtype){
 	esp_partition_t *ota_partition=NULL;
-	ESP_LOGI(TAG, "Looking for OTA partition.");
+	ESP_LOGD(TAG, "Looking for OTA partition.");
 
 	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, subtype , NULL);
 	if(it == NULL){
@@ -378,7 +378,7 @@ esp_partition_t * _get_ota_partition(esp_partition_subtype_t subtype){
 	else {
 		ota_partition = (esp_partition_t *) esp_partition_get(it);
 		if(ota_partition != NULL){
-			ESP_LOGI(TAG, "Found OTA partition: %s.",ota_partition->label);
+			ESP_LOGD(TAG, "Found OTA partition: %s.",ota_partition->label);
 		}
 		else {
 			ESP_LOGE(TAG,"OTA partition not found!  Unable update application.");
@@ -414,7 +414,7 @@ esp_err_t _erase_last_boot_app_partition(const esp_partition_t *ota_partition)
 		ESP_LOGW(TAG,"Invalid erase block size of %u. Value should be a multiple of %d and will be adjusted to %u.", single_pass_size, SPI_FLASH_SEC_SIZE,temp_single_pass_size);
 		single_pass_size=temp_single_pass_size;
 	}
-	ESP_LOGI(TAG,"Erasing flash partition of size %u in blocks of %d bytes", ota_partition->size, single_pass_size);
+	ESP_LOGD(TAG,"Erasing flash partition of size %u in blocks of %d bytes", ota_partition->size, single_pass_size);
 	num_passes=ota_partition->size/single_pass_size;
 	remain_size=ota_partition->size-(num_passes*single_pass_size);
 	ESP_LOGI(TAG,"Erasing in %d passes with blocks of %d bytes ", num_passes,single_pass_size);
@@ -509,7 +509,7 @@ esp_err_t ota_header_check(){
     ota_status->last_invalid_app= esp_ota_get_last_invalid_partition();
     ota_status->ota_partition = _get_ota_partition(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 
-    ESP_LOGI(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", ota_status->running->label, ota_status->running->type, ota_status->running->subtype, ota_status->running->address);
+    ESP_LOGD(TAG, "Running partition [%s] type %d subtype %d (offset 0x%08x)", ota_status->running->label, ota_status->running->type, ota_status->running->subtype, ota_status->running->address);
     if (ota_status->total_image_len > ota_status->ota_partition->size){
     	ota_task_cleanup("Error: Image size (%d) too large to fit in partition (%d).",ota_status->ota_partition->size,ota_status->total_image_len );
         return ESP_FAIL;
@@ -523,7 +523,7 @@ esp_err_t ota_header_check(){
         ESP_LOGW(TAG, "Configured OTA boot partition at offset 0x%08x, but running from offset 0x%08x", ota_status->configured->address, ota_status->running->address);
         ESP_LOGW(TAG, "(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)");
     }
-    ESP_LOGI(TAG, "Next ota update partition is: [%s] subtype %d at offset 0x%x",
+    ESP_LOGD(TAG, "Next ota update partition is: [%s] subtype %d at offset 0x%x",
     		ota_status->update_partition->label, ota_status->update_partition->subtype, ota_status->update_partition->address);
 
     if (ota_status->total_image_len >= IMAGE_HEADER_SIZE) {
@@ -531,12 +531,12 @@ esp_err_t ota_header_check(){
 		memcpy(&new_app_info, &ota_status->bin_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
 		ESP_LOGI(TAG, "New firmware version: %s", new_app_info.version);
 		if (esp_ota_get_partition_description(ota_status->running, &running_app_info) == ESP_OK) {
-			ESP_LOGI(TAG, "Running recovery version: %s", running_app_info.version);
+			ESP_LOGD(TAG, "Running recovery version: %s", running_app_info.version);
 		}
 		sendMessaging(MESSAGING_INFO,"New version is : %s",new_app_info.version);
 		esp_app_desc_t invalid_app_info;
 		if (esp_ota_get_partition_description(ota_status->last_invalid_app, &invalid_app_info) == ESP_OK) {
-			ESP_LOGI(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
+			ESP_LOGD(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
 		}
 
 		if (memcmp(new_app_info.version, running_app_info.version, sizeof(new_app_info.version)) == 0) {
@@ -564,7 +564,7 @@ void ota_task(void *pvParameter)
 
     ota_status->update_partition = esp_ota_get_next_update_partition(NULL);
 
-	ESP_LOGI(TAG,"Initializing OTA configuration");
+	ESP_LOGD(TAG,"Initializing OTA configuration");
 	err = init_config(pvParameter);
 	if(err!=ESP_OK){
 		ota_task_cleanup("Error: Failed to initialize OTA.");
@@ -636,7 +636,7 @@ void ota_task(void *pvParameter)
 			taskYIELD();
 
         } else if (data_read == 0) {
-            ESP_LOGI(TAG, "End of OTA data stream");
+            ESP_LOGD(TAG, "End of OTA data stream");
             break;
         }
     }
@@ -684,12 +684,12 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
 
 	if(bin_url){
 		ota_thread_parms.url =strdup(bin_url);
-		ESP_LOGI(TAG, "Starting ota on core %u for : %s", OTA_CORE,ota_thread_parms.url);
+		ESP_LOGD(TAG, "Starting ota on core %u for : %s", OTA_CORE,ota_thread_parms.url);
 	}
 	else {
 		ota_thread_parms.bin = bin_buffer;
 		ota_thread_parms.length = length;
-		ESP_LOGI(TAG, "Starting ota on core %u for file upload", OTA_CORE);
+		ESP_LOGD(TAG, "Starting ota on core %u for file upload", OTA_CORE);
 	}
 
     char * num_buffer=config_alloc_get(NVS_TYPE_STR, "ota_stack");
@@ -715,7 +715,7 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
 //    ret=xTaskCreatePinnedToCore(&ota_task, "ota_task", stack_size , (void *)&ota_thread_parms, task_priority, NULL, OTA_CORE);
     ret=xTaskCreate(&ota_task, "ota_task", stack_size , (void *)&ota_thread_parms, task_priority, NULL);
     if (ret != pdPASS)  {
-            ESP_LOGI(TAG, "create thread %s failed", "ota_task");
+            ESP_LOGE(TAG, "create thread %s failed", "ota_task");
             return ESP_FAIL;
     }
     return ESP_OK;

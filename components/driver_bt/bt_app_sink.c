@@ -92,7 +92,7 @@ static void bt_volume_up(bool pressed) {
 	// volume UP/DOWN buttons are not supported by iPhone/Android
 	volume_set_by_local_host(s_volume < 127-3 ? s_volume + 3 : 127);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
-	ESP_LOGI(BT_AV_TAG, "BT volume up %u", s_volume);
+	ESP_LOGD(BT_AV_TAG, "BT volume up %u", s_volume);
 }
 
 static void bt_volume_down(bool pressed) {
@@ -148,7 +148,7 @@ void bt_disconnect(void) {
 	displayer_control(DISPLAYER_SHUTDOWN);
 	if (s_audio == AUDIO_PLAYING) esp_avrc_ct_send_passthrough_cmd(tl++ & 0x0f, ESP_AVRC_PT_CMD_STOP, ESP_AVRC_PT_CMD_STATE_PRESSED);
 	actrls_unset();
-	ESP_LOGI(BT_AV_TAG, "forced disconnection %d", s_audio);
+	ESP_LOGD(BT_AV_TAG, "forced disconnection %d", s_audio);
 }
 
 /* update metadata if any */
@@ -277,7 +277,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
     case ESP_A2D_CONNECTION_STATE_EVT: {
         a2d = (esp_a2d_cb_param_t *)(p_param);
         uint8_t *bda = a2d->conn_stat.remote_bda;
-        ESP_LOGI(BT_AV_TAG, "A2DP connection state: %s, [%02x:%02x:%02x:%02x:%02x:%02x]",
+        ESP_LOGD(BT_AV_TAG, "A2DP connection state: %s, [%02x:%02x:%02x:%02x:%02x:%02x]",
              s_a2d_conn_state_str[a2d->conn_stat.state], bda[0], bda[1], bda[2], bda[3], bda[4], bda[5]);
         if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
@@ -290,7 +290,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
     }
     case ESP_A2D_AUDIO_STATE_EVT: {
         a2d = (esp_a2d_cb_param_t *)(p_param);
-        ESP_LOGI(BT_AV_TAG, "A2DP audio state: %s", s_a2d_audio_state_str[a2d->audio_stat.state]);
+        ESP_LOGD(BT_AV_TAG, "A2DP audio state: %s", s_a2d_audio_state_str[a2d->audio_stat.state]);
 
         if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
 			s_audio = AUDIO_CONNECTED;
@@ -320,7 +320,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
     }
     case ESP_A2D_AUDIO_CFG_EVT: {
         a2d = (esp_a2d_cb_param_t *)(p_param);
-        ESP_LOGI(BT_AV_TAG, "A2DP audio stream configuration, codec type %d", a2d->audio_cfg.mcc.type);
+        ESP_LOGD(BT_AV_TAG, "A2DP audio stream configuration, codec type %d", a2d->audio_cfg.mcc.type);
         // for now only SBC stream is supported
         if (a2d->audio_cfg.mcc.type == ESP_A2D_MCT_SBC) {
             s_sample_rate = 16000;
@@ -382,12 +382,12 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
 {
     switch (event_id) {
     case ESP_AVRC_RN_TRACK_CHANGE:
-		ESP_LOGI(BT_AV_TAG, "Track changed");
+		ESP_LOGD(BT_AV_TAG, "Track changed");
         bt_av_new_track();
 		(*bt_app_a2d_cmd_cb)(BT_SINK_PROGRESS, 0, 0);
         break;
     case ESP_AVRC_RN_PLAY_STATUS_CHANGE:
-        ESP_LOGI(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
+        ESP_LOGD(BT_AV_TAG, "Playback status changed: 0x%x", event_parameter->playback);
 		if (s_audio != AUDIO_IDLE) {
 			switch (event_parameter->playback) {
 			case ESP_AVRC_PLAYBACK_PLAYING:
@@ -410,7 +410,7 @@ void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_param
 				(*bt_app_a2d_cmd_cb)(BT_SINK_STOP);
 				break;
 			default:
-				ESP_LOGI(BT_AV_TAG, "Un-handled event");
+				ESP_LOGW(BT_AV_TAG, "Un-handled event");
 				break;
 			}	
 		} else {
@@ -433,7 +433,7 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
     switch (event) {
     case ESP_AVRC_CT_CONNECTION_STATE_EVT: {
         uint8_t *bda = rc->conn_stat.remote_bda;
-        ESP_LOGI(BT_RC_CT_TAG, "AVRC conn_state evt: state %d, [%02x:%02x:%02x:%02x:%02x:%02x]",
+        ESP_LOGD(BT_RC_CT_TAG, "AVRC conn_state evt: state %d, [%02x:%02x:%02x:%02x:%02x:%02x]",
                  rc->conn_stat.connected, bda[0], bda[1], bda[2], bda[3], bda[4], bda[5]);
 
         if (rc->conn_stat.connected) {
@@ -446,11 +446,11 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_CT_PASSTHROUGH_RSP_EVT: {
-        ESP_LOGI(BT_RC_CT_TAG, "AVRC passthrough rsp: key_code 0x%x, key_state %d", rc->psth_rsp.key_code, rc->psth_rsp.key_state);
+        ESP_LOGD(BT_RC_CT_TAG, "AVRC passthrough rsp: key_code 0x%x, key_state %d", rc->psth_rsp.key_code, rc->psth_rsp.key_state);
         break;
     }
     case ESP_AVRC_CT_METADATA_RSP_EVT: {
-        ESP_LOGI(BT_RC_CT_TAG, "AVRC metadata rsp: attribute id 0x%x, %s", rc->meta_rsp.attr_id, rc->meta_rsp.attr_text);
+        ESP_LOGD(BT_RC_CT_TAG, "AVRC metadata rsp: attribute id 0x%x, %s", rc->meta_rsp.attr_id, rc->meta_rsp.attr_text);
 		
 		if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_PLAYING_TIME) s_metadata.duration = atoi((char*) rc->meta_rsp.attr_text);
 		else if (rc->meta_rsp.attr_id == ESP_AVRC_MD_ATTR_TITLE) strncpy(s_metadata.title, (char*) rc->meta_rsp.attr_text, METADATA_LEN);
@@ -467,11 +467,11 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_CT_REMOTE_FEATURES_EVT: {
-        ESP_LOGI(BT_RC_CT_TAG, "AVRC remote features %x, TG features %x", rc->rmt_feats.feat_mask, rc->rmt_feats.tg_feat_flag);
+        ESP_LOGD(BT_RC_CT_TAG, "AVRC remote features %x, TG features %x", rc->rmt_feats.feat_mask, rc->rmt_feats.tg_feat_flag);
         break;
     }
     case ESP_AVRC_CT_GET_RN_CAPABILITIES_RSP_EVT: {
-        ESP_LOGI(BT_RC_CT_TAG, "remote rn_cap: count %d, bitmask 0x%x", rc->get_rn_caps_rsp.cap_count,
+        ESP_LOGD(BT_RC_CT_TAG, "remote rn_cap: count %d, bitmask 0x%x", rc->get_rn_caps_rsp.cap_count,
                  rc->get_rn_caps_rsp.evt_set.bits);
         s_avrc_peer_rn_cap.bits = rc->get_rn_caps_rsp.evt_set.bits;
         bt_av_new_track();
@@ -487,7 +487,7 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
 
 static void volume_set_by_controller(uint8_t volume)
 {
-    ESP_LOGI(BT_RC_TG_TAG, "Volume is set by remote controller %d%%\n", (uint32_t)volume * 100 / 0x7f);
+    ESP_LOGD(BT_RC_TG_TAG, "Volume is set by remote controller %d%%\n", (uint32_t)volume * 100 / 0x7f);
     _lock_acquire(&s_volume_lock);
     s_volume = volume;
     _lock_release(&s_volume_lock);
@@ -496,7 +496,7 @@ static void volume_set_by_controller(uint8_t volume)
 
 static void volume_set_by_local_host(uint8_t volume)
 {
-    ESP_LOGI(BT_RC_TG_TAG, "Volume is set locally to: %d%%", (uint32_t)volume * 100 / 0x7f);
+    ESP_LOGD(BT_RC_TG_TAG, "Volume is set locally to: %d%%", (uint32_t)volume * 100 / 0x7f);
     _lock_acquire(&s_volume_lock);
     s_volume = volume;
     _lock_release(&s_volume_lock);
@@ -516,21 +516,21 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param)
     switch (event) {
     case ESP_AVRC_TG_CONNECTION_STATE_EVT: {
         uint8_t *bda = rc->conn_stat.remote_bda;
-        ESP_LOGI(BT_RC_TG_TAG, "AVRC conn_state evt: state %d, [%02x:%02x:%02x:%02x:%02x:%02x]",
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC conn_state evt: state %d, [%02x:%02x:%02x:%02x:%02x:%02x]",
                  rc->conn_stat.connected, bda[0], bda[1], bda[2], bda[3], bda[4], bda[5]);
         break;
     }
     case ESP_AVRC_TG_PASSTHROUGH_CMD_EVT: {
-        ESP_LOGI(BT_RC_TG_TAG, "AVRC passthrough cmd: key_code 0x%x, key_state %d", rc->psth_cmd.key_code, rc->psth_cmd.key_state);
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC passthrough cmd: key_code 0x%x, key_state %d", rc->psth_cmd.key_code, rc->psth_cmd.key_state);
         break;
     }
     case ESP_AVRC_TG_SET_ABSOLUTE_VOLUME_CMD_EVT: {
-        ESP_LOGI(BT_RC_TG_TAG, "AVRC set absolute volume: %d%%", (int)rc->set_abs_vol.volume * 100/ 0x7f);
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC set absolute volume: %d%%", (int)rc->set_abs_vol.volume * 100/ 0x7f);
         volume_set_by_controller(rc->set_abs_vol.volume);
         break;
     }
     case ESP_AVRC_TG_REGISTER_NOTIFICATION_EVT: {
-        ESP_LOGI(BT_RC_TG_TAG, "AVRC register event notification: %d, param: 0x%x", rc->reg_ntf.event_id, rc->reg_ntf.event_parameter);
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC register event notification: %d, param: 0x%x", rc->reg_ntf.event_id, rc->reg_ntf.event_parameter);
         if (rc->reg_ntf.event_id == ESP_AVRC_RN_VOLUME_CHANGE) {
             s_volume_notify = true;
             esp_avrc_rn_param_t rn_param;
@@ -540,7 +540,7 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_TG_REMOTE_FEATURES_EVT: {
-        ESP_LOGI(BT_RC_TG_TAG, "AVRC remote features %x, CT features %x", rc->rmt_feats.feat_mask, rc->rmt_feats.ct_feat_flag);
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC remote features %x, CT features %x", rc->rmt_feats.feat_mask, rc->rmt_feats.ct_feat_flag);
         break;
     }
     default:
@@ -632,15 +632,15 @@ void bt_sink_deinit(void)
 {
 	/* this still does not work, can't figure out how to stop properly this BT stack */
 	bt_app_task_shut_down();
-	ESP_LOGI(BT_AV_TAG, "bt_app_task shutdown successfully");	
+	ESP_LOGD(BT_AV_TAG, "bt_app_task shutdown successfully");
 	if (esp_bluedroid_disable() != ESP_OK) return;
-    ESP_LOGI(BT_AV_TAG, "esp_bluedroid_disable called successfully");
+    ESP_LOGD(BT_AV_TAG, "esp_bluedroid_disable called successfully");
     if (esp_bluedroid_deinit() != ESP_OK) return;
-    ESP_LOGI(BT_AV_TAG, "esp_bluedroid_deinit called successfully");
+    ESP_LOGD(BT_AV_TAG, "esp_bluedroid_deinit called successfully");
     if (esp_bt_controller_disable() != ESP_OK) return;
-    ESP_LOGI(BT_AV_TAG, "esp_bt_controller_disable called successfully");
+    ESP_LOGD(BT_AV_TAG, "esp_bt_controller_disable called successfully");
     if (esp_bt_controller_deinit() != ESP_OK) return;
-	ESP_LOGI(BT_AV_TAG, "bt stopped successfully");
+	ESP_LOGD(BT_AV_TAG, "bt stopped successfully");
 }
 
 static void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
@@ -648,7 +648,7 @@ static void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
     switch (event) {
     case ESP_BT_GAP_AUTH_CMPL_EVT: {
         if (param->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) {
-            ESP_LOGI(BT_AV_TAG, "authentication success: %s", param->auth_cmpl.device_name);
+            ESP_LOGD(BT_AV_TAG, "authentication success: %s", param->auth_cmpl.device_name);
             esp_log_buffer_hex(BT_AV_TAG, param->auth_cmpl.bda, ESP_BD_ADDR_LEN);
         } else {
             ESP_LOGE(BT_AV_TAG, "authentication failed, status:%d", param->auth_cmpl.stat);
@@ -658,19 +658,19 @@ static void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
 
 #if (CONFIG_BT_SSP_ENABLED == true)
     case ESP_BT_GAP_CFM_REQ_EVT:
-        ESP_LOGI(BT_AV_TAG, "ESP_BT_GAP_CFM_REQ_EVT Please compare the numeric value: %d", param->cfm_req.num_val);
+        ESP_LOGD(BT_AV_TAG, "ESP_BT_GAP_CFM_REQ_EVT Please compare the numeric value: %d", param->cfm_req.num_val);
         esp_bt_gap_ssp_confirm_reply(param->cfm_req.bda, true);
         break;
     case ESP_BT_GAP_KEY_NOTIF_EVT:
-        ESP_LOGI(BT_AV_TAG, "ESP_BT_GAP_KEY_NOTIF_EVT passkey:%d", param->key_notif.passkey);
+        ESP_LOGD(BT_AV_TAG, "ESP_BT_GAP_KEY_NOTIF_EVT passkey:%d", param->key_notif.passkey);
         break;
     case ESP_BT_GAP_KEY_REQ_EVT:
-        ESP_LOGI(BT_AV_TAG, "ESP_BT_GAP_KEY_REQ_EVT Please enter passkey!");
+        ESP_LOGD(BT_AV_TAG, "ESP_BT_GAP_KEY_REQ_EVT Please enter passkey!");
         break;
 #endif
 
     default: {
-        ESP_LOGI(BT_AV_TAG, "event: %d", event);
+        ESP_LOGD(BT_AV_TAG, "event: %d", event);
         break;
     }
     }
