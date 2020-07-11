@@ -364,7 +364,7 @@ static decode_state helixaac_decode(void) {
 		if (a->type == '2') {
 
 			// adts stream - seek for header
-			long n = AACFindSyncWord(streambuf->readp, bytes_wrap);
+			long n = HAAC(a, FindSyncWord, streambuf->readp, bytes_wrap);
 			
 			LOG_DEBUG("Sync search in %d bytes %d", bytes_wrap, n);
 			
