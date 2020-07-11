@@ -135,7 +135,7 @@ esp_err_t http_server_start()
     //todo:  use the endpoint below to configure session token?
     // config.open_fn
 
-    ESP_LOGI(TAG, "Starting HTTP Server");
+    ESP_LOGD(TAG, "Starting HTTP Server");
     esp_err_t err= __httpd_start(&_server, &config);
     if(err != ESP_OK){
     	ESP_LOGE_LOC(TAG,"Start server failed");
@@ -153,7 +153,7 @@ esp_err_t http_server_start()
 /* Function to free context */
 void adder_free_func(void *ctx)
 {
-    ESP_LOGI(TAG, "/adder Free Context function called");
+    ESP_LOGD(TAG, "/adder Free Context function called");
     free(ctx);
 }
 
