@@ -979,6 +979,7 @@ esp_err_t process_redirect(httpd_req_t *req, const char * status){
 	char * ap_ip_address=get_ap_ip_address();
 	char * remote_ip=NULL;
 	in_port_t port=0;
+	char *redirect_url = NULL;
 
 	ESP_LOGD_LOC(TAG,  "Getting remote socket address");
 	remote_ip = http_alloc_get_socket_address(req,0, &port);
@@ -988,13 +989,12 @@ esp_err_t process_redirect(httpd_req_t *req, const char * status){
 
 	if(strcasestr(status,"302")){
 		size_t url_buf_size = strlen(location_prefix) + strlen(ap_ip_address)+1;
-		char * redirect_url = malloc(url_buf_size);
+		redirect_url = malloc(url_buf_size);
 		memset(redirect_url,0x00,url_buf_size);
 		snprintf(redirect_url, buf_size,"%s%s/",location_prefix, ap_ip_address);
 		ESP_LOGW_LOC(TAG,  "Redirecting host [%s] to %s (from uri %s)",remote_ip, redirect_url,req->uri);
 		httpd_resp_set_hdr(req,"Location",redirect_url);
 		snprintf(redirect, buf_size,"OK");
-		FREE_AND_NULL(redirect_url);
 	}
 	else {
 
@@ -1007,6 +1007,7 @@ esp_err_t process_redirect(httpd_req_t *req, const char * status){
 	httpd_resp_set_status(req, status);
 	httpd_resp_send(req, redirect, HTTPD_RESP_USE_STRLEN);
 	FREE_AND_NULL(redirect);
+	FREE_AND_NULL(redirect_url);
 	FREE_AND_NULL(remote_ip);
 
 	return ESP_OK;
