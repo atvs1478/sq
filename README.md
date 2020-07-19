@@ -103,7 +103,7 @@ In AirPlay and Bluetooth mode, only these native remotes are supported, I've not
 See "set GPIO" below to set the GPIO associated to infrared receiver (option "ir"). 
 
 ### Set GPIO
-The parameter "set_GPIO" is use to assign GPIO to various functions.
+The parameter "set_GPIO" is used to assign GPIO to various functions.
 
 GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
 
