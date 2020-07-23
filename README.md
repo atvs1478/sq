@@ -5,6 +5,12 @@ Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.p
 
 Use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
+NB: you can use the pre-build binaries SqueezeAMP4MBFlash/SqueezeAMP8MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
+- set_GPIO: 12=green,13=red,34=jack,2=spkfault
+- batt_config: channel=7,scale=20.24
+- dac_config: bck=33,ws=25,do=32
+- spdif_config: bck=33,ws=25,do=15
+
 ### ESP32-A1S
 Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4000765857347.html?spm=2114.12010615.8148356.11.5d963cd0j669ns) or an external amplifier if you want direct speaker connection. 
 
