@@ -79,13 +79,15 @@ bck=<gpio>,ws=<gpio>,do=<gpio>
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
-I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
-SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1326|SH1106]
+I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver=SSD1306|SSD1326[:1|4]|SSD1327|SH1106]
+SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1322|SSD1326[:1|4]|SSD1327|SH1106][SSD1675]
 ```
 - VFlip and HFlip are optional can be used to change display orientation
 - Default speed is 8000000 (8MHz) but SPI can work up to 26MHz or even 40MHz
+- SSD1326 can be used with bit depth of 1 (mono) or 4 (16 gray levels)
+- SSD1675 is experimental and e-ink are not suitable for that type of display anyway due to their very low response time
 
-Currently 128x32/64 I2C and SPI display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this](https://www.waveshare.com/wiki/1.3inch_OLED_HAT) are supported
+Currently 128x32/64 I2C and SPI display like [this](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi) and [this](https://www.waveshare.com/wiki/1.3inch_OLED_HAT) or 256x32 like [this](https://www.aliexpress.com/item/32833603664.html?spm=a2g0o.productlist.0.0.2d19776cyQvsBi&algo_pvid=c7a3db92-e019-4095-8a28-dfdf0a087f98&algo_expid=c7a3db92-e019-4095-8a28-dfdf0a087f98-1&btsid=0ab6f81e15955375483301352e4208&ws_ab_test=searchweb0_0,searchweb201602_,searchweb201603_) or larger 256x64 like [this](https://www.buydisplay.com/oled-display/oled-display-module?resolution=159) are supported. You also have square 128x128 display [here](https://www.amazon.com/gp/product/B079N1LLG8/ref=ox_sc_act_title_1?smid=A1N6DLY3NQK2VM&psc=1) where artwork can be up to 96x96 and you have vertical vu-meter/spectrum
 
 The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay and Bluetooth. Syntax is
 ```
