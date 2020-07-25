@@ -123,6 +123,8 @@ static struct {
 	bool owned;
 } displayer = { .dirty = true, .owned = true };	
 
+static uint32_t *grayMap;
+
 #define LONG_WAKE 		(10*1000)
 #define SB_HEIGHT		32
 
@@ -295,6 +297,12 @@ bool sb_display_init(void) {
 	// need to force height to 32 maximum
 	displayer.width = GDS_GetWidth(display);
 	displayer.height = min(GDS_GetHeight(display), SB_HEIGHT);
+	
+	// allocate gray-color mapping if needed;
+	if (GDS_GetMode(display) > GDS_GRAYSCALE) {
+		grayMap = malloc(256*sizeof(*grayMap));
+		for (int i = 0; i < 256; i++) grayMap[i] = GDS_GrayMap(display, i);
+	}
 	
 	// create visu configuration
 	visu.bar_gap = 1;
@@ -571,22 +579,40 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		data += (VU_WIDTH - width) / 2 * VU_HEIGHT;	
 	}	
 
-	// this is 8 bits grayscale
-	int scale = 8 - GDS_GetDepth(display);
+	if (GDS_GetMode(display) <= GDS_GRAYSCALE) {
+		// this is 8 bits grayscale
+		int scale = 8 - GDS_GetDepth(display);
 	
-	// use "fast" version as we are not beyond screen boundaries
-	if (visu.rotate) {
-		for (int r = 0; r < width; r++) {
-			for (int c = VU_HEIGHT; --c >= 0;) {
-				GDS_DrawPixelFastExt(display, c + x, r + y, *data++ >> scale);
+		// use "fast" version as we are not beyond screen boundaries
+		if (visu.rotate) {
+			for (int r = 0; r < width; r++) {
+				for (int c = VU_HEIGHT; --c >= 0;) {
+					GDS_DrawPixelFast(display, c + x, r + y, *data++ >> scale);
+				}	
 			}	
+		} else {
+			for (int r = 0; r < width; r++) {
+				for (int c = 0; c < VU_HEIGHT; c++) {
+				GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
+				}	
+			}			
 		}	
 	} else {
-		for (int r = 0; r < width; r++) {
-			for (int c = 0; c < VU_HEIGHT; c++) {
-				GDS_DrawPixelFastExt(display, r + x, c + y, *data++ >> scale);
+		// use "fast" version as we are not beyond screen boundaries
+		if (visu.rotate) {
+			for (int r = 0; r < width; r++) {
+				for (int c = VU_HEIGHT; --c >= 0;) {
+					GDS_DrawPixelFast(display, c + x, r + y, grayMap[*data++]);
+				}	
 			}	
-		}			
+		} else {
+			for (int r = 0; r < width; r++) {
+				for (int c = 0; c < VU_HEIGHT; c++) {
+				GDS_DrawPixelFast(display, r + x, c + y, grayMap[*data++]);
+				}	
+			}			
+		}	
+		
 	}	
 	
 	// need to manually set dirty flag as DrawPixel does not do it
@@ -908,12 +934,13 @@ static void visu_update(void) {
 
 	if (mode != VISU_VUMETER || !visu.style) {
 		// there is much more optimization to be done here, like not redrawing bars unless needed
+
 		for (int i = visu.n; --i >= 0;) {
 			// update maximum
 			if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
 			else if (visu.bars[i].max) visu.bars[i].max--;
 			else if (!clear) continue;
-			
+
 			if (visu.rotate) {
 				int x1 = visu.col;
 				int y1 = visu.row + visu.border + visu.bar_border + i*(visu.bar_width + visu.bar_gap);

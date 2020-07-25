@@ -12,7 +12,6 @@
 #include <string.h>
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
-#include "freertos/FreeRTOS.h"
 #include <freertos/task.h>
 #include "gds.h"
 #include "gds_err.h"
@@ -51,6 +50,7 @@ bool GDS_SPIAttachDevice( struct GDS_Device* Device, int Width, int Height, int 
     SPIDeviceConfig.clock_speed_hz = Speed > 0 ? Speed : SPI_MASTER_FREQ_8M;
     SPIDeviceConfig.spics_io_num = CSPin;
     SPIDeviceConfig.queue_size = 1;
+	SPIDeviceConfig.flags = SPI_DEVICE_NO_DUMMY;
 
     ESP_ERROR_CHECK_NONFATAL( spi_bus_add_device( SPIHost, &SPIDeviceConfig, &SPIDevice ), return false );
 	
