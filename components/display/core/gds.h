@@ -13,14 +13,12 @@
  monochrome mode is not such type of screen, SH1106 and SSD1306 are
 */ 
 
-enum { 	GDS_COLOR_L0 = 0, GDS_COLOR_L1, GDS_COLOR_L2, GDS_COLOR_L3, GDS_COLOR_L4, GDS_COLOR_L5, GDS_COLOR_L6, GDS_COLOR_L7, 
-		GDS_COLOR_L8, GDS_COLOR_L9, GDS_COLOR_L10, GDS_COLOR_L11, GDS_COLOR_L12, GDS_COLOR_L13, GDS_COLOR_L14, GDS_COLOR_L15,
-		GDS_COLOR_MAX
-};
+// this is an ordered enum, do not change!
+enum { GDS_MONO = 0, GDS_GRAYSCALE, GDS_RGB332, GDS_RGB444, GDS_RGB555, GDS_RGB565, GDS_RGB666, GDS_RGB888 };
 		
 #define GDS_COLOR_BLACK (0)
 #define GDS_COLOR_WHITE (-1)
-#define GDS_COLOR_XOR 	(GDS_COLOR_MAX + 1)
+#define GDS_COLOR_XOR 	(256)
 
 struct GDS_Device;
 struct GDS_FontDef;
@@ -39,6 +37,8 @@ void 	GDS_SetDirty( struct GDS_Device* Device );
 int 	GDS_GetWidth( struct GDS_Device* Device );
 int 	GDS_GetHeight( struct GDS_Device* Device );
 int 	GDS_GetDepth( struct GDS_Device* Device );
+int 	GDS_GetMode( struct GDS_Device* Device );
+int 	GDS_GrayMap( struct GDS_Device* Device, uint8_t Level );
 void 	GDS_ClearExt( struct GDS_Device* Device, bool full, ...);
 void 	GDS_Clear( struct GDS_Device* Device, int Color );
 void 	GDS_ClearWindow( struct GDS_Device* Device, int x1, int y1, int x2, int y2, int Color );

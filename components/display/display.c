@@ -48,8 +48,8 @@ static EXT_RAM_ATTR struct {
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, NULL };
 
 /****************************************************************************************
  * 
@@ -60,7 +60,7 @@ void display_init(char *welcome) {
 
 	if (!config) {
 		ESP_LOGI(TAG, "no display");
-		return false;
+		return;
 	}	
 	
 	int width = -1, height = -1;
