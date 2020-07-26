@@ -87,6 +87,7 @@ SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,speed=<speed>][,HFlip][,VFlip][dri
 - SH1106 is 128x64 monochrome I2C/SPI [here]((https://www.waveshare.com/wiki/1.3inch_OLED_HAT))
 - SSD1306 is 128x32 monochrome I2C/SPI [here](https://www.buydisplay.com/i2c-blue-0-91-inch-oled-display-module-128x32-arduino-raspberry-pi)
 - SSD1322 is 128x128 16-level grayscale SPI [here](https://www.amazon.com/gp/product/B079N1LLG8/ref=ox_sc_act_title_1?smid=A1N6DLY3NQK2VM&psc=1) - artwork can be up to 96x96 with vertical vu-meter/spectrum
+- SSD1351 is 128x128 65k/262k color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/1.5inch-rgb-oled-module.htm)
 - SSD1326 is 256x32 monochrome or grayscale 16-levels SPI [here](https://www.aliexpress.com/item/32833603664.html?spm=a2g0o.productlist.0.0.2d19776cyQvsBi&algo_pvid=c7a3db92-e019-4095-8a28-dfdf0a087f98&algo_expid=c7a3db92-e019-4095-8a28-dfdf0a087f98-1&btsid=0ab6f81e15955375483301352e4208&ws_ab_test=searchweb0_0,searchweb201602_,searchweb201603_)
 - SSD1327 is 256x64 grayscale 16-levels SPI in multiple sizes [here](https://www.buydisplay.com/oled-display/oled-display-module?resolution=159) - it is very nice
 - SSD1675 is an e-ink paper and is experimental as e-ink is really not suitable for LMS du to its very low refresh rate
