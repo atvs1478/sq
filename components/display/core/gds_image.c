@@ -42,31 +42,31 @@ typedef struct {
  * monochrome (0.2125 * color.r) + (0.7154 * color.g) + (0.0721 * color.b)
  * grayscale (0.3 * R) + (0.59 * G) + (0.11 * B) )
  */
-inline int Scaler332(uint8_t *Pixels) {
+static inline int Scaler332(uint8_t *Pixels) {
 	return (Pixels[2] & ~0x1f) | ((Pixels[1] & ~0x1f) >> 3) | (Pixels[0] >> 6);
 }
 
-inline int Scaler444(uint8_t *Pixels) {
+static inline int Scaler444(uint8_t *Pixels) {
 	return ((Pixels[2] & ~0x0f) << 4) | (Pixels[1] & ~0x0f) | (Pixels[0] >> 4);
 }
 
-inline int Scaler555(uint8_t *Pixels) {
+static inline int Scaler555(uint8_t *Pixels) {
 	return ((Pixels[2] & ~0x07) << 7) | ((Pixels[1] & ~0x07) << 2) | (Pixels[0] >> 3);
 }
 
-inline int Scaler565(uint8_t *Pixels) {
+static inline int Scaler565(uint8_t *Pixels) {
 	return ((Pixels[2] & ~0x07) << 8) | ((Pixels[1] & ~0x03) << 3) | (Pixels[0] >> 3);
 }
 
-inline int Scaler666(uint8_t *Pixels) {
+static inline int Scaler666(uint8_t *Pixels) {
 	return ((Pixels[2] & ~0x03) << 10) | ((Pixels[1] & ~0x03) << 4) | (Pixels[0] >> 2);
 }
 
-inline int Scaler888(uint8_t *Pixels) {
+static inline int Scaler888(uint8_t *Pixels) {
 	return (Pixels[2] << 16) | (Pixels[1] << 8) | Pixels[0];
 }
 
-inline int ScalerGray(uint8_t *Pixels) {
+static inline int ScalerGray(uint8_t *Pixels) {
 	return (Pixels[2] * 14 + Pixels[1] * 76 + Pixels[0] * 38) >> 7;
 }
 
@@ -236,37 +236,37 @@ void GDS_GetJPEGSize(uint8_t *Source, int *Width, int *Height) {
  * grayscale (0.3 * R) + (0.59 * G) + (0.11 * B) )
  */
  
-inline int ToGray888(uint8_t **Pixel) {
+static inline int ToGray888(uint8_t **Pixel) {
 	uint32_t v = *(*Pixel)++; v |= *(*Pixel)++ << 8; v |= *(*Pixel)++ << 16; 
 	return (((v & 0xff) * 14) + ((v >> 8) & 0xff) * 76 + ((v >> 16) * 38) + 1) >> 7;
 } 
  
-inline int ToGray666(uint8_t **Pixel) {
+static inline int ToGray666(uint8_t **Pixel) {
 	uint32_t v = *(*Pixel)++; v |= *(*Pixel)++ << 8; v |= *(*Pixel)++ << 16; 
 	return (((v & 0x3f) * 14) + ((v >> 6) & 0x3f) * 76 + ((v >> 12) * 38) + 1) >> 7;
 }
 
-inline int ToGray565(uint16_t **Pixel) {
+static inline int ToGray565(uint16_t **Pixel) {
 	uint16_t v = *(*Pixel)++; 
 	return ((((v & 0x1f) * 14) << 1) + ((v >> 5) & 0x3f) * 76 + (((v >> 11) * 38) << 1) + 1) >> 7;
 }
 
-inline int ToGray555(uint16_t **Pixel) {
+static inline int ToGray555(uint16_t **Pixel) {
 	uint16_t v = *(*Pixel)++; 
 	return ((v & 0x1f) * 14 + ((v >> 5) & 0x1f) * 76 + (v >> 10) * 38) >> 7;
 }
 
-inline int ToGray444(uint16_t **Pixel) {
+static inline int ToGray444(uint16_t **Pixel) {
 	uint16_t v = *(*Pixel)++; 
 	return ((v & 0x0f) * 14 + ((v >> 4) & 0x0f) * 76 + (v >> 8) * 38) >> 7;
 }
 
-inline int ToGray332(uint8_t **Pixel) {
+static inline int ToGray332(uint8_t **Pixel) {
 	uint8_t v = *(*Pixel)++; 
 	return ((((v & 0x3) * 14) << 1) + ((v >> 2) & 0x7) * 76 + (v >> 5) * 38 + 1) >> 7;
 }
 
-inline int ToSelf(uint8_t **Pixel) {
+static inline int ToSelf(uint8_t **Pixel) {
 	return *(*Pixel)++; 
 }
 	
