@@ -387,9 +387,6 @@ typedef BOOL bool;
 
 #endif
 
-typedef u32_t frames_t;
-typedef int sockfd;
-
 // logging
 typedef enum { lERROR = 0, lWARN, lINFO, lDEBUG, lSDEBUG } log_level;
 
@@ -401,7 +398,10 @@ void logprint(const char *fmt, ...);
 #define LOG_INFO(fmt, ...)  if (loglevel >= lINFO)  logprint("%s %s:%d " fmt "\n", logtime(), __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #define LOG_DEBUG(fmt, ...) if (loglevel >= lDEBUG) logprint("%s %s:%d " fmt "\n", logtime(), __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #define LOG_SDEBUG(fmt, ...) if (loglevel >= lSDEBUG) logprint("%s %s:%d " fmt "\n", logtime(), __FUNCTION__, __LINE__, ##__VA_ARGS__)
-
+	
+typedef uint32_t frames_t;
+typedef int sockfd;
+	
 #if EMBEDDED
 #include "embedded.h"
 #endif

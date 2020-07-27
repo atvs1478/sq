@@ -5,11 +5,11 @@
 #include <stdbool.h>
 
 /* NOTE for drivers:
- The build-in DrawPixel(Fast), DrawCBR and ClearWindow are optimized for 1 bit 
- and 4 bits screen depth. For any other type of screen, DrawCBR and ClearWindow
- default to use DrawPixel, which is very sub-optimal. For such other depth, you 
- must supply the DrawPixelFast. The built-in 1 bit depth function are only for 
- screen with vertical framing (1 byte = 8 lines). For example SSD1326 in 
+ The build-in DrawPixel(Fast), DrawCBR and ClearWindow have optimized for 1 bit 
+ and 4 bits grayscale screen depth and 8, 16, 24 color. For any other type of screen, 
+ DrawCBR and ClearWindow default to use DrawPixel, which is very sub-optimal. For 
+ other depth, you  must supply the DrawPixelFast. The built-in 1 bit depth function 
+ are only for screen with vertical framing (1 byte = 8 lines). For example SSD1326 in 
  monochrome mode is not such type of screen, SH1106 and SSD1306 are
 */ 
 
