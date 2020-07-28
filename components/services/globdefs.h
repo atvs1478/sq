@@ -10,14 +10,18 @@
  
 #pragma once
 
-#define I2C_SYSTEM_PORT	1
-#define SPI_SYSTEM_HOST	SPI2_HOST
+#define I2C_SYSTEM_PORT		1
+#define SPI_SYSTEM_HOST		SPI2_HOST
 
 extern int i2c_system_port;
 extern int i2c_system_speed;
 extern int spi_system_host;
 extern int spi_system_dc_gpio;
 extern bool gpio36_39_used;
+typedef struct {
+	int timer, base_channel, max;
+} pwm_system_t;
+extern pwm_system_t pwm_system;
 
 #ifdef CONFIG_SQUEEZEAMP
 #define ADAC dac_tas57xx

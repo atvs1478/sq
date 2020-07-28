@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include <driver/i2c.h>
+#include "driver/ledc.h"
+#include "driver/i2c.h"
 #include "config.h"
 #include "battery.h"
 #include "led.h"
@@ -25,6 +26,11 @@ int i2c_system_port = I2C_SYSTEM_PORT;
 int i2c_system_speed = 400000;
 int spi_system_host = SPI_SYSTEM_HOST;
 int spi_system_dc_gpio = -1;
+pwm_system_t pwm_system = { 
+		.timer = LEDC_TIMER_0,
+		.base_channel = LEDC_CHANNEL_0,
+		.max = (1 << LEDC_TIMER_13_BIT),
+	};		
 
 static const char *TAG = "services";
 
@@ -91,6 +97,16 @@ void services_init(void) {
 		spi_system_host = -1;
 		ESP_LOGW(TAG, "no SPI configured");
 	}	
+	
+	// system-wide PWM timer configuration
+	ledc_timer_config_t pwm_timer = {
+		.duty_resolution = LEDC_TIMER_13_BIT, 
+		.freq_hz = 5000,                     
+		.speed_mode = LEDC_HIGH_SPEED_MODE,  
+		.timer_num = pwm_system.timer,
+	};
+	
+	ledc_timer_config(&pwm_timer);
 
 	led_svc_init();
 	battery_svc_init();

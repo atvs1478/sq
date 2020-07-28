@@ -321,6 +321,9 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "set_GPIO", CONFIG_SET_GPIO);
 	config_set_default(NVS_TYPE_STR, "set_GPIO", CONFIG_SET_GPIO, 0);
 	
+	ESP_LOGD(TAG,"Registering default value for key %s", "led_brightness");
+	config_set_default(NVS_TYPE_STR, "led_brightness", "", 0);
+	
 	ESP_LOGD(TAG,"Registering default value for key %s", "spdif_config");
 	config_set_default(NVS_TYPE_STR, "spdif_config", "", 0);
 	
