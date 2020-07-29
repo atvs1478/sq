@@ -20,9 +20,10 @@ enum { LED_GREEN = 0, LED_RED };
 #define led_blink(idx, on, off)			led_blink_core(idx, on, off, false)
 #define led_blink_pushed(idx, on, off)	led_blink_core(idx, on, off, true)
 
-bool led_config(int idx, gpio_num_t gpio, int onstate);
-bool led_unconfig(int idx);
+bool led_config(int idx, gpio_num_t gpio, int onstate, int pwm);	
+bool led_brightness(int idx, int percent); 
 bool led_blink_core(int idx, int ontime, int offtime, bool push);
 bool led_unpush(int idx);
+int  led_allocate(void);
 
 #endif

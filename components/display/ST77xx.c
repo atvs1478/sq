@@ -19,15 +19,18 @@
 #define SHADOW_BUFFER
 #define USE_IRAM
 #define PAGE_BLOCK		2048
-#define ENABLE_WRITE	0x5c
+#define ENABLE_WRITE	0x2c
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 
-static char TAG[] = "SSD1351";
+static char TAG[] = "ST77xx";
+
+enum { ST7735, ST7789 };
 
 struct PrivateSpace {
 	uint8_t *iRAM, *Shadowbuffer;
-	uint8_t ReMap, PageSize;
+	uint8_t MADCtl, PageSize;
+	uint8_t Model;
 };
 
 // Functions are not declared to minimize # of lines
@@ -36,15 +39,16 @@ static void WriteByte( struct GDS_Device* Device, uint8_t Data ) {
 	Device->WriteData( Device, &Data, 1 );
 }
 
-static void SetColumnAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End ) {
-	Device->WriteCommand( Device, 0x15 );
-	WriteByte( Device, Start );
-	WriteByte( Device, End );
+static void SetColumnAddress( struct GDS_Device* Device, uint16_t Start, uint16_t End ) {
+	uint32_t Addr = __builtin_bswap16(Start) | (__builtin_bswap16(End) << 16);
+	Device->WriteCommand( Device, 0x2A );
+	Device->WriteData( Device, (uint8_t*) &Addr, 4 );
 }
-static void SetRowAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End ) {
-	Device->WriteCommand( Device, 0x75 );
-	WriteByte( Device, Start );
-	WriteByte( Device, End );
+
+static void SetRowAddress( struct GDS_Device* Device, uint16_t Start, uint16_t End ) {
+	uint32_t Addr = __builtin_bswap16(Start) | (__builtin_bswap16(End) << 16);
+	Device->WriteCommand( Device, 0x2B );
+	Device->WriteData( Device, (uint8_t*) &Addr, 4 );
 }
 
 static void Update16( struct GDS_Device* Device ) {
@@ -102,7 +106,7 @@ static void Update16( struct GDS_Device* Device ) {
 		int Height = min(Private->PageSize, Device->Height - r);
 		
 		SetRowAddress( Device, r, r + Height - 1 );
-		Device->WriteCommand(Device, ENABLE_WRITE);		
+		Device->WriteCommand(Device, ENABLE_WRITE);
 		
 		if (Private->iRAM) {
 			memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width * 2, Height * Device->Width * 2 );
@@ -116,10 +120,10 @@ static void Update16( struct GDS_Device* Device ) {
 
 static void Update24( struct GDS_Device* Device ) {
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	int FirstCol = (Device->Width * 3) / 2, LastCol = 0, FirstRow = -1, LastRow = 0;  
 		
 #ifdef SHADOW_BUFFER
 	uint16_t *optr = (uint16_t*) Private->Shadowbuffer, *iptr = (uint16_t*) Device->Framebuffer;
+	int FirstCol = (Device->Width * 3) / 2, LastCol = 0, FirstRow = -1, LastRow = 0;  
 	
 	for (int r = 0; r < Device->Height; r++) {
 		// look for change and update shadow (cheap optimization = width always / by 2)
@@ -180,24 +184,24 @@ static void Update24( struct GDS_Device* Device ) {
 
 static void SetHFlip( struct GDS_Device* Device, bool On ) { 
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap & ~(1 << 1)) : (Private->ReMap | (1 << 1));
-	Device->WriteCommand( Device, 0xA0 );
-	WriteByte( Device, Private->ReMap );
+	Private->MADCtl = On ? (Private->MADCtl & ~(1 << 7)) : (Private->MADCtl | (1 << 7));
+	Device->WriteCommand( Device, 0x36 );
+	WriteByte( Device, Private->MADCtl );
 }	
 
 static void SetVFlip( struct GDS_Device *Device, bool On ) { 
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap | (1 << 4)) : (Private->ReMap & ~(1 << 4));
-	Device->WriteCommand( Device, 0xA0 );
-	WriteByte( Device, Private->ReMap );
+	Private->MADCtl = On ? (Private->MADCtl | (1 << 6)) : (Private->MADCtl & ~(1 << 6));
+	Device->WriteCommand( Device, 0x36 );
+	WriteByte( Device, Private->MADCtl );
 }	
 	
-static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0xAF ); }
-static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0xAE ); }
+static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0x29 ); }
+static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0x28 ); }
 
 static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
-    Device->WriteCommand( Device, 0xC7 );
-	WriteByte( Device, Contrast >> 4);
+	Device->WriteCommand( Device, 0x51 );
+	WriteByte( Device, Contrast );
 }
 
 static bool Init( struct GDS_Device* Device ) {
@@ -214,70 +218,54 @@ static bool Init( struct GDS_Device* Device ) {
 	Private->iRAM = heap_caps_malloc( (Private->PageSize + 1) * Device->Width * Depth, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
 #endif
 
-	ESP_LOGI(TAG, "SSD1351 with bit depth %u, page %u, iRAM %p", Device->Depth, Private->PageSize, Private->iRAM);
+	ESP_LOGI(TAG, "ST77xx with bit depth %u, page %u, iRAM %p", Device->Depth, Private->PageSize, Private->iRAM);
 	
-	// unlock (specially 0xA2)
-	Device->WriteCommand( Device, 0xFD);
-	WriteByte(Device, 0xB1);
+	// Sleepout + Booster
+	Device->WriteCommand( Device, 0x11 );
 		
-	// set clocks
-	/*
-    Device->WriteCommand( Device, 0xB3 );
-    WriteByte( Device, ( 0x08 << 4 ) | 0x00 );
-	*/
-
-	// need to be off and disable display RAM
-	Device->DisplayOff( Device );
-
-	// need COM split (5)
-	Private->ReMap = (1 << 5);
-	
-	// Display Offset
-    Device->WriteCommand( Device, 0xA2 );
-    WriteByte( Device, 0x00 );
-
-	// Display Start Line
-    Device->WriteCommand( Device, 0xA1 );
-	WriteByte( Device, 0x00 );
-	
+	// need BGR & Address Mode
+	Private->MADCtl = (1 << 3) | ((Device->Width > Device->Height ? 1 : 0) << 5);
+	Device->WriteCommand( Device, 0x36 );
+	WriteByte( Device, Private->MADCtl );		
+		
 	// set flip modes & contrast
-	Device->SetContrast( Device, 0x7F );
+	GDS_SetContrast( Device, 0x7F );
 	Device->SetVFlip( Device, false );
 	Device->SetHFlip( Device, false );
 	
-	// set Adressing Mode Horizontal
-	Private->ReMap |= (0 << 2);
 	// set screen depth (16/18)
-	if (Device->Depth == 24) Private->ReMap |= (0x02 << 6);
-	// write ReMap byte
-	Device->WriteCommand( Device, 0xA0 );
-	WriteByte( Device, Private->ReMap );		
+	Device->WriteCommand( Device, 0x3A );
+	WriteByte( Device, Device->Depth == 24 ? 0x06 : 0x05 );
 	
 	// no Display Inversion
-    Device->WriteCommand( Device, 0xA6 );	
-	
+    Device->WriteCommand( Device, 0x20 );	
+		
 	// gone with the wind
 	Device->DisplayOn( Device );
 	Device->Update( Device );
-	
+
 	return true;
 }	
 
-static const struct GDS_Device SSD1351 = {
-	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
+static const struct GDS_Device ST77xx = {
+	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff,
 	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
 	.Update = Update16, .Init = Init,
 	.Mode = GDS_RGB565, .Depth = 16,
 };	
 
-struct GDS_Device* SSD1351_Detect(char *Driver, struct GDS_Device* Device) {
+struct GDS_Device* ST77xx_Detect(char *Driver, struct GDS_Device* Device) {
+	uint8_t Model;
 	int Depth;
 	
-	if (!strcasestr(Driver, "SSD1351")) return NULL;
-	
+	if (strcasestr(Driver, "ST7735")) Model = ST7735;
+	else if (strcasestr(Driver, "ST7789")) Model = ST7789;
+	else return NULL;
+		
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
-	
-	*Device = SSD1351;	
+		
+	*Device = ST77xx;	
+	((struct PrivateSpace*) Device->Private)->Model = Model;
 	sscanf(Driver, "%*[^:]:%u", &Depth);
 	
 	if (Depth == 18) {
@@ -285,6 +273,8 @@ struct GDS_Device* SSD1351_Detect(char *Driver, struct GDS_Device* Device) {
 		Device->Depth = 24;
 		Device->Update = Update24;
 	} 	
+	
+	if (Model == ST7789) Device->SetContrast = SetContrast;
 	
 	return Device;
 }
