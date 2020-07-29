@@ -11,10 +11,9 @@
 
 #include "platform_config.h"
 #include "squeezelite.h"
+#include "bt_app_sink.h"
 #include "raop_sink.h"
 #include <math.h>
-
-#include "bt_app_sink.h"
 
 #define LOCK_O   mutex_lock(outputbuf->mutex)
 #define UNLOCK_O mutex_unlock(outputbuf->mutex)
@@ -146,7 +145,7 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		LOG_INFO("Setting BT sample rate %u", output.next_sample_rate);
 		break;
 	case BT_SINK_VOLUME: {
-		u16_t volume = (u16_t) va_arg(args, u32_t);
+		u32_t volume = va_arg(args, u32_t);
 		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
 		break;
@@ -283,7 +282,7 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 			float volume = va_arg(args, double);
 			LOG_INFO("Volume[0..1] %0.4f", volume);
 			volume = 65536 * powf(volume, 3);
-			set_volume((u16_t) volume, (u16_t) volume);
+			set_volume(volume, volume);
 			break;
 		}
 		default:

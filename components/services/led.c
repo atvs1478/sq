@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
+#include "platform_config.h"
 #include "led.h"
 #include "globdefs.h"
 #include "accessors.h"
