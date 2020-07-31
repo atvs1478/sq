@@ -119,8 +119,7 @@ void display_init(char *welcome) {
 		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 		static EXT_RAM_ATTR StackType_t xStack[DISPLAYER_STACK_SIZE] __attribute__ ((aligned (4)));
 		
-		GDS_SetHFlip(display, strcasestr(config, "HFlip") ? true : false);
-		GDS_SetVFlip(display, strcasestr(config, "VFlip") ? true : false);
+		GDS_SetLayout( display, strcasestr(config, "HFlip"), strcasestr(config, "VFlip"), strcasestr(config, "rotate"));
 		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, welcome);
 

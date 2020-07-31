@@ -426,7 +426,7 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
  */
 static bool handler(u8_t *data, int len){
 	bool res = true;
-	
+
 	if (!strncmp((char*) data, "vfdc", 4)) {
 		vfdc_handler(data, len);
 	} else if (!strncmp((char*) data, "grfe", 4)) {
@@ -444,7 +444,7 @@ static bool handler(u8_t *data, int len){
 	} else {
 		res = false;
 	}
-	
+
 	// chain protocol handlers (bitwise or is fine)
 	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
 	
