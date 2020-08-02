@@ -8,7 +8,7 @@ if you want to rebuild, use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults
 NB: You can use the pre-build binaries SqueezeAMP4MBFlash/SqueezeAMP8MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
 - set_GPIO: 12=green,13=red,34=jack,2=spkfault
 - batt_config: channel=7,scale=20.24
-- dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14
+- dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0
 - spdif_config: bck=33,ws=25,do=15
 
 ### ESP32-A1S
@@ -124,7 +124,7 @@ The parameter "set_GPIO" is used to assign GPIO to various functions.
 
 GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
 
-The \<amp\> parameter can use used to assign a GPIO that will be set to active level when playback starts. It will be reset when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
+The \<amp\> parameter can use used to assign a GPIO that will be set to active level (default 1) when playback starts. It will be reset when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
 
 If you have an audio jack that supports insertion (use :0 or :1 to set the level when inserted), you can specify which GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
 
@@ -135,7 +135,7 @@ The \<ir\> parameter set the GPIO associated to an IR receiver. No need to add p
 Syntax is:
 
 ```
-<gpio>=Vcc|GND|amp[:0|1]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
+<gpio>=Vcc|GND|amp[:1|0]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 ### LED 
