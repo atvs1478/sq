@@ -8,7 +8,7 @@ if you want to rebuild, use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults
 NB: You can use the pre-build binaries SqueezeAMP4MBFlash/SqueezeAMP8MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
 - set_GPIO: 12=green,13=red,34=jack,2=spkfault
 - batt_config: channel=7,scale=20.24
-- dac_config: bck=33,ws=25,do=32
+- dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14
 - spdif_config: bck=33,ws=25,do=15
 
 ### ESP32-A1S
@@ -24,6 +24,7 @@ The board showed above has the following IO set
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
+- dac_config: model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32
 - a button mapping: 
 ```
 [{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
@@ -63,8 +64,9 @@ data=<gpio>,clk=<gpio>[,dc=<gpio>][,host=1|2]
 ### DAC/I2S
 The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can define the defaults at compile time but nvs parameter takes precedence except for SqueezeAMP and A1S where these are forced at runtime. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
-bck=<gpio>,ws=<gpio>,do=<gpio>
+bck=<gpio>,ws=<gpio>,do=<gpio>[,model=TAS57xx|TAS5713|AC101|I2S][,sda=<gpio>,scl=gpio]
 ```
+if "model" is not set or is not recognized, then default "I2S" is used. 
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
 
