@@ -77,8 +77,8 @@ extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
 
-// by default no DAC selected
-struct adac_s *adac = &dac_external;
+const struct adac_s *dac_set[] = { &dac_tas57xx, &dac_ac101, NULL };
+const struct adac_s *adac = &dac_external;
 
 static log_level loglevel;
 
@@ -145,8 +145,9 @@ static void set_amp_gpio(int gpio, char *value) {
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;
-	char *p;
-
+	char *p, *dac_config, *spdif_config;
+	esp_err_t res;
+	
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
 	free(p);
@@ -182,7 +183,17 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	}
 		
 	running = true;
+	i2s_pin_config_t i2s_pin_config = {	.bck_io_num = -1, .ws_io_num = -1, .data_out_num = -1, .data_in_num = -1 }; 				
 
+	// get SPDIF configuration from NVS or compile
+#ifdef CONFIG_SPDIF_CONFIG
+	spdif_config = strdup(CONFIG_SPDIF_CONFIG);
+#else
+	spdif_config = config_alloc_get(NVS_TYPE_STR, "spdif_config");
+	if (!spdif_config) spdif_config = strdup("bck=" STR(CONFIG_SPDIF_BCK_IO) ",ws=" STR(CONFIG_SPDIF_WS_IO) ",do=" STR(CONFIG_SPDIF_DO_IO));
+#endif		
+	if ((p = strcasestr(spdif_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
+	
 	// common I2S initialization
 	i2s_config.mode = I2S_MODE_MASTER | I2S_MODE_TX;
 	i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
@@ -191,21 +202,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	i2s_config.tx_desc_auto_clear = true;		
 	i2s_config.use_apll = true;
 	i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1; //Interrupt level 1
-
+	
 	if (strcasestr(device, "spdif")) {
 		spdif = true;	
-		i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { .bck_io_num = CONFIG_SPDIF_BCK_IO, .ws_io_num = CONFIG_SPDIF_WS_IO, 
-															  .data_out_num = CONFIG_SPDIF_DO_IO, .data_in_num = -1 };
-#ifndef CONFIG_SPDIF_LOCKED															  
-		char *nvs_item = config_alloc_get(NVS_TYPE_STR, "spdif_config");
-		if (nvs_item) {
-			if ((p = strcasestr(nvs_item, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
-			if ((p = strcasestr(nvs_item, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
-			if ((p = strcasestr(nvs_item, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
-			free(nvs_item);
-		} 
-#endif		
-		
+
+		if ((p = strcasestr(spdif_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(spdif_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
+			
 		if (i2s_pin_config.bck_io_num == -1 || i2s_pin_config.ws_io_num == -1 || i2s_pin_config.data_out_num == -1) {
 			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
 																		   i2s_pin_config.ws_io_num, 
@@ -223,30 +226,53 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		   audio frame. So the real depth is true frames is (LEN * COUNT / 2)
 		*/   
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN / 2;	
-		i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
-		i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
+		res = i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
+		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
 		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
 	} else {
-#if CONFIG_SPDIF_DO_IO != -1
-		gpio_pad_select_gpio(CONFIG_SPDIF_DO_IO);
-		gpio_set_direction(CONFIG_SPDIF_DO_IO, GPIO_MODE_OUTPUT);
-		gpio_set_level(CONFIG_SPDIF_DO_IO, 0);
-#endif
-
+		// turn off SPDIF if configured
+		if (i2s_pin_config.data_out_num >= 0) {
+			gpio_pad_select_gpio(i2s_pin_config.data_out_num);
+			gpio_set_direction(i2s_pin_config.data_out_num, GPIO_MODE_OUTPUT);
+			gpio_set_level(i2s_pin_config.data_out_num, 0);
+		}	
+		
+#ifdef CONFIG_DAC_CONFIG
+		dac_config = strdup(CONFIG_DAC_CONFIG);
+#else
+		dac_config = config_alloc_get(NVS_TYPE_STR, "dac_config");
+		if (!dac_config) dac_config = strdup("model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) ",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) ",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL));
+#endif	
+		char model[32] = "i2s";
+		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
+		
+		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
+		res = adac->init(dac_config, I2C_PORT) ? ESP_OK : ESP_FAIL;
+		
+		if ((p = strcasestr(dac_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(dac_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(dac_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
+		free(dac_config);
+		
 		i2s_config.sample_rate = output.current_sample_rate;
 		i2s_config.bits_per_sample = bytes_per_frame * 8 / 2;
 		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
 		i2s_config.dma_buf_len = DMA_BUF_LEN;	
 		i2s_config.dma_buf_count = DMA_BUF_COUNT;
-		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;	
+		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;			
 		
-		// finally let DAC driver initialize I2C and I2S
-		if (dac_tas57xx.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_tas57xx;
-		else if (dac_a1s.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) adac = &dac_a1s;
-		else if (!dac_external.init(I2C_PORT, CONFIG_I2S_NUM, &i2s_config)) {
-			LOG_WARN("DAC not configured and SPDIF not enabled, I2S will not continue");
-			return;
-		}
+		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
+		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
+	
+		LOG_INFO("%s DAC using I2S bck:%d, ws:%d, do:%d", model, i2s_pin_config.bck_io_num, 
+							i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+	}	
+	
+	free(spdif_config);
+	
+	if (res != ESP_OK) {
+		LOG_WARN("no DAC configured");
+		return;
 	}	
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 

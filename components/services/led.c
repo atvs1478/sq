@@ -168,7 +168,7 @@ int led_allocate(void) {
  */
 bool led_config(int idx, gpio_num_t gpio, int onstate, int pwm) {
 	if (gpio < 0) {
-		ESP_LOGW(TAG,"LED GPIO not configured");
+		ESP_LOGW(TAG,"LED GPIO -1 ignored");
 		return false;
 	}
 	

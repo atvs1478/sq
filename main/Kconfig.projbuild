@@ -33,7 +33,14 @@ menu "Squeezelite-ESP32"
 		bool				
 	config SPKFAULT_LOCKED
 		bool				
-    menu "Audio Output"
+	config DAC_CONFIG
+		string 
+		default "model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14" if SQUEEZEAMP
+		default "model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32" if A1S
+	config SPDIF_CONFIG		
+		string
+		default "bck=33,ws=25,do=15" if SQUEEZEAMP
+	menu "Audio Output"
 		choice OUTPUT_TYPE
 			prompt "Output Type"
 	        default BASIC_I2C_BT
@@ -44,7 +51,6 @@ menu "Squeezelite-ESP32"
 				select JACK_LOCKED
 				select BAT_LOCKED
 				select I2C_LOCKED
-				select SPDIF_LOCKED
 				select LED_LOCKED
 				select SPKFAULT_LOCKED
 			config A1S
@@ -54,38 +60,52 @@ menu "Squeezelite-ESP32"
 	            bool "Generic I2S & Bluetooth"
 	    endchoice
 	  	
-		menu "DAC I2S settings" 
+		menu "DAC settings" 
 			visible if BASIC_I2C_BT
-			config I2S_NUM         
-		        int "I2S channel (0 or 1). "
-		        default 0
-		        help
-		            I2S dma channel to use.  
-		    config I2S_BCK_IO         
-		        int "I2S Bit clock GPIO number. "
-				default 33 if !A1S
-		        default 27 if A1S
-		        help
-		            I2S Bit Clock gpio pin to use.  
-		    config I2S_WS_IO         
-		        int "I2S Word Select GPIO number. "
-		        default 25 if !A1S
-				default 26 if A1S
-		        help
-		            I2S Word Select gpio pin to use.
-		    config I2S_DO_IO         
-		        int "I2S Data Output GPIO number. "
-		        default 32 if !A1S
-				default 25 if A1S
-		        help
-		            I2S data output gpio pin to use.
-			config I2S_DI_IO         
-		        int "I2S Data Input GPIO number. "
-		        default -1 if !A1S
-				default 35 if A1S
-		        help
-		            I2S data input gpio pin to use (not used mostly, leave it to -1).					
-					
+			menu "I2S settings"
+				config I2S_NUM         
+					int "I2S channel (0 or 1). "
+					default 0
+					help
+						I2S dma channel to use.  
+				config I2S_BCK_IO         
+					int "I2S Bit clock GPIO number. "
+					default 33 
+					help
+						I2S Bit Clock gpio pin to use.  
+				config I2S_WS_IO         
+					int "I2S Word Select GPIO number. "
+					default 25 
+					help
+						I2S Word Select gpio pin to use.
+				config I2S_DO_IO         
+					int "I2S Data Output GPIO number. "
+					default 32
+					help
+						I2S data output gpio pin to use.
+				config I2S_DI_IO         
+					int "I2S Data Input GPIO number. "
+					default -1 if !A1S
+					help
+						I2S data input gpio pin to use (not used mostly, leave it to -1).					
+			endmenu
+			menu "I2C settings"	
+				config I2C_SDA
+					int "I2C SDA GPIO number for DAC control. "
+					default -1
+					help
+						I2C data gpio pin to use with DAC (not used mostly, leave it to -1).										
+				config I2C_SCL
+					int "I2C SCL GPIO number for DAC control. "
+					default -1
+					help
+						I2C clock gpio pin to use with DAC (not used mostly, leave it to -1).															
+			endmenu		
+			config MUTE_GPIO
+				int "GPIO for muting DAC"
+				default -1 
+				help
+					GPIO used to mute DAC (not used mostly, leave it to -1).															
 		endmenu
 		
 		menu "SPDIF settings" 
@@ -107,9 +127,7 @@ menu "Squeezelite-ESP32"
 		            Must be set as SPDIF re-uses I2S but only needs DO (recommendation: set it to I2S Word select value)
 		    config SPDIF_DO_IO         
 		        int "SPDIF Data I/O GPIO number"
-		        default 15 if SQUEEZEAMP
-				default I2S_DO_IO if !A1S
-				default -1 if A1S
+		        default -1
 				help
 		            I2S data output IO use to simulate SPDIF
 		endmenu

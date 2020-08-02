@@ -9,28 +9,28 @@
  *
  */
  
-#include "squeezelite.h" 
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2s.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
+#include "esp_log.h"
 #include "adac.h"
-
-// this is the only hard-wired thing
-#define VOLUME_GPIO	14	
 
 #define TAS575x 0x98
 #define TAS578x	0x90
 
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config);
+static const char TAG[] = "TAS575x/8x";
+
+static bool init(char *config, int i2c_port_num);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
 static void volume(unsigned left, unsigned right);
 static void power(adac_power_e mode);
 
-struct adac_s dac_tas57xx = { init, deinit, power, speaker, headset, volume };
+const struct adac_s dac_tas57xx = { "TAS57xx", init, deinit, power, speaker, headset, volume };
 
 struct tas57xx_cmd_s {
 	uint8_t reg;
@@ -59,9 +59,9 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 	{ 0x56, 0x00 },	// TAS57_ANALOGUE_ON
 };
 
-static log_level loglevel = lINFO;
-static u8_t tas57_addr;
+static uint8_t tas57_addr;
 static int i2c_port;
+static int mute_gpio = -1;
 
 static void dac_cmd(dac_cmd_e cmd, ...);
 static int tas57_detect(void);
@@ -69,19 +69,24 @@ static int tas57_detect(void);
 /****************************************************************************************
  * init
  */
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{	 
+static bool init(char *config, int i2c_port_num)	{	 
 	i2c_port = i2c_port_num;
-		
+	char *p;	
+	
 	// configure i2c
 	i2c_config_t i2c_config = {
 			.mode = I2C_MODE_MASTER,
-			.sda_io_num = 27,
+			.sda_io_num = -1,
 			.sda_pullup_en = GPIO_PULLUP_ENABLE,
-			.scl_io_num = 26,
+			.scl_io_num = -1,
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 100000,
+			.master.clk_speed = 250000,
 		};
-		
+
+	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "scl")) != NULL) i2c_config.scl_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "mute")) != NULL) mute_gpio = atoi(strchr(p, '=') + 1);
+	
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
 		
@@ -89,13 +94,11 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{
 	tas57_addr = tas57_detect();
 	
 	if (!tas57_addr) {
-		LOG_WARN("No TAS57xx detected");
+		ESP_LOGW(TAG, "No TAS57xx detected");
 		i2c_driver_delete(i2c_port);
-		return 0;
+		return false;
 	}
-	
-	LOG_INFO("TAS57xx DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
-	
+
 	i2c_cmd_handle_t i2c_cmd = i2c_cmd_link_create();
 	
 	for (int i = 0; tas57xx_init_sequence[i].reg != 0xff; i++) {
@@ -103,30 +106,25 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config)	{
 		i2c_master_write_byte(i2c_cmd, tas57_addr | I2C_MASTER_WRITE, I2C_MASTER_NACK);
 		i2c_master_write_byte(i2c_cmd, tas57xx_init_sequence[i].reg, I2C_MASTER_NACK);
 		i2c_master_write_byte(i2c_cmd, tas57xx_init_sequence[i].value, I2C_MASTER_NACK);
-
-		LOG_DEBUG("i2c write %x at %u", tas57xx_init_sequence[i].reg, tas57xx_init_sequence[i].value);
+		ESP_LOGD(TAG, "i2c write %x at %u", tas57xx_init_sequence[i].reg, tas57xx_init_sequence[i].value);
 	}
 
 	i2c_master_stop(i2c_cmd);	
 	esp_err_t res = i2c_master_cmd_begin(i2c_port, i2c_cmd, 500 / portTICK_RATE_MS);
     i2c_cmd_link_delete(i2c_cmd);
 
-	// configure I2S pins & install driver	
-	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
-														.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO,
-								};
-	res |= i2s_driver_install(i2s_num, i2s_config, 0, NULL);
-	res |= i2s_set_pin(i2s_num, &i2s_pin_config);
-	LOG_INFO("DAC using I2S bck:%d, ws:%d, do:%d", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+	ESP_LOGI(TAG, "TAS57xx uses I2C sda:%d, scl:%d and mute: %d", i2c_config.sda_io_num, i2c_config.scl_io_num, mute_gpio);
 	
 	if (res == ESP_OK) {
-		// init volume & mute
-		gpio_pad_select_gpio(VOLUME_GPIO);
-		gpio_set_direction(VOLUME_GPIO, GPIO_MODE_OUTPUT);
-		gpio_set_level(VOLUME_GPIO, 0);
+		if (mute_gpio >= 0) {
+			// init volume & mute
+			gpio_pad_select_gpio(mute_gpio);
+			gpio_set_direction(mute_gpio, GPIO_MODE_OUTPUT);
+			gpio_set_level(mute_gpio, 0);
+		}	
 		return true;
 	} else {
-		LOG_ERROR("could not intialize TAS57xx %d", res);
+		ESP_LOGE(TAG, "could not intialize TAS57xx %d", res);
 		return false;
 	}	
 }	
@@ -142,8 +140,8 @@ static void deinit(void)	{
  * change volume
  */
 static void volume(unsigned left, unsigned right) {
-	LOG_INFO("TAS57xx volume (L:%u R:%u)", left, right);
-	gpio_set_level(VOLUME_GPIO, left || right);
+	ESP_LOGI(TAG, "TAS57xx volume (L:%u R:%u)", left, right);
+	if (mute_gpio >= 0) gpio_set_level(mute_gpio, left || right);
 } 
 
 /****************************************************************************************
@@ -161,7 +159,7 @@ static void power(adac_power_e mode) {
 		dac_cmd(TAS57_DOWN);
 		break;				
 	default:
-		LOG_WARN("unknown DAC command");
+		ESP_LOGW(TAG, "unknown DAC command");
 		break;
 	}
 }
@@ -192,7 +190,7 @@ void dac_cmd(dac_cmd_e cmd, ...) {
 
 	switch(cmd) {
 	case TAS57_VOLUME:
-		LOG_ERROR("DAC volume not handled yet");
+		ESP_LOGE(TAG, "DAC volume not handled yet");
 		break;
 	default:
 		i2c_master_start(i2c_cmd);
@@ -206,7 +204,7 @@ void dac_cmd(dac_cmd_e cmd, ...) {
     i2c_cmd_link_delete(i2c_cmd);
 	
 	if (ret != ESP_OK) {
-		LOG_ERROR("could not intialize TAS57xx %d", ret);
+		ESP_LOGE(TAG, "could not intialize TAS57xx %d", ret);
 	}
 
 	va_end(args);
@@ -216,7 +214,7 @@ void dac_cmd(dac_cmd_e cmd, ...) {
  * TAS57 detection
  */
 static int tas57_detect(void) {
-	u8_t data, addr[] = {TAS578x, TAS575x};
+	uint8_t data, addr[] = {TAS578x, TAS575x};
 	int ret;
 	
 	for (int i = 0; i < sizeof(addr); i++) {
@@ -235,7 +233,7 @@ static int tas57_detect(void) {
 		i2c_cmd_link_delete(i2c_cmd);	
 		
 		if (ret == ESP_OK) {
-			LOG_INFO("Detected TAS @0x%x", addr[i]);
+			ESP_LOGI(TAG, "Detected TAS @0x%x", addr[i]);
 			return addr[i];
 		}	
 	}	
