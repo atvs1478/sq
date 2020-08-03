@@ -8,7 +8,7 @@ if you want to rebuild, use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults
 NB: You can use the pre-build binaries SqueezeAMP4MBFlash/SqueezeAMP8MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
 - set_GPIO: 12=green,13=red,34=jack,2=spkfault
 - batt_config: channel=7,scale=20.24
-- dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14
+- dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0
 - spdif_config: bck=33,ws=25,do=15
 
 ### ESP32-A1S
@@ -29,7 +29,13 @@ So a possible config would be
 ```
 [{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
 ```
+### T-WATCH2020 by LilyGo
+This is a fun [smartwatch](http://www.lilygo.cn/prod_view.aspx?TypeId=50036&Id=1290&FId=t3:50036:3) based on ESP32. It has a 240x240 ST7789 screen and onboard audio. Not very useful to listen to anything but it works. This is an example of a device that requires an I2C set of commands for its dac (see below). There is a build-option if you decide to rebuild everything by yourself, otherwise the I2S default option works with the following parameters
 
+- dac_config: model=I2S,bck=26,ws=25,do=33,i2c=106,sda=21,scl=22
+- dac_controlset: { "init": [ {"reg":41, "val":128}, {"reg":18, "val":255} ], "poweron": [ {"reg":18, "val":64, "mode":"or"} ], "poweroff": [ {"reg":18, "val":191, "mode":"and"} ] }
+- spi_config: dc=27,data=19,clk=18
+- display_config: SPI,driver=ST7789,width=240,height=240,cs=5,back=12,speed=16000000,HFlip,VFlip
 ### ESP32-WROVER + I2S DAC
 Squeezelite-esp32 requires esp32 chipset and 4MB PSRAM. ESP32-WROVER meets these requirements. To get an audio output an I2S DAC can be used. Cheap PCM5102 I2S DACs work others may also work. PCM5012 DACs can be hooked up via:
 
@@ -64,9 +70,18 @@ data=<gpio>,clk=<gpio>[,dc=<gpio>][,host=1|2]
 ### DAC/I2S
 The NVS parameter "dac_config" set the gpio used for i2s communication with your DAC. You can define the defaults at compile time but nvs parameter takes precedence except for SqueezeAMP and A1S where these are forced at runtime. If your DAC also requires i2c, then you must go the re-compile route. Syntax is
 ```
-bck=<gpio>,ws=<gpio>,do=<gpio>[,model=TAS57xx|TAS5713|AC101|I2S][,sda=<gpio>,scl=gpio]
+bck=<gpio>,ws=<gpio>,do=<gpio>[,mute=<gpio>[:0|1][,model=TAS57xx|TAS5713|AC101|I2S][,i2c=<addr>,sda=<gpio>,scl=gpio]
 ```
-if "model" is not set or is not recognized, then default "I2S" is used. 
+if "model" is not set or is not recognized, then default "I2S" is used. I2C parameters are optional an only needed if your dac requires and I2C control (See 'dac_controlset' below). Note that "i2c" parameters is decimal, hex notation is not allowed.
+
+The parameter "dac_controlset" allows definition of simple commands to be sent of i2c for init, power on and off using a JSON syntax:
+```
+{ init: [ {"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"}, ... {{"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"} ],
+  poweron: [ {"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"}, ... {{"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"} ],
+  poweroff: [ {"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"}, ... {{"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"} ] }
+```
+This is standard JSON notation, so if you are not familiar with it, Google is your best friend. Be aware that the '...' means you can have as many entries as you want, it's not part of the syntax. Every section is optional, but it does not make sense to set i2c in the 'dac_config' parameter and not setting anything here. The parameter 'mode' allows to *or* the register with the value or to *and* it. Don't set 'mode' if you simply want to write. **Note that all values must be decimal**
+
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
 
@@ -124,7 +139,7 @@ The parameter "set_GPIO" is used to assign GPIO to various functions.
 
 GPIO can be set to GND provide or Vcc at boot. This is convenient to power devices that consume less than 40mA from the side connector. Be careful because there is no conflict checks being made wrt which GPIO you're changing, so you might damage your board or create a conflict here. 
 
-The \<amp\> parameter can use used to assign a GPIO that will be set to 1 when playback starts. It will be reset to 0 when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
+The \<amp\> parameter can use used to assign a GPIO that will be set to active level (default 1) when playback starts. It will be reset when squeezelite becomes idle. The idle timeout is set on the squeezelite command line through -C \<timeout\>
 
 If you have an audio jack that supports insertion (use :0 or :1 to set the level when inserted), you can specify which GPIO it's connected to. Using the parameter jack_mutes_amp allows to mute the amp when headset (e.g.) is inserted.
 
@@ -135,7 +150,7 @@ The \<ir\> parameter set the GPIO associated to an IR receiver. No need to add p
 Syntax is:
 
 ```
-<gpio>=Vcc|GND|amp|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
+<gpio>=Vcc|GND|amp[:1|0]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
 ### LED 
