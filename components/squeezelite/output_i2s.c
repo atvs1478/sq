@@ -77,7 +77,7 @@ extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
 extern u8_t *silencebuf;
 
-const struct adac_s *dac_set[] = { &dac_tas57xx, &dac_ac101, NULL };
+const struct adac_s *dac_set[] = { &dac_tas57xx, &dac_tas5713, &dac_ac101, NULL };
 const struct adac_s *adac = &dac_external;
 
 static log_level loglevel;
@@ -85,7 +85,6 @@ static log_level loglevel;
 static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
-static int bytes_per_frame;
 static u8_t *obuf;
 static frames_t oframes;
 static bool spdif;
@@ -158,31 +157,14 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);
 	free(p);
 	
-#ifdef CONFIG_I2S_BITS_PER_CHANNEL
-	switch (CONFIG_I2S_BITS_PER_CHANNEL) {
-		case 24:
-			output.format = S24_BE;
-			bytes_per_frame = 2*3;
-			break;
-		case 16:
-			output.format = S16_BE;
-			bytes_per_frame = 2*2;
-			break;
-		case 8:
-			output.format = S8_BE;
-			bytes_per_frame = 2*4;
-			break;
-		default:
-			LOG_ERROR("Unsupported bit depth %d",CONFIG_I2S_BITS_PER_CHANNEL);
-			break;
-	}
+#if BYTES_PER_FRAME == 8
+	output.format = S32_LE;
 #else
 	output.format = S16_LE;
-	bytes_per_frame = 2*2;
 #endif
 
 	output.write_cb = &_i2s_write_frames;
-	obuf = malloc(FRAME_BLOCK * bytes_per_frame);
+	obuf = malloc(FRAME_BLOCK * BYTES_PER_FRAME);
 	if (!obuf) {
 		LOG_ERROR("Cannot allocate i2s buffer");
 		return;
@@ -240,6 +222,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 			gpio_set_level(i2s_pin_config.data_out_num, 0);
 		}	
 		
+		i2s_config.sample_rate = output.current_sample_rate;
+		i2s_config.bits_per_sample = BYTES_PER_FRAME * 8 / 2;
+		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
+		i2s_config.dma_buf_len = DMA_BUF_LEN;	
+		i2s_config.dma_buf_count = DMA_BUF_COUNT;
+		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;			
+
 		char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
 												",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
 												",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
@@ -248,7 +237,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
 		
 		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
-		res = adac->init(dac_config, I2C_PORT) ? ESP_OK : ESP_FAIL;
+		res = adac->init(dac_config, I2C_PORT, &i2s_config) ? ESP_OK : ESP_FAIL;
 		
 		if ((p = strcasestr(dac_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(dac_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
@@ -261,13 +250,6 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		}	
 		
 		free(dac_config);
-		
-		i2s_config.sample_rate = output.current_sample_rate;
-		i2s_config.bits_per_sample = bytes_per_frame * 8 / 2;
-		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
-		i2s_config.dma_buf_len = DMA_BUF_LEN;	
-		i2s_config.dma_buf_count = DMA_BUF_COUNT;
-		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;			
 		
 		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
 		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
@@ -377,13 +359,13 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 			_apply_gain(outputbuf, out_frames, gainL, gainR);
 		}
 			
-		memcpy(obuf + oframes * bytes_per_frame, outputbuf->readp, out_frames * bytes_per_frame);
+		memcpy(obuf + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
 #else
 		optr = (s32_t*) outputbuf->readp;	
 #endif		
 	} else {
 #if BYTES_PER_FRAME == 4		
-		memcpy(obuf + oframes * bytes_per_frame, silencebuf, out_frames * bytes_per_frame);
+		memcpy(obuf + oframes * BYTES_PER_FRAME, silencebuf, out_frames * BYTES_PER_FRAME);
 #else		
 		optr = (s32_t*) silencebuf;
 #endif	
@@ -397,10 +379,10 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 			dsd_invert((u32_t *) optr, out_frames);
 	)
 
-	_scale_and_pack_frames(obuf + oframes * bytes_per_frame, optr, out_frames, gainL, gainR, output.format);
+	_scale_and_pack_frames(obuf + oframes * BYTES_PER_FRAME, optr, out_frames, gainL, gainR, output.format);
 #endif	
 
-	output_visu_export((s16_t*) (obuf + oframes * bytes_per_frame), out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
+	output_visu_export((s16_t*) (obuf + oframes * BYTES_PER_FRAME), out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
 
 	oframes += out_frames;
 	
@@ -509,8 +491,8 @@ static void *output_thread_i2s(void *arg) {
 			/* 
 			if (synced)
 				//  can sleep for a buffer_queue - 1 and then eat a buffer (discard) if we are synced
-				usleep(((DMA_BUF_COUNT - 1) * DMA_BUF_LEN * bytes_per_frame * 1000) / 44100 * 1000);
-				discard = DMA_BUF_COUNT * DMA_BUF_LEN * bytes_per_frame;
+				usleep(((DMA_BUF_COUNT - 1) * DMA_BUF_LEN * BYTES_PER_FRAME * 1000) / 44100 * 1000);
+				discard = DMA_BUF_COUNT * DMA_BUF_LEN * BYTES_PER_FRAME;
 			}	
 			*/
 			i2s_config.sample_rate = output.current_sample_rate;
@@ -523,20 +505,25 @@ static void *output_thread_i2s(void *arg) {
 		}
 		
 		// run equalizer
-		equalizer_process(obuf, oframes * bytes_per_frame, output.current_sample_rate);
+		equalizer_process(obuf, oframes * BYTES_PER_FRAME, output.current_sample_rate);
 		
 		// we assume that here we have been able to entirely fill the DMA buffers
 		if (spdif) {
 			spdif_convert((ISAMPLE_T*) obuf, oframes, (u32_t*) sbuf, &count);
 			i2s_write(CONFIG_I2S_NUM, sbuf, oframes * 16, &bytes, portMAX_DELAY);
 			bytes /= 4;
+#if BYTES_PER_FRAME == 4		
+		} else if (i2s_config.bits_per_sample == 32) {  
+			i2s_write_expand(CONFIG_I2S_NUM, obuf, oframes * BYTES_PER_FRAME, 16, 32, &bytes, portMAX_DELAY);
+#endif			
 		} else {
-			i2s_write(CONFIG_I2S_NUM, obuf, oframes * bytes_per_frame, &bytes, portMAX_DELAY);			
-		}	
+			i2s_write(CONFIG_I2S_NUM, obuf, oframes * BYTES_PER_FRAME, &bytes, portMAX_DELAY);
+		}
+
 		fullness = gettime_ms();
 			
-		if (bytes != oframes * bytes_per_frame) {
-			LOG_WARN("I2S DMA Overflow! available bytes: %d, I2S wrote %d bytes", oframes * bytes_per_frame, bytes);
+		if (bytes != oframes * BYTES_PER_FRAME) {
+			LOG_WARN("I2S DMA Overflow! available bytes: %d, I2S wrote %d bytes", oframes * BYTES_PER_FRAME, bytes);
 		}
 		
 		SET_MIN_MAX( TIME_MEASUREMENT_GET(timer_start),i2s_time);
@@ -557,7 +544,7 @@ static void *output_thread_i2s_stats(void *arg) {
 		output_state state = output.state;
 		
 		if(stats && state>OUTPUT_STOPPED){
-			LOG_INFO( "Output State: %d, current sample rate: %d, bytes per frame: %d",state,output.current_sample_rate, bytes_per_frame);
+			LOG_INFO( "Output State: %d, current sample rate: %d, bytes per frame: %d",state,output.current_sample_rate, BYTES_PER_FRAME);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD1);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD2);
 			LOG_INFO( LINE_MIN_MAX_FORMAT_HEAD3);

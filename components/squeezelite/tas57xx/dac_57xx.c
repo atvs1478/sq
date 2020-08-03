@@ -23,7 +23,7 @@
 
 static const char TAG[] = "TAS575x/8x";
 
-static bool init(char *config, int i2c_port_num);
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
@@ -68,10 +68,10 @@ static int tas57_detect(void);
 /****************************************************************************************
  * init
  */
-static bool init(char *config, int i2c_port_num)	{	 
-	i2c_port = i2c_port_num;
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {	 
 	char *p;	
-	
+	i2c_port = i2c_port_num;
+		
 	// configure i2c
 	i2c_config_t i2c_config = {
 			.mode = I2C_MODE_MASTER,
@@ -131,7 +131,9 @@ static void deinit(void)	{
 /****************************************************************************************
  * change volume
  */
-static bool volume(unsigned left, unsigned right) { return false; }
+static bool volume(unsigned left, unsigned right) { 
+	return false; 
+}
 
 /****************************************************************************************
  * power
