@@ -1,6 +1,6 @@
 
 
-idf_component_register( SRC_DIRS . external a1s tas57xx
+idf_component_register( SRC_DIRS . external ac101 tas57xx
 						INCLUDE_DIRS .  a1s 
 						PRIV_REQUIRES 	
 									codecs
