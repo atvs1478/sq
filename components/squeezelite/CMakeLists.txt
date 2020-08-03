@@ -1,7 +1,7 @@
 
 
 idf_component_register( SRC_DIRS . external ac101 tas57xx
-						INCLUDE_DIRS .  a1s 
+						INCLUDE_DIRS .  ac101 
 						PRIV_REQUIRES 	
 									codecs
 									newlib 
