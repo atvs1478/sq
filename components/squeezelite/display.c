@@ -573,8 +573,9 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 	
 	// adjust to current display window
 	if (width > VU_WIDTH) {
+		if (rotate) y += (width - VU_WIDTH) / 2;		
+		else x += (width - VU_WIDTH) / 2;		
 		width = VU_WIDTH;
-		x += (width - VU_WIDTH) / 2;
 	} else {
 		data += (VU_WIDTH - width) / 2 * VU_HEIGHT;	
 	}	
