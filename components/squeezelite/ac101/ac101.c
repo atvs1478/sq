@@ -52,7 +52,7 @@ static bool init(char *config, int i2c_port_num);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
-static void volume(unsigned left, unsigned right);
+static bool volume(unsigned left, unsigned right);
 static void power(adac_power_e mode);
 
 const struct adac_s dac_ac101 = { "AC101", init, deinit, power, speaker, headset, volume };
@@ -164,8 +164,9 @@ static void deinit(void)	{
 /****************************************************************************************
  * change volume
  */
-static void volume(unsigned left, unsigned right) {
+static bool volume(unsigned left, unsigned right) {
 	// nothing at that point, volume is handled by backend
+	return false;
 } 
 
 /****************************************************************************************

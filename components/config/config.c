@@ -611,9 +611,21 @@ void config_delete_key(const char *key){
 	}
 	config_unlock();
 }
+
 void * config_alloc_get(nvs_type_t nvs_type, const char *key) {
 	return config_alloc_get_default(nvs_type, key, NULL, 0);
 }
+
+void * config_alloc_get_str(const char *key, char *lead, char *fallback) {
+	if (lead && *lead) return strdup(lead);
+	char *value = config_alloc_get_default(NVS_TYPE_STR, key, NULL, 0);
+	if ((!value || !*value) && fallback) {
+		if (value) free(value);
+		value = strdup(fallback);
+	}
+	return value;
+}
+
 void * config_alloc_get_default(nvs_type_t nvs_type, const char *key, void * default_value, size_t blob_size) {
 
 	void * value = NULL;

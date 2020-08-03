@@ -93,7 +93,10 @@ static size_t dma_buf_frames;
 static pthread_t thread;
 static TaskHandle_t stats_task;
 static bool stats;
-static int amp_gpio = -1;
+static struct {
+	int gpio, active;
+} amp_control = { -1, 1 },
+  mute_control = { CONFIG_MUTE_GPIO, CONFIG_MUTE_GPIO_LEVEL };
 
 DECLARE_ALL_MIN_MAX;
 
@@ -129,14 +132,17 @@ static void jack_handler(bool inserted) {
  * amp GPIO
  */
 static void set_amp_gpio(int gpio, char *value) {
+	char *p;
+	
 	if (!strcasecmp(value, "amp")) {
-		amp_gpio = gpio;
+		amp_control.gpio = gpio;
+		if ((p = strchr(value, ':')) != NULL) amp_control.active = atoi(p + 1);
 		
-		gpio_pad_select_gpio(amp_gpio);
-		gpio_set_direction(amp_gpio, GPIO_MODE_OUTPUT);
-		gpio_set_level(amp_gpio, 0);
+		gpio_pad_select_gpio(amp_control.gpio);
+		gpio_set_direction(amp_control.gpio, GPIO_MODE_OUTPUT);
+		gpio_set_level(amp_control.gpio, !amp_control.active);
 		
-		LOG_INFO("setting amplifier GPIO %d", amp_gpio);
+		LOG_INFO("setting amplifier GPIO %d (active:%d)", amp_control.gpio, amp_control.active);
 	}	
 }	
 
@@ -145,7 +151,7 @@ static void set_amp_gpio(int gpio, char *value) {
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;
-	char *p, *dac_config, *spdif_config;
+	char *p;
 	esp_err_t res;
 	
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
@@ -186,12 +192,9 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	i2s_pin_config_t i2s_pin_config = {	.bck_io_num = -1, .ws_io_num = -1, .data_out_num = -1, .data_in_num = -1 }; 				
 
 	// get SPDIF configuration from NVS or compile
-#ifdef CONFIG_SPDIF_CONFIG
-	spdif_config = strdup(CONFIG_SPDIF_CONFIG);
-#else
-	spdif_config = config_alloc_get(NVS_TYPE_STR, "spdif_config");
-	if (!spdif_config) spdif_config = strdup("bck=" STR(CONFIG_SPDIF_BCK_IO) ",ws=" STR(CONFIG_SPDIF_WS_IO) ",do=" STR(CONFIG_SPDIF_DO_IO));
-#endif		
+	char *spdif_config = config_alloc_get_str("spdif_config", CONFIG_SPDIF_CONFIG, "bck=" STR(CONFIG_SPDIF_BCK_IO) 
+											  ",ws=" STR(CONFIG_SPDIF_WS_IO) ",do=" STR(CONFIG_SPDIF_DO_IO));
+
 	if ((p = strcasestr(spdif_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
 	
 	// common I2S initialization
@@ -237,12 +240,10 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 			gpio_set_level(i2s_pin_config.data_out_num, 0);
 		}	
 		
-#ifdef CONFIG_DAC_CONFIG
-		dac_config = strdup(CONFIG_DAC_CONFIG);
-#else
-		dac_config = config_alloc_get(NVS_TYPE_STR, "dac_config");
-		if (!dac_config) dac_config = strdup("model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) ",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) ",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL));
-#endif	
+		char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
+												",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
+												",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
+												",mute" STR(CONFIG_MUTE_GPIO));
 		char model[32] = "i2s";
 		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
 		
@@ -252,6 +253,13 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		if ((p = strcasestr(dac_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(dac_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(dac_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(dac_config, "mute")) != NULL) {
+			char mute[8];
+			sscanf(p, "%*[^=]=%7[^,]", mute);
+			mute_control.gpio = atoi(mute);
+			if ((p = strchr(mute, ':')) != NULL) mute_control.active = atoi(p + 1);
+		}	
+		
 		free(dac_config);
 		
 		i2s_config.sample_rate = output.current_sample_rate;
@@ -263,9 +271,15 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		
 		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
 		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
-	
-		LOG_INFO("%s DAC using I2S bck:%d, ws:%d, do:%d", model, i2s_pin_config.bck_io_num, 
-							i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+		
+		if (res == ESP_OK && mute_control.gpio >= 0) {
+			gpio_pad_select_gpio(mute_control.gpio);
+			gpio_set_direction(mute_control.gpio, GPIO_MODE_OUTPUT);
+			gpio_set_level(mute_control.gpio, mute_control.active);
+		}		
+				
+		LOG_INFO("%s DAC using I2S bck:%d, ws:%d, do:%d, mute:%d:%d (res:%d)", model, i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, 
+																   i2s_pin_config.data_out_num, mute_control.gpio, mute_control.active, res);
 	}	
 	
 	free(spdif_config);
@@ -340,8 +354,8 @@ void output_close_i2s(void) {
  * change volume
  */
 bool output_volume_i2s(unsigned left, unsigned right) {
-	adac->volume(left, right);
-	return false;	
+	if (mute_control.gpio >= 0) gpio_set_level(mute_control.gpio, (left | right) ? !mute_control.active : mute_control.active);
+	return adac->volume(left, right);
 } 
 
 /****************************************************************************************
@@ -422,8 +436,8 @@ static void *output_thread_i2s(void *arg) {
 			LOG_INFO("Output state is %d", output.state);
 			if (output.state == OUTPUT_OFF) {
 				led_blink(LED_GREEN, 100, 2500);
-				if (amp_gpio != -1) gpio_set_level(amp_gpio, 0);
-				LOG_INFO("switching off amp GPIO %d", amp_gpio);
+				if (amp_control.gpio != -1) gpio_set_level(amp_control.gpio, !amp_control.active);
+				LOG_INFO("switching off amp GPIO %d", amp_control.gpio);
 			} else if (output.state == OUTPUT_STOPPED) {
 				adac->speaker(false);
 				led_blink(LED_GREEN, 200, 1000);
@@ -486,7 +500,7 @@ static void *output_thread_i2s(void *arg) {
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
 			i2s_start(CONFIG_I2S_NUM);
 			adac->power(ADAC_ON);	
-			if (amp_gpio != -1) gpio_set_level(amp_gpio, 1);
+			if (amp_control.gpio != -1) gpio_set_level(amp_control.gpio, amp_control.active);
 		} 
 		
 		// this does not work well as set_sample_rates resets the fifos (and it's too early)

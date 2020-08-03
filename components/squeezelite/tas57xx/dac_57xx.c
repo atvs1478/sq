@@ -27,7 +27,7 @@ static bool init(char *config, int i2c_port_num);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
-static void volume(unsigned left, unsigned right);
+static bool volume(unsigned left, unsigned right);
 static void power(adac_power_e mode);
 
 const struct adac_s dac_tas57xx = { "TAS57xx", init, deinit, power, speaker, headset, volume };
@@ -61,7 +61,6 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 
 static uint8_t tas57_addr;
 static int i2c_port;
-static int mute_gpio = -1;
 
 static void dac_cmd(dac_cmd_e cmd, ...);
 static int tas57_detect(void);
@@ -85,7 +84,6 @@ static bool init(char *config, int i2c_port_num)	{
 
 	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
 	if ((p = strcasestr(config, "scl")) != NULL) i2c_config.scl_io_num = atoi(strchr(p, '=') + 1);
-	if ((p = strcasestr(config, "mute")) != NULL) mute_gpio = atoi(strchr(p, '=') + 1);
 	
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
@@ -113,20 +111,14 @@ static bool init(char *config, int i2c_port_num)	{
 	esp_err_t res = i2c_master_cmd_begin(i2c_port, i2c_cmd, 500 / portTICK_RATE_MS);
     i2c_cmd_link_delete(i2c_cmd);
 
-	ESP_LOGI(TAG, "TAS57xx uses I2C sda:%d, scl:%d and mute: %d", i2c_config.sda_io_num, i2c_config.scl_io_num, mute_gpio);
+	ESP_LOGI(TAG, "TAS57xx uses I2C sda:%d, scl:%d", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
-	if (res == ESP_OK) {
-		if (mute_gpio >= 0) {
-			// init volume & mute
-			gpio_pad_select_gpio(mute_gpio);
-			gpio_set_direction(mute_gpio, GPIO_MODE_OUTPUT);
-			gpio_set_level(mute_gpio, 0);
-		}	
-		return true;
-	} else {
+	if (res != ESP_OK) {
 		ESP_LOGE(TAG, "could not intialize TAS57xx %d", res);
 		return false;
 	}	
+	
+	return true;
 }	
 
 /****************************************************************************************
@@ -139,10 +131,7 @@ static void deinit(void)	{
 /****************************************************************************************
  * change volume
  */
-static void volume(unsigned left, unsigned right) {
-	ESP_LOGI(TAG, "TAS57xx volume (L:%u R:%u)", left, right);
-	if (mute_gpio >= 0) gpio_set_level(mute_gpio, left || right);
-} 
+static bool volume(unsigned left, unsigned right) { return false; }
 
 /****************************************************************************************
  * power
@@ -175,8 +164,7 @@ static void speaker(bool active) {
 /****************************************************************************************
  * headset
  */
-static void headset(bool active) {
-} 
+static void headset(bool active) { } 
  
 /****************************************************************************************
  * DAC specific commands

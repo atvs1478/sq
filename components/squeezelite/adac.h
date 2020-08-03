@@ -21,7 +21,7 @@ struct adac_s {
 	void (*power)(adac_power_e mode);
 	void (*speaker)(bool active);
 	void (*headset)(bool active);
-	void (*volume)(unsigned left, unsigned right);
+	bool (*volume)(unsigned left, unsigned right);
 };
 
 extern const struct adac_s dac_tas57xx;
