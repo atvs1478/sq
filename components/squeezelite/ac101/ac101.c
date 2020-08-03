@@ -48,7 +48,7 @@ static const char TAG[] = "AC101";
         return b;\
     }
 	
-static bool init(char *config, int i2c_port_num);
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
@@ -70,7 +70,7 @@ static int i2c_port;
 /****************************************************************************************
  * init
  */
-static bool init(char *config, int i2c_port_num) {	 
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {	 
 	esp_err_t res = ESP_OK;
 	char *p;
 	

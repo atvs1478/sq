@@ -285,24 +285,15 @@ uint16_t unset_mac_bit(mac_bits bit, uint16_t val){
 	return ~(1 << bit) & val;
 }
 
-static void SetHFlip( struct GDS_Device* Device, bool On ) { 
+static void SetLayout( struct GDS_Device* Device, bool HFlip, bool VFlip, bool Rotate ) { 
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap & ~(1 << MAC_BIT_MX)) : (Private->ReMap | (1 << MAC_BIT_MX));
+	Private->ReMap = HFlip ? (Private->ReMap & ~(1 << MAC_BIT_MX)) : (Private->ReMap | (1 << MAC_BIT_MX));
+	Private->ReMap = VFlip ? (Private->ReMap | (1 << MAC_BIT_MY)) : (Private->ReMap & ~(1 << MAC_BIT_MY));
 	Device->WriteCommand( Device, L1_CMD_MEMORY_ACCESS_CONTROL );
 	Device->WriteData( Device, &Private->ReMap, 1 );
 	WriteDataByte(Device,0x00);
-
 }	
 
-static void SetVFlip( struct GDS_Device *Device, bool On ) { 
-	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap | (1 << MAC_BIT_MY)) : (Private->ReMap & ~(1 << MAC_BIT_MY));
-	Device->WriteCommand( Device, 0xA0 );
-	Device->WriteData( Device, &Private->ReMap, 1 );
-	WriteDataByte(Device,0x00);
-
-}	
-	
 static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, L1_CMD_DISPLAY_ON ); }
 static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, L1_CMD_DISPLAY_OFF ); }
 
@@ -356,7 +347,7 @@ static bool Init( struct GDS_Device* Device ) {
 
 static const struct GDS_Device ILI9341 = {
 	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
-	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
+	.SetLayout = SetLayout,
 	.Update = Update, .Init = Init,
 };	
 

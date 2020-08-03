@@ -16,7 +16,7 @@ typedef enum { ADAC_ON = 0, ADAC_STANDBY, ADAC_OFF } adac_power_e;
 
 struct adac_s {
 	char *model;
-	bool (*init)(char *config, int i2c_port_num);
+	bool (*init)(char *config, int i2c_port_num, i2s_config_t *i2s_config);
 	void (*deinit)(void);
 	void (*power)(adac_power_e mode);
 	void (*speaker)(bool active);
@@ -25,5 +25,6 @@ struct adac_s {
 };
 
 extern const struct adac_s dac_tas57xx;
+extern const struct adac_s dac_tas5713;
 extern const struct adac_s dac_ac101;
 extern const struct adac_s dac_external;

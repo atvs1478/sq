@@ -71,6 +71,7 @@ const display_config_t * config_display_get(){
 	if ((p = strcasestr(config, "speed")) != NULL) dstruct.speed = atoi(strchr(p, '=') + 1);
 	dstruct.hflip= strcasestr(config, "HFlip") ? true : false;
 	dstruct.vflip= strcasestr(config, "VFlip") ? true : false;
+	dstruct.rotate= strcasestr(config, "rotate") ? true : false;
 	return &dstruct;
 }
 

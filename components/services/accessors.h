@@ -23,6 +23,7 @@ typedef struct {
 	char *type;
 	bool hflip;
 	bool vflip;
+	bool rotate;
 } display_config_t;
 const display_config_t * config_display_get();
 esp_err_t 					config_i2c_set(const i2c_config_t * config, int port);

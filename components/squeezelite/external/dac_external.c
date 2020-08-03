@@ -25,7 +25,7 @@ static void speaker(bool active) { }
 static void headset(bool active) { } 
 static bool volume(unsigned left, unsigned right) { return false; }
 static void power(adac_power_e mode);
-static bool init(char *config, int i2c_port_num);
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config);
 
 static bool i2c_json_execute(char *set);
 static esp_err_t i2c_write_reg(uint8_t reg, uint8_t val);
@@ -38,7 +38,7 @@ static cJSON *i2c_json;
 /****************************************************************************************
  * init
  */
-static bool init(char *config, int i2c_port_num)	{	 
+static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {	 
 	char *p;	
 	i2c_port = i2c_port_num;
 	
