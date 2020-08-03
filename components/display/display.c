@@ -59,20 +59,15 @@ static const char *known_drivers[] = {"SH1106",
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, ILI9341_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, ILI9341_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, NULL };
 
 /****************************************************************************************
  * 
  */
 void display_init(char *welcome) {
 	bool init = false;
-	char *config = config_alloc_get(NVS_TYPE_STR, "display_config");
-
-	if (!config) {
-		ESP_LOGI(TAG, "no display");
-		return;
-	}	
+	char *config = config_alloc_get_str("display_config", CONFIG_DISPLAY_CONFIG, "N/A");
 	
 	int width = -1, height = -1, backlight_pin = -1;
 	char *p, *drivername = strstr(config, "driver");
@@ -130,8 +125,7 @@ void display_init(char *welcome) {
 		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 		static EXT_RAM_ATTR StackType_t xStack[DISPLAYER_STACK_SIZE] __attribute__ ((aligned (4)));
 		
-		GDS_SetHFlip(display, strcasestr(config, "HFlip") ? true : false);
-		GDS_SetVFlip(display, strcasestr(config, "VFlip") ? true : false);
+		GDS_SetLayout( display, strcasestr(config, "HFlip"), strcasestr(config, "VFlip"), strcasestr(config, "rotate"));
 		GDS_SetFont(display, &Font_droid_sans_fallback_15x17 );
 		GDS_TextPos(display, GDS_FONT_MEDIUM, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, welcome);
 

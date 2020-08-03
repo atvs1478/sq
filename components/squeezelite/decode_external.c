@@ -28,7 +28,6 @@ extern struct buffer *outputbuf;
 // this is the only system-wide loglevel variable
 extern log_level loglevel;
 
-
 static bool enable_bt_sink;
 static bool enable_airplay;
 

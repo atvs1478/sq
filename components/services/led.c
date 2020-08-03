@@ -168,7 +168,7 @@ int led_allocate(void) {
  */
 bool led_config(int idx, gpio_num_t gpio, int onstate, int pwm) {
 	if (gpio < 0) {
-		ESP_LOGW(TAG,"LED GPIO not configured");
+		ESP_LOGW(TAG,"LED GPIO -1 ignored");
 		return false;
 	}
 	
@@ -231,7 +231,7 @@ void led_svc_init(void) {
 #ifndef CONFIG_LED_LOCKED
 	parse_set_GPIO(set_led_gpio);
 #endif
-	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, red.gpio, red.active, red.pwm);
+	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, green.gpio, green.active, green.pwm );
 	
 	char *nvs_item = config_alloc_get(NVS_TYPE_STR, "led_brightness"), *p; 
 	if (nvs_item) {

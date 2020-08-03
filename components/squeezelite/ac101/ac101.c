@@ -33,7 +33,7 @@
 #include "adac.h"
 #include "ac101.h"
 
-const static char TAG[] = "AC101";
+static const char TAG[] = "AC101";
 
 #define SPKOUT_EN ((1 << 9) | (1 << 11) | (1 << 7) | (1 << 5))
 #define EAROUT_EN ((1 << 11) | (1 << 12) | (1 << 13))
@@ -48,14 +48,14 @@ const static char TAG[] = "AC101";
         return b;\
     }
 	
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config);
+static bool init(char *config, int i2c_port_num);
 static void deinit(void);
 static void speaker(bool active);
 static void headset(bool active);
-static void volume(unsigned left, unsigned right);
+static bool volume(unsigned left, unsigned right);
 static void power(adac_power_e mode);
 
-struct adac_s dac_a1s = { init, deinit, power, speaker, headset, volume };
+const struct adac_s dac_ac101 = { "AC101", init, deinit, power, speaker, headset, volume };
 
 static esp_err_t i2c_write_reg(uint8_t reg, uint16_t val);
 static uint16_t i2c_read_reg(uint8_t reg);
@@ -70,21 +70,24 @@ static int i2c_port;
 /****************************************************************************************
  * init
  */
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {	 
+static bool init(char *config, int i2c_port_num) {	 
 	esp_err_t res = ESP_OK;
+	char *p;
 	
-	i2c_port = i2c_port_num;
-
 	// configure i2c
 	i2c_config_t i2c_config = {
 			.mode = I2C_MODE_MASTER,
-			.sda_io_num = 33,
+			.sda_io_num = -1,
 			.sda_pullup_en = GPIO_PULLUP_ENABLE,
-			.scl_io_num = 32,
+			.scl_io_num = -1,
 			.scl_pullup_en = GPIO_PULLUP_ENABLE,
 			.master.clk_speed = 250000,
 		};
-		
+	
+	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "scl")) != NULL) i2c_config.scl_io_num = atoi(strchr(p, '=') + 1);
+	
+	i2c_port = i2c_port_num;
 	i2c_param_config(i2c_port, &i2c_config);
 	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
 	
@@ -95,8 +98,6 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 		i2c_driver_delete(i2c_port);
 		return 0;		
 	}
-	
-	ESP_LOGI(TAG, "AC101 DAC using I2C sda:%u, scl:%u", i2c_config.sda_io_num, i2c_config.scl_io_num);
 	
 	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
 	// huh?
@@ -140,13 +141,6 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	i2c_write_reg(OMIXER_SR, 		BIN(0000,0101,0000,1010));	// source=DAC(R/L) and LINEIN(R/L)
 #endif	
 	
-	// configure I2S pins & install driver	
-	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
-															.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO
-								};
-	res |= i2s_driver_install(i2s_num, i2s_config, 0, NULL);
-	res |= i2s_set_pin(i2s_num, &i2s_pin_config);
-	
 	// enable earphone & speaker
 	i2c_write_reg(SPKOUT_CTRL, 0x0220);
 	i2c_write_reg(HPOUT_CTRL, 0xf801);
@@ -155,7 +149,7 @@ static bool init(int i2c_port_num, int i2s_num, i2s_config_t *i2s_config) {
 	ac101_set_spk_volume(100);
 	ac101_set_earph_volume(100);
 	
-	ESP_LOGI(TAG, "DAC using I2S bck:%d, ws:%d, do:%d", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
+	ESP_LOGI(TAG, "AC101 uses I2C sda:%d, scl:%d", i2c_config.sda_io_num, i2c_config.scl_io_num);
 
 	return (res == ESP_OK);
 }	
@@ -170,8 +164,9 @@ static void deinit(void)	{
 /****************************************************************************************
  * change volume
  */
-static void volume(unsigned left, unsigned right) {
+static bool volume(unsigned left, unsigned right) {
 	// nothing at that point, volume is handled by backend
+	return false;
 } 
 
 /****************************************************************************************

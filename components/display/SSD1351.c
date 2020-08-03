@@ -164,34 +164,31 @@ static void Update24( struct GDS_Device* Device ) {
 #else
 	// always update by full lines
 	SetColumnAddress( Device, 0, Device->Width - 1);
-	Device->WriteCommand(Device, ENABLE_WRITE);
 	
-	for (int r = 0; r < Device->Height; r += Private->PageSize) {
-		SetRowAddress( Device, r, r + Private->PageSize - 1 );
+	for (int r = 0; r < Device->Height; r += min(Private->PageSize, Device->Height - r)) {
+		int Height = min(Private->PageSize, Device->Height - r);
+		
+		SetRowAddress( Device, r, r + Height - 1 );
+		Device->WriteCommand(Device, ENABLE_WRITE);
+		
 		if (Private->iRAM) {
-			memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width * 3, Private->PageSize * Device->Width * 3 );
-			Device->WriteData( Device, Private->iRAM, Private->PageSize * Device->Width * 3 );
+			memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width * 3, Height * Device->Width * 3 );
+			Device->WriteData( Device, Private->iRAM, Height * Device->Width * 3 );
 		} else	{
-			Device->WriteData( Device, Device->Framebuffer + r * Device->Width * 3, Private->PageSize * Device->Width * 3 );
+			Device->WriteData( Device, Device->Framebuffer + r * Device->Width * 3, Height * Device->Width * 3 );
 		}	
 	}	
 #endif	
 }
 
-static void SetHFlip( struct GDS_Device* Device, bool On ) { 
+static void SetLayout( struct GDS_Device* Device, bool HFlip, bool VFlip, bool Rotate ) { 
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap & ~(1 << 1)) : (Private->ReMap | (1 << 1));
+	Private->ReMap = HFlip ? (Private->ReMap & ~(1 << 1)) : (Private->ReMap | (1 << 1));
+	Private->ReMap = VFlip ? (Private->ReMap | (1 << 4)) : (Private->ReMap & ~(1 << 4));
 	Device->WriteCommand( Device, 0xA0 );
 	WriteByte( Device, Private->ReMap );
 }	
 
-static void SetVFlip( struct GDS_Device *Device, bool On ) { 
-	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = On ? (Private->ReMap | (1 << 4)) : (Private->ReMap & ~(1 << 4));
-	Device->WriteCommand( Device, 0xA0 );
-	WriteByte( Device, Private->ReMap );
-}	
-	
 static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0xAF ); }
 static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0xAE ); }
 
@@ -242,8 +239,7 @@ static bool Init( struct GDS_Device* Device ) {
 	
 	// set flip modes & contrast
 	Device->SetContrast( Device, 0x7F );
-	Device->SetVFlip( Device, false );
-	Device->SetHFlip( Device, false );
+	Device->SetLayout( Device, false, false, false );
 	
 	// set Adressing Mode Horizontal
 	Private->ReMap |= (0 << 2);
@@ -265,7 +261,7 @@ static bool Init( struct GDS_Device* Device ) {
 
 static const struct GDS_Device SSD1351 = {
 	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
-	.SetVFlip = SetVFlip, .SetHFlip = SetHFlip,
+	.SetLayout = SetLayout,
 	.Update = Update16, .Init = Init,
 	.Mode = GDS_RGB565, .Depth = 16,
 };	

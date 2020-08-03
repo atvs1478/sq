@@ -2,6 +2,9 @@
 # Automatically generated file. DO NOT EDIT.
 # Espressif IoT Development Framework (ESP-IDF) Project Configuration
 #
+CONFIG_DAC_CONFIG="model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32"
+CONFIG_MUTE_GPIO=-1
+CONFIG_MUTE_GPIO_LEVEL=-1
 CONFIG_IDF_TARGET_ESP32=y
 CONFIG_IDF_TARGET="esp32"
 CONFIG_IDF_FIRMWARE_CHIP_ID=0x0000

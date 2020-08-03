@@ -15,14 +15,15 @@
 typedef enum { ADAC_ON = 0, ADAC_STANDBY, ADAC_OFF } adac_power_e;
 
 struct adac_s {
-	bool (*init)(int i2c_port_num, int i2s_num, i2s_config_t *config);
+	char *model;
+	bool (*init)(char *config, int i2c_port_num);
 	void (*deinit)(void);
 	void (*power)(adac_power_e mode);
 	void (*speaker)(bool active);
 	void (*headset)(bool active);
-	void (*volume)(unsigned left, unsigned right);
+	bool (*volume)(unsigned left, unsigned right);
 };
 
-extern struct adac_s dac_tas57xx;
-extern struct adac_s dac_a1s;
-extern struct adac_s dac_external;
+extern const struct adac_s dac_tas57xx;
+extern const struct adac_s dac_ac101;
+extern const struct adac_s dac_external;

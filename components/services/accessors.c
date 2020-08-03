@@ -115,7 +115,7 @@ const spi_bus_config_t * config_spi_get(spi_host_device_t * spi_host) {
         .quadhd_io_num = -1
     };
 
-	nvs_item = config_alloc_get(NVS_TYPE_STR, "spi_config");
+	nvs_item = config_alloc_get_str("spi_config", CONFIG_SPI_CONFIG, NULL);
 	if (nvs_item) {
 		if ((p = strcasestr(nvs_item, "data")) != NULL) spi.mosi_io_num = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "clk")) != NULL) spi.sclk_io_num = atoi(strchr(p, '=') + 1);

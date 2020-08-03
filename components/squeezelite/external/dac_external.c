@@ -12,46 +12,163 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/i2s.h>
+#include "driver/i2c.h"
 #include "esp_log.h"
+#include "cJSON.h"
 #include "platform_config.h"
 #include "adac.h"
 
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config);
-static void deinit(void) { };
-static void speaker(bool active) { };
-static void headset(bool active) { } ;
-static void volume(unsigned left, unsigned right) { };
-static void power(adac_power_e mode) { };
+static const char TAG[] = "DAC external";
 
-struct adac_s dac_external = { init, deinit, power, speaker, headset, volume };
+static void deinit(void) { }
+static void speaker(bool active) { }
+static void headset(bool active) { } 
+static bool volume(unsigned left, unsigned right) { return false; }
+static void power(adac_power_e mode);
+static bool init(char *config, int i2c_port_num);
 
-static char TAG[] = "DAC external";
+static bool i2c_json_execute(char *set);
+static esp_err_t i2c_write_reg(uint8_t reg, uint8_t val);
+static uint8_t i2c_read_reg(uint8_t reg);
 
-static bool init(int i2c_port_num, int i2s_num, i2s_config_t *config) { 
-	i2s_pin_config_t i2s_pin_config = (i2s_pin_config_t) { 	.bck_io_num = CONFIG_I2S_BCK_IO, .ws_io_num = CONFIG_I2S_WS_IO, 
-															.data_out_num = CONFIG_I2S_DO_IO, .data_in_num = CONFIG_I2S_DI_IO };
-	char *nvs_item = config_alloc_get(NVS_TYPE_STR, "dac_config");
+const struct adac_s dac_external = { "i2s", init, deinit, power, speaker, headset, volume };
+static int i2c_port, i2c_addr;
+static cJSON *i2c_json;
+
+/****************************************************************************************
+ * init
+ */
+static bool init(char *config, int i2c_port_num)	{	 
+	char *p;	
+	i2c_port = i2c_port_num;
 	
-	if (nvs_item) {
-		char *p;
-		if ((p = strcasestr(nvs_item, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(nvs_item, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(nvs_item, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
-		free(nvs_item);
-	} 
+	// configure i2c
+	i2c_config_t i2c_config = {
+			.mode = I2C_MODE_MASTER,
+			.sda_io_num = -1,
+			.sda_pullup_en = GPIO_PULLUP_ENABLE,
+			.scl_io_num = -1,
+			.scl_pullup_en = GPIO_PULLUP_ENABLE,
+			.master.clk_speed = 250000,
+		};
+
+	if ((p = strcasestr(config, "i2c")) != NULL) i2c_addr = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "scl")) != NULL) i2c_config.scl_io_num = atoi(strchr(p, '=') + 1);
+
+	p = config_alloc_get_str("dac_controlset", CONFIG_DAC_CONTROLSET, NULL);
+	i2c_json = cJSON_Parse(p);
 	
-	if (i2s_pin_config.bck_io_num != -1 && i2s_pin_config.ws_io_num != -1 && i2s_pin_config.data_out_num != -1) {
-		i2s_driver_install(i2s_num, config, 0, NULL);
-		i2s_set_pin(i2s_num, &i2s_pin_config);
-
-		ESP_LOGI(TAG, "External DAC using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
-
+	if (!i2c_addr || !i2c_json || i2c_config.sda_io_num == -1 || i2c_config.scl_io_num == -1) {
+		if (p) free(p);
+		ESP_LOGW(TAG, "No i2c controlset found");
 		return true;
-	} else {
-		ESP_LOGI(TAG, "Cannot initialize I2S for DAC bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
-																		   i2s_pin_config.ws_io_num, 
-																		   i2s_pin_config.data_out_num);
+	}	
+	
+	ESP_LOGI(TAG, "DAC uses I2C @%d with sda:%d, scl:%d", i2c_addr, i2c_config.sda_io_num, i2c_config.scl_io_num);
+	
+	// we have an I2C configured	
+	i2c_param_config(i2c_port, &i2c_config);
+	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
+		
+	if (!i2c_json_execute("init")) {	
+		ESP_LOGE(TAG, "could not intialize DAC");
 		return false;
-	}
+	}	
+	
+	return true;
+}	
+
+/****************************************************************************************
+ * power
+ */
+static void power(adac_power_e mode) {
+	if (mode == ADAC_STANDBY || mode == ADAC_OFF) i2c_json_execute("poweroff");
+	else i2c_json_execute("poweron");
 }
+
+/****************************************************************************************
+ * 
+ */
+bool i2c_json_execute(char *set) {
+	cJSON *json_set = cJSON_GetObjectItemCaseSensitive(i2c_json, set);
+	cJSON *item;
+
+	if (!json_set) return true;
+	
+	cJSON_ArrayForEach(item, json_set)
+	{
+		cJSON *reg = cJSON_GetObjectItemCaseSensitive(item, "reg");
+		cJSON *val = cJSON_GetObjectItemCaseSensitive(item, "val");
+		cJSON *mode = cJSON_GetObjectItemCaseSensitive(item, "mode");
+
+		if (!reg || !val) continue;
+
+		if (!mode) {
+			i2c_write_reg(reg->valueint, val->valueint);
+		} else if (!strcasecmp(mode->valuestring, "or")) {
+			uint8_t data = i2c_read_reg(reg->valueint);
+			data |= (uint8_t) val->valueint;
+			i2c_write_reg(reg->valueint, data);
+		} else if (!strcasecmp(mode->valuestring, "and")) {
+			uint8_t data = i2c_read_reg(reg->valueint);
+			data &= (uint8_t) val->valueint;
+			i2c_write_reg(reg->valueint, data);
+        }
+	}
+	
+	return true;
+}	
+
+/****************************************************************************************
+ * 
+ */
+static esp_err_t i2c_write_reg(uint8_t reg, uint8_t val) {
+	esp_err_t ret;
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+	
+	i2c_master_write_byte(cmd, i2c_addr | I2C_MASTER_WRITE, I2C_MASTER_NACK);
+	i2c_master_write_byte(cmd, reg, I2C_MASTER_NACK);
+	i2c_master_write_byte(cmd, val, I2C_MASTER_NACK);
+	
+	i2c_master_stop(cmd);
+    ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    i2c_cmd_link_delete(cmd);
+	
+	if (ret != ESP_OK) {
+		ESP_LOGW(TAG, "I2C write failed");
+	}
+	
+    return ret;
+}
+
+/****************************************************************************************
+ * 
+ */
+static uint8_t i2c_read_reg(uint8_t reg) {
+	esp_err_t ret;
+	uint8_t data = 0;
+	
+	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    
+	i2c_master_write_byte(cmd, i2c_addr | I2C_MASTER_WRITE, I2C_MASTER_NACK);
+	i2c_master_write_byte(cmd, reg, I2C_MASTER_NACK);
+
+	i2c_master_start(cmd);			
+	i2c_master_write_byte(cmd, i2c_addr | I2C_MASTER_READ, I2C_MASTER_NACK);
+	i2c_master_read_byte(cmd, &data, I2C_MASTER_NACK);
+	
+    i2c_master_stop(cmd);
+	ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
+	i2c_cmd_link_delete(cmd);
+	
+	if (ret != ESP_OK) {
+		ESP_LOGW(TAG, "I2C read failed");
+	}
+	
+	return data;
+}
+
 
