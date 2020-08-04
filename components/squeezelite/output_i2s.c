@@ -146,10 +146,22 @@ static void set_amp_gpio(int gpio, char *value) {
 }	
 
 /****************************************************************************************
+ * Set pin from config string
+ */
+static void set_i2s_pin(char *config, i2s_pin_config_t *pin_config) {
+	char *p;
+	pin_config->bck_io_num = pin_config->ws_io_num = pin_config->data_out_num = pin_config->data_in_num = -1; 				
+	if ((p = strcasestr(config, "bck")) != NULL) pin_config->bck_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "ws")) != NULL) pin_config->ws_io_num = atoi(strchr(p, '=') + 1);
+	if ((p = strcasestr(config, "do")) != NULL) pin_config->data_out_num = atoi(strchr(p, '=') + 1);
+}
+
+/****************************************************************************************
  * Initialize the DAC output
  */
 void output_init_i2s(log_level level, char *device, unsigned output_buf_size, char *params, unsigned rates[], unsigned rate_delay, unsigned idle) {
 	loglevel = level;
+	int silent_do = -1;
 	char *p;
 	esp_err_t res;
 	
@@ -164,6 +176,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 #endif
 
 	output.write_cb = &_i2s_write_frames;
+	
 	obuf = malloc(FRAME_BLOCK * BYTES_PER_FRAME);
 	if (!obuf) {
 		LOG_ERROR("Cannot allocate i2s buffer");
@@ -171,14 +184,20 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	}
 		
 	running = true;
-	i2s_pin_config_t i2s_pin_config = {	.bck_io_num = -1, .ws_io_num = -1, .data_out_num = -1, .data_in_num = -1 }; 				
 
 	// get SPDIF configuration from NVS or compile
 	char *spdif_config = config_alloc_get_str("spdif_config", CONFIG_SPDIF_CONFIG, "bck=" STR(CONFIG_SPDIF_BCK_IO) 
 											  ",ws=" STR(CONFIG_SPDIF_WS_IO) ",do=" STR(CONFIG_SPDIF_DO_IO));
+											  
+	char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
+											",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
+											",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
+											",mute" STR(CONFIG_MUTE_GPIO));	
 
-	if ((p = strcasestr(spdif_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
-	
+	i2s_pin_config_t i2s_dac_pin, i2s_spdif_pin;											
+	set_i2s_pin(spdif_config, &i2s_spdif_pin);										
+	set_i2s_pin(dac_config, &i2s_dac_pin);										
+
 	// common I2S initialization
 	i2s_config.mode = I2S_MODE_MASTER | I2S_MODE_TX;
 	i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
@@ -191,13 +210,10 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (strcasestr(device, "spdif")) {
 		spdif = true;	
 
-		if ((p = strcasestr(spdif_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(spdif_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
-			
-		if (i2s_pin_config.bck_io_num == -1 || i2s_pin_config.ws_io_num == -1 || i2s_pin_config.data_out_num == -1) {
-			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_pin_config.bck_io_num, 
-																		   i2s_pin_config.ws_io_num, 
-																		   i2s_pin_config.data_out_num);
+		if (i2s_spdif_pin.bck_io_num == -1 || i2s_spdif_pin.ws_io_num == -1 || i2s_spdif_pin.data_out_num == -1) {
+			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_spdif_pin.bck_io_num, 
+																		   i2s_spdif_pin.ws_io_num, 
+																		   i2s_spdif_pin.data_out_num);
 		}
 									
 		i2s_config.sample_rate = output.current_sample_rate * 2;
@@ -211,48 +227,38 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		   audio frame. So the real depth is true frames is (LEN * COUNT / 2)
 		*/   
 		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN / 2;	
-		res = i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
-		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
-		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, i2s_pin_config.data_out_num);
-	} else {
-		// turn off SPDIF if configured
-		if (i2s_pin_config.data_out_num >= 0) {
-			gpio_pad_select_gpio(i2s_pin_config.data_out_num);
-			gpio_set_direction(i2s_pin_config.data_out_num, GPIO_MODE_OUTPUT);
-			gpio_set_level(i2s_pin_config.data_out_num, 0);
-		}	
 		
+		// silence DAC output if sharing the same ws/bck
+		if (i2s_dac_pin.ws_io_num == i2s_spdif_pin.ws_io_num && i2s_dac_pin.bck_io_num == i2s_spdif_pin.bck_io_num)	silent_do = i2s_dac_pin.data_out_num;		
+		
+		res = i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
+		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_spdif_pin);
+		LOG_INFO("SPDIF using I2S bck:%u, ws:%u, do:%u", i2s_spdif_pin.bck_io_num, i2s_spdif_pin.ws_io_num, i2s_spdif_pin.data_out_num);
+	} else {
 		i2s_config.sample_rate = output.current_sample_rate;
 		i2s_config.bits_per_sample = BYTES_PER_FRAME * 8 / 2;
 		// Counted in frames (but i2s allocates a buffer <= 4092 bytes)
 		i2s_config.dma_buf_len = DMA_BUF_LEN;	
 		i2s_config.dma_buf_count = DMA_BUF_COUNT;
-		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;			
+		dma_buf_frames = DMA_BUF_COUNT * DMA_BUF_LEN;	
+		
+		// silence SPDIF output
+		silent_do = i2s_spdif_pin.data_out_num;		
 
-		char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
-												",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
-												",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
-												",mute" STR(CONFIG_MUTE_GPIO));
 		char model[32] = "i2s";
 		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
-		
-		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
-		res = adac->init(dac_config, I2C_PORT, &i2s_config) ? ESP_OK : ESP_FAIL;
-		
-		if ((p = strcasestr(dac_config, "bck")) != NULL) i2s_pin_config.bck_io_num = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(dac_config, "ws")) != NULL) i2s_pin_config.ws_io_num = atoi(strchr(p, '=') + 1);
-		if ((p = strcasestr(dac_config, "do")) != NULL) i2s_pin_config.data_out_num = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(dac_config, "mute")) != NULL) {
 			char mute[8];
 			sscanf(p, "%*[^=]=%7[^,]", mute);
 			mute_control.gpio = atoi(mute);
 			if ((p = strchr(mute, ':')) != NULL) mute_control.active = atoi(p + 1);
 		}	
-		
-		free(dac_config);
+
+		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
+		res = adac->init(dac_config, I2C_PORT, &i2s_config) ? ESP_OK : ESP_FAIL;
 		
 		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
-		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_pin_config);
+		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_dac_pin);
 		
 		if (res == ESP_OK && mute_control.gpio >= 0) {
 			gpio_pad_select_gpio(mute_control.gpio);
@@ -260,15 +266,23 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 			gpio_set_level(mute_control.gpio, mute_control.active);
 		}		
 				
-		LOG_INFO("%s DAC using I2S bck:%d, ws:%d, do:%d, mute:%d:%d (res:%d)", model, i2s_pin_config.bck_io_num, i2s_pin_config.ws_io_num, 
-																   i2s_pin_config.data_out_num, mute_control.gpio, mute_control.active, res);
+		LOG_INFO("%s DAC using I2S bck:%d, ws:%d, do:%d, mute:%d:%d (res:%d)", model, i2s_dac_pin.bck_io_num, i2s_dac_pin.ws_io_num, 
+																   i2s_dac_pin.data_out_num, mute_control.gpio, mute_control.active, res);
 	}	
-	
+			
+	free(dac_config);
 	free(spdif_config);
 	
 	if (res != ESP_OK) {
 		LOG_WARN("no DAC configured");
 		return;
+	}	
+	
+	// turn off GPIO than is not used (SPDIF of DAC DO when shared)
+	if (silent_do >= 0) {
+		gpio_pad_select_gpio(silent_do);
+		gpio_set_direction(silent_do, GPIO_MODE_OUTPUT);
+		gpio_set_level(silent_do, 0);
 	}	
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 
