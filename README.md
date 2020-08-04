@@ -72,9 +72,9 @@ The NVS parameter "dac_config" set the gpio used for i2s communication with your
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>[,mute=<gpio>[:0|1][,model=TAS57xx|TAS5713|AC101|I2S][,sda=<gpio>,scl=gpio[,i2c=<addr>]]
 ```
-if "model" is not set or is not recognized, then default "I2S" is used. I2C parameters are optional an only needed if your dac requires and I2C control (See 'dac_controlset' below). Note that "i2c" parameters is decimal, hex notation is not allowed.
+if "model" is not set or is not recognized, then default "I2S" is used. I2C parameters are optional an only needed if your dac requires an I2C control (See 'dac_controlset' below). Note that "i2c" parameters are decimal, hex notation is not allowed.
 
-The parameter "dac_controlset" allows definition of simple commands to be sent of i2c for init, power on and off using a JSON syntax:
+The parameter "dac_controlset" allows definition of simple commands to be sent over i2c for init, power on and off using a JSON syntax:
 ```
 { init: [ {"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"}, ... {{"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"} ],
   poweron: [ {"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"}, ... {{"reg":<register>,"val":<value>,"mode":<nothing>|"or"|"and"} ],
