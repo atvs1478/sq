@@ -56,7 +56,7 @@ Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 
 ### SqueezeAmpToo !
 
-ANd the super cool project https://github.com/rochuck/squeeze-amp-too
+And the super cool project https://github.com/rochuck/squeeze-amp-too
 
 ## Configuration
 To access NVS, in the webUI, go to credits and select "shows nvs editor". Go into the NVS editor tab to change NFS parameters. In syntax description below \<\> means a value while \[\] describe optional parameters. 
