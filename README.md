@@ -54,7 +54,7 @@ XMT - 3.3V
 
 Use the `squeezelite-esp32-I2S-4MFlash-sdkconfig.defaults` configuration file.
 
-### Squeeze-Amp-Too !
+### SqueezeAmpToo !
 
 And the super cool project https://github.com/rochuck/squeeze-amp-too
 
