@@ -466,7 +466,7 @@ static void *output_thread_i2s(void *arg) {
 		_output_frames( iframes );
 		// oframes must be a global updated by the write callback
 		output.frames_in_process = oframes;
-						
+
 		SET_MIN_MAX_SIZED(oframes,rec,iframes);
 		SET_MIN_MAX_SIZED(_buf_used(outputbuf),o,outputbuf->size);
 		SET_MIN_MAX_SIZED(_buf_used(streambuf),s,streambuf->size);
@@ -484,7 +484,7 @@ static void *output_thread_i2s(void *arg) {
 			UNLOCK;
 			continue;
 		}
-		
+
 		UNLOCK;
 				
 		// now send all the data
@@ -498,7 +498,7 @@ static void *output_thread_i2s(void *arg) {
 			adac->power(ADAC_ON);	
 			if (amp_control.gpio != -1) gpio_set_level(amp_control.gpio, amp_control.active);
 		} 
-		
+
 		// this does not work well as set_sample_rates resets the fifos (and it's too early)
 		if (i2s_config.sample_rate != output.current_sample_rate) {
 			LOG_INFO("changing sampling rate %u to %u", i2s_config.sample_rate, output.current_sample_rate);
