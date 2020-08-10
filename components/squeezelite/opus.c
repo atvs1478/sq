@@ -101,7 +101,7 @@ static int _read_cb(void *datasource, char *ptr, int size) {
 
 	bytes = min(_buf_used(streambuf), _buf_cont_read(streambuf));
 	bytes = min(bytes, size);
-
+	
 	memcpy(ptr, streambuf->readp, bytes);
 	_buf_inc_readp(streambuf, bytes);
 
@@ -171,7 +171,6 @@ static decode_state opus_decompress(void) {
 		write_buf = process.inbuf;
 	);
 
-	//printf("processing %u frames\n", frames);
 	// write the decoded frames into outputbuf then unpack them (they are 16 bits)
 	n = OP(u, read, u->of, (opus_int16*) write_buf, frames * channels, NULL);
 			
