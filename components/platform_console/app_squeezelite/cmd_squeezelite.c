@@ -92,10 +92,11 @@ static void * squeezelite_thread(){
 	ESP_LOGV(TAG ,"Freeing argv pointer");
 	free(thread_parms.argv);
 	isRunning=false;
-	ESP_LOGE(TAG, "Exited from squeezelite thread, something's wrong ... rebooting");
+	ESP_LOGE(TAG, "Exited from squeezelite thread, something's wrong ... rebooting (wait 30s for user to take action)");
 	if(!wait_for_commit()){
 		ESP_LOGW(TAG,"Unable to commit configuration. ");
 	}
+	vTaskDelay( pdMS_TO_TICKS( 30*1000 ) );
     esp_restart();
 	return NULL;
 }
