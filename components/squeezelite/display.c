@@ -588,13 +588,13 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		if (visu.rotate) {
 			for (int r = 0; r < width; r++) {
 				for (int c = VU_HEIGHT; --c >= 0;) {
-					GDS_DrawPixelFastExt(display, c + x, r + y, *data++ >> scale);
+					GDS_DrawPixelFast(display, c + x, r + y, *data++ >> scale);
 				}	
 			}	
 		} else {
 			for (int r = 0; r < width; r++) {
 				for (int c = 0; c < VU_HEIGHT; c++) {
-				GDS_DrawPixelFastExt(display, r + x, c + y, *data++ >> scale);
+					GDS_DrawPixelFast(display, r + x, c + y, *data++ >> scale);
 				}	
 			}			
 		}	
@@ -603,13 +603,13 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		if (visu.rotate) {
 			for (int r = 0; r < width; r++) {
 				for (int c = VU_HEIGHT; --c >= 0;) {
-					GDS_DrawPixelFastExt(display, c + x, r + y, grayMap[*data++]);
+					GDS_DrawPixelFast(display, c + x, r + y, grayMap[*data++]);
 				}	
 			}	
 		} else {
 			for (int r = 0; r < width; r++) {
 				for (int c = 0; c < VU_HEIGHT; c++) {
-				GDS_DrawPixelFastExt(display, r + x, c + y, grayMap[*data++]);
+					GDS_DrawPixelFast(display, r + x, c + y, grayMap[*data++]);
 				}	
 			}			
 		}	
