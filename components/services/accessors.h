@@ -19,8 +19,8 @@ typedef struct {
 	int address;
 	int CS_pin;
 	int speed;
-	char *drivername;
-	char *type;
+	const char *drivername;
+	const char *type;
 	bool hflip;
 	bool vflip;
 	bool rotate;

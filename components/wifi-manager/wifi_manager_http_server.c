@@ -29,7 +29,6 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "config.h"
 #include "messaging.h"
 #include "platform_esp32.h"
 static const char TAG[] = "http_server";

@@ -102,7 +102,7 @@ DECLARE_ALL_MIN_MAX;
 static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
 static void *output_thread_i2s(void *arg);
-static void *output_thread_i2s_stats(void *arg);
+static void output_thread_i2s_stats(void *arg);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 static void (*jack_handler_chain)(bool inserted);
 
@@ -502,13 +502,13 @@ static void *output_thread_i2s(void *arg) {
 		// this does not work well as set_sample_rates resets the fifos (and it's too early)
 		if (i2s_config.sample_rate != output.current_sample_rate) {
 			LOG_INFO("changing sampling rate %u to %u", i2s_config.sample_rate, output.current_sample_rate);
-			/* 
-			if (synced)
+			if (synced) {
+			/* 				
 				//  can sleep for a buffer_queue - 1 and then eat a buffer (discard) if we are synced
 				usleep(((DMA_BUF_COUNT - 1) * DMA_BUF_LEN * BYTES_PER_FRAME * 1000) / 44100 * 1000);
 				discard = DMA_BUF_COUNT * DMA_BUF_LEN * BYTES_PER_FRAME;
+			*/		
 			}	
-			*/
 			i2s_config.sample_rate = output.current_sample_rate;
 			i2s_set_sample_rates(CONFIG_I2S_NUM, spdif ? i2s_config.sample_rate * 2 : i2s_config.sample_rate);
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
@@ -552,7 +552,7 @@ static void *output_thread_i2s(void *arg) {
 /****************************************************************************************
  * Stats output thread
  */
-static void *output_thread_i2s_stats(void *arg) {
+static void output_thread_i2s_stats(void *arg) {
 	while (1) {
 		// no need to lock
 		output_state state = output.state;
@@ -579,7 +579,7 @@ static void *output_thread_i2s_stats(void *arg) {
 		}
 		vTaskDelay( pdMS_TO_TICKS( STATS_PERIOD_MS ) );
 	}
-	return NULL;
+	return;
 }
 
 /****************************************************************************************

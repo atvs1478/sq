@@ -17,8 +17,8 @@
 #include "display.h"
 
 static const char *TAG = "services";
-static char *i2c_name="I2C";
-static char *spi_name="SPI";
+static const char *i2c_name="I2C";
+static const char *spi_name="SPI";
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -37,15 +37,9 @@ esp_err_t config_i2c_set(const i2c_config_t * config, int port){
 	return ESP_OK;
 }
 
-void config_display_free(display_config_t ** disp ){
-	if(disp && *disp){
-		free((*disp)->drivername);
-		free((*disp)->type);
-		free(*disp);
-		*disp=NULL;
-	}
-}
-
+/****************************************************************************************
+ * 
+ */
 const display_config_t * config_display_get(){
 	static display_config_t dstruct;
 	char *config = config_alloc_get(NVS_TYPE_STR, "display_config");

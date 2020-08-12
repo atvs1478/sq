@@ -41,21 +41,19 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include <stdio.h>
 #include <stdlib.h>
 #include "cJSON.h"
-#include "config.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "platform_config.h"
 #include "sys/param.h"
 #include "esp_vfs.h"
-#include "lwip/ip_addr.h"
 #include "messaging.h"
 #include "platform_esp32.h"
 #include "trace.h"
 #include "esp_console.h"
 #include "argtable3/argtable3.h"
 #include "platform_console.h"
-
+ 
 #define HTTP_STACK_SIZE	(5*1024)
 const char str_na[]="N/A";
 #define STR_OR_NA(s) s?s:str_na
@@ -490,8 +488,8 @@ esp_err_t console_cmd_get_handler(httpd_req_t *req){
 esp_err_t console_cmd_post_handler(httpd_req_t *req){
 	char success[]="{}";
 	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
-	bool bOTA=false;
-	char * otaURL=NULL;
+	//bool bOTA=false;
+	//char * otaURL=NULL;
 	esp_err_t err = post_handler_buff_receive(req);
 	if(err!=ESP_OK){
 		return err;

@@ -159,8 +159,12 @@ static void 	buffer_reset(abuf_t *audio_buffer);
 static void 	buffer_push_packet(rtp_t *ctx);
 static bool 	rtp_request_resend(rtp_t *ctx, seq_t first, seq_t last);
 static bool 	rtp_request_timing(rtp_t *ctx);
-static void*	rtp_thread_func(void *arg);
 static int	  	seq_order(seq_t a, seq_t b);
+#ifdef WIN32
+static void 	*rtp_thread_func(void *arg);
+#else
+static void 	rtp_thread_func(void *arg);
+#endif	
 
 /*---------------------------------------------------------------------------*/
 static struct alac_codec_s* alac_init(int fmtp[32]) {
@@ -566,7 +570,11 @@ static void buffer_push_packet(rtp_t *ctx) {
 
 
 /*---------------------------------------------------------------------------*/
+#ifdef WIN32
 static void *rtp_thread_func(void *arg) {
+#else	
+static void rtp_thread_func(void *arg) {
+#endif	
 	fd_set fds;
 	int i, sock = -1;
 	int count = 0;
@@ -621,8 +629,9 @@ static void *rtp_thread_func(void *arg) {
 			case 0x56: {
 				pktp += 4;
 				plen -= 4;
-			}
-
+			}	
+			// fall through
+			
 			// data packet
 			case 0x60: {
 				seqno = ntohs(*(u16_t*)(pktp+2));
@@ -696,7 +705,6 @@ static void *rtp_thread_func(void *arg) {
 
 			// NTP timing packet
 			case 0x53: {
-				u64_t expected;
 				u32_t reference   = ntohl(*(u32_t*)(pktp+12)); // only low 32 bits in our case
 				u64_t remote 	  =(((u64_t) ntohl(*(u32_t*)(pktp+16))) << 32) + ntohl(*(u32_t*)(pktp+20));
 				u32_t roundtrip   = gettime_ms() - reference;
@@ -713,8 +721,8 @@ static void *rtp_thread_func(void *arg) {
 				  The expected elapsed remote time should be exactly the same as
 				  elapsed local time between the two request, corrected by the
 				  drifting
+				  u64_t expected = ctx->timing.remote + MS2NTP(reference - ctx->timing.local);
 				*/
-				expected = ctx->timing.remote + MS2NTP(reference - ctx->timing.local);
 
 				ctx->timing.remote = remote;
 				ctx->timing.local = reference;
@@ -741,9 +749,9 @@ static void *rtp_thread_func(void *arg) {
 #ifndef WIN32
 	xTaskNotifyGive(ctx->joiner);
 	vTaskSuspend(NULL);
-#endif
-
+#else	
 	return NULL;
+#endif
 }
 
 /*---------------------------------------------------------------------------*/

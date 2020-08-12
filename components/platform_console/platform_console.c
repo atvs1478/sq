@@ -12,23 +12,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "esp_system.h"
 #include "esp_log.h"
 #include "esp_console.h"
 #include "esp_vfs_dev.h"
 #include "driver/uart.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
-#include "nvs.h"
+#include "nvs.h" 
 #include "nvs_flash.h"
 #include "pthread.h"
 #include "platform_esp32.h"
-#include "esp_pthread.h"
 #include "cmd_decl.h"
-#include "wifi_manager.h"
 #include "trace.h"
 #include "platform_config.h"
-#include "telnet.h"
+#include "telnet.h" 
 
 #include "messaging.h"
 

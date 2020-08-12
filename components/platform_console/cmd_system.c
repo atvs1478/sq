@@ -268,6 +268,7 @@ static int free_mem(int argc, char **argv)
     return 0;
 }
 
+/*
 static struct {
     struct arg_str *a2dp_dev_name;
     struct arg_str *a2dp_sink_name;
@@ -276,9 +277,10 @@ static struct {
     struct arg_str *enable_bt_sink;
     struct arg_end *end;
 } set_btsource_args;
+*/
 
-static int do_set_btsource(int argc, char **argv)
-{
+//static int do_set_btsource(int argc, char **argv)
+//{
 //	a2dp_dev_name;
 //	a2dp_sink_name;
 //	wakeup_gpio_level;
@@ -317,8 +319,8 @@ static int do_set_btsource(int argc, char **argv)
 //    }
 //    rtc_gpio_isolate(GPIO_NUM_12);
 //    esp_deep_sleep_start();
-	return 0;
-}
+//return 0;
+//}
 
 
 
