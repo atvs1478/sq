@@ -63,7 +63,6 @@ static void ac101_start(ac_module_t mode);
 static void ac101_stop(void);
 static void ac101_set_earph_volume(uint8_t volume);
 static void ac101_set_spk_volume(uint8_t volume);
-static int ac101_get_spk_volume(void);
 	
 static int i2c_port;
 
@@ -269,13 +268,6 @@ void set_sample_rate(int rate) {
 }
 
 /****************************************************************************************
- * Get normalized (0..100) speaker volume
- */
-static int ac101_get_spk_volume(void) {
-	return ((i2c_read_reg(SPKOUT_CTRL) & 0x1f) * 100) / 0x1f;
-}
-
-/****************************************************************************************
  * Set normalized (0..100) volume
  */
 static void ac101_set_spk_volume(uint8_t volume) {
@@ -286,13 +278,6 @@ static void ac101_set_spk_volume(uint8_t volume) {
 }
 
 /****************************************************************************************
- * Get normalized (0..100) earphone volume
- */
-static int ac101_get_earph_volume(void) {
-	return (((i2c_read_reg(HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
-}
-
-/****************************************************************************************
  * Set normalized (0..100) earphone volume
  */
 static void ac101_set_earph_volume(uint8_t volume) {
@@ -300,6 +285,21 @@ static void ac101_set_earph_volume(uint8_t volume) {
 	value = (((int) value * 0x3f) / 100) << 4;
 	value |= i2c_read_reg(HPOUT_CTRL) & ~(0x3f << 4);
 	i2c_write_reg(HPOUT_CTRL, value);
+}
+
+#if 0
+/****************************************************************************************
+ * Get normalized (0..100) speaker volume
+ */
+static int ac101_get_spk_volume(void) {
+	return ((i2c_read_reg(SPKOUT_CTRL) & 0x1f) * 100) / 0x1f;
+}
+
+/****************************************************************************************
+ * Get normalized (0..100) earphone volume
+ */
+static int ac101_get_earph_volume(void) {
+	return (((i2c_read_reg(HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
 }
 
 /****************************************************************************************
@@ -333,6 +333,27 @@ static void ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_output_mi
 /****************************************************************************************
  * 
  */
+static void ac101_deinit(void) {
+	i2c_write_reg(CHIP_AUDIO_RS, 0x123);		//soft reset
+}
+
+/****************************************************************************************
+ * Don't know when this one is supposed to be called
+ */
+static void ac101_i2s_config_clock(ac_i2s_clock_t *cfg) {
+	uint16_t regval=0;
+	regval = i2c_read_reg(I2S1LCK_CTRL);
+	regval &= 0xe03f;
+	regval |= (cfg->bclk_div << 9);
+	regval |= (cfg->lclk_div << 6);
+	i2c_write_reg(I2S1LCK_CTRL, regval);
+}
+
+#endif
+
+/****************************************************************************************
+ * 
+ */
 static void ac101_start(ac_module_t mode) {
     if (mode == AC_MODULE_LINE) {
 		i2c_write_reg(0x51, 0x0408);
@@ -362,21 +383,3 @@ static void ac101_stop(void) {
 	i2c_write_reg(PLL_CTRL2, value);
 }
 
-/****************************************************************************************
- * 
- */
-static void ac101_deinit(void) {
-	i2c_write_reg(CHIP_AUDIO_RS, 0x123);		//soft reset
-}
-
-/****************************************************************************************
- * Don't know when this one is supposed to be called
- */
-static void ac101_i2s_config_clock(ac_i2s_clock_t *cfg) {
-	uint16_t regval=0;
-	regval = i2c_read_reg(I2S1LCK_CTRL);
-	regval &= 0xe03f;
-	regval |= (cfg->bclk_div << 9);
-	regval |= (cfg->lclk_div << 6);
-	i2c_write_reg(I2S1LCK_CTRL, regval);
-}

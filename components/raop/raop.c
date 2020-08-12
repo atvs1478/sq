@@ -89,7 +89,13 @@ extern struct mdnsd* glmDNSServer;
 extern log_level	raop_loglevel;
 static log_level 	*loglevel = &raop_loglevel;
 
+#ifdef WIN32
 static void*	rtsp_thread(void *arg);
+static void* 	search_remote(void *args);
+#else
+static void		rtsp_thread(void *arg);
+static void 	search_remote(void *args);
+#endif
 static void		cleanup_rtsp(raop_ctx_t *ctx, bool abort);
 static bool 	handle_rtsp(raop_ctx_t *ctx, int sock);
 
@@ -97,7 +103,7 @@ static char*	rsa_apply(unsigned char *input, int inlen, int *outlen, int mode);
 static int  	base64_pad(char *src, char **padded);
 static int 		base64_encode(const void *data, int size, char **str);
 static int 		base64_decode(const char *str, void *data);
-static void* 	search_remote(void *args);
+
 
 extern char private_key[];
 enum { RSA_MODE_KEY, RSA_MODE_AUTH };
@@ -352,7 +358,11 @@ bool raop_cmd(struct raop_ctx_s *ctx, raop_event_t event, void *param) {
 }
 
 /*----------------------------------------------------------------------------*/
+#ifdef WIN32
 static void *rtsp_thread(void *arg) {
+#else
+static void rtsp_thread(void *arg) {
+#endif	
 	raop_ctx_t *ctx = (raop_ctx_t*) arg;
 	int  sock = -1;
 
@@ -397,9 +407,9 @@ static void *rtsp_thread(void *arg) {
 #ifndef WIN32
 	xTaskNotifyGive(ctx->joiner);
 	vTaskSuspend(NULL);
+#else
+	return NULL;	
 #endif
-
-	return NULL;
 }
 
 
@@ -708,7 +718,7 @@ static void* search_remote(void *args) {
 #else
 
 /*----------------------------------------------------------------------------*/
-static void* search_remote(void *args) {
+static void search_remote(void *args) {
 	raop_ctx_t *ctx = (raop_ctx_t*) args;
 	bool found = false;
 	
@@ -741,8 +751,6 @@ static void* search_remote(void *args) {
 	// can't use xNotifyGive as it seems LWIP is using it as well
 	xSemaphoreGive(ctx->active_remote.destroy_mutex);
 	vTaskSuspend(NULL);
-	
-	return NULL;
  }
 #endif
 

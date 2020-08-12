@@ -37,7 +37,7 @@ extern bool bypass_wifi_manager;
 
 extern EventGroupHandle_t wifi_event_group;
 extern const int CONNECTED_BIT;
-static const char * TAG = "cmd_wifi";
+//static const char * TAG = "cmd_wifi";
 /** Arguments used by 'join' function */
 static struct {
     struct arg_int *timeout;
@@ -123,9 +123,8 @@ static bool wifi_join(const char *ssid, const char *pass, int timeout_ms)
     return (bits & CONNECTED_BIT) != 0;
 }
 
-
-static int set_auto_connect(int argc, char **argv)
-{
+//static int set_auto_connect(int argc, char **argv)
+//{
 //    int nerrors = arg_parse(argc, argv, (void **) &join_args);
 //    if (nerrors != 0) {
 //        arg_print_errors(stderr, join_args.end, argv[0]);
@@ -147,8 +146,9 @@ static int set_auto_connect(int argc, char **argv)
 //        return 1;
 //    }
 //    ESP_LOGI(__func__, "Connected");
-    return 0;
-}
+//    return 0;
+//}
+
 static int connect(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **) &join_args);
