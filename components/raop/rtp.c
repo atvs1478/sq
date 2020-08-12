@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "platform.h"
 #include "rtp.h"
@@ -48,12 +49,10 @@
 #ifdef WIN32
 #include <openssl/aes.h>
 #include "alac_wrapper.h"
-#include "assert.h"
 #define MSG_DONTWAIT 0
 #else
 #include "esp_pthread.h"
 #include "esp_system.h"
-#include "esp_assert.h"
 #include <mbedtls/version.h>
 #include <mbedtls/aes.h>
 #include "alac_wrapper.h"
@@ -721,7 +720,7 @@ static void rtp_thread_func(void *arg) {
 				  The expected elapsed remote time should be exactly the same as
 				  elapsed local time between the two request, corrected by the
 				  drifting
-				  u64_t expected = ctx->timing.remote + MS2NTP(reference - ctx->timing.local);
+				u64_t expected = ctx->timing.remote + MS2NTP(reference - ctx->timing.local);
 				*/
 
 				ctx->timing.remote = remote;

@@ -579,7 +579,6 @@ static void output_thread_i2s_stats(void *arg) {
 		}
 		vTaskDelay( pdMS_TO_TICKS( STATS_PERIOD_MS ) );
 	}
-	return;
 }
 
 /****************************************************************************************
