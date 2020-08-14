@@ -97,7 +97,7 @@ static void task_stats( cJSON* top ) {
 		cJSON_AddNumberToObject(t,"bprio",current.tasks[i].uxBasePriority);
 		cJSON_AddNumberToObject(t,"cprio",current.tasks[i].uxCurrentPriority);
 		cJSON_AddStringToObject(t,"nme",current.tasks[i].pcTaskName);
-		cJSON_AddStringToObject(t,"st",current.tasks[i].eCurrentState);
+		cJSON_AddNumberToObject(t,"st",current.tasks[i].eCurrentState);
 		cJSON_AddNumberToObject(t,"num",current.tasks[i].xTaskNumber);
 		cJSON_AddItemToArray(tlist,t);
 		if (i % 3 == 2 || i == current.n - 1) {

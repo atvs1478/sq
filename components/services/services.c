@@ -83,7 +83,7 @@ void services_init(void) {
 		i2c_system_port = -1;
 		ESP_LOGW(TAG, "no I2C configured");
 	}	
-		
+
 	const spi_bus_config_t * spi_config = config_spi_get((spi_host_device_t*) &spi_system_host);
 	ESP_LOGI(TAG,"Configuring SPI data:%d clk:%d host:%u dc:%d", spi_config->mosi_io_num, spi_config->sclk_io_num, spi_system_host, spi_system_dc_gpio);
 	
@@ -99,7 +99,7 @@ void services_init(void) {
 		spi_system_host = -1;
 		ESP_LOGW(TAG, "no SPI configured");
 	}	
-	
+
 	// system-wide PWM timer configuration
 	ledc_timer_config_t pwm_timer = {
 		.duty_resolution = LEDC_TIMER_13_BIT, 
