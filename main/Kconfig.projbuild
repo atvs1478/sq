@@ -97,17 +97,17 @@ menu "Squeezelite-ESP32"
 						I2S dma channel to use.  
 				config I2S_BCK_IO         
 					int "I2S Bit clock GPIO number. "
-					default 33 
+					default -1 
 					help
 						I2S Bit Clock gpio pin to use.  
 				config I2S_WS_IO         
 					int "I2S Word Select GPIO number. "
-					default 25 
+					default -1 
 					help
 						I2S Word Select gpio pin to use.
 				config I2S_DO_IO         
 					int "I2S Data Output GPIO number. "
-					default 32
+					default -1
 					help
 						I2S data output gpio pin to use.
 				config I2S_DI_IO         
