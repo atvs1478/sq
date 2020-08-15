@@ -206,7 +206,7 @@ void sendMessaging(messaging_types type,const char * fmt, ...){
     char * json_msg = cJSON_PrintUnformatted(msg);
 	messaging_post_message(type, MESSAGING_CLASS_OTA, json_msg);
 	free(json_msg);
-	cJSON_free(msg);
+	cJSON_Delete(msg);
     _printMemStats();
 }
 
