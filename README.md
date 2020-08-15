@@ -86,6 +86,7 @@ The parameter "dac_controlset" allows definition of simple commands to be sent o
 ```
 This is standard JSON notation, so if you are not familiar with it, Google is your best friend. Be aware that the '...' means you can have as many entries as you want, it's not part of the syntax. Every section is optional, but it does not make sense to set i2c in the 'dac_config' parameter and not setting anything here. The parameter 'mode' allows to *or* the register with the value or to *and* it. Don't set 'mode' if you simply want to write. **Note that all values must be decimal**
 
+NB: For well-known configuration, this is ignored
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
 
@@ -97,6 +98,7 @@ Leave it blank to disable SPDIF usage, you can also define them at compile time 
 ```
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
+NB: For well-known configuration, this is ignored
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
@@ -156,12 +158,13 @@ Syntax is:
 ```
 <gpio>=Vcc|GND|amp[:1|0]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
-You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for SqueezeAMP where these are forced at runtime.
+You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for well-known configurations where these are forced at runtime.
 ### LED 
 See §**set_GPIO** for how to set the green and red LEDs. In addition, their brightness can be controlled using the "led_brigthness" parameter. The syntax is
 ```
 [green=0..100][,red=0..100]
 ```
+NB: For well-known configuration, this is ignored
 ### Rotary Encoder
 One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software. 
 
@@ -278,9 +281,9 @@ There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctr
 ### Battery / ADC
 The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
 ```
-channel=0..7,scale=<scale>
+channel=0..7,scale=<scale>,cells=<2|3>
 ```
-NB: Set parameter to empty to disable battery reading
+NB: Set parameter to empty to disable battery reading. For well-known configuration, this is ignored (except for SqueezeAMP where number of cells is required)
 ## Setting up ESP-IDF
 ### Docker
 You can use docker to build squeezelite-esp32  
