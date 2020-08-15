@@ -481,7 +481,7 @@ esp_err_t console_cmd_get_handler(httpd_req_t *req){
 		ESP_LOGD_LOC(TAG,  "Error retrieving command json string. ");
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Unable to format command");
 	}
-	cJSON_free(cmdlist);
+	cJSON_Delete(cmdlist);
 	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
 	return err;
 }
@@ -1139,7 +1139,7 @@ esp_err_t messages_get_handler(httpd_req_t *req){
 		CHECK_RESET_FREE_MEM_CHECK(before, "after http send");
 		free(json_text);
 		CHECK_RESET_FREE_MEM_CHECK(before, "after free json message");
-		cJSON_free(json_messages);
+		cJSON_Delete(json_messages);
 		CHECK_RESET_FREE_MEM_CHECK(before, "after free json");
 	}
 	else {

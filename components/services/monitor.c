@@ -134,8 +134,7 @@ static void monitor_callback(TimerHandle_t xTimer) {
 		messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_STATS,top_a);
 		FREE_AND_NULL(top_a);
 	}
-	cJSON_free(top);
-
+	cJSON_Delete(top);
 }
 
 /****************************************************************************************
