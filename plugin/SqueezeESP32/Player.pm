@@ -9,17 +9,83 @@ use List::Util qw(min);
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
+my $sprefs = preferences('server');
 my $prefs = preferences('plugin.squeezeesp32');
 my $log   = logger('plugin.squeezeesp32');
 
+our $defaultPrefs = {
+	'analogOutMode'        => 0,
+	'bass'                 => 0,
+	'treble'               => 0,
+	'lineInAlwaysOn'       => 0, 
+	'lineInLevel'          => 50, 
+	'menuItem'             => [qw(
+		NOW_PLAYING
+		BROWSE_MUSIC
+		RADIO
+		PLUGIN_MY_APPS_MODULE_NAME
+		PLUGIN_APP_GALLERY_MODULE_NAME
+		FAVORITES
+		GLOBAL_SEARCH
+		PLUGIN_LINE_IN
+		PLUGINS
+		SETTINGS
+		SQUEEZENETWORK_CONNECT
+	)],
+};
+
+my $handlersAdded;
+
 sub model { 'squeezeesp32' }
 sub modelName { 'SqueezeESP32' }
-sub hasIR { 0 }
+
+sub hasScrolling { 1 }
+sub hasIR { 1 }
+# TODO: add in settings when ready
+sub hasLineIn { 0 }
+sub hasHeadSubOut { 1 }
+# TODO: LMS sliders are hard-coded in html file from -23 to +23 
+sub maxTreble {	20 }
+sub minTreble {	-13 }
+sub maxBass { 20 }
+sub minBass { -13 }
 
 sub init {
 	my $client = shift;
+	
+	if (!$handlersAdded) {
+
+		# Add a handler for line-in/out status changes
+		Slim::Networking::Slimproto::addHandler( LIOS => \&lineInOutStatus );
+	
+		# Create a new event for sending LIOS updates
+		Slim::Control::Request::addDispatch(
+			['lios', '_state'],
+			[1, 0, 0, undef],
+		   );
+		
+		Slim::Control::Request::addDispatch(
+			['lios', 'linein', '_state'],
+			[1, 0, 0, undef],
+		   );
+		
+		Slim::Control::Request::addDispatch(
+			['lios', 'lineout', '_state'],
+			[1, 0, 0, undef],
+		   );
+		
+		$handlersAdded = 1;
+
+	}
+	
 	$client->SUPER::init(@_);
-	$client->config_artwork();
+	$client->config_artwork;
+}
+
+sub initPrefs {
+	my $client = shift;
+	$sprefs->client($client)->init($defaultPrefs);
+	$client->SUPER::initPrefs;
 }
 
 # Allow the player to define it's display width (and probably more)
@@ -50,12 +116,26 @@ sub playerSettingsFrame {
 	$client->SUPER::playerSettingsFrame($data_ref);
 }
 
-sub hasScrolling {
-	return 1;
+sub bass {
+	return tone(2, @_);
+}	
+
+sub treble {
+	return tone(8, @_);
 }
 
-sub hasIR { 
-	return 1; 
+sub tone {
+	my ($center, $client, $value) = @_;
+	my $equalizer = $prefs->get('equalizer');
+	
+	if (defined($value)) {
+		$equalizer->[$center-1] = int($value * 0.2 + 0.5);
+		$equalizer->[$center] = int($value * 0.7 + 0.5);
+		$equalizer->[$center+1] = int($value * 0.1 + 0.5);
+		$prefs->client($client)->set('equalizer', $equalizer);
+	}
+
+	return int($equalizer->[$center-1] * 0.2 + $equalizer->[$center] * 0.7 + $equalizer->[$center+1] * 0.1);
 }
 
 sub update_artwork {
@@ -129,6 +209,63 @@ sub reconnect {
 	my $client = shift;
 	$client->pluginData('artwork_md5', '');
 	$client->SUPER::reconnect(@_);
+}
+
+# Change the analog output mode between headphone and sub-woofer
+# If no mode is specified, the value of the client's analogOutMode preference is used.
+# Otherwise the mode is temporarily changed to the given value without altering the preference.
+sub setAnalogOutMode {
+	my $client = shift;
+	# 0 = headphone (internal speakers off), 1 = sub out,
+	# 2 = always on (internal speakers on), 3 = always off
+	my $mode = shift;
+
+	if (! defined $mode) {
+		$mode = $sprefs->client($client)->get('analogOutMode');
+	}
+
+	my $data = pack('C', $mode);
+	$client->sendFrame('audo', \$data);
+}
+
+# LINE_IN 	0x01
+# LINE_OUT	0x02
+# HEADPHONE	0x04
+
+sub lineInConnected {
+	my $state = Slim::Networking::Slimproto::voltage(shift) || return 0;
+	return $state & 0x01 || 0;
+}
+
+sub lineOutConnected {
+	my $state = Slim::Networking::Slimproto::voltage(shift) || return 0;
+	return $state & 0x02 || 0;
+}
+
+sub lineInOutStatus {
+	my ( $client, $data_ref ) = @_;
+	
+	my $state = unpack 'n', $$data_ref;
+
+	my $oldState = {
+		in  => $client->lineInConnected(),
+		out => $client->lineOutConnected(),
+	};
+	
+	Slim::Networking::Slimproto::voltage( $client, $state );
+
+	Slim::Control::Request::notifyFromArray( $client, [ 'lios', $state ] );
+	
+	if ($oldState->{in} != $client->lineInConnected()) {
+		Slim::Control::Request::notifyFromArray( $client, [ 'lios', 'linein', $client->lineInConnected() ] );
+		if ( Slim::Utils::PluginManager->isEnabled('Slim::Plugin::LineIn::Plugin')) {
+			Slim::Plugin::LineIn::Plugin::lineInItem($client, 1);
+		}
+	}
+
+	if ($oldState->{out} != $client->lineOutConnected()) {
+		Slim::Control::Request::notifyFromArray( $client, [ 'lios', 'lineout', $client->lineOutConnected() ] );
+	}
 }
 
 1;
