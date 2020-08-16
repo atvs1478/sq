@@ -284,9 +284,60 @@ The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC 
 channel=0..7,scale=<scale>,cells=<2|3>
 ```
 NB: Set parameter to empty to disable battery reading. For well-known configuration, this is ignored (except for SqueezeAMP where number of cells is required)
+# Configuration
+## 1/ setup WiFi
+- Boot the esp, look for a new wifi access point showing up and connect to it. Default build ssid and passwords are "squeezelite"/"squeezelite". 
+- Once connected, navigate to 192.168.4.1 
+- Wait for the list of access points visible from the device to populate in the web page.
+- Choose an access point and enter any credential as needed
+- Once connection is established, note down the address the device received; this is the address you will use to configure it going forward 
+
+## 2/ setup squeezelite command line (optional)
+
+At this point, the device should have disabled its built-in access point and should be connected to a known WiFi network.
+- navigate to the address that was noted in step #1
+- Using the list of predefined options, choose the mode in which you want squeezelite to start
+- Generate the command
+- Add or change any additional command line option (for example player name, etc)
+- Activate squeezelite execution: this tells the device to automatiaclly run the command at start
+- Update the configuration
+- click on the "start toggle" button. This will force a reboot. 
+- The toggle switch should be set to 'ON' to ensure that squeezelite is active after booting (you might have to fiddle with it a few times)
+- You can enable accessto  NVS parameters under 'credits'
+
+## 3/ Updating Squeezelite
+- From the firmware tab, click on "Check for Updates"
+- Look for updated binaries
+- Select a line
+- Click on "Flash!"
+- The system will reboot into recovery mode (if not already in that mode), wipe the squeezelite partition and download/flash the selected version 
+- You can choose a local file or have a local webserver
+
+## 4/ Recovery
+- From the firmware tab, click on the "Recovery" button. This will reboot the ESP32 into recovery, where additional configuration options are available from the NVS editor
+
+# Additional command line notes, configured from the http configuration
+The squeezelite options are very similar to the regular Linux ones. Differences are :
+
+	- the output is -o ["BT -n '<sinkname>' "] | [I2S]
+	- if you've compiled with RESAMPLE option, normal soxr options are available using -R [-u <options>]. Note that anything above LQ or MQ will overload the CPU
+	- if you've used RESAMPLE16, <options> are (b|l|m)[:i], with b = basic linear interpolation, l = 13 taps, m = 21 taps, i = interpolate filter coefficients
+
+For example, so use a BT speaker named MySpeaker, accept audio up to 192kHz and resample everything to 44100 and use 16 bits resample with medium quality, the command line is:
+	
+	squeezelite -o "BT -n 'BT <sinkname>'" -b 500:2000 -R -u m -Z 192000 -r "44100-44100"
+
+See squeezlite command line, but keys options are
+
+	- Z <rate> : tell LMS what is the max sample rate supported before LMS resamples
+	- R (see above)
+	- r "<minrate>-<maxrate>"
+	- C <sec> : set timeout to switch off amp gpio
+	- W : activate WAV and AIFF header parsing
+# Building everything yourself
 ## Setting up ESP-IDF
 ### Docker
-You can use docker to build squeezelite-esp32  
+You can use docker to build squeezelite-esp32 (optional) 
 First you need to build the Docker container:
 ```
 docker build -t esp-idf .
@@ -304,9 +355,11 @@ If you want to use a more recent version of gcc and IDF (4.0 stable), move to cm
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
 And then copying the i2s.c patch file from this repo over to the esp-idf folder
-You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
+You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264. As of this writing (08.2020), espressif has patched esp-dsp so this is no more needed
 
 ## Building Squeezelite-esp32
+Don't forget the to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)
+### old make way
 MOST IMPORTANT: create the right default config file
 - make defconfig
 (Note: You can also copy over config files from the build-scripts folder to ./sdkconfig)
@@ -337,55 +390,12 @@ You can also manually download the recovery & initial boot
 ```
 python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port ${ESPPORT} --baud ${ESPBAUD} --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0xd000 ./build/ota_data_initial.bin 0x1000 ./build/bootloader/bootloader.bin 0x10000 ./build/recovery.bin 0x8000 ./build/partitions.bin
 ```
- 
-# Configuration
-1/ setup WiFi
-- Boot the esp, look for a new wifi access point showing up and connect to it. Default build ssid and passwords are "squeezelite"/"squeezelite". 
-- Once connected, navigate to 192.168.4.1 
-- Wait for the list of access points visible from the device to populate in the web page.
-- Choose an access point and enter any credential as needed
-- Once connection is established, note down the address the device received; this is the address you will use to configure it going forward 
-
-2/ setup squeezelite command line (optional)
-
-At this point, the device should have disabled its built-in access point and should be connected to a known WiFi network.
-- navigate to the address that was noted in step #1
-- Using the list of predefined options, hoose the mode in which you want squeezelite to start
-- Generate the command
-- Add or change any additional command line option (for example player name, etc)
-- Activate squeezelite execution: this tells the device to automatiaclly run the command at start
-- Update the configuration
-- click on the "start toggle" button. This will force a reboot. 
-- The toggle switch should be set to 'ON' to ensure that squeezelite is active after booting
-
-3/ Updating Squeezelite
-- From the firmware tab, click on "Check for Updates"
-- Look for updated binaries
-- Select a line
-- Click on "Flash!"
-- The system will reboot into recovery mode (if not already in that mode), wipe the squeezelite partition and download/flash the selected version 
-
-3/ Recovery
-- From the firmware tab, click on the "Recovery" button. This will reboot the ESP32 into recovery, where additional configuration options are available from the NVS editor
-
-# Additional command line notes, configured from the http configuration
-The squeezelite options are very similar to the regular Linux ones. Differences are :
-
-	- the output is -o ["BT -n '<sinkname>' "] | [I2S]
-	- if you've compiled with RESAMPLE option, normal soxr options are available using -R [-u <options>]. Note that anything above LQ or MQ will overload the CPU
-	- if you've used RESAMPLE16, <options> are (b|l|m)[:i], with b = basic linear interpolation, l = 13 taps, m = 21 taps, i = interpolate filter coefficients
-
-For example, so use a BT speaker named MySpeaker, accept audio up to 192kHz and resample everything to 44100 and use 16 bits resample with medium quality, the command line is:
-	
-	squeezelite -o "BT -n 'BT <sinkname>'" -b 500:2000 -R -u m -Z 192000 -r "44100-44100"
-
-See squeezlite command line, but keys options are
-
-	- Z <rate> : tell LMS what is the max sample rate supported before LMS resamples
-	- R (see above)
-	- r "<minrate>-<maxrate>"
-
-## Additional misc notes to do you build
+### Using cmake
+Create you config using 'idf.py menuconfig' then build binaries using 'idf.py all'. It will build the recovery and the application (squeezelite) itself. See the recommended command to upload everything. Otherwise, if you just want to download squeezelite, do
+```
+python.exe <idf_path>\components\esptool_py\esptool\esptool.py -p COM<n> -b 921600 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build\squeezelite.bin
+```
+## Additional misc notes to do you build (kitchen sink)
 - as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
 - for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
@@ -396,16 +406,14 @@ See squeezlite command line, but keys options are
 			#pragma GCC push_options
 			#pragma GCC optimize ("O0")
 			#pragma GCC pop_options
+- better use helixaac						
 - opus & opusfile
 	- for opus, the ESP-provided library seems to work, but opusfile is still needed
 	- per mad & few others, edit configure and change $ac_link to add -c (faking link)
 	- change ac_files to remove ''
 	- add DEPS_CFLAGS and DEPS_LIBS to avoid pkg-config to be required
 	- stack consumption can be very high with some codec variants, so set NONTHREADSAFE_PSEUDOSTACK and GLOBAL_STACK_SIZE=32000 and unset VAR_ARRAYS in config.h
-- better use helixaac			
 - set IDF_PATH=/home/esp-idf
-- set ESPPORT=COM9
-- update flash partition size
 - other compiler #define
 	- use no resampling or set RESAMPLE (soxr) or set RESAMPLE16 for fast fixed 16 bits resampling
 	- use LOOPBACK (mandatory)
@@ -413,10 +421,8 @@ See squeezlite command line, but keys options are
 	- LINKALL (mandatory)
 	- NO_FAAD unless you want to us faad, which currently overloads the CPU
 	- TREMOR_ONLY (mandatory)
+- better use helixaac			
 - When initially cloning the repo, make sure you do it recursively. For example: 
 	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
 - If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
 	-  git submodule update --init --recursive
-
-
-
