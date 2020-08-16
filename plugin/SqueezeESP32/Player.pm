@@ -13,6 +13,19 @@ my $sprefs = preferences('server');
 my $prefs = preferences('plugin.squeezeesp32');
 my $log   = logger('plugin.squeezeesp32');
 
+{
+	__PACKAGE__->mk_accessor('rw', 'tone_update');
+}
+
+sub new {
+	my $class = shift;
+	my $client = $class->SUPER::new(@_);
+	$client->init_accessor(
+		tone_update				=> 0,
+	);
+	return $client;
+}
+
 our $defaultPrefs = {
 	'analogOutMode'        => 0,
 	'bass'                 => 0,
@@ -54,6 +67,9 @@ sub init {
 	my $client = shift;
 	
 	if (!$handlersAdded) {
+	
+		$sprefs->setChange( \&change_tone, 'bass');
+		$sprefs->setChange( \&change_tone, 'treble');
 
 		# Add a handler for line-in/out status changes
 		Slim::Networking::Slimproto::addHandler( LIOS => \&lineInOutStatus );
@@ -116,26 +132,48 @@ sub playerSettingsFrame {
 	$client->SUPER::playerSettingsFrame($data_ref);
 }
 
-sub bass {
-	return tone(2, @_);
-}	
+sub change_tone {
+	my ($type, $new, $client, $old) = @_;
+	return $client->$type($new) unless $client->isa('Plugins::SqueezeESP32::Player') && !$client->tone_update;
 
-sub treble {
-	return tone(8, @_);
+	my ($c, $minValue, $maxValue);
+	my $equalizer = $prefs->client($client)->get('equalizer');	
+	
+	if ($type eq 'bass') {
+		$c = 2;
+		$minValue = minBass;
+		$maxValue = maxBass;
+	} else {
+		$c = 8;
+		$minValue = minTreble;
+		$maxValue = maxTreble;
+	}		
+
+	$new = $minValue if $new < $minValue;
+	$new = $minValue if $new < $minValue;
+	
+	if ($old - $minValue) {
+		my $ratio = ($new - $minValue) / ($old - $minValue) - 1;
+		$equalizer->[$c-1] = min(int(($equalizer->[$c-1] - $minValue) * (1 + 0.2 * $ratio) + 0.5 + $minValue), $maxValue);
+		$equalizer->[$c] = min(int(($equalizer->[$c] - $minValue) * (1 + 0.7 * $ratio) + 0.5 + $minValue), $maxValue);
+		$equalizer->[$c+1] = min(int(($equalizer->[$c+1] - $minValue) * (1 + 0.1 * $ratio) + 0.5 + $minValue), $maxValue);
+	} else {
+		$equalizer->[$c-1] = int($new * 0.2 + 0.5);
+		$equalizer->[$c] = int($new * 0.7 + 0.5);
+		$equalizer->[$c+1] = int($new * 0.1 + 0.5);
+	}		
+
+	$prefs->client($client)->set('equalizer', $equalizer);
+	$sprefs->client($client)->set($type, $new);
 }
 
-sub tone {
-	my ($center, $client, $value) = @_;
-	my $equalizer = $prefs->client($client)->get('equalizer');
-	
-	if (defined($value)) {
-		$equalizer->[$center-1] = int($value * 0.2 + 0.5);
-		$equalizer->[$center] = int($value * 0.7 + 0.5);
-		$equalizer->[$center+1] = int($value * 0.1 + 0.5);
-		$prefs->client($client)->set('equalizer', $equalizer);
-	}
+sub update_tones {
+	my ($client, $equalizer) = @_;
 
-	return int($equalizer->[$center-1] * 0.2 + $equalizer->[$center] * 0.7 + $equalizer->[$center+1] * 0.1);
+	$client->tone_update(1);
+	$sprefs->client($client)->set('bass', int($equalizer->[1]*0.2 + $equalizer->[2]*0.7 + $equalizer->[3]*0.1 + 0.5));
+	$sprefs->client($client)->set('treble', int($equalizer->[7]*0.2 + $equalizer->[8]*0.7 + $equalizer->[9]*0.1 + 0.5));
+	$client->tone_update(0);	
 }
 
 sub update_artwork {

@@ -73,6 +73,7 @@ sub handler {
 			$equalizer->[$i] = $paramRef->{"pref_equalizer.$i"} || 0;
 		}
 		$cprefs->set('equalizer', $equalizer);
+		$client->update_tones($equalizer);
 	}
 
 	if ($client->displayWidth) {
