@@ -126,7 +126,7 @@ sub treble {
 
 sub tone {
 	my ($center, $client, $value) = @_;
-	my $equalizer = $prefs->get('equalizer');
+	my $equalizer = $prefs->client($client)->get('equalizer');
 	
 	if (defined($value)) {
 		$equalizer->[$center-1] = int($value * 0.2 + 0.5);
