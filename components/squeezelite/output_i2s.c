@@ -31,6 +31,7 @@ sure that using rate_delay would fix that
 */
 
 #include "squeezelite.h"
+#include "slimproto.h"
 #include "esp_pthread.h"
 #include "driver/i2s.h"
 #include "driver/i2c.h"
@@ -82,6 +83,7 @@ const struct adac_s *adac = &dac_external;
 
 static log_level loglevel;
 
+static bool (*slimp_handler_chain)(u8_t *data, int len);
 static bool jack_mutes_amp;
 static bool running, isI2SStarted;
 static i2s_config_t i2s_config;
@@ -107,6 +109,36 @@ static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *cou
 static void (*jack_handler_chain)(bool inserted);
 
 #define I2C_PORT	0
+
+/****************************************************************************************
+ * AUDO packet handler
+ */
+static bool handler(u8_t *data, int len){
+	bool res = true;
+	
+	if (!strncmp((char*) data, "audo", 4)) {
+		struct audo_packet *pkt = (struct audo_packet*) data;
+		// 0 = headphone (internal speakers off), 1 = sub out,
+		// 2 = always on (internal speakers on), 3 = always off	
+
+		if (jack_mutes_amp != (pkt->config == 0)) {
+			jack_mutes_amp = pkt->config == 0;
+			config_set_value(NVS_TYPE_STR, "jack_mutes_amp", jack_mutes_amp ? "y" : "n");		
+			
+			if (jack_mutes_amp && jack_inserted_svc()) adac->speaker(false);
+			else adac->speaker(true);
+		}
+
+		LOG_INFO("got AUDO %02x", pkt->config);
+	} else {
+		res = false;
+	}
+	
+	// chain protocol handlers (bitwise or is fine)
+	if (*slimp_handler_chain) res |= (*slimp_handler_chain)(data, len);
+	
+	return res;
+}
 
 /****************************************************************************************
  * jack insertion handler
@@ -164,6 +196,10 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	int silent_do = -1;
 	char *p;
 	esp_err_t res;
+
+	// chain SLIMP handlers
+	slimp_handler_chain = slimp_handler;
+	slimp_handler = handler;	
 	
 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	jack_mutes_amp = (strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0);

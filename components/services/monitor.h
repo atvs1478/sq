@@ -17,4 +17,5 @@ extern void (*spkfault_handler_svc)(bool inserted);
 extern bool spkfault_svc(void);
 
 extern int battery_value_svc(void);
+extern uint8_t battery_level_svc(void);
 

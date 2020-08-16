@@ -14,6 +14,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "monitor.h"
 
 mutex_type slimp_mutex;
 
@@ -60,3 +61,11 @@ u16_t get_RSSI(void) {
     if (wifidata.primary != 0) return 100 + wifidata.rssi + 30;
     else return 0xffff;
 }	
+
+u16_t get_plugged(void) {
+    return jack_inserted_svc() ? PLUG_HEADPHONE : 0;
+}
+
+u8_t get_battery(void) {
+	return (battery_level_svc() * 16) / 100;
+}	 
