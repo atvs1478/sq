@@ -33,15 +33,27 @@ static struct {
 	int channel;
 	float sum, avg, scale;
 	int count;
+	int cells;
 	TimerHandle_t timer;
-} battery;
+} battery = {
+	.channel = CONFIG_BAT_CHANNEL,
+	.cells = 2,
+};	
 
 /****************************************************************************************
  * 
  */
 int battery_value_svc(void) {
-	 return battery.avg;
+	return battery.avg;
  }
+ 
+/****************************************************************************************
+ * 
+ */
+uint8_t battery_level_svc(void) {
+	// TODO: this is totally incorrect
+	return battery.avg ? (battery.avg - (3.0 * battery.cells)) / ((4.2 - 3.0) * battery.cells) * 100 : 0;
+}
 
 /****************************************************************************************
  * 
@@ -59,29 +71,30 @@ static void battery_callback(TimerHandle_t xTimer) {
  * 
  */
 void battery_svc_init(void) {
-	battery.channel = CONFIG_BAT_CHANNEL;
 #ifdef CONFIG_BAT_SCALE	
 	battery.scale = atof(CONFIG_BAT_SCALE);
 #endif	
 
-#ifndef CONFIG_BAT_LOCKED
 	char *nvs_item = config_alloc_get_default(NVS_TYPE_STR, "bat_config", "n", 0);
 	if (nvs_item) {
-		char *p;
+		char *p;		
+#ifndef CONFIG_BAT_LOCKED		
 		if ((p = strcasestr(nvs_item, "channel")) != NULL) battery.channel = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "scale")) != NULL) battery.scale = atof(strchr(p, '=') + 1);
+#endif		
+		if ((p = strcasestr(nvs_item, "cells")) != NULL) battery.cells = atof(strchr(p, '=') + 1);		
 		free(nvs_item);
 	}	
-#endif	
 
 	if (battery.channel != -1) {
-		ESP_LOGI(TAG, "Battery measure channel: %u, scale %f", battery.channel, battery.scale);
-	
 		adc1_config_width(ADC_WIDTH_BIT_12);
 		adc1_config_channel_atten(battery.channel, ADC_ATTEN_DB_0);
-    
+
+		battery.avg = adc1_get_raw(battery.channel) * battery.scale / 4095.0;    
 		battery.timer = xTimerCreate("battery", BATTERY_TIMER / portTICK_RATE_MS, pdTRUE, NULL, battery_callback);
 		xTimerStart(battery.timer, portMAX_DELAY);
+		
+		ESP_LOGI(TAG, "Battery measure channel: %u, scale %f, cells %u, avg %.2fV", battery.channel, battery.scale, battery.cells, battery.avg);		
 	} else {
 		ESP_LOGI(TAG, "No battery");
 	}	

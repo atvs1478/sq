@@ -66,8 +66,13 @@ extern mutex_type slimp_mutex;
 #define LOCK_P   mutex_lock(slimp_mutex)
 #define UNLOCK_P mutex_unlock(slimp_mutex)
 
-// must provide or define as 0xffff
-u16_t		get_RSSI(void);
+// bitmap of plugs status
+#define PLUG_LINE_IN 	0x01
+#define PLUG_LINE_OUT	0x02
+#define PLUG_HEADPHONE	0x04
+u16_t	get_RSSI(void);			// must provide or define as 0xffff
+u16_t	get_plugged(void);		// must provide or define as 0x0
+u8_t	get_battery(void);		// must provide 0..15 or define as 0x0
 
 // to be defined to nothing if you don't want to support these
 extern struct visu_export_s {

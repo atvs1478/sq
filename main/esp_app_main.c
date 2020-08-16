@@ -287,8 +287,6 @@ void register_default_nvs(){
 	config_set_default(NVS_TYPE_STR, "a2dp_ctrld", STR(CONFIG_A2DP_CONTROL_DELAY_MS), 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONTROL_DELAY_MS));
 
-
-
 	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", SQUEEZELITE_ESP32_RELEASE_URL);
 	config_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
@@ -360,6 +358,9 @@ void register_default_nvs(){
 	//todo: add dac_config for known targets
 	ESP_LOGD(TAG,"Registering default value for key %s", "dac_controlset");
 	config_set_default(NVS_TYPE_STR, "dac_controlset", "", 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s", "jack_mutes_amp");
+	config_set_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
 	
 	ESP_LOGD(TAG,"Registering default value for key %s", "bat_config");
 	config_set_default(NVS_TYPE_STR, "bat_config", "", 0);
