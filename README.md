@@ -285,14 +285,14 @@ channel=0..7,scale=<scale>,cells=<2|3>
 ```
 NB: Set parameter to empty to disable battery reading. For well-known configuration, this is ignored (except for SqueezeAMP where number of cells is required)
 # Configuration
-## 1/ setup WiFi
+## Setup WiFi
 - Boot the esp, look for a new wifi access point showing up and connect to it. Default build ssid and passwords are "squeezelite"/"squeezelite". 
 - Once connected, navigate to 192.168.4.1 
 - Wait for the list of access points visible from the device to populate in the web page.
 - Choose an access point and enter any credential as needed
 - Once connection is established, note down the address the device received; this is the address you will use to configure it going forward 
 
-## 2/ setup squeezelite command line (optional)
+## Setup squeezelite command line (optional)
 
 At this point, the device should have disabled its built-in access point and should be connected to a known WiFi network.
 - navigate to the address that was noted in step #1
@@ -305,7 +305,11 @@ At this point, the device should have disabled its built-in access point and sho
 - The toggle switch should be set to 'ON' to ensure that squeezelite is active after booting (you might have to fiddle with it a few times)
 - You can enable accessto  NVS parameters under 'credits'
 
-## 3/ Updating Squeezelite
+## Monitor
+
+In addition of the esp-idf serial link monitor option, you can also enable a telnet server (see NVS parameters) where you'll have access to a ton of logs of what's happening inside the WROVER.
+
+## Update Squeezelite
 - From the firmware tab, click on "Check for Updates"
 - Look for updated binaries
 - Select a line
@@ -313,10 +317,10 @@ At this point, the device should have disabled its built-in access point and sho
 - The system will reboot into recovery mode (if not already in that mode), wipe the squeezelite partition and download/flash the selected version 
 - You can choose a local file or have a local webserver
 
-## 4/ Recovery
+## Recovery
 - From the firmware tab, click on the "Recovery" button. This will reboot the ESP32 into recovery, where additional configuration options are available from the NVS editor
 
-# Additional command line notes, configured from the http configuration
+### Additional command line notes, configured from the http configuration
 The squeezelite options are very similar to the regular Linux ones. Differences are :
 
 	- the output is -o ["BT -n '<sinkname>' "] | [I2S]
@@ -359,7 +363,7 @@ You also need to use esp-dsp recent version or at least make sure you have this 
 
 ## Building Squeezelite-esp32
 Don't forget the to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)
-### old make way
+### Usng make (deprecated)
 MOST IMPORTANT: create the right default config file
 - make defconfig
 (Note: You can also copy over config files from the build-scripts folder to ./sdkconfig)
@@ -395,6 +399,7 @@ Create you config using 'idf.py menuconfig' then build binaries using 'idf.py al
 ```
 python.exe <idf_path>\components\esptool_py\esptool\esptool.py -p COM<n> -b 921600 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build\squeezelite.bin
 ```
+Use 'idf monitor' to monitor the application (see esp-idf documentation)
 ## Additional misc notes to do you build (kitchen sink)
 - as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
 - for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
