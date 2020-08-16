@@ -320,7 +320,7 @@ In addition of the esp-idf serial link monitor option, you can also enable a tel
 ## Recovery
 - From the firmware tab, click on the "Recovery" button. This will reboot the ESP32 into recovery, where additional configuration options are available from the NVS editor
 
-### Additional command line notes, configured from the http configuration
+## Additional configuration notes (from the Web UI)
 The squeezelite options are very similar to the regular Linux ones. Differences are :
 
 	- the output is -o ["BT -n '<sinkname>' "] | [I2S]
