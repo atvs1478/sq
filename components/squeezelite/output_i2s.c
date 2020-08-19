@@ -228,7 +228,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	char *dac_config = config_alloc_get_str("dac_config", CONFIG_DAC_CONFIG, "model=i2s,bck=" STR(CONFIG_I2S_BCK_IO) 
 											",ws=" STR(CONFIG_I2S_WS_IO) ",do=" STR(CONFIG_I2S_DO_IO) 
 											",sda=" STR(CONFIG_I2C_SDA) ",scl=" STR(CONFIG_I2C_SCL)
-											",mute" STR(CONFIG_MUTE_GPIO));	
+											",mute=" STR(CONFIG_MUTE_GPIO));	
 
 	i2s_pin_config_t i2s_dac_pin, i2s_spdif_pin;											
 	set_i2s_pin(spdif_config, &i2s_spdif_pin);										
@@ -284,7 +284,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		char model[32] = "i2s";
 		if ((p = strcasestr(dac_config, "model")) != NULL) sscanf(p, "%*[^=]=%31[^,]", model);
 		if ((p = strcasestr(dac_config, "mute")) != NULL) {
-			char mute[8];
+			char mute[8] = "";
 			sscanf(p, "%*[^=]=%7[^,]", mute);
 			mute_control.gpio = atoi(mute);
 			if ((p = strchr(mute, ':')) != NULL) mute_control.active = atoi(p + 1);
@@ -292,7 +292,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 
 		for (int i = 0; adac == &dac_external && dac_set[i]; i++) if (strcasestr(dac_set[i]->model, model)) adac = dac_set[i];
 		res = adac->init(dac_config, I2C_PORT, &i2s_config) ? ESP_OK : ESP_FAIL;
-		
+
 		res |= i2s_driver_install(CONFIG_I2S_NUM, &i2s_config, 0, NULL);
 		res |= i2s_set_pin(CONFIG_I2S_NUM, &i2s_dac_pin);
 		

@@ -372,7 +372,6 @@ static int do_i2c_set_display(int argc, char **argv)
 	int result = 0;
 	char * name = NULL;
 	char * driver= NULL;
-	char * err_message=malloc(1);
 	char config_string[200]={};
 	bool bHasi2cConfig = false, bHasSpiConfig=false;
     int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&i2cdisp_args);
@@ -383,20 +382,19 @@ static int do_i2c_set_display(int argc, char **argv)
     char * nvs_item = config_alloc_get(NVS_TYPE_STR, "i2c_config");
 	if (nvs_item && strlen(nvs_item)>0) {
 		bHasi2cConfig=true;
-		FREE_AND_NULL(nvs_item);
 	}
+	FREE_AND_NULL(nvs_item);
 
 	nvs_item = config_alloc_get(NVS_TYPE_STR, "spi_config");
 	if (nvs_item && strlen(nvs_item)>0) {
 		bHasSpiConfig=true;
-		FREE_AND_NULL(nvs_item);
 	}
+	FREE_AND_NULL(nvs_item);
 
 		/* Check "--clear" option */
 	if (i2cdisp_args.clear->count) {
 		log_send_messaging(MESSAGING_WARNING,"Display config cleared");
 		config_set_value(NVS_TYPE_STR, "display_config", "");
-		FREE_AND_NULL(err_message);
 		return 0;
 	}
 	char *buf = NULL;
