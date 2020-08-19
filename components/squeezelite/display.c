@@ -585,7 +585,7 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		int scale = 8 - GDS_GetDepth(display);
 	
 		// use "fast" version as we are not beyond screen boundaries
-		if (rotate) {
+		if (visu.rotate) {
 			for (int r = 0; r < width; r++) {
 				for (int c = VU_HEIGHT; --c >= 0;) {
 					GDS_DrawPixelFast(display, c + x, r + y, *data++ >> scale);
@@ -600,7 +600,7 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 		}	
 	} else {
 		// use "fast" version as we are not beyond screen boundaries
-		if (rotate) {
+		if (visu.rotate) {
 			for (int r = 0; r < width; r++) {
 				for (int c = VU_HEIGHT; --c >= 0;) {
 					GDS_DrawPixelFast(display, c + x, r + y, grayMap[*data++]);
@@ -613,6 +613,7 @@ void draw_VU(struct GDS_Device * display, const uint8_t *data, int level, int x,
 				}	
 			}			
 		}	
+		
 	}	
 	
 	// need to manually set dirty flag as DrawPixel does not do it
@@ -965,13 +966,9 @@ static void visu_update(void) {
 			}
 		}
 	} else if (displayer.width / 2 >  3 * VU_WIDTH / 4) {
-		if (visu.rotate) {
-			draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, visu.height / 2, visu.rotate);
-			draw_VU(display, vu_bitmap, visu.bars[1].current, 0, visu.row + visu.height / 2, visu.height / 2, visu.rotate);
-		} else {
-			draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, visu.width / 2, visu.rotate);
-			draw_VU(display, vu_bitmap, visu.bars[1].current, visu.width / 2, visu.row, visu.width / 2, visu.rotate);
-		}
+		int width = visu.rotate ? visu.height : visu.width;
+		draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, width / 2, visu.rotate);
+		draw_VU(display, vu_bitmap, visu.bars[1].current, width / 2, visu.row, width / 2, visu.rotate);
 	} else {
 		int level = (visu.bars[0].current + visu.bars[1].current) / 2;
 		draw_VU(display, vu_bitmap, level, 0, visu.row, visu.rotate ? visu.height : visu.width, visu.rotate);		
