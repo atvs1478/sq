@@ -1,6 +1,6 @@
 idf_component_register(SRC_DIRS .
-						INCLUDE_DIRS . 
-						REQUIRES json tools platform_config display
+						INCLUDE_DIRS . ${IDF_PATH}/components/driver
+						REQUIRES json tools platform_config display 
 
 )
 
