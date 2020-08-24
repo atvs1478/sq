@@ -257,7 +257,6 @@ Follow the instructions from https://docs.espressif.com/projects/esp-idf/en/v4.0
 If you want to use a more recent version of gcc and IDF (4.0 stable), move to cmake-master branch</strong>
 
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
-And then copying the i2s.c patch file from this repo over to the esp-idf folder
 You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264
 >>>>>>> refs/remotes/origin/master
 
