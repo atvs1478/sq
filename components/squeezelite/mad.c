@@ -419,3 +419,4 @@ struct codec *register_mad(void) {
 	LOG_INFO("using mad to decode mp3");
 	return &ret;
 }
+
