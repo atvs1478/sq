@@ -426,7 +426,8 @@ Use 'idf monitor' to monitor the application (see esp-idf documentation)
 	- LINKALL (mandatory)
 	- NO_FAAD unless you want to us faad, which currently overloads the CPU
 	- TREMOR_ONLY (mandatory)
-- better use helixaac			
+- better use helixaac		
+- libmad has been patched to avoid using a lot of stack. There is an issue with sycn detection in 1.15.1b from where the original stack patch was done but since a few fixes have been made wrt sync detection. This 1.15.1b-10 found on debian fixes the issue where mad thinks it has reached sync but has not and so returns a wrong sample rate. It comes at the expense of 8KB (!) of code where a simple check in squeezelite/mad.c that next_frame[0] is 0xff and next_frame[1] & 0xf0 is 0xf0 does the trick ...
 - When initially cloning the repo, make sure you do it recursively. For example: 
 	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
 - If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
