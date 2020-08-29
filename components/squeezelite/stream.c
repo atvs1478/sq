@@ -43,8 +43,10 @@ static struct buffer buf;
 static mutex_type poll_mutex;
 struct buffer *streambuf = &buf;
 
-#define LOCK   mutex_lock(streambuf->mutex)
-#define UNLOCK mutex_unlock(streambuf->mutex)
+#define LOCK     mutex_lock(streambuf->mutex)
+#define UNLOCK   mutex_unlock(streambuf->mutex)
+#define LOCK_L   mutex_lock(poll_mutex)
+#define UNLOCK_L mutex_unlock(poll_mutex)
 
 static sockfd fd;
 
@@ -188,6 +190,7 @@ static void *stream_thread() {
 
 		} else {
 
+			LOCK_L;
 			pollinfo.fd = fd;
 			pollinfo.events = POLLIN;
 			if (stream.state == SEND_HEADERS) {
@@ -197,12 +200,9 @@ static void *stream_thread() {
 
 		UNLOCK;
 		
-		mutex_lock(poll_mutex);
-		int pending = _poll(ssl, &pollinfo, 100);
-		mutex_unlock(poll_mutex);
+		if (_poll(ssl, &pollinfo, 100)) {
 
-		if (pending) {
-			
+			UNLOCK_L;	
 			LOCK;
 
 			// check socket has not been closed while in poll
@@ -355,6 +355,7 @@ static void *stream_thread() {
 			UNLOCK;
 			
 		} else {
+			UNLOCK_L;
 			LOG_SDEBUG("poll timeout");
 		}
 	}
@@ -579,7 +580,6 @@ void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, un
 
 bool stream_disconnect(void) {
 	bool disc = false;
-	mutex_lock(poll_mutex);
 	LOCK;
 #if USE_SSL
 	if (ssl) {
@@ -588,13 +588,14 @@ bool stream_disconnect(void) {
 		ssl = NULL;
 	}
 #endif
+	LOCK_L;
 	if (fd != -1) {
 		closesocket(fd);
 		fd = -1;
 		disc = true;
 	}
+	UNLOCK_L,
 	stream.state = STOPPED;
 	UNLOCK;
-	mutex_unlock(poll_mutex);
 	return disc;
 }
