@@ -40,6 +40,7 @@
 static log_level loglevel;
 
 static struct buffer buf;
+static mutex_type poll_mutex;
 struct buffer *streambuf = &buf;
 
 #define LOCK   mutex_lock(streambuf->mutex)
@@ -195,9 +196,13 @@ static void *stream_thread() {
 		}
 
 		UNLOCK;
+		
+		mutex_lock(poll_mutex);
+		int pending = _poll(ssl, &pollinfo, 100);
+		mutex_unlock(poll_mutex);
 
-		if (_poll(ssl, &pollinfo, 100)) {
-
+		if (pending) {
+			
 			LOCK;
 
 			// check socket has not been closed while in poll
@@ -350,7 +355,6 @@ static void *stream_thread() {
 			UNLOCK;
 			
 		} else {
-			
 			LOG_SDEBUG("poll timeout");
 		}
 	}
@@ -403,6 +407,7 @@ void stream_init(log_level level, unsigned stream_buf_size) {
 	*stream.header = '\0';
 
 	fd = -1;
+	mutex_create_p(poll_mutex);
 
 #if LINUX || FREEBSD
 	touch_memory(streambuf->buf, streambuf->size);
@@ -432,6 +437,7 @@ void stream_close(void) {
 #endif
 	free(stream.header);
 	buf_destroy(streambuf);
+	mutex_destroy(poll_mutex);
 }
 
 void stream_file(const char *header, size_t header_len, unsigned threshold) {
@@ -573,6 +579,7 @@ void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, un
 
 bool stream_disconnect(void) {
 	bool disc = false;
+	mutex_lock(poll_mutex);
 	LOCK;
 #if USE_SSL
 	if (ssl) {
@@ -588,5 +595,6 @@ bool stream_disconnect(void) {
 	}
 	stream.state = STOPPED;
 	UNLOCK;
+	mutex_unlock(poll_mutex);
 	return disc;
 }
