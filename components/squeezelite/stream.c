@@ -199,7 +199,6 @@ static void *stream_thread() {
 
 		} else {
 
-			polling = true;
 			pollinfo.fd = fd;
 			pollinfo.events = POLLIN;
 			if (stream.state == SEND_HEADERS) {
@@ -208,6 +207,8 @@ static void *stream_thread() {
 		}
 
 		UNLOCK;
+		// no mutex needed - we just want to know if we are inside poll()
+		polling = true;
 		
 		if (_poll(ssl, &pollinfo, 100)) {
 
@@ -364,7 +365,6 @@ static void *stream_thread() {
 			UNLOCK;
 			
 		} else {
-			// it is safe to set it unlocked
 			polling = false;
 			LOG_SDEBUG("poll timeout");
 		}
@@ -490,8 +490,7 @@ void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, un
 
 #if EMBEDDED
 	// wait till we are not polling anymore
-	for (LOCK; running && polling; UNLOCK, usleep(10000), LOCK);
-	UNLOCK;
+	while (polling && running) { usleep(10000);	}	
 #endif	
 	
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
