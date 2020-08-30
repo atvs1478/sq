@@ -42,8 +42,30 @@ static log_level loglevel;
 static struct buffer buf;
 struct buffer *streambuf = &buf;
 
-#define LOCK   mutex_lock(streambuf->mutex)
-#define UNLOCK mutex_unlock(streambuf->mutex)
+#define LOCK     mutex_lock(streambuf->mutex)
+#define UNLOCK   mutex_unlock(streambuf->mutex)
+
+/* 
+After a lot of hesitation, I've added that "poll mutex" to prevent
+socket from being allocated while we are still in poll(). The issue 
+happens is we have a close quickly followed by an open, we might still
+be in the poll() and simple OS fail as they re-allocate the same socket
+on which a thread is still waiting. 
+Ideally, you want to set the lock in the disconnect() but that would mean
+very often we'd have to always wait for the end of the poll(), i.e. up to
+100ms for nothing most of the time where if it is in the open(), it is 
+less elegant as closing a socket on which there is a poll() is not good 
+but it's more efficient as it is very rare that you'd have an open() less 
+then 100ms after a close()
+*/
+#if EMBEDDED
+static mutex_type poll_mutex;
+#define LOCK_L   mutex_lock(poll_mutex)
+#define UNLOCK_L mutex_unlock(poll_mutex)
+#else
+#define LOCK_L   
+#define UNLOCK_L 
+#endif
 
 static sockfd fd;
 
@@ -187,6 +209,7 @@ static void *stream_thread() {
 
 		} else {
 
+			LOCK_L;
 			pollinfo.fd = fd;
 			pollinfo.events = POLLIN;
 			if (stream.state == SEND_HEADERS) {
@@ -195,9 +218,10 @@ static void *stream_thread() {
 		}
 
 		UNLOCK;
-
+		
 		if (_poll(ssl, &pollinfo, 100)) {
 
+			UNLOCK_L;	
 			LOCK;
 
 			// check socket has not been closed while in poll
@@ -350,7 +374,7 @@ static void *stream_thread() {
 			UNLOCK;
 			
 		} else {
-			
+			UNLOCK_L;
 			LOG_SDEBUG("poll timeout");
 		}
 	}
@@ -403,6 +427,9 @@ void stream_init(log_level level, unsigned stream_buf_size) {
 	*stream.header = '\0';
 
 	fd = -1;
+#if EMBEDDED	
+	mutex_create_p(poll_mutex);
+#endif	
 
 #if LINUX || FREEBSD
 	touch_memory(streambuf->buf, streambuf->size);
@@ -432,13 +459,16 @@ void stream_close(void) {
 #endif
 	free(stream.header);
 	buf_destroy(streambuf);
+#if EMBEDDED	
+	mutex_destroy(poll_mutex);
+#endif	
 }
 
 void stream_file(const char *header, size_t header_len, unsigned threshold) {
 	buf_flush(streambuf);
 
 	LOCK;
-
+	
 	stream.header_len = header_len;
 	memcpy(stream.header, header, header_len);
 	*(stream.header+header_len) = '\0';
@@ -473,7 +503,9 @@ void stream_file(const char *header, size_t header_len, unsigned threshold) {
 void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, unsigned threshold, bool cont_wait) {
 	struct sockaddr_in addr;
 
+	LOCK_L;
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
+	UNLOCK_L;
 
 	if (sock < 0) {
 		LOG_ERROR("failed to create socket");

@@ -628,8 +628,9 @@ static void grfe_handler( u8_t *data, int len) {
 	
 	scroller.active = false;
 	
-	// visu has priority when full screen on small screens
-	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) {
+	// full screen artwork or for small screen, full screen visu has priority
+	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) ||
+		(artwork.enable && artwork.x == 0 && artwork.y == 0)) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
@@ -751,8 +752,11 @@ static void grfg_handler(u8_t *data, int len) {
 	
 	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
 
-	// on small screen, visu has priority when full screen	
-	if ((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) return;
+	// full screen artwork or for small screen, visu has priority when full screen	
+	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) || 
+		(artwork.enable && artwork.x == 0 && artwork.y == 0)) {
+		return;
+	}	
 	
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 		
@@ -795,7 +799,7 @@ static void grfa_handler(u8_t *data, int len) {
 
 	// when using full screen visualizer on small screen there is a brief overlay	
 	artwork.enable = (length != 0);
-
+	
 	// just a config or an actual artwork	
 	if (length < 32) {
 		if (artwork.enable) {
@@ -840,8 +844,10 @@ static void grfa_handler(u8_t *data, int len) {
  * Update visualization bars
  */
 static void visu_update(void) {
-	// no need to protect against no woning the display as we are playing	
-	if (pthread_mutex_trylock(&visu_export.mutex)) return;
+	// no update when artwork is full screen (but no need to protect against not owning the display as we are playing	
+	if ((artwork.enable && artwork.x == 0 && artwork.y == 0) || pthread_mutex_trylock(&visu_export.mutex)) {
+		return;
+	}	
 	
 	int mode = visu.mode & ~VISU_ESP32;
 				

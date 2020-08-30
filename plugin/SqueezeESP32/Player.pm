@@ -221,6 +221,11 @@ sub clear_artwork {
 	if ($artwork && $artwork->{'enable'}) {
 		main::INFOLOG && $log->is_info && $log->info("artwork stop/clear " . $request->getRequestString());
 		$client->pluginData('artwork_md5', '');
+		# refresh screen and disable artwork when artwork was full screen (hack)
+		if (!$artwork->{'x'} && !$artwork->{'y'}) {
+			$client->sendFrame(grfa => \("\x00"x4)) unless $artwork->{'x'} || $artwork->{'y'};
+			$client->display->update;
+		}	
 	}
 }
 
