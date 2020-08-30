@@ -13,6 +13,19 @@ my $sprefs = preferences('server');
 my $prefs = preferences('plugin.squeezeesp32');
 my $log   = logger('plugin.squeezeesp32');
 
+{
+	__PACKAGE__->mk_accessor('rw', 'tone_update');
+}
+
+sub new {
+	my $class = shift;
+	my $client = $class->SUPER::new(@_);
+	$client->init_accessor(
+		tone_update	=> 0,
+	);
+	return $client;
+}
+
 our $defaultPrefs = {
 	'analogOutMode'        => 0,
 	'bass'                 => 0,
@@ -44,7 +57,6 @@ sub hasIR { 1 }
 # TODO: add in settings when ready
 sub hasLineIn { 0 }
 sub hasHeadSubOut { 1 }
-# TODO: LMS sliders are hard-coded in html file from -23 to +23 
 sub maxTreble {	20 }
 sub minTreble {	-13 }
 sub maxBass { 20 }
@@ -54,7 +66,7 @@ sub init {
 	my $client = shift;
 	
 	if (!$handlersAdded) {
-
+	
 		# Add a handler for line-in/out status changes
 		Slim::Networking::Slimproto::addHandler( LIOS => \&lineInOutStatus );
 	
@@ -117,25 +129,41 @@ sub playerSettingsFrame {
 }
 
 sub bass {
-	return tone(2, @_);
-}	
-
-sub treble {
-	return tone(8, @_);
+	my ($client, $new) = @_;
+	my $value = $client->SUPER::bass($new);
+	
+	$client->update_equalizer($value, [2, 1, 3]) if defined $new;
+	
+	return $value;
 }
 
-sub tone {
-	my ($center, $client, $value) = @_;
-	my $equalizer = $prefs->client($client)->get('equalizer');
+sub treble {
+	my ($client, $new) = @_;
+	my $value = $client->SUPER::treble($new);
 	
-	if (defined($value)) {
-		$equalizer->[$center-1] = int($value * 0.2 + 0.5);
-		$equalizer->[$center] = int($value * 0.7 + 0.5);
-		$equalizer->[$center+1] = int($value * 0.1 + 0.5);
-		$prefs->client($client)->set('equalizer', $equalizer);
-	}
+	$client->update_equalizer($value, [8, 9, 7]) if defined $new;
 
-	return int($equalizer->[$center-1] * 0.2 + $equalizer->[$center] * 0.7 + $equalizer->[$center+1] * 0.1);
+	return $value;
+}
+
+sub update_equalizer {
+	my ($client, $value, $index) = @_;
+	return if $client->tone_update;
+	
+	my $equalizer = $prefs->client($client)->get('equalizer');	
+	$equalizer->[$index->[0]] = $value;
+	$equalizer->[$index->[1]] = int($value / 2 + 0.5);
+	$equalizer->[$index->[2]] = int($value / 4 + 0.5);
+	$prefs->client($client)->set('equalizer', $equalizer);
+}
+
+sub update_tones {
+	my ($client, $equalizer) = @_;
+
+	$client->tone_update(1);
+	$sprefs->client($client)->set('bass', int(($equalizer->[1] * 2 + $equalizer->[2] + $equalizer->[3] * 4) / 7 + 0.5));
+	$sprefs->client($client)->set('treble', int(($equalizer->[7] * 4 + $equalizer->[8] + $equalizer->[9] * 2) / 7 + 0.5));
+	$client->tone_update(0);	
 }
 
 sub update_artwork {
@@ -193,6 +221,11 @@ sub clear_artwork {
 	if ($artwork && $artwork->{'enable'}) {
 		main::INFOLOG && $log->is_info && $log->info("artwork stop/clear " . $request->getRequestString());
 		$client->pluginData('artwork_md5', '');
+		# refresh screen and disable artwork when artwork was full screen (hack)
+		if (!$artwork->{'x'} && !$artwork->{'y'}) {
+			$client->sendFrame(grfa => \("\x00"x4)) unless $artwork->{'x'} || $artwork->{'y'};
+			$client->display->update;
+		}	
 	}
 }
 

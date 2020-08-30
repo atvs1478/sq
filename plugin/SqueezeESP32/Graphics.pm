@@ -78,7 +78,7 @@ sub displayWidth {
 	if ($display->widthOverride) {
 		my $artwork = $prefs->client($client)->get('artwork');
 		if ($artwork->{'enable'} && $artwork->{'y'} < 32 && ($client->isPlaying || $client->isPaused)) {
-			return $artwork->{x} + ($display->modes->[$mode || 0]{_width} || 0);
+			return ($artwork->{x} || $display->widthOverride) + ($display->modes->[$mode || 0]{_width} || 0);
 		} else {
 			return $display->widthOverride + ($display->modes->[$mode || 0]{_width} || 0);
 		}	
@@ -113,9 +113,9 @@ sub build_modes {
 	my $artwork = $cprefs->get('artwork');
 	my $disp_width = $cprefs->get('width') || 128;
 
-	# if artwork is in main display, reduce width
-	my $width = ($artwork->{'enable'} && $artwork->{'y'} < 32) ? $artwork->{'x'} : $disp_width;
-	my $width_low = ($artwork->{'enable'} && ($artwork->{'y'} >= 32 || $disp_width - $artwork->{'x'} > 32)) ? $artwork->{'x'} : $disp_width;
+	# if artwork is in main display, reduce width but when artwork is (0,0) fake it
+	my $width = ($artwork->{'enable'} && $artwork->{'y'} < 32 && $artwork->{'x'}) ? $artwork->{'x'} : $disp_width;
+	my $width_low = ($artwork->{'enable'} && $artwork->{'x'} && ($artwork->{'y'} >= 32 || $disp_width - $artwork->{'x'} > 32)) ? $artwork->{'x'} : $disp_width;
 			
 	my $small_VU = $cprefs->get('small_VU');
 	my $spectrum = $cprefs->get('spectrum');
