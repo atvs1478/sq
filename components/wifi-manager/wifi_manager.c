@@ -462,7 +462,11 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
 	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);
-
+#if CONFIG_I2C_LOCKED
+	cJSON_AddTrueToObject(root, "is_i2c_locked");
+#else
+	cJSON_AddFalseToObject(root, "is_i2c_locked");
+#endif
 	ESP_LOGV(TAG,  "wifi_manager_get_basic_info done");
 	return root;
 }
