@@ -5,6 +5,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -83,8 +84,8 @@ static void vCallbackFunction( TimerHandle_t xTimer ) {
  */
 bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	if (!leds[idx].gpio || leds[idx].gpio < 0 ) return false;
-
-	ESP_LOGD(TAG,"led_blink_core led idx %d, ontime %d, offtime %d, pushing %s. Led state: pushedon %d, pushedoff %d, timer %s, pushed %s", idx,ontime,offtime,pushed?"TRUE":"FALSE", leds[idx].pushedon,leds[idx].pushedoff,leds[idx].timer?"TRUE":"FALSE", leds[idx].pushed?"TRUE":"FALSE");
+	
+	ESP_LOGD(TAG,"led_blink_core %d on:%d off:%d, pushed:%u", idx, ontime, offtime, pushed);
 	if (leds[idx].timer) {
 		// normal requests waits if a pop is pending
 		if (!pushed && leds[idx].pushed) {
@@ -97,18 +98,15 @@ bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
 	
 	// save current state if not already pushed
 	if (!leds[idx].pushed) {
-		ESP_LOGD(TAG,"Pushing state. Ontime %d->%d. Offtime %d->%d",leds[idx].pushedon,leds[idx].ontime, leds[idx].pushedoff,leds[idx].offtime);
 		leds[idx].pushedon = leds[idx].ontime;
 		leds[idx].pushedoff = leds[idx].offtime;	
 		leds[idx].pushed = pushed;
-
 	}	
 	
 	// then set new one
 	leds[idx].ontime = ontime;
 	leds[idx].offtime = offtime;	
-
-
+			
 	if (ontime == 0) {
 		ESP_LOGD(TAG,"led %d, setting reverse level", idx);
 		set_level(leds + idx, false);
@@ -126,8 +124,7 @@ bool led_blink_core(int idx, int ontime, int offtime, bool pushed) {
         ESP_LOGD(TAG,"led %d, Setting gpio %d and starting timer", idx, leds[idx].gpio);
 		if (xTimerStart(leds[idx].timer, BLOCKTIME) == pdFAIL) return false;
 	}
-	ESP_LOGD(TAG,"led_blink_core END led idx %d, ontime %d, offtime %d, pushing %s. Led state: pushedon %d, pushedoff %d, timer %s, pushed %s", idx,ontime,offtime,pushed?"TRUE":"FALSE", leds[idx].pushedon,leds[idx].pushedoff,leds[idx].timer?"TRUE":"FALSE", leds[idx].pushed?"TRUE":"FALSE");
-
+	
 	
 	return true;
 } 

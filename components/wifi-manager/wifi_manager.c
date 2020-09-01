@@ -693,8 +693,6 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				ESP_LOGD(TAG,   "WIFI_EVENT_AP_STACONNECTED. aid: %d, mac: %s",stac->aid,STR_OR_BLANK(mac));
 				FREE_AND_NULL(mac);
 				xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_AP_STA_CONNECTED_BIT);
-				wifi_manager_send_message(EVENT_STA_CONNECTED, NULL);
-
 			}
 				break;
 			case WIFI_EVENT_AP_STADISCONNECTED:
@@ -1480,9 +1478,6 @@ void wifi_manager( void * pvParameters ){
 				bHasConnected=true;
 
 				/* callback */
-				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
-				break;
-			case EVENT_STA_CONNECTED:
 				if(cb_ptr_arr[msg.code]) (*cb_ptr_arr[msg.code])(NULL);
 				break;
 			case UPDATE_CONNECTION_OK:
