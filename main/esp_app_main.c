@@ -95,10 +95,6 @@ void cb_connection_sta_disconnected(void *pvParameter){
 	bWifiConnected=false;
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 }
-void cb_connection_sta_connected(void *pvParameter){
-
-}
-
 bool wait_for_wifi(){
 	bool connected=(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)!=0;
 	if(!connected){
@@ -467,7 +463,6 @@ void app_main()
 		 * This can be either after we're started the AP mode, or after we've started the STA mode  */
 		wifi_manager_set_callback(ORDER_START_AP, &start_telnet);
 		wifi_manager_set_callback(ORDER_CONNECT_STA, &start_telnet);
-		wifi_manager_set_callback(EVENT_STA_CONNECTED, &cb_connection_sta_connected);
 	}
 
 	console_start();
