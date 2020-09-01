@@ -231,15 +231,13 @@ void led_svc_init(void) {
 #ifndef CONFIG_LED_LOCKED
 	parse_set_GPIO(set_led_gpio);
 #endif
-	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, green.gpio, green.active, green.pwm );
-	
 	char *nvs_item = config_alloc_get(NVS_TYPE_STR, "led_brightness"), *p; 
 	if (nvs_item) {
 		if ((p = strcasestr(nvs_item, "green")) != NULL) green.pwm = atoi(strchr(p, '=') + 1);
 		if ((p = strcasestr(nvs_item, "red")) != NULL) red.pwm = atoi(strchr(p, '=') + 1);
 		free(nvs_item);
 	}
-
+	ESP_LOGI(TAG,"Configuring LEDs green:%d (active:%d %d%%), red:%d (active:%d %d%%)", green.gpio, green.active, green.pwm, red.gpio, red.active, red.pwm );
 	led_config(LED_GREEN, green.gpio, green.active, green.pwm);
 	led_config(LED_RED, red.gpio, red.active, red.pwm);
 }
