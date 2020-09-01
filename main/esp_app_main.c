@@ -95,6 +95,10 @@ void cb_connection_sta_disconnected(void *pvParameter){
 	bWifiConnected=false;
 	xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 }
+void cb_connection_sta_connected(void *pvParameter){
+
+}
+
 bool wait_for_wifi(){
 	bool connected=(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)!=0;
 	if(!connected){
@@ -447,7 +451,7 @@ void app_main()
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
-	led_blink(LED_GREEN, 250, 250);
+	led_blink_pushed(LED_GREEN, 250, 250);
 
 	if(bypass_wifi_manager){
 		ESP_LOGW(TAG,"*******************************************************************************************");
@@ -463,6 +467,7 @@ void app_main()
 		 * This can be either after we're started the AP mode, or after we've started the STA mode  */
 		wifi_manager_set_callback(ORDER_START_AP, &start_telnet);
 		wifi_manager_set_callback(ORDER_CONNECT_STA, &start_telnet);
+		wifi_manager_set_callback(EVENT_STA_CONNECTED, &cb_connection_sta_connected);
 	}
 
 	console_start();
