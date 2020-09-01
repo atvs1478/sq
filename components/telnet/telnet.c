@@ -253,6 +253,10 @@ void process_received_data(const char * buffer, size_t size){
 		if(bMirrorToUART){
 			write(uart_fd, command, size);
 		}
+		for(int i=strlen(command);i>=0;i--){
+			// strip any cr/lf
+			if(command[i]== '\n' || command[i]== '\r') command[i]= '\0';
+		}
 		run_command((char *)command);
 	}
 	free(command);
