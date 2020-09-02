@@ -721,6 +721,7 @@ esp_err_t config_post_handler(httpd_req_t *req){
 
 	if(err==ESP_OK){
 		httpd_resp_sendstr(req, "{ \"result\" : \"OK\" }");
+		messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"Save Success");
 	}
     cJSON_Delete(root);
 	if(bOTA) {

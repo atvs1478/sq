@@ -100,8 +100,95 @@ function RepeatRefreshAPInterval(){
     if(RefreshAPIIntervalActive)
         startRefreshAPInterval();
 }
+function getConfigJson(slimMode){
+	var config = {};
+    $("input.nvs").each(function() {
+        var key = $(this)[0].id;
+        var val = $(this).val();
+        if(!slimMode){
+            var nvs_type = parseInt($(this)[0].attributes.nvs_type.nodeValue,10);
+            if (key != '') {
+                config[key] = {};
+                if(nvs_type == nvs_type_t.NVS_TYPE_U8    
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_I8    
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_U16   
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_I16   
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_U32   
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_I32   
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_U64   
+    				|| nvs_type ==  nvs_type_t.NVS_TYPE_I64) {
+    					config[key].value = parseInt(val);	
+    			}   
+    			else { 
+    				config[key].value = val; 
+    			} 
+                config[key].type = nvs_type;
+            }
+        }
+        else {
+        	config[key] = val;
+        }
+    });
+    var key = $("#nvs-new-key").val();
+    var val = $("#nvs-new-value").val();
+    if (key != '') {
+    	if(!slimMode){
+	        config[key] = {};
+	        config[key].value = val;
+	        config[key].type = 33;
+    	}
+    	else {
+    		config[key] = val;
+    	}
+    }
+    return config;
+	}
 
-$(document).ready(function(){
+
+	function onFileLoad(elementId, event) {
+		var data={};
+    	try{
+    		data = JSON.parse(elementId.srcElement.result);
+    	}
+    	catch (e){
+    		alert('Parsing failed!\r\n '+ e);
+    	}
+    	$("input.nvs").each(function() {
+            var key = $(this)[0].id;
+            var val = $(this).val();
+    		if(data[key]){
+    			if(data[key] != val){
+    				console.log("Changed "& key & " " & val & "==>" & data[key]);
+    				$(this).val(data[key]);
+    			}
+    		}
+    		else {
+    			console.log("Value " & key & " missing from file");
+    		}
+    	});
+
+	}
+	
+	function onChooseFile(event, onLoadFileHandler) {
+	    if (typeof window.FileReader !== 'function')
+	        throw ("The file API isn't supported on this browser.");
+	    let input = event.target;
+	    if (!input)
+	        throw ("The browser does not properly implement the event object");
+	    if (!input.files)
+	        throw ("This browser does not support the `files` property of the file input.");
+	    if (!input.files[0])
+	        return undefined;
+	    let file = input.files[0];
+	    let fr = new FileReader();
+	    fr.onload = onLoadFileHandler;
+	    fr.readAsText(file);
+	    input.value="";
+	}
+	$(document).ready(function(){
+		$("#load-nvs").click(function () {
+		    $("#nvsfilename").trigger('click');
+		});
     $("#wifi-status").on("click", ".ape", function() {
         $( "#wifi" ).slideUp( "fast", function() {});
         $( "#connect-details" ).slideDown( "fast", function() {});
@@ -334,42 +421,27 @@ $(document).ready(function(){
         console.log('sent config JSON with data:', JSON.stringify(data));
     });
 
+
+	$("#save-as-nvs").on("click", function() {
+		var data = { 'timestamp': Date.now() };
+	        var config = getConfigJson(true);
+	         const a = document.createElement("a");
+	         a.href = URL.createObjectURL(
+	        		new Blob([JSON.stringify(config, null, 2)], {
+	        		type: "text/plain"
+	        }));
+	        a.setAttribute("download", "nvs_config" + Date.now() +"json");
+	        document.body.appendChild(a);
+	        a.click();
+	        document.body.removeChild(a);
+	        console.log('sent config JSON with headers:', JSON.stringify(headers));
+	        console.log('sent config JSON with data:', JSON.stringify(data));
+	    });
+    
     $("#save-nvs").on("click", function() {
         var headers = {};
         var data = { 'timestamp': Date.now() };
-        var config = {};
-        $("input.nvs").each(function() {
-            var key = $(this)[0].id;
-            var val = $(this).val();
-            var nvs_type = parseInt($(this)[0].attributes.nvs_type.nodeValue,10);
-            if (key != '') {
-                config[key] = {};
-                if(nvs_type == nvs_type_t.NVS_TYPE_U8    
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_I8    
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_U16   
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_I16   
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_U32   
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_I32   
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_U64   
-					|| nvs_type ==  nvs_type_t.NVS_TYPE_I64) {
-						config[key].value = parseInt(val);	
-				}   
-				else { 
-					config[key].value = val; 
-				} 
-                
-                
-                config[key].type = nvs_type;
-            }
-        });
-        var key = $("#nvs-new-key").val();
-        var val = $("#nvs-new-value").val();
-        if (key != '') {
-//            headers["X-Custom-"	+key] = val;
-            config[key] = {};
-            config[key].value = val;
-            config[key].type = 33;
-        }
+        var config = getConfigJson(false);
         data['config'] = config;
         $.ajax({
             url: '/config.json',
@@ -421,7 +493,6 @@ $(document).ready(function(){
             fwurl : {
             value : url,
             type : 33
-
             }
         };
 

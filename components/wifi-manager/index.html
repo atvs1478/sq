@@ -332,13 +332,16 @@
                         <tbody id="nvsTable">
                         </tbody>
                     </table>
-                    <div class="buttons">
+<div class="buttons">
 						<div id="boot-div">
                         	<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
                             	<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
                         	</form>
                     	</div>                    
-                        <input id="save-nvs" type="button" class="btn btn-success" value="Save" />
+                        <input id="save-nvs" type="button" class="btn btn-success" value="Commit">
+                        <input id="save-as-nvs" type="button" class="btn btn-success" value="Download config">
+                        <input id="load-nvs" type="button" class="btn btn-success" value="Load File">
+                        <input aria-describedby="fileHelp" onchange="onChooseFile(event, onFileLoad.bind(this))" id="nvsfilename" type="file" style="display:none">
                     </div>
                 </div> <!-- nvs -->
 
