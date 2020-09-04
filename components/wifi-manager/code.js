@@ -1149,12 +1149,8 @@ function getCommands() {
 						innerhtml+=attributes;
 						if(arg.checkbox){
 							if(data.values?.[command.name]?.[arg.longopts] ){
-								innerhtml+='checked=true ';							
+								innerhtml+='checked ';							
 							}
-							else{
-								innerhtml+='checked=false ';							
-							}
-								
 	
 							innerhtml+='></input></td>';
 						}

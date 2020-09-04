@@ -439,10 +439,7 @@ static int do_i2c_set_display(int argc, char **argv)
 		driver=strdup(i2cdisp_args.driver->sval[0]);
 	}
 
-	/* Check "--speed" option */
-	if (i2cdisp_args.speed->count) {
-		speed=i2cdisp_args.speed->ival[0];
-	}
+
 	/* Check "--back" option */
 	if (i2cdisp_args.back->count) {
 		back=i2cdisp_args.back->ival[0];
@@ -455,6 +452,20 @@ static int do_i2c_set_display(int argc, char **argv)
 
 
 	if(!name) name = strdup("I2C");
+	/* Check "--speed" option */
+	if (i2cdisp_args.speed->count) {
+		speed=i2cdisp_args.speed->ival[0];
+	}
+	else {
+		if(strcasestr(name,"I2C")){
+			speed = 250000;
+		}
+		else {
+			speed = 8000000;
+		}
+	}
+
+
 	if(!driver) driver = strdup("SSD1306");
 
 
@@ -927,7 +938,7 @@ static void register_i2c_set_display(){
 	i2cdisp_args.vflip = arg_lit0(NULL, "vf", "Flip picture vertically");
 	i2cdisp_args.rotate = arg_lit0("r", "rotate", "Rotate the picture 180 deg");
 	i2cdisp_args.back = arg_int0("b", "back", "<n>","Backlight GPIO (if applicable)");
-	i2cdisp_args.speed = arg_int0("s", "speed", "<n>","Default speed is 8000000 (8MHz) but SPI can work up to 26MHz or even 40MHz");
+	i2cdisp_args.speed = arg_int0("s", "speed", "<n>","Default speed is 8000000 (8MHz) for SPI and 250000 for I2C. The SPI interface can work up to 26MHz~40MHz");
 	i2cdisp_args.end = arg_end(8);
 	const esp_console_cmd_t i2c_set_display= {
 	 		.command = "setdisplay",
