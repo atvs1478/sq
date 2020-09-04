@@ -68,10 +68,13 @@
                 <a class="nav-link" data-toggle="tab" href="#tab-firmware">Firmware</a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-setdisplay">Display</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-syslog">Syslog</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#tab-commands">System</a>
+                <a class="nav-link" data-toggle="tab" href="#tab-commands">Advanced</a>
             </li>			
             <li class="nav-item">
                 <a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
@@ -195,6 +198,12 @@
                         </div>
                     </div>
                 </div> <!-- wifi -->
+     			<div class="tab-pane fade" id="tab-setdisplay">
+     				<table class="table table-hover" id="setdisplay-table">
+					<tbody id="setdisplay-list">
+                    </tbody>
+                    </table>
+                </div> <!-- display -->
 
                 <div class="tab-pane fade" id="tab-audio">
                     <div id="audioout">
@@ -304,7 +313,6 @@
                     </tbody>
                     </table>
                 </div> <!-- system -->
-
                 <div class="tab-pane fade" id="tab-syslog">
                     <table class="table table-hover">
                         <thead>
@@ -365,6 +373,11 @@
 	                <div class="custom-control custom-switch">
 	                      <input type="checkbox" class="custom-control-input" id="show-nvs" checked="checked">
 	                      <label class="custom-control-label" for="show-nvs"></label>
+	                </div>
+	                <h2>Show Advanced Commands</h2>
+	                <div class="custom-control custom-switch">
+	                      <input type="checkbox" class="custom-control-input" id="show-commands" checked="checked">
+	                      <label class="custom-control-label" for="show-commands"></label>
 	                </div>
                 </div> <!-- credits -->
             </div>

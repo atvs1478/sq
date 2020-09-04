@@ -10,6 +10,7 @@
 
 #include "gds.h"
 
+
 /* 
  The displayer is not thread-safe and the caller must ensure use its own 
  mutexes if it wants something better. Especially, text() line() and draw()
@@ -38,3 +39,4 @@ void displayer_scroll(char *string, int speed, int pause);
 void displayer_control(enum displayer_cmd_e cmd, ...);
 void displayer_metadata(char *artist, char *album, char *title);
 void displayer_timer(enum displayer_time_e mode, int elapsed, int duration);
+char * display_get_supported_drivers();

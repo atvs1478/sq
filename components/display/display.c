@@ -396,3 +396,27 @@ const char *display_conf_get_driver_name(char * driver){
 	}
 	return NULL;
 }
+
+/****************************************************************************************
+ *
+ */
+char * display_get_supported_drivers(){
+	int total_size = 1;
+	char * supported_drivers=NULL;
+	const char * separator = "|";
+	int separator_len = strlen(separator);
+
+	for(uint8_t i=0;known_drivers[i]!=NULL && strlen(known_drivers[i])>0;i++ ){
+		total_size += strlen(known_drivers[i])+separator_len;
+	}
+	total_size+=2;
+	supported_drivers = malloc(total_size);
+	memset(supported_drivers,0x00,total_size);
+	strcat(supported_drivers,"<");
+	for(uint8_t i=0;known_drivers[i]!=NULL && strlen(known_drivers[i])>0;i++ ){
+		supported_drivers = strcat(supported_drivers,known_drivers[i]);
+		supported_drivers = strcat(supported_drivers,separator);
+	}
+	strcat(supported_drivers,">");
+	return supported_drivers;
+}

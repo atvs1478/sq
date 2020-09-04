@@ -63,6 +63,7 @@ var checkStatusInterval = null;
 var StatusIntervalActive = false;
 var RefreshAPIIntervalActive = false;
 var LastRecoveryState=null;
+var LastCommandsState=null;
 var output = '';
 
 function stopCheckStatusInterval(){
@@ -169,6 +170,7 @@ function getConfigJson(slimMode){
 
 	}
 	
+	
 	function onChooseFile(event, onLoadFileHandler) {
 	    if (typeof window.FileReader !== 'function')
 	        throw ("The file API isn't supported on this browser.");
@@ -186,7 +188,9 @@ function getConfigJson(slimMode){
 	    input.value="";
 	}
 	$(document).ready(function(){
-		$("#load-nvs").click(function () {
+        $("input#show-commands")[0].checked=LastCommandsState==1?true:false;
+        $('a[href^="#tab-commands"]').hide();
+        $("#load-nvs").click(function () {
 		    $("#nvsfilename").trigger('click');
 		});
     $("#wifi-status").on("click", ".ape", function() {
@@ -295,6 +299,17 @@ function getConfigJson(slimMode){
 
         $( "#connect-details" ).slideUp( "fast", function() {});
         $( "#wifi" ).slideDown( "fast", function() {})
+    });
+    
+    $("input#show-commands").on("click", function() {
+        this.checked=this.checked?1:0;
+        if(this.checked){
+            $('a[href^="#tab-commands"]').show();
+            LastCommandsState = 1;
+        } else {
+        	LastCommandsState = 0;
+            $('a[href^="#tab-commands"]').hide();
+        }
     });
 
     $("input#show-nvs").on("click", function() {
@@ -1006,7 +1021,8 @@ function checkStatus(){
         blockAjax = false;
     });
 }
-function runCommand(button) {
+
+function runCommand(button,reboot) {
 	pardiv = button.parentNode.parentNode;
 	fields=document.getElementById("flds-"+button.value);
 	cmdstring=button.value+' ';
@@ -1055,7 +1071,32 @@ function runCommand(button) {
 			console.log(xhr.status);
 			console.log(thrownError);
 			if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
-		}
+			
+		},
+        complete: function(response) {
+            //var returnedResponse = JSON.parse(response.responseText);
+            console.log(response.responseText);
+            if(reboot){
+            	showMessage('Applying. Please wait for the ESP32 to reboot', 'MESSAGING_WARNING');
+	            console.log('now triggering reboot');
+	            $.ajax({
+	                url: '/reboot.json',
+	                dataType: 'text',
+	                method: 'POST',
+	                cache: false,
+	                contentType: 'application/json; charset=utf-8',
+	                data: JSON.stringify({ 'timestamp': Date.now()}),
+	                error: function (xhr, ajaxOptions, thrownError) {
+	                    console.log(xhr.status);
+	                    console.log(thrownError);
+	                    if (thrownError != '') showMessage(thrownError, 'MESSAGING_ERROR');
+	                },
+	                complete: function(response) {
+	                	console.log('reboot call completed');
+	                }
+	            });
+            }
+        }
 	});
 	enableStatusTimer = true;
 }
@@ -1064,60 +1105,82 @@ function runCommand(button) {
 function getCommands() {
     $.getJSON("/commands.json", function(data) {
         console.log(data);
-		innerhtml='';
+		var advancedtabhtml='';
 		
 		data.commands.forEach(function(command) {
-			innerhtml+='<tr><td>';
-			innerhtml+=escapeHTML(command.help).replace(/\n/g, '<br />')+'<br>';
+			isConfig=($('#'+command.name+'-list').length>0);
+			innerhtml='';
+			innerhtml+='<tr><td>'+(isConfig?'<h1>':'');
+			innerhtml+=escapeHTML(command.help).replace(/\n/g, '<br />')+(isConfig?'</h1>':'<br>');
 			innerhtml+='<div >';
 			if(command.hasOwnProperty("argtable")){
 			innerhtml+='<table class="table table-hover" id="flds-'+command.name+'"><tbody>';
 				command.argtable.forEach(function (arg){
-					innerhtml+="<tr>";
-					ctrlname=command.name+'-'+arg.longopts;
-					innerhtml+='<td><label for="'+ctrlname+'">'+ arg.glossary+'</label></td>';
-					ctrltype="text";
-					if(arg.checkbox){
-						ctrltype="checkbox";
-					}
-					curvalue=data.values?.[command.name]?.[arg.longopts] || '';
 					placeholder=arg?.datatype || '';
-					innerhtml+='<td><input type="'+ctrltype+'" id="'+ctrlname+'" name="'+ctrlname+'" placeholder="'+placeholder+'" hasvalue="'+arg.hasvalue+'"   ';
-					
+					ctrlname=command.name+'-'+arg.longopts;
+					curvalue=data.values?.[command.name]?.[arg.longopts] || '';
+					innerhtml+="<tr>";
+					var attributes ='datatype="'+arg.datatype+'" ';
+					attributes+='hasvalue='+arg.hasvalue+' ';
+					attributes+='longopts="'+arg.longopts+'" ';
+					attributes+='shortopts="'+arg.shortopts+'" ';
+					attributes+='checkbox='+arg.checkbox+' ';
 
-					innerhtml+='datatype="'+arg.datatype+'" ';
-					innerhtml+='hasvalue='+arg.hasvalue+' ';
-					innerhtml+='longopts="'+arg.longopts+'" ';
-					innerhtml+='shortopts="'+arg.shortopts+'" ';
-					innerhtml+='checkbox='+arg.checkbox+' ';
 
-					
-					
-					if(arg.checkbox){
-						if(curvalue=data.values?.[command.name]?.[arg.longopts] ){
-							innerhtml+='checked=true ';							
-						}
-						else{
-							innerhtml+='checked=false ';							
-						}
-							
-
-						innerhtml+='></input></td>';
+					if(placeholder.includes('|')){
+						placeholder = placeholder.replace('<','').replace('>','');
+						innerhtml+='<td><select name="'+ctrlname+'" ';
+						innerhtml+=attributes;
+						innerhtml+=' class="custom-select">';
+						innerhtml+='<option '+(curvalue.length>0?'value':'selected')+'>'+arg.glossary+'</option>'
+						placeholder.split('|').forEach(function(choice){
+							innerhtml+='<option '+(curvalue.length>0&&curvalue==choice?'selected':'value')+'="'+choice+'">'+choice+'</option>';
+						});
+						innerhtml+='</select></td>';
 					}
 					else {
-						innerhtml+='value="'+curvalue+'" ';
-						innerhtml+='></input></td>'+ curvalue.length>0?'<td>last: '+curvalue+'</td>':'';
+						ctrltype="text";
+						if(arg.checkbox){
+							ctrltype="checkbox";
+						}
+						
+						innerhtml+='<td><label for="'+ctrlname+'">'+ arg.glossary+'</label></td>';
+						innerhtml+='<td><input type="'+ctrltype+'" id="'+ctrlname+'" name="'+ctrlname+'" placeholder="'+placeholder+'" hasvalue="'+arg.hasvalue+'"   ';
+						innerhtml+=attributes;
+						if(arg.checkbox){
+							if(data.values?.[command.name]?.[arg.longopts] ){
+								innerhtml+='checked=true ';							
+							}
+							else{
+								innerhtml+='checked=false ';							
+							}
+								
+	
+							innerhtml+='></input></td>';
+						}
+						else {
+							innerhtml+='value="'+curvalue+'" ';
+							innerhtml+='></input></td>'+ curvalue.length>0?'<td>last: '+curvalue+'</td>':'';
+						}
 					}
-					
 					innerhtml+="</tr>";
 				});
-			innerhtml+='</tbody></table><br>';
+			innerhtml+='</tbody></table>';
 			
 			}
-			innerhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" value="'+command.name+'" onclick="runCommand(this);"></div></div><td></tr>';
-
-            });		
-		$("#commands-list").append(innerhtml);
+			if(isConfig){
+				innerhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-success" value="Save" onclick="runCommand(this,false);">';
+				innerhtml+='<input id="btn-'+ command.name + '-apply" type="button" class="btn btn-success" value="Apply" onclick="runCommand(this,true);"></div></div><td></tr>';
+				$('#'+command.name+'-list').append(innerhtml);
+			}
+			else {
+				advancedtabhtml+='<br>'+innerhtml;
+				advancedtabhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" value="'+command.name+'" onclick="runCommand(this);"></div></div><td></tr>';
+			}
+			
+           });
+		$("#commands-list").append(advancedtabhtml);
+		
 		
     })
     .fail(function(xhr, ajaxOptions, thrownError) {

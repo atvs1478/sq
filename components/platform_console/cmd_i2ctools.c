@@ -82,15 +82,17 @@ static struct {
 } i2ccheck_args;
 
 static struct {
-	struct arg_lit *clear;
-	struct arg_lit *hflip;
-	struct arg_lit *vflip;
-	struct arg_lit *rotate;
-	struct arg_int *address;
-	struct arg_int *width;
-	struct arg_int *height;
 	struct arg_str *name;
 	struct arg_str *driver;
+	struct arg_int *width;
+	struct arg_int *height;
+	struct arg_int *address;
+	struct arg_lit *rotate;
+	struct arg_lit *hflip;
+	struct arg_lit *vflip;
+	struct arg_int *speed;
+	struct arg_int *back;
+	struct arg_lit *clear;
 	struct arg_end *end;
 } i2cdisp_args;
 
@@ -368,7 +370,7 @@ static int do_i2c_show_display(int argc, char **argv){
 
 static int do_i2c_set_display(int argc, char **argv)
 {
-	int width=0, height=0, address=60;
+	int width=0, height=0, address=60, back=-1, speed=8000000 ;
 	int result = 0;
 	char * name = NULL;
 	char * driver= NULL;
@@ -426,6 +428,7 @@ static int do_i2c_set_display(int argc, char **argv)
 		fprintf(f,"Missing parameter: --height\n");
 		nerrors ++;
 	}
+
 	/* Check "--name" option */
 	if (i2cdisp_args.name->count) {
 		name=strdup(i2cdisp_args.name->sval[0]);
@@ -435,6 +438,21 @@ static int do_i2c_set_display(int argc, char **argv)
 	if (i2cdisp_args.driver->count) {
 		driver=strdup(i2cdisp_args.driver->sval[0]);
 	}
+
+	/* Check "--speed" option */
+	if (i2cdisp_args.speed->count) {
+		speed=i2cdisp_args.speed->ival[0];
+	}
+	/* Check "--back" option */
+	if (i2cdisp_args.back->count) {
+		back=i2cdisp_args.back->ival[0];
+		if(!GPIO_IS_VALID_OUTPUT_GPIO(back)){
+			fprintf(f,"Invalid GPIO for back light: %d %s\n", back, GPIO_IS_VALID_GPIO(back)?"has input capabilities only":"is not a GPIO");
+			back=-1;
+			nerrors ++;
+		}
+	}
+
 
 	if(!name) name = strdup("I2C");
 	if(!driver) driver = strdup("SSD1306");
@@ -456,8 +474,8 @@ static int do_i2c_set_display(int argc, char **argv)
 	bool rotate = i2cdisp_args.rotate->count>0;
 
 	if(nerrors==0){
-		snprintf(config_string, sizeof(config_string),"%s:width=%i,height=%i,address=%i,driver=%s%s%s",
-				name,width,height,address,driver,rotate || i2cdisp_args.hflip->count?",HFlip":"",rotate || i2cdisp_args.vflip->count?",VFlip":"" );
+		snprintf(config_string, sizeof(config_string),"%s:back=%i,speed=%i,width=%i,height=%i,address=%i,driver=%s%s%s",
+				name,back,speed,width,height,address,driver,rotate || i2cdisp_args.hflip->count?",HFlip":"",rotate || i2cdisp_args.vflip->count?",VFlip":"" );
 		fprintf(f,"Updating display configuration string configuration to :\n"
 				"display_config = \"%s\"",config_string );
 		result = config_set_value(NVS_TYPE_STR, "display_config", config_string)!=ESP_OK;
@@ -897,15 +915,19 @@ cJSON * i2c_set_display_cb(){
 }
 
 static void register_i2c_set_display(){
+	char * supported_drivers = display_get_supported_drivers();
+
 	i2cdisp_args.address = arg_int0("a", "address", "<n>", "Set the device address, default 60");
 	i2cdisp_args.width = arg_int0("w", "width", "<n>", "Set the display width");
 	i2cdisp_args.height = arg_int0("h", "height", "<n>", "Set the display height");
 	i2cdisp_args.name = arg_str0("t", "type", "<I2C|SPI>", "Display type, I2C or SPI. Default I2C");
-	i2cdisp_args.driver = arg_str0("d", "driver", "<string>", "Set the display driver name. Default SSD1306");
+	i2cdisp_args.driver = arg_str0("d", "driver", supported_drivers?supported_drivers:"<string>", "Set the display driver name. Default SSD1306");
 	i2cdisp_args.clear = arg_lit0(NULL, "clear", "clear configuration and return");
 	i2cdisp_args.hflip = arg_lit0(NULL, "hf", "Flip picture horizontally");
 	i2cdisp_args.vflip = arg_lit0(NULL, "vf", "Flip picture vertically");
 	i2cdisp_args.rotate = arg_lit0("r", "rotate", "Rotate the picture 180 deg");
+	i2cdisp_args.back = arg_int0("b", "back", "<n>","Backlight GPIO (if applicable)");
+	i2cdisp_args.speed = arg_int0("s", "speed", "<n>","Default speed is 8000000 (8MHz) but SPI can work up to 26MHz or even 40MHz");
 	i2cdisp_args.end = arg_end(8);
 	const esp_console_cmd_t i2c_set_display= {
 	 		.command = "setdisplay",
