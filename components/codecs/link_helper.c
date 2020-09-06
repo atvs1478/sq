@@ -1,3 +1,1 @@
-void dummy_obj() {
-	return;
-}
+static int a;
