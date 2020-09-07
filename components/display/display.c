@@ -400,7 +400,7 @@ const char *display_conf_get_driver_name(char * driver){
 /****************************************************************************************
  *
  */
-char * display_get_supported_drivers(){
+char * display_get_supported_drivers(void){
 	int total_size = 1;
 	char * supported_drivers=NULL;
 	const char * separator = "|";
