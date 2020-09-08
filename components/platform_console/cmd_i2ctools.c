@@ -30,7 +30,8 @@
 #define NACK_VAL 0x1                /*!< I2C nack value */
 
 static const char *TAG = "cmd_i2ctools";
-
+#define NOT_OUTPUT "has input capabilities only"
+#define NOT_GPIO "is not a GPIO"
 static gpio_num_t i2c_gpio_sda = 19;
 static gpio_num_t i2c_gpio_scl = 18;
 static uint32_t i2c_frequency = 100000;
@@ -62,11 +63,12 @@ static struct {
 } i2cdump_args;
 
 static struct {
-	struct arg_lit *load;
     struct arg_int *port;
     struct arg_int *freq;
     struct arg_int *sda;
     struct arg_int *scl;
+	struct arg_lit *load;
+	struct arg_lit *clear;
     struct arg_end *end;
 } i2cconfig_args;
 
@@ -371,7 +373,6 @@ static int do_i2c_show_display(int argc, char **argv){
 static int do_i2c_set_display(int argc, char **argv)
 {
 	int width=0, height=0, address=60, back=-1, speed=8000000 ;
-	int result = 0;
 	char * name = NULL;
 	char * driver= NULL;
 	char config_string[200]={};
@@ -444,7 +445,7 @@ static int do_i2c_set_display(int argc, char **argv)
 	if (i2cdisp_args.back->count) {
 		back=i2cdisp_args.back->ival[0];
 		if(!GPIO_IS_VALID_OUTPUT_GPIO(back)){
-			fprintf(f,"Invalid GPIO for back light: %d %s\n", back, GPIO_IS_VALID_GPIO(back)?"has input capabilities only":"is not a GPIO");
+			fprintf(f,"Invalid GPIO for back light: %d %s\n", back, GPIO_IS_VALID_GPIO(back)?NOT_OUTPUT:NOT_GPIO );
 			back=-1;
 			nerrors ++;
 		}
@@ -489,29 +490,40 @@ static int do_i2c_set_display(int argc, char **argv)
 				name,back,speed,width,height,address,driver,rotate || i2cdisp_args.hflip->count?",HFlip":"",rotate || i2cdisp_args.vflip->count?",VFlip":"" );
 		fprintf(f,"Updating display configuration string configuration to :\n"
 				"display_config = \"%s\"",config_string );
-		result = config_set_value(NVS_TYPE_STR, "display_config", config_string)!=ESP_OK;
+		nerrors = config_set_value(NVS_TYPE_STR, "display_config", config_string)!=ESP_OK;
 	}
-	else {
-		result = 1;
-	}
+
 	FREE_AND_NULL(name);
 	FREE_AND_NULL(driver);
 	fflush (f);
 	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
 	fclose(f);
 	FREE_AND_NULL(buf);
-	return result;
+	return nerrors==0;
 }
 
 static int do_i2cconfig_cmd(int argc, char **argv)
 {
 	esp_err_t err=ESP_OK;
-	int res=0;
-	char * err_message=malloc(1);
 	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&i2cconfig_args);
     if (nerrors != 0) {
         return 0;
     }
+	/* Check "--clear" option */
+	if (i2cconfig_args.clear->count) {
+		log_send_messaging(MESSAGING_WARNING,"i2c config cleared");
+		config_set_value(NVS_TYPE_STR, "i2c_config", "");
+		return 0;
+	}
+
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		log_send_messaging(MESSAGING_ERROR,"Unable to open memory stream.");
+		return 0;
+	}
+
     /* Check "--load" option */
     if (i2cconfig_args.load->count) {
     	log_send_messaging(MESSAGING_WARNING,"Loading i2c config");
@@ -522,8 +534,8 @@ static int do_i2cconfig_cmd(int argc, char **argv)
 		/* Check "--port" option */
 		if (i2cconfig_args.port->count) {
 			if (i2c_get_port(i2cconfig_args.port->ival[0], &i2c_port) != ESP_OK) {
-				log_send_messaging(MESSAGING_ERROR, "Invalid port %u ",i2cconfig_args.port->ival[0]);
-				return 1;
+				fprintf(f,"Invalid port %u \n",i2cconfig_args.port->ival[0]);
+				nerrors ++;
 			}
 		}
 		/* Check "--freq" option */
@@ -533,60 +545,67 @@ static int do_i2cconfig_cmd(int argc, char **argv)
 		if (i2cconfig_args.sda->count){
 			/* Check "--sda" option */
 			i2c_gpio_sda = i2cconfig_args.sda->ival[0];
+			if(!GPIO_IS_VALID_OUTPUT_GPIO(i2c_gpio_sda )){
+				fprintf(f,"Invalid SDA gpio: %d %s\n", i2c_gpio_sda , GPIO_IS_VALID_GPIO(i2c_gpio_sda )?NOT_OUTPUT:NOT_GPIO );
+				nerrors ++;
+			}
 		}
 		else {
-			REALLOC_CAT(err_message,"Missing --sda option.");
-			res=1;
+			fprintf(f,"Missing SDA GPIO\n");
+			nerrors ++;
 		}
-
 		if (i2cconfig_args.scl->count){
-			/* Check "--sda" option */
+			/* Check "--scl" option */
 			i2c_gpio_scl = i2cconfig_args.scl->ival[0];
+			if(!GPIO_IS_VALID_OUTPUT_GPIO(i2c_gpio_scl )){
+				fprintf(f,"Invalid SCL gpio: %d %s\n", i2c_gpio_scl , GPIO_IS_VALID_GPIO(i2c_gpio_scl )?NOT_OUTPUT:NOT_GPIO );
+				nerrors ++;
+			}
 		}
 		else {
-			REALLOC_CAT(err_message,"Missing --scl option.");
-			res=1;
+			fprintf(f,"Missing SCL GPIO\n");
+			nerrors ++;
 		}
     }
 
 #ifdef CONFIG_SQUEEZEAMP
 	if (i2c_port == I2C_NUM_0) {
 		i2c_port = I2C_NUM_1;
-		log_send_messaging(MESSAGING_ERROR, "can't use i2c port 0 on SqueezeAMP. Changing to port 1.");
+		fprintf(f,"can't use i2c port 0 on SqueezeAMP. Changing to port 1.\n");
 	}
 #endif
-	if(!res){
-		log_send_messaging(MESSAGING_INFO,"Uninstall i2c driver from port %u if needed",i2c_port);
+	if(!nerrors){
+		fprintf(f,"Uninstalling i2c driver from port %u if needed\n",i2c_port);
 		if(is_i2c_started(i2c_port)){
 			if((err=i2c_driver_delete(i2c_port))!=ESP_OK){
-				log_send_messaging(MESSAGING_ERROR, "i2c driver delete failed. %s", esp_err_to_name(err));
-				res = 1;
+				fprintf(f,"i2c driver delete failed. %s\n", esp_err_to_name(err));
+				nerrors++;
 			}
 		}
 	}
-	if(!res){
-		log_send_messaging(MESSAGING_INFO, "Initializing driver with config scl=%u sda=%u speed=%u port=%u",i2c_gpio_scl,i2c_gpio_sda,i2c_frequency,i2c_port);
+	if(!nerrors){
+		fprintf(f,"Initializing driver with config scl=%u sda=%u speed=%u port=%u\n",i2c_gpio_scl,i2c_gpio_sda,i2c_frequency,i2c_port);
 		if((err=i2c_master_driver_initialize())==ESP_OK){
-			log_send_messaging(MESSAGING_INFO, "Initalize success.");
+			fprintf(f,"Initalize success.\n");
 			// now start the i2c driver
-			log_send_messaging(MESSAGING_INFO,"Starting the i2c driver.");
+			fprintf(f,"Starting the i2c driver.");
 			if((err=i2c_master_driver_install())!=ESP_OK){
-				log_send_messaging(MESSAGING_ERROR,"I2C master driver install failed. %s", esp_err_to_name(err));
-				res=1;
+				fprintf(f,"I2C master driver install failed. %s\n", esp_err_to_name(err));
+				nerrors++;
 			}
 			else
 			{
-				log_send_messaging(MESSAGING_INFO,"i2c driver successfully started.");
+				fprintf(f,"i2c driver successfully started.\n");
 			}
 		}
 		else {
 
-			log_send_messaging(MESSAGING_ERROR,"I2C initialization failed. %s", esp_err_to_name(err));
-			res=1;
+			fprintf(f,"I2C initialization failed. %s\n", esp_err_to_name(err));
+			nerrors++;
 		}
 	}
-	if(!res && !i2cconfig_args.load->count){
-		log_send_messaging(MESSAGING_INFO,"Storing i2c parameters.");
+	if(!nerrors && !i2cconfig_args.load->count){
+		fprintf(f,"Storing i2c parameters.\n");
 			i2c_config_t config={
 				.mode = I2C_MODE_MASTER,
 				.sda_io_num = i2c_gpio_sda,
@@ -597,11 +616,12 @@ static int do_i2cconfig_cmd(int argc, char **argv)
 			};
 			config_i2c_set(&config, i2c_port);
 	}
-	if(res){
-		log_send_messaging(MESSAGING_ERROR,"%s", err_message);
-	}
-	free(err_message);
-    return res;
+	fflush (f);
+	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+
+	return nerrors==0;
 }
 
 #define RUN_SHOW_ERROR(c)
@@ -1071,6 +1091,7 @@ cJSON * i2config_cb(){
 }
 static void register_i2cconfig(void)
 {
+	i2cconfig_args.clear = arg_lit0(NULL, "clear", "clear configuration and return");
     i2cconfig_args.port = arg_int0("p", "port", "0|1", "Set the I2C bus port number");
     i2cconfig_args.freq = arg_int0("f", "freq", "int", "Set the frequency(Hz) of I2C bus. e.g. 100000");
     i2cconfig_args.sda = arg_int0("d", "sda", "int", "Set the gpio for I2C SDA. e.g. 19");
