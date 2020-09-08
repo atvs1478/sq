@@ -65,7 +65,17 @@ var RefreshAPIIntervalActive = false;
 var LastRecoveryState=null;
 var LastCommandsState=null;
 var output = '';
+function delay_msg(t, v) {
+	   return new Promise(function(resolve) { 
+	       setTimeout(resolve.bind(null, v), t)
+	   });
+	}
 
+	Promise.prototype.delay = function(t) {
+	    return this.then(function(v) {
+	        return delay_msg(t, v);
+	    });
+	}
 function stopCheckStatusInterval(){
     if(checkStatusInterval != null){
         clearTimeout(checkStatusInterval);
@@ -1096,7 +1106,10 @@ function runCommand(button,reboot) {
 	                },
 	                complete: function(response) {
 	                	console.log('reboot call completed');
-	                	getCommands();
+	                	Promise.resolve().delay(5000).then(function(v) {
+	                		console.log('Getting updated commands');
+	                	    getCommands();
+	                	});
 	                }
 	            });
             }
@@ -1177,7 +1190,7 @@ function getCommands() {
 				}
 				else {
 					advancedtabhtml+='<br>'+innerhtml;
-					advancedtabhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" cmdname="'+command.name+'" value="'+command.name+'" onclick="runCommand(this);"></div></div><td></tr>';
+					advancedtabhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" cmdname="'+command.name+'" value="'+command.name+'" onclick="runCommand(this, false);"></div></div><td></tr>';
 				}
 			}		
         });
