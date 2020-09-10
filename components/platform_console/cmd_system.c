@@ -31,17 +31,22 @@
 #include "driver/uart.h"            // for the uart driver access
 #include "messaging.h"				  
 #include "platform_console.h"
-
+#include "trace.h"
 
 #ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
 #define WITH_TASKS_INFO 1
 #endif
 
+static struct {
+	struct arg_str *name;
+	struct arg_end *end;
+} name_args;
 
 static const char * TAG = "cmd_system";
 
 static void register_setbtsource();
 static void register_free();
+static void register_setdevicename();
 static void register_heap();
 static void register_version();
 static void register_restart();
@@ -59,6 +64,7 @@ void register_system()
 	register_setbtsource();
     register_free();
     register_heap();
+    register_setdevicename();
     register_version();
     register_restart();
     register_deep_sleep();
@@ -372,6 +378,61 @@ static int heap_size(int argc, char **argv)
     log_send_messaging(MESSAGING_INFO, "min heap size: %u", heap_size);
     return 0;
 }
+cJSON * setdevicename_cb(){
+	char * default_host_name = config_alloc_get_str("host_name",NULL,"Squeezelite");
+	cJSON * values = cJSON_CreateObject();
+	cJSON_AddStringToObject(values,"name",default_host_name);
+	free(default_host_name);
+	return values;
+}
+static int setnamevar(char * nvsname, FILE *f, char * value){
+	esp_err_t err=ESP_OK;
+	if((err=config_set_value(NVS_TYPE_STR, nvsname, value))!=ESP_OK){
+		fprintf(f,"Unable to set %s=%s. %s\n",nvsname,value,esp_err_to_name(err));
+	}
+	return err==ESP_OK?0:1;
+}
+static int setdevicename(int argc, char **argv)
+{
+	char * name = NULL;
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&name_args);
+    if (nerrors != 0) {
+        return 0;
+    }
+
+	/* Check "--name" option */
+	if (name_args.name->count) {
+		name=strdup(name_args.name->sval[0]);
+	}
+	else {
+		log_send_messaging(MESSAGING_ERROR,"Name must be specified.");
+		return 0;
+	}
+
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		log_send_messaging(MESSAGING_ERROR,"Unable to open memory stream.");
+		return 0;
+	}
+	nerrors+=setnamevar("a2dp_dev_name", f, name);
+	nerrors+=setnamevar("airplay_name", f, name);
+	nerrors+=setnamevar("ap_ssid", f, name);
+	nerrors+=setnamevar("bt_name", f, name);
+	nerrors+=setnamevar("host_name", f, name);
+	if(nerrors==0){
+		fprintf(f,"Device name changed to %s\n",name);
+	}
+
+	FREE_AND_NULL(name);
+	fflush (f);
+	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return nerrors==0;
+
+}
 
 static void register_heap()
 {
@@ -386,6 +447,22 @@ static void register_heap()
 
 }
 
+
+static void register_setdevicename()
+{
+	char * default_host_name = config_alloc_get_str("host_name",NULL,"Squeezelite");
+	name_args.name = arg_str0("n", "name", default_host_name, "Device name");
+	name_args.end = arg_end(8);
+	const esp_console_cmd_t set_name= {
+	 		.command = "setname",
+			.help="Sets the name of the device (host, bluetooth, etc)",
+			.hint = NULL,
+			.func = &setdevicename,
+			.argtable = &name_args
+	};
+	cmd_to_json_with_cb(&set_name,&setdevicename_cb);
+	ESP_ERROR_CHECK(esp_console_cmd_register(&set_name));
+}
 /** 'tasks' command prints the list of tasks and related information */
 #if WITH_TASKS_INFO
 

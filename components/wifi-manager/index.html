@@ -198,9 +198,11 @@
                     </div>
                 </div> <!-- wifi -->
      			<div class="tab-pane fade" id="tab-setdisplay">
-     				<table class="table table-hover" id="setdisplay-table"><tbody id="setdisplay-list"></tbody></table>
-                    <table class="table table-hover" id="i2cconfig-table"><tbody id="i2cconfig-list"></tbody></table>
-					<table class="table table-hover" id="spiset-table"><tbody id="spiset-list"></tbody></table>
+     			<div id="setname-list"></div>
+     			<div id="setdisplay-list"></div>
+     			<div id="i2cconfig-list"></div>
+     			<div id="spiconfig-list"></div>
+     			
                 </div> <!-- display -->
 
                 <div class="tab-pane fade" id="tab-audio">
@@ -306,10 +308,7 @@
                     </div>
                 </div> <!-- firmware -->
                 <div class="tab-pane fade" id="tab-commands">
-                    <table class="table table-hover" id="commands-list-table">
-					<tbody id="commands-list">
-                    </tbody>
-                    </table>
+                    <form ><fieldset id="commands-list"></fieldset></form>
                 </div> <!-- system -->
                 <div class="tab-pane fade" id="tab-syslog">
                     <table class="table table-hover">

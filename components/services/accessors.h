@@ -27,6 +27,7 @@ typedef struct {
 } display_config_t;
 const display_config_t * config_display_get();
 esp_err_t 					config_i2c_set(const i2c_config_t * config, int port);
+esp_err_t 					config_spi_set(const spi_bus_config_t * config, int host, int dc);
 const i2c_config_t * 		config_i2c_get(int * i2c_port);
 const spi_bus_config_t * 	config_spi_get(spi_host_device_t * spi_host);
 void 						parse_set_GPIO(void (*cb)(int gpio, char *value));

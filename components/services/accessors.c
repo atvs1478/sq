@@ -36,6 +36,20 @@ esp_err_t config_i2c_set(const i2c_config_t * config, int port){
 	}
 	return ESP_OK;
 }
+/****************************************************************************************
+ *
+ */
+esp_err_t config_spi_set(const spi_bus_config_t * config, int host, int dc){
+	int buffer_size=255;
+	char * config_buffer=calloc(buffer_size,1);
+	if(config_buffer)  {
+		snprintf(config_buffer,buffer_size,"data=%u,clk=%u,dc=%u,host=%u",config->mosi_io_num,config->sclk_io_num,dc,host);
+		ESP_LOGI(TAG,"Updating SPI configuration to %s",config_buffer);
+		config_set_value(NVS_TYPE_STR, "spi_config", config_buffer);
+		free(config_buffer);
+	}
+	return ESP_OK;
+}
 
 /****************************************************************************************
  * 

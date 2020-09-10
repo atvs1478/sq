@@ -1033,12 +1033,10 @@ function checkStatus(){
 }
 
 function runCommand(button,reboot) {
-	pardiv = button.parentNode.parentNode;
 	cmdstring = button.attributes.cmdname.value;
 	fields=document.getElementById("flds-"+cmdstring);
 	cmdstring+=' ';
 	if(fields){
-		hint = pardiv.hint;
 		allfields=fields.querySelectorAll("select,input");
 		for (i = 0; i < allfields.length; i++) {
 			attr=allfields[i].attributes;
@@ -1122,79 +1120,69 @@ function runCommand(button,reboot) {
 function getCommands() {
     $.getJSON("/commands.json", function(data) {
         console.log(data);
-		var advancedtabhtml='';
 		data.commands.forEach(function(command) {
 			if($("#flds-"+command.name).length == 0){
 				isConfig=($('#'+command.name+'-list').length>0);
 				innerhtml='';
-				innerhtml+='<tr><td>'+(isConfig?'<h1>':'');
-				innerhtml+=escapeHTML(command.help).replace(/\n/g, '<br />')+(isConfig?'</h1>':'<br>');
-				innerhtml+='<div >';
+				//innerhtml+='<tr class="table-light"><td>'+(isConfig?'<h1>':'');
+				innerhtml+='<fieldset id="flds-'+command.name+'"><legend>' + escapeHTML(command.help).replace(/\n/g, '<br />')+'</legend>';
 				if(command.hasOwnProperty("argtable")){
-				innerhtml+='<table class="table table-hover" id="flds-'+command.name+'"><tbody>';
 					command.argtable.forEach(function (arg){
 						placeholder=arg?.datatype || '';
 						ctrlname=command.name+'-'+arg.longopts;
 						curvalue=data.values?.[command.name]?.[arg.longopts] || '';
-						innerhtml+="<tr>";
-						var attributes ='datatype="'+arg.datatype+'" ';
-						attributes+='hasvalue='+arg.hasvalue+' ';
+						
+						
+						var attributes='hasvalue='+arg.hasvalue+' ';
+						//attributes +='datatype="'+arg.datatype+'" ';
 						attributes+='longopts="'+arg.longopts+'" ';
 						attributes+='shortopts="'+arg.shortopts+'" ';
 						attributes+='checkbox='+arg.checkbox+' ';
 						attributes+='cmdname="'+command.name+'" ';
-						attributes+= 'id="'+ctrlname+'" name="'+ctrlname+'" placeholder="'+placeholder+'" hasvalue="'+arg.hasvalue+'"   ';
-	
-	
-						if(placeholder.includes('|')){
-							placeholder = placeholder.replace('<','').replace('>','');
-							innerhtml+='<td><select ';
-							innerhtml+=attributes;
-							innerhtml+=' class="custom-select">';
-							innerhtml+='<option '+(curvalue.length>0?'value':'selected')+'>'+arg.glossary+'</option>'
-							placeholder.split('|').forEach(function(choice){
-								innerhtml+='<option '+(curvalue.length>0&&curvalue==choice?'selected':'value')+'="'+choice+'">'+choice+'</option>';
-							});
-							innerhtml+='</select></td>';
+						attributes+= 'id="'+ctrlname+'" name="'+ctrlname+'" hasvalue="'+arg.hasvalue+'"   ';
+						if(arg.checkbox){
+							innerhtml+='<div class="form-check"><label class="form-check-label">';
+							innerhtml+='<input type="checkbox" '+attributes+' class="form-check-input" value="" >'+arg.glossary+'</label>';
 						}
 						else {
-							ctrltype="text";
-							if(arg.checkbox){
-								ctrltype="checkbox";
-							}
-							
-							innerhtml+='<td><label for="'+ctrlname+'">'+ arg.glossary+'</label></td>';
-							innerhtml+='<td><input type="'+ctrltype+'"';
-							innerhtml+=attributes;
-							if(arg.checkbox){
-								if(data.values?.[command.name]?.[arg.longopts] ){
-									innerhtml+='checked ';							
-								}
-		
-								innerhtml+='></input></td>';
+							innerhtml+='<div class="form-group" ><label for="'+ctrlname+'">'+ arg.glossary+'</label>';
+							if(placeholder.includes('|')){
+								placeholder = placeholder.replace('<','').replace('>','');
+								innerhtml+='<select '+attributes + ' class="form-control"';
+								placeholder='--|'+placeholder;
+								placeholder.split('|').forEach(function(choice){
+									innerhtml+='<option >'+choice+'</option>';
+								});
+								innerhtml+='</select>';
 							}
 							else {
-								innerhtml+='value="'+curvalue+'" ';
-								innerhtml+='></input></td>'+ curvalue.length>0?'<td>last: '+curvalue+'</td>':'';
+								innerhtml+='<input type="text" class="form-control" placeholder="'+placeholder+'" '+attributes+'>';
 							}
+							innerhtml+='<small class="form-text text-muted">Previous value: '+curvalue+'</small>';
 						}
-						innerhtml+="</tr>";
+						innerhtml+='</div>';
+						
 					});
-				innerhtml+='</tbody></table>';
-				
 				}
+				
 				if(isConfig){
-					innerhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-success" cmdname="'+command.name+'" value="Save" onclick="runCommand(this,false);">';
-					innerhtml+='<input id="btn-'+ command.name + '-apply" type="button" class="btn btn-success" cmdname="'+command.name+'" value="Apply" onclick="runCommand(this,true);"></div></div><td></tr>';
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,false)">Save</button>';
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,true)">Apply</button>';
+				}
+				else {
+					innerhtml+='<button type="submit" class="btn btn-primary" id="btn-'+ command.name +'" cmdname="'+command.name+'" onclick="runCommand(this,false)">Execute</button>';
+				}
+				innerhtml+='</fieldset>';
+				
+				if(isConfig){
 					$('#'+command.name+'-list').append(innerhtml);
 				}
 				else {
-					advancedtabhtml+='<br>'+innerhtml;
-					advancedtabhtml+='<div class="buttons"><input id="btn-'+ command.name + '" type="button" class="btn btn-danger btn-sm" cmdname="'+command.name+'" value="'+command.name+'" onclick="runCommand(this, false);"></div></div><td></tr>';
+					$("#commands-list").append(innerhtml);
 				}
 			}		
         });
-		$("#commands-list").append(advancedtabhtml);
+		
 		
 		data.commands.forEach(function(command) {
 			if(command.hasOwnProperty("argtable")){
@@ -1205,6 +1193,10 @@ function getCommands() {
 					}
 					else {
 						$(ctrlselector)[0].value=data.values?.[command.name]?.[arg.longopts] || '';
+						if($(ctrlselector)[0].value.length==0 && (arg?.datatype || '').includes('|')){
+							$(ctrlselector)[0].value='--';
+						}
+						
 					}
 
 				});
