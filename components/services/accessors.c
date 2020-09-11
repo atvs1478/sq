@@ -370,7 +370,7 @@ cJSON * get_gpio_list() {
 	}
 #else
 		if(adc1_pad_get_io_num(CONFIG_BAT_CHANNEL,&gpio_num )==ESP_OK){
-			cJSON_AddItemToArray(list,get_gpio_entry("bat","",gpio_num,true));
+			cJSON_AddItemToArray(gpio_list,get_gpio_entry("bat","",gpio_num,true));
 		}
 #endif
 	gpio_list = get_GPIO_from_nvs("i2c_config","i2c", gpio_list, false);
