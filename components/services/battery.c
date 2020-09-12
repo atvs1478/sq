@@ -43,7 +43,7 @@ static struct {
 /****************************************************************************************
  * 
  */
-int battery_value_svc(void) {
+float battery_value_svc(void) {
 	return battery.avg;
  }
  
