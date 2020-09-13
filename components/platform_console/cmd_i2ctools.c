@@ -1179,7 +1179,7 @@ cJSON * spiconfig_cb(){
 static void register_spiconfig(void)
 {
 	spiconfig_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
-	spiconfig_args.clk = arg_int0("k", "clock", "<n>", "Clock GPIO");
+	spiconfig_args.clk = arg_int0("k", "clk", "<n>", "Clock GPIO");
 	spiconfig_args.data = arg_int0("d","data", "<n>","Data GPIO");
 	spiconfig_args.dc = arg_int0("c","dc", "<n>", "DC GPIO");
 	spiconfig_args.host= arg_int0("h", "host", "int", "SPI Host Number");
@@ -1198,7 +1198,7 @@ static void register_i2cconfig(void)
 {
 	i2cconfig_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
     i2cconfig_args.port = arg_int0("p", "port", "0|1", "Port");
-    i2cconfig_args.freq = arg_int0("f", "freq", "int", "Frequency (Hz) e.g. 100000");
+    i2cconfig_args.freq = arg_int0("f", "speed", "int", "Frequency (Hz) e.g. 100000");
     i2cconfig_args.sda = arg_int0("d", "sda", "<n>", "SDA GPIO. e.g. 19");
     i2cconfig_args.scl = arg_int0("c", "scl", "<n>", "SCL GPIO. e.g. 18");
     i2cconfig_args.load = arg_lit0("l", "load", "Load Existing Configuration");
