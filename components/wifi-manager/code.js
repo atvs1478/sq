@@ -1243,8 +1243,9 @@ function getCommands() {
 }
 
 function getConfig() {
-	$.getJSON("/config.json", function(data) {
-			Object.keys(data.hasOwnProperty('config') ? data.config : data).sort().forEach(function(key, i) {
+	$.getJSON("/config.json", function(entries) {
+		data = entries.hasOwnProperty('config') ? entries.config : entries;
+			Object.keys(data).sort().forEach(function(key, i) {
 				if (data.hasOwnProperty(key)) {
 					if (key == 'autoexec') {
 						if (data["autoexec"].value === "1") {
@@ -1280,9 +1281,9 @@ function getConfig() {
 				}
 			});
 			$("tbody#nvsTable").append("<tr><td><input type='text' class='form-control' id='nvs-new-key' placeholder='new key'></td><td><input type='text' class='form-control' id='nvs-new-value' placeholder='new value' nvs_type=33 ></td></tr>");
-			if (data.hasOwnProperty('gpio')) {
-				data.gpio.forEach(function(gpio_entry) {
-					cl = gpio_entry.fixed ? "table-light" : "table-dark";
+			if (entries.hasOwnProperty('gpio')) {
+				entries.gpio.forEach(function(gpio_entry) {
+					cl = gpio_entry.fixed ? "table-secondary" : "table-primary";
 					$("tbody#gpiotable").append('<tr class=' + cl + '><th scope="row">' + gpio_entry.group + '</th><td>' + gpio_entry.name + '</td><td>' + gpio_entry.gpio + '</td><td>' + (gpio_entry.fixed ? 'Fixed':'Configuration') + '</td></tr>');
 				});
 			}

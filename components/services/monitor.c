@@ -237,7 +237,7 @@ void monitor_svc_init(void) {
 		monitor_timer = xTimerCreate("monitor", MONITOR_TIMER / portTICK_RATE_MS, pdTRUE, NULL, monitor_callback);
 		xTimerStart(monitor_timer, portMAX_DELAY);
 	}	
-	free(p);
+	FREE_AND_NULL(p);
 	
 	ESP_LOGI(TAG, "Heap internal:%zu (min:%zu) external:%zu (min:%zu)", 
 			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
