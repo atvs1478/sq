@@ -47,6 +47,7 @@ esp_err_t config_i2c_set(const i2c_config_t * config, int port){
 	}
 	return ESP_OK;
 }
+
 /****************************************************************************************
  *
  */
@@ -259,32 +260,28 @@ esp_err_t get_gpio_structure(cJSON * gpio_entry, gpio_entry_t ** gpio){
 	cJSON * val = cJSON_GetObjectItem(gpio_entry,"gpio");
 	if(val){
 		(*gpio)->gpio= (int)val->valuedouble;
-	}
-	else {
+	} else {
 		ESP_LOGE(TAG,"gpio pin not found");
 		err=ESP_FAIL;
 	}
 	val = cJSON_GetObjectItem(gpio_entry,"name");
 	if(val){
 		(*gpio)->name= strdup(cJSON_GetStringValue(val));
-	}
-	else {
+	} else {
 		ESP_LOGE(TAG,"gpio name value not found");
 		err=ESP_FAIL;
 	}
 	val = cJSON_GetObjectItem(gpio_entry,"group");
 	if(val){
 		(*gpio)->group= strdup(cJSON_GetStringValue(val));
-	}
-	else {
+	} else {
 		ESP_LOGE(TAG,"gpio group value not found");
 		err=ESP_FAIL;
 	}
 	val = cJSON_GetObjectItem(gpio_entry,"fixed");
 	if(val){
 		(*gpio)->fixed= cJSON_IsTrue(val);
-	}
-	else {
+	} else {
 		ESP_LOGE(TAG,"gpio fixed indicator not found");
 		err=ESP_FAIL;
 	}
@@ -357,8 +354,7 @@ cJSON * get_gpio_list() {
 	if (bat_config) {
 		char *p;
 		int channel;
-		if ((p = strcasestr(bat_config, "channel") ) != NULL)
-		{
+		if ((p = strcasestr(bat_config, "channel") ) != NULL) {
 			channel = atoi(strchr(p, '=') + 1);
 			if(channel != -1){
 				if(adc1_pad_get_io_num(channel,&gpio_num )==ESP_OK){
