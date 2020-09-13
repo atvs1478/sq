@@ -1284,7 +1284,16 @@ void wifi_manager( void * pvParameters ){
 						}
 					}
 					ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - setting config for WIFI_IF_STA");
-					if((err=esp_wifi_set_config(WIFI_IF_STA, wifi_manager_get_wifi_sta_config()))!=ESP_OK) {
+					wifi_config_t* cfg = wifi_manager_get_wifi_sta_config();
+				    char * scan_mode = config_alloc_get_default(NVS_TYPE_STR, "wifi_smode", "f", 0);
+				    if (scan_mode && strcasecmp(scan_mode,"a")==0) {
+				    	cfg->sta.scan_method=WIFI_ALL_CHANNEL_SCAN;
+				    }
+				    else {
+				    	cfg->sta.scan_method=WIFI_FAST_SCAN;
+				    }
+				    FREE_AND_NULL(scan_mode);
+					if((err=esp_wifi_set_config(WIFI_IF_STA, cfg))!=ESP_OK) {
 						ESP_LOGE(TAG,  "Failed to set STA configuration. Error %s",esp_err_to_name(err));
 						break;
 					}

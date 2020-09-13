@@ -41,7 +41,13 @@ static struct {
 	struct arg_str *name;
 	struct arg_end *end;
 } name_args;
-
+static struct {
+ 	struct arg_lit *telnet;
+ 	struct arg_lit *btspeaker;
+ 	struct arg_lit *airplay;
+ 	struct arg_lit *stats;
+    struct arg_end *end;
+} set_services_args;
 static const char * TAG = "cmd_system";
 
 static void register_setbtsource();
@@ -55,6 +61,7 @@ static void register_light_sleep();
 static void register_factory_boot();
 static void register_restart_ota();
 static void register_update_certs();
+static void register_set_services();
 #if WITH_TASKS_INFO
 static void register_tasks();
 #endif
@@ -63,6 +70,7 @@ void register_system()
 {
 	register_setbtsource();
     register_free();
+    register_set_services();
     register_heap();
     register_setdevicename();
     register_version();
@@ -109,9 +117,6 @@ static void register_version()
     cmd_to_json(&cmd);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
-
-/** 'restart' command restarts the program */
-
 
 esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 {
@@ -582,7 +587,80 @@ static void register_deep_sleep()
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
+static int enable_disable(FILE * f,char * nvs_name, struct arg_lit *arg){
+	esp_err_t err = config_set_value(NVS_TYPE_STR, nvs_name, arg->count>0?"Y":"N");
+	const char * name = arg->hdr.longopts?arg->hdr.longopts:arg->hdr.glossary;
 
+	if(err!=ESP_OK){
+		fprintf(f,"Error %s %s. %s\n",arg->count>0?"Enabling":"Disabling", name, esp_err_to_name(err));
+	}
+	else {
+		fprintf(f,"%s %s\n",arg->count>0?"Enabled":"Disabled",name);
+	}
+	return err;
+}
+static int do_set_services(int argc, char **argv)
+{
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&set_services_args);
+    if (nerrors != 0) {
+        return 0;
+    }
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		log_send_messaging(MESSAGING_ERROR,"Unable to open memory stream.");
+		return 0;
+	}
+
+	nerrors += enable_disable(f,"enable_airplay",set_services_args.airplay);
+	nerrors += enable_disable(f,"enable_bt_sink",set_services_args.btspeaker);
+	nerrors += enable_disable(f,"telnet_enable",set_services_args.telnet);
+	nerrors += enable_disable(f,"stats",set_services_args.stats);
+	fflush (f);
+	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return nerrors==0;
+}
+
+cJSON * set_services_cb(){
+	cJSON * values = cJSON_CreateObject();
+	char * p=NULL;
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_bt_sink")) != NULL) {
+		cJSON_AddBoolToObject(values,"BT_Speaker",strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0);
+		FREE_AND_NULL(p);
+	}
+	if ((p = config_alloc_get(NVS_TYPE_STR, "enable_airplay")) != NULL) {
+		cJSON_AddBoolToObject(values,"AirPlay",strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0);
+		FREE_AND_NULL(p);
+	}
+	if ((p = config_alloc_get(NVS_TYPE_STR, "telnet_enable")) != NULL) {
+		cJSON_AddBoolToObject(values,"telnet",strcasestr("YXD",p)!=NULL);
+		FREE_AND_NULL(p);
+	}
+	if((p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0))!=NULL){
+		cJSON_AddBoolToObject(values,"stats",(*p == '1' || *p == 'Y' || *p == 'y')) ;
+	}
+	return values;
+}
+
+static void register_set_services(){
+	set_services_args.airplay = arg_lit0(NULL, "AirPlay", "AirPlay");
+	set_services_args.btspeaker = arg_lit0(NULL, "BT_Speaker", "Bluetooth Speaker");
+	set_services_args.telnet= arg_lit0(NULL, "telnet", "Telnet server. Use only for troubleshooting");
+	set_services_args.stats= arg_lit0(NULL, "stats", "System Statistics. Use only for troubleshooting");
+    set_services_args.end=arg_end(2);
+	const esp_console_cmd_t cmd = {
+        .command = "set_services",
+        .help = "Services",
+		.argtable = &set_services_args,
+        .hint = NULL,
+        .func = &do_set_services,
+    };
+	cmd_to_json_with_cb(&cmd,&set_services_cb);
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
 /** 'light_sleep' command puts the chip into light sleep mode */
 
 static struct {
