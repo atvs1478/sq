@@ -35,7 +35,7 @@ typedef unsigned long long u64_t;
 #define OUTPUT_THREAD_STACK_SIZE  6 * 1024
 #define IR_THREAD_STACK_SIZE      6 * 1024
 
-// number of 5s times search for a server will happen beforee slimproto exits (0 = no limit)
+// number of times the 5s search for a server will happen before slimproto exits (0 = no limit)
 #define MAX_SERVER_RETRIES	5
 
 // or can be as simple as #define PLAYER_ID 100

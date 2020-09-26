@@ -1,4 +1,3 @@
-
 idf_component_register(SRC_DIRS . core core/ifaces  fonts
 						INCLUDE_DIRS . fonts core
 						REQUIRES platform_config tools esp_common

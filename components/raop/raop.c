@@ -228,7 +228,6 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	closesocket(sock);
 
 	pthread_join(ctx->thread, NULL);
-
 	rtp_end(ctx->rtp);
 
 	shutdown(ctx->sock, SD_BOTH);
@@ -247,14 +246,17 @@ void raop_delete(struct raop_ctx_s *ctx) {
 	// then the RTSP task
 	ctx->joiner = xTaskGetCurrentTaskHandle();
 	ctx->running = false;
+	
+	// brute-force exit of accept() 
+	shutdown(ctx->sock, SHUT_RDWR);
+	closesocket(ctx->sock);
 
+	// wait to make sure LWIP if scheduled (avoid issue with NotifyTake)	
+	vTaskDelay(100 / portTICK_PERIOD_MS);
 	ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 	vTaskDelete(ctx->thread);
 	heap_caps_free(ctx->xTaskBuffer);
 
-	shutdown(ctx->sock, SHUT_RDWR);
-	closesocket(ctx->sock);
-	
 	// cleanup all session-created items
 	cleanup_rtsp(ctx, true);
 		

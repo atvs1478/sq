@@ -962,7 +962,7 @@ void slimproto(log_level level, char *server, u8_t mac[6], const char *name, con
 			if (++failed_connect > 5 && !server) {
 				slimproto_ip = serv_addr.sin_addr.s_addr = discover_server(NULL, MAX_SERVER_RETRIES);
 				if (!slimproto_ip) return;
-			} else if (MAX_SERVER_RETRIES && failed_connect > 5 * MAX_SERVER_RETRIES) return;
+			} else if (reconnect && MAX_SERVER_RETRIES && failed_connect > 5 * MAX_SERVER_RETRIES) return;
 #else
 			// rediscover server if it was not set at startup or exit 
 			if (!server && ++failed_connect > 5) {

@@ -327,12 +327,12 @@ void register_external(void) {
 
 void deregister_external(void) {
 	if (!strcasestr(output.device, "BT ") && enable_bt_sink) {
-		bt_sink_deinit();
 		LOG_INFO("Stopping BT sink");
+		bt_sink_deinit();
 	}
 	if (enable_airplay){
+		LOG_INFO("Stopping AirPlay sink");		
 		raop_sink_deinit();
-		LOG_INFO("Stopping AirPlay sink");
 	}
 }
 
