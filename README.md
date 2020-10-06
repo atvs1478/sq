@@ -102,10 +102,11 @@ NB: For well-known configuration, this is ignored
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
-I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,HFlip][,VFlip][driver=SSD1306|SSD1326[:1|4]|SSD1327|SH1106]
-SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,back=<gpio>][,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1322|SSD1326[:1|4]|SSD1327|SH1106|SSD1675|ST7735|ST7789[,rotate]]
+I2C,width=<pixels>,height=<pixels>[address=<i2c_address>][,reset=<gpio>][,HFlip][,VFlip][driver=SSD1306|SSD1326[:1|4]|SSD1327|SH1106]
+SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,back=<gpio>][,reset=<gpio>][,speed=<speed>][,HFlip][,VFlip][driver=SSD1306|SSD1322|SSD1326[:1|4]|SSD1327|SH1106|SSD1675|ST7735|ST7789[,rotate]]
 ```
 - back: a LED backlight used by some older devices (ST7735). It is PWM controlled for brightness
+- reset: some display have a reset pin that is should normally be pulled up if unused
 - VFlip and HFlip are optional can be used to change display orientation
 - rotate: for non-square *drivers*, move to portrait mode. Note that *width* and *height* must be inverted then
 - Default speed is 8000000 (8MHz) but SPI can work up to 26MHz or even 40MHz
