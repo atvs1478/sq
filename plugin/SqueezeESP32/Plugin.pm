@@ -25,7 +25,7 @@ $prefs->migrateClient(1, sub {
 });
 
 $prefs->setChange(sub {
-	send_equalizer($_[2]);
+	$_[2]->send_equalizer;
 }, 'equalizer');
 
 sub initPlugin {
@@ -40,8 +40,10 @@ sub initPlugin {
 	}
 
 	$class->SUPER::initPlugin(@_);
-	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
-	main::INFOLOG && $log->is_info && $log->info("Added class 100 for SqueezeESP32");
+	# no name can be a subset of others due to a bug in addPlayerClass
+	Slim::Networking::Slimproto::addPlayerClass($class, 100, 'squeezeesp32-basic', { client => 'Plugins::SqueezeESP32::Player', display => 'Plugins::SqueezeESP32::Graphics' });
+	Slim::Networking::Slimproto::addPlayerClass($class, 101, 'squeezeesp32-graphic', { client => 'Plugins::SqueezeESP32::Player', display => 'Slim::Display::NoDisplay' });		
+	main::INFOLOG && $log->is_info && $log->info("Added class 100 and 101 for SqueezeESP32");
 
 	# register a command to set the EQ - without saving the values! Send params as single comma separated list of values
 	Slim::Control::Request::addDispatch(['squeezeesp32', 'seteq', '_eq'], [1, 0, 0, \&setEQ]);
@@ -50,9 +52,6 @@ sub initPlugin {
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
-
-	# the custom player class is only initialized if it has a display - thus we need to listen to connect events in order to initializes other player prefs
-	Slim::Control::Request::subscribe( \&onPlayer,[ ['client'], [ 'new', 'reconnect' ] ] );
 }
 
 sub onStopClear {
@@ -61,20 +60,6 @@ sub onStopClear {
 
 	if ($client->isa('Plugins::SqueezeESP32::Player')) {
 		$client->clear_artwork($request);
-	}
-}
-
-sub onPlayer {
-	my $request = shift;
-	my $client  = $request->client || return;
-
-	if ($client->model eq 'squeezeesp32') {
-		main::INFOLOG && $log->is_info && $log->info("SqueezeESP player connected: " . $client->id);
-
-		$prefs->client($client)->init( {
-			equalizer => [(0) x 10],
-		} );
-		send_equalizer($client);
 	}
 }
 
@@ -104,18 +89,7 @@ sub setEQ {
 		$eqParams[$x] ||= 0;
 	}
 
-	send_equalizer($client, \@eqParams);
-}
-
-sub send_equalizer {
-	my ($client, $equalizer) = @_;
-
-	if ($client->model eq 'squeezeesp32') {
-		$equalizer ||= $prefs->client($client)->get('equalizer') || [(0) x 10];
-		my $size = @$equalizer;
-		my $data = pack("c[$size]", @{$equalizer});
-		$client->sendFrame( eqlz => \$data );
-	}
+	$client->send_equalizer(\@eqParams);
 }
 
 1;

@@ -31,7 +31,7 @@ sub page {
 sub prefs {
 	my ($class, $client) = @_;
 	my @prefs;
-	push @prefs, qw(width small_VU) if defined $client->displayWidth;
+	push @prefs, qw(width small_VU) if $client->displayWidth;
 	return ($prefs->client($client), @prefs);
 }
 
@@ -41,7 +41,7 @@ sub handler {
 	my ($cprefs, @prefs) = $class->prefs($client);
 
 	if ($paramRef->{'saveSettings'}) {
-		if (defined $client->displayWidth) {
+		if ($client->displayWidth) {
 			$cprefs->set('small_VU', $paramRef->{'pref_small_VU'} || 15);
 			my $spectrum = {
 				scale => $paramRef->{'pref_spectrum_scale'} || 25,
@@ -76,7 +76,7 @@ sub handler {
 		$client->update_tones($equalizer);
 	}
 
-	if (defined $client->displayWidth) {
+	if ($client->displayWidth) {
 		# the Settings super class can't handle anything but scalar values
 		# we need to populate the $paramRef for the other prefs manually
 		$paramRef->{'pref_spectrum'} = $cprefs->get('spectrum');

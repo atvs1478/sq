@@ -51,7 +51,7 @@ u8_t custom_player_id = 12;
 void embedded_init(void) {
 	mutex_create(slimp_mutex);
 	sb_controls_init();
-	if (sb_display_init()) custom_player_id = 100;
+	custom_player_id = sb_display_init() ? 100 : 101;
 }
 
 u16_t get_RSSI(void) {
