@@ -1,10 +1,10 @@
 <?xml version='1.0' standalone='yes'?>
 <extensions>
   <plugins>
-    <plugin version="0.200" name="SqueezeESP32" minTarget="7.9" maxTarget="*">
+    <plugin version="0.201" name="SqueezeESP32" minTarget="7.9" maxTarget="*">
       <link>https://github.com/sle118/squeezelite-esp32</link>
       <creator>Philippe</creator>
-      <sha>ab2d65f5ba8e73f0f78a1a8650af19ebb1e8e724</sha>
+      <sha>c7134a3f03fbb836c48c929700ad7765854644f7</sha>
       <email>philippe_44@outlook.com</email>
       <desc lang="EN">SqueezeESP32 additional player id (100)</desc>
       <url>http://github.com/sle118/squeezelite-esp32/raw/master/plugin/SqueezeESP32.zip</url>

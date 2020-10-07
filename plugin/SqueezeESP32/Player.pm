@@ -91,12 +91,19 @@ sub init {
 	}
 	
 	$client->SUPER::init(@_);
-	$client->config_artwork;
-}
+	main::INFOLOG && $log->is_info && $log->info("SqueezeESP player connected: " . $client->id);
+}	
 
 sub initPrefs {
 	my $client = shift;
+	
 	$sprefs->client($client)->init($defaultPrefs);
+	
+	$prefs->client($client)->init( { 
+		equalizer => [(0) x 10],
+		artwork => 0,	
+	} );
+
 	$client->SUPER::initPrefs;
 }
 
@@ -144,6 +151,15 @@ sub treble {
 	$client->update_equalizer($value, [8, 9, 7]) if defined $new;
 
 	return $value;
+}
+
+sub send_equalizer {
+	my ($client, $equalizer) = @_;
+
+	$equalizer ||= $prefs->client($client)->get('equalizer') || [(0) x 10];
+	my $size = @$equalizer;
+	my $data = pack("c[$size]", @{$equalizer});
+	$client->sendFrame( eqlz => \$data );
 }
 
 sub update_equalizer {
@@ -240,8 +256,11 @@ sub config_artwork {
 
 sub reconnect {
 	my $client = shift;
-	$client->pluginData('artwork_md5', '');
 	$client->SUPER::reconnect(@_);
+	
+	$client->pluginData('artwork_md5', '');
+	$client->config_artwork;
+	$client->send_equalizer;
 }
 
 # Change the analog output mode between headphone and sub-woofer
