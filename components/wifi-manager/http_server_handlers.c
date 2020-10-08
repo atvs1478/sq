@@ -89,18 +89,18 @@ static const char redirect_payload3[]="'>here</a> to login.</p></body></html>";
  * @see file "component.mk"
  * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
  */
-extern const uint8_t style_css_start[] asm("_binary_style_css_start");
-extern const uint8_t style_css_end[]   asm("_binary_style_css_end");
-extern const uint8_t jquery_gz_start[] asm("_binary_jquery_min_js_gz_start");
-extern const uint8_t jquery_gz_end[] asm("_binary_jquery_min_js_gz_end");
-extern const uint8_t popper_gz_start[] asm("_binary_popper_min_js_gz_start");
-extern const uint8_t popper_gz_end[] asm("_binary_popper_min_js_gz_end");
-extern const uint8_t bootstrap_js_gz_start[] asm("_binary_bootstrap_min_js_gz_start");
-extern const uint8_t bootstrap_js_gz_end[] asm("_binary_bootstrap_min_js_gz_end");
-extern const uint8_t bootstrap_css_gz_start[] asm("_binary_bootstrap_min_css_gz_start");
-extern const uint8_t bootstrap_css_gz_end[] asm("_binary_bootstrap_min_css_gz_end");
-extern const uint8_t code_js_start[] asm("_binary_code_js_start");
-extern const uint8_t code_js_end[] asm("_binary_code_js_end");
+extern const uint8_t style_css_start[] asm("_binary_style_css_gz_start");
+extern const uint8_t style_css_end[]   asm("_binary_style_css_gz_end");
+extern const uint8_t jquery_gz_start[] asm("_binary_jquery_js_gz_start");
+extern const uint8_t jquery_gz_end[] asm("_binary_jquery_js_gz_end");
+// extern const uint8_t popper_gz_start[] asm("_binary_popper_min_js_gz_start");
+// extern const uint8_t popper_gz_end[] asm("_binary_popper_min_js_gz_end");
+extern const uint8_t bootstrap_js_gz_start[] asm("_binary_bootstrap_js_gz_start");
+extern const uint8_t bootstrap_js_gz_end[] asm("_binary_bootstrap_js_gz_end");
+extern const uint8_t bootstrap_css_gz_start[] asm("_binary_bootstrap_css_gz_start");
+extern const uint8_t bootstrap_css_gz_end[] asm("_binary_bootstrap_css_gz_end");
+extern const uint8_t code_js_start[] asm("_binary_code_js_gz_start");
+extern const uint8_t code_js_end[] asm("_binary_code_js_gz_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
@@ -232,31 +232,31 @@ bool is_captive_portal_host_name(httpd_req_t *req){
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
-	START_FREE_MEM_CHECK(ff);
 	session_context_t * context = (session_context_t *)ctx;
     if(context){
     	ESP_LOGD(TAG, "Freeing up socket context");
     	FREE_AND_NULL(context->auth_token);
     	FREE_AND_NULL(context->sess_ip_address);
     	free(context);
-    	CHECK_RESET_FREE_MEM_CHECK(ff,"free_ctx");
     }
 }
 
 session_context_t* get_session_context(httpd_req_t *req){
-	START_FREE_MEM_CHECK(ff);
+	bool newConnection=false;
 	if (! req->sess_ctx) {
 		ESP_LOGD(TAG,"New connection context. Allocating session buffer");
 		req->sess_ctx = malloc(sizeof(session_context_t));
 		memset(req->sess_ctx,0x00,sizeof(session_context_t));
 		req->free_ctx = free_ctx_func;
+		newConnection = true;
 		// get the remote IP address only once per session
 	}
 	session_context_t *ctx_data = (session_context_t*)req->sess_ctx;
 	FREE_AND_NULL(ctx_data->sess_ip_address);
 	ctx_data->sess_ip_address = http_alloc_get_socket_address(req, 0, &ctx_data->port);
-	ESP_LOGD_LOC(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
-	CHECK_RESET_FREE_MEM_CHECK(ff,"get sess context");
+	if(newConnection){
+		ESP_LOGI(TAG, "serving %s to peer %s port %u", req->uri, ctx_data->sess_ip_address , ctx_data->port);
+	}
 	return (session_context_t *)req->sess_ctx;
 }
 
@@ -408,11 +408,13 @@ esp_err_t resource_filehandler(httpd_req_t *req){
    }
 
    if(strstr(filename, "code.js")) {
-	    const size_t file_size = (code_js_end - code_js_start);
 	    set_content_type_from_file(req, filename);
+		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+	    const size_t file_size = (code_js_end - code_js_start);
 	    httpd_resp_send(req, (const char *)code_js_start, file_size);
 	} else if(strstr(filename, "style.css")) {
 		set_content_type_from_file(req, filename);
+		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (style_css_end - style_css_start);
 	    httpd_resp_send(req, (const char *)style_css_start, file_size);
     } else if(strstr(filename, "favicon.ico")) {
@@ -424,11 +426,11 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 	    const size_t file_size = (jquery_gz_end - jquery_gz_start);
 	    httpd_resp_send(req, (const char *)jquery_gz_start, file_size);
-	} else if(strstr(filename, "popper.js")) {
-		set_content_type_from_file(req, filename);
-		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-	    const size_t file_size = (popper_gz_end - popper_gz_start);
-	    httpd_resp_send(req, (const char *)popper_gz_start, file_size);
+	// } else if(strstr(filename, "popper.js")) {
+	// 	set_content_type_from_file(req, filename);
+	// 	httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+	//     const size_t file_size = (popper_gz_end - popper_gz_start);
+	//     httpd_resp_send(req, (const char *)popper_gz_start, file_size);
 	} else if(strstr(filename, "bootstrap.js")) {
 			set_content_type_from_file(req, filename);
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
@@ -487,7 +489,8 @@ esp_err_t console_cmd_get_handler(httpd_req_t *req){
 	return err;
 }
 esp_err_t console_cmd_post_handler(httpd_req_t *req){
-	char success[]="{}";
+	char success[]="{\"Result\" : \"Success\" }";
+	char failed[]="{\"Result\" : \"Failed\" }";
 	ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
 	//bool bOTA=false;
 	//char * otaURL=NULL;
@@ -522,13 +525,17 @@ esp_err_t console_cmd_post_handler(httpd_req_t *req){
 		ESP_LOGE_LOC(TAG, "Command not found. Received content was: %s",command);
 		httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Malformed command json.  Unable to parse content.");
 		err = ESP_FAIL;
+
 	}
 	else{
 		// navigate to the first child of the config structure
-		run_command(cJSON_GetStringValue(item));
+		if(run_command(cJSON_GetStringValue(item))!=ESP_OK){
+			httpd_resp_send(req, (const char *)failed, strlen(failed));
+		}
+		else {
+			httpd_resp_send(req, (const char *)success, strlen(success));
+		}
 	}
-
-	httpd_resp_send(req, (const char *)success, strlen(success));
 
 	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
 	return err;
@@ -1041,7 +1048,11 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
 	bool connected_to_sta_ip_interface = false;
 	bool useragentiscaptivenetwork = false;
 
-	ESP_LOGW_LOC(TAG, "Invalid URL requested: [%s]", req->uri);
+    in_port_t port=0;
+    ESP_LOGV_LOC(TAG,  "Getting remote socket address");
+    remote_ip = http_alloc_get_socket_address(req,0, &port);
+
+	ESP_LOGW_LOC(TAG, "%s requested invalid URL: [%s]",remote_ip, req->uri);
     if(wifi_manager_lock_sta_ip_string(portMAX_DELAY)){
 		sta_ip_address = strdup(wifi_manager_get_sta_ip_string());
 		wifi_manager_unlock_sta_ip_string();
@@ -1051,9 +1062,6 @@ esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error){
     	httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , NULL);
 	}
 
-    in_port_t port=0;
-    ESP_LOGV_LOC(TAG,  "Getting remote socket address");
-    remote_ip = http_alloc_get_socket_address(req,0, &port);
 
     ESP_LOGV_LOC(TAG,  "Getting host name from request");
     char *req_host = alloc_get_http_header(req, "Host");
@@ -1128,34 +1136,24 @@ esp_err_t redirect_ev_handler(httpd_req_t *req){
 
 esp_err_t messages_get_handler(httpd_req_t *req){
     ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
-    START_FREE_MEM_CHECK(before);
-    START_FREE_MEM_CHECK(all);
     if(!is_user_authenticated(req)){
     	// todo:  redirect to login page
     	// return ESP_OK;
     }
-    CHECK_RESET_FREE_MEM_CHECK(before, "after user auth");
     esp_err_t err = set_content_type_from_req(req);
 	if(err != ESP_OK){
 		return err;
 	}
-	CHECK_RESET_FREE_MEM_CHECK(before, "after set_content_type");
 	cJSON * json_messages=  messaging_retrieve_messages(messaging);
-	CHECK_RESET_FREE_MEM_CHECK(before, "after receiving messages");
 	if(json_messages!=NULL){
 		char * json_text= cJSON_Print(json_messages);
-		CHECK_RESET_FREE_MEM_CHECK(before, "after json print");
 		httpd_resp_send(req, (const char *)json_text, strlen(json_text));
-		CHECK_RESET_FREE_MEM_CHECK(before, "after http send");
 		free(json_text);
-		CHECK_RESET_FREE_MEM_CHECK(before, "after free json message");
 		cJSON_Delete(json_messages);
-		CHECK_RESET_FREE_MEM_CHECK(before, "after free json");
 	}
 	else {
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Unable to retrieve messages");
 	}
-	CHECK_RESET_FREE_MEM_CHECK(all, "before returning");
 	return ESP_OK;
 }
 

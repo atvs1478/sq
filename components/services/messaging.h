@@ -1,4 +1,5 @@
 #include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
 #include "cJSON.h"
 #pragma once
@@ -10,7 +11,8 @@ typedef enum {
 typedef enum {
 	MESSAGING_CLASS_OTA,
 	MESSAGING_CLASS_SYSTEM,
-	MESSAGING_CLASS_STATS
+	MESSAGING_CLASS_STATS,
+	MESSAGING_CLASS_CFGCMD
 } messaging_classes;
 
 typedef struct messaging_list_t *messaging_handle_t;
@@ -30,6 +32,7 @@ void messaging_post_message(messaging_types type,messaging_classes msg_class, co
 cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle);
 single_message_t *  messaging_retrieve_message(RingbufHandle_t buf_handle);
 void log_send_messaging(messaging_types msgtype,const char *fmt, ...);
+void cmd_send_messaging(const char * cmdname,messaging_types msgtype, const char *fmt, ...);
 esp_err_t messaging_type_to_err_type(messaging_types type);
 void messaging_service_init();
 

@@ -119,6 +119,7 @@ const char * messaging_get_class_desc(messaging_classes msg_class){
 	CASE_TO_STR(MESSAGING_CLASS_OTA);
 	CASE_TO_STR(MESSAGING_CLASS_SYSTEM);
 	CASE_TO_STR(MESSAGING_CLASS_STATS);
+	CASE_TO_STR(MESSAGING_CLASS_CFGCMD);
 		default:
 			return "Unknown";
 			break;
@@ -141,12 +142,12 @@ cJSON *  messaging_retrieve_messages(RingbufHandle_t buf_handle){
 		else {
 			json_message = cJSON_CreateObject();
 			cJSON_AddStringToObject(json_message, "message", message->message);
-			vRingbufferReturnItem(buf_handle, (void *)message);
 			cJSON_AddStringToObject(json_message, "type", messaging_get_type_desc(message->type));
 			cJSON_AddStringToObject(json_message, "class", messaging_get_class_desc(message->msg_class));
 			cJSON_AddNumberToObject(json_message,"sent_time",message->sent_time);
 			cJSON_AddNumberToObject(json_message,"current_time",esp_timer_get_time() / 1000);
 			cJSON_AddItemToArray(json_messages,json_message);
+			vRingbufferReturnItem(buf_handle, (void *)message);
 		}
 	}
 	return json_messages;
@@ -260,5 +261,23 @@ void log_send_messaging(messaging_types msgtype,const char *fmt, ...) {
 	else{
 		ESP_LOGE(tag, "Memory allocation failed while sending message");
 	}
-
+}
+void cmd_send_messaging(const char * cmdname,messaging_types msgtype, const char *fmt, ...){
+	va_list va;
+	va_start(va, fmt);
+	size_t cmd_len = strlen(cmdname)+1;
+	size_t ln = vsnprintf(NULL, 0, fmt, va)+1;
+	char * message_txt = malloc(ln+cmd_len);
+	if(message_txt){
+		strcpy(message_txt,cmdname);
+		strcat(message_txt,"\n");
+		vsprintf((message_txt+cmd_len), fmt, va);
+		va_end(va);
+		ESP_LOG_LEVEL_LOCAL(messaging_type_to_err_type(msgtype),tag, "%s",message_txt);
+		messaging_post_message(msgtype, MESSAGING_CLASS_CFGCMD, message_txt );
+		free(message_txt);
+	}
+	else{
+		ESP_LOGE(tag, "Memory allocation failed while sending message");
+	}
 }

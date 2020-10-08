@@ -32,11 +32,8 @@ static const char *TAG = "monitor";
 
 static TimerHandle_t monitor_timer;
 
-static struct {
-	int gpio;
-	int active;
-} 	jack = { CONFIG_JACK_GPIO, 0 },
-	spkfault = { CONFIG_SPKFAULT_GPIO, 0 };
+static monitor_gpio_t jack = { CONFIG_JACK_GPIO, 0 };
+static monitor_gpio_t spkfault = { CONFIG_SPKFAULT_GPIO, 0 };
 
 void (*jack_handler_svc)(bool inserted);
 bool jack_inserted_svc(void);
@@ -245,3 +242,17 @@ void monitor_svc_init(void) {
 			heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
 			heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
 }
+
+/****************************************************************************************
+ * 
+ */
+ monitor_gpio_t * get_spkfault_gpio(){
+	return &spkfault	; 
+ } 
+
+/****************************************************************************************
+ * 
+ */
+ monitor_gpio_t * get_jack_insertion_gpio(){
+	return &jack;
+} 

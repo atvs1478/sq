@@ -32,25 +32,30 @@
 #include "messaging.h"				  
 #include "platform_console.h"
 #include "trace.h"
-
-#ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
+#ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
 #define WITH_TASKS_INFO 1
 #endif
-
+static struct {
+	struct arg_str *scanmode;
+    struct arg_lit *disable_power_save;
+	struct arg_end *end;
+} wifi_parms_arg;
 static struct {
 	struct arg_str *name;
 	struct arg_end *end;
 } name_args;
 static struct {
- 	struct arg_lit *telnet;
  	struct arg_lit *btspeaker;
  	struct arg_lit *airplay;
+ 	struct arg_str *telnet;
+#if WITH_TASKS_INFO    
  	struct arg_lit *stats;
+#endif     
     struct arg_end *end;
 } set_services_args;
 static const char * TAG = "cmd_system";
 
-static void register_setbtsource();
+//static void register_setbtsource();
 static void register_free();
 static void register_setdevicename();
 static void register_heap();
@@ -62,13 +67,15 @@ static void register_factory_boot();
 static void register_restart_ota();
 static void register_update_certs();
 static void register_set_services();
+static void register_set_wifi_parms();
 #if WITH_TASKS_INFO
 static void register_tasks();
 #endif
 extern BaseType_t wifi_manager_task;
 void register_system()
 {
-	register_setbtsource();
+    register_set_wifi_parms();
+//	register_setbtsource();
     register_free();
     register_set_services();
     register_heap();
@@ -90,7 +97,7 @@ static int get_version(int argc, char **argv)
 {
     esp_chip_info_t info;
     esp_chip_info(&info);
-    log_send_messaging(MESSAGING_INFO,
+    cmd_send_messaging(argv[0],MESSAGING_INFO,
     "IDF Version:%s\r\n"
     "Chip info:\r\n"
     "\tmodel:%s\r\n"
@@ -196,7 +203,7 @@ static int restart(int argc, char **argv)
 {
 	log_send_messaging(MESSAGING_WARNING, "\n\nPerforming a simple restart to the currently active partition.");
 	if(!wait_for_commit()){
-		log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
+		cmd_send_messaging(argv[0],MESSAGING_WARNING,"Unable to commit configuration. ");
 	}
     vTaskDelay(750/ portTICK_PERIOD_MS);
     esp_restart();
@@ -205,7 +212,7 @@ static int restart(int argc, char **argv)
 
 void simple_restart()
 {
-	log_send_messaging(MESSAGING_WARNING,"\n\n Called to perform a simple system reboot.");
+	log_send_messaging(MESSAGING_WARNING,"System reboot requested.");
 	if(!wait_for_commit()){
 		log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
 	}
@@ -216,24 +223,24 @@ void simple_restart()
 }
 
 esp_err_t guided_restart_ota(){
-	log_send_messaging(MESSAGING_WARNING,"\n\nCalled for a reboot to OTA Application");
+	log_send_messaging(MESSAGING_WARNING,"System reboot to Application requested");
     guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 esp_err_t guided_factory(){
-	log_send_messaging(MESSAGING_WARNING,"\n\nCalled for a reboot to recovery application");
+	log_send_messaging(MESSAGING_WARNING,"System reboot to recovery requested");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return ESP_FAIL; // return fail.  This should never return... we're rebooting!
 }
 static int restart_factory(int argc, char **argv)
 {
-	log_send_messaging(MESSAGING_WARNING, "Executing guided boot into recovery");
+	cmd_send_messaging(argv[0],MESSAGING_WARNING, "Executing guided boot into recovery");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_FACTORY);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
 static int restart_ota(int argc, char **argv)
 {
-	log_send_messaging(MESSAGING_WARNING, "Executing guided boot into ota app 0");
+	cmd_send_messaging(argv[0],MESSAGING_WARNING, "Executing guided boot into ota app 0");
 	guided_boot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 	return 0; // return fail.  This should never return... we're rebooting!
 }
@@ -241,7 +248,7 @@ static void register_restart()
 {
     const esp_console_cmd_t cmd = {
         .command = "restart",
-        .help = "Software reset of the chip",
+        .help = "Reboot system",
         .hint = NULL,
         .func = &restart,
     };
@@ -252,7 +259,7 @@ static void register_restart_ota()
 {
     const esp_console_cmd_t cmd = {
         .command = "restart_ota",
-        .help = "Selects the ota app partition to boot from and performa a software reset of the chip",
+        .help = "Reboot system to Squeezelite",
         .hint = NULL,
         .func = &restart_ota,
     };
@@ -264,7 +271,7 @@ static void register_factory_boot()
 {
     const esp_console_cmd_t cmd = {
         .command = "recovery",
-        .help = "Resets and boot to recovery (if available)",
+        .help = "Reboot system to Recovery",
         .hint = NULL,
         .func = &restart_factory,
     };
@@ -275,94 +282,10 @@ static void register_factory_boot()
 
 static int free_mem(int argc, char **argv)
 {
-	log_send_messaging(MESSAGING_INFO,"%d", esp_get_free_heap_size());
+	cmd_send_messaging(argv[0],MESSAGING_INFO,"%d", esp_get_free_heap_size());
     return 0;
 }
 
-/*
-static struct {
-    struct arg_str *a2dp_dev_name;
-    struct arg_str *a2dp_sink_name;
-    struct arg_str *wakeup_gpio_level;
-    struct arg_str *bt_sink_pin;
-    struct arg_str *enable_bt_sink;
-    struct arg_end *end;
-} set_btsource_args;
-*/
-
-//static int do_set_btsource(int argc, char **argv)
-//{
-//	a2dp_dev_name;
-//	a2dp_sink_name;
-//	wakeup_gpio_level;
-//	bt_sink_pin;
-//	enable_bt_sink;
-
-
-
-//	int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&deep_sleep_args);
-//    if (nerrors != 0) {
-//        return 1;
-//    }
-//    if (deep_sleep_args.wakeup_time->count) {
-//        uint64_t timeout = 1000ULL * deep_sleep_args.wakeup_time->ival[0];
-//        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
-//        ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
-//    }
-//    if (deep_sleep_args.wakeup_gpio_num->count) {
-//        int io_num = deep_sleep_args.wakeup_gpio_num->ival[0];
-//        if (!rtc_gpio_is_valid_gpio(io_num)) {
-//        	log_send_messaging(MESSAGING_ERROR, "GPIO %d is not an RTC IO", io_num);
-//            return 1;
-//        }
-//        int level = 0;
-//        if (deep_sleep_args.wakeup_gpio_level->count) {
-//            level = deep_sleep_args.wakeup_gpio_level->ival[0];
-//            if (level != 0 && level != 1) {
-//            	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
-//                return 1;
-//            }
-//        }
-//        log_send_messaging(MESSAGING_INFO, "Enabling wakeup on GPIO%d, wakeup on %s level",
-//                 io_num, level ? "HIGH" : "LOW");
-//
-//        ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, level) );
-//    }
-//    rtc_gpio_isolate(GPIO_NUM_12);
-//    esp_deep_sleep_start();
-//return 0;
-//}
-
-
-
-static void register_setbtsource(){
-
-//	a2dp_dev_name;
-//	a2dp_sink_name;
-//	wakeup_gpio_level;
-//	bt_sink_pin;
-//	enable_bt_sink;
-//
-//    set_btsource_args.wakeup_time =
-//        arg_int0("t", "time", "<t>", "Wake up time, ms");
-//    set_btsource_args.wakeup_gpio_num =
-//        arg_int0(NULL, "io", "<n>",
-//                 "If specified, wakeup using GPIO with given number");
-//    set_btsource_args.wakeup_gpio_level =
-//        arg_int0(NULL, "io_level", "<0|1>", "GPIO level to trigger wakeup");
-//    set_btsource_args.end = arg_end(3);
-//
-//    const esp_console_cmd_t cmd = {
-//        .command = "deep_sleep",
-//        .help = "Enter deep sleep mode. "
-//        "Two wakeup modes are supported: timer and GPIO. "
-//        "If no wakeup option is specified, will sleep indefinitely.",
-//        .hint = NULL,
-//        .func = &do_set_btsource,
-//        .argtable = &set_btsource_args
-//    };
-//    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
-}
 
 static void register_free()
 {
@@ -380,7 +303,7 @@ static void register_free()
 static int heap_size(int argc, char **argv)
 {
     uint32_t heap_size = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
-    log_send_messaging(MESSAGING_INFO, "min heap size: %u", heap_size);
+    cmd_send_messaging(argv[0],MESSAGING_INFO, "min heap size: %u", heap_size);
     return 0;
 }
 cJSON * setdevicename_cb(){
@@ -397,12 +320,82 @@ static int setnamevar(char * nvsname, FILE *f, char * value){
 	}
 	return err==ESP_OK?0:1;
 }
+typedef enum {
+    SCANNING,
+    PROCESSING_NAME
+} scanstate_t;
+int set_squeezelite_player_name(FILE * f,const char * name){
+	char * nvs_config= config_alloc_get(NVS_TYPE_STR, "autoexec1");
+	char **argv = NULL;
+    esp_err_t err=ESP_OK;
+    int nerrors=0;
+    bool bFoundParm=false;
+    scanstate_t state=SCANNING;
+    char * newCommandLine = NULL;
+    char * parm = " -n ";
+    char * cleaned_name = strdup(name);
+    for(char * p=cleaned_name;*p!='\0';p++){
+        if(*p == ' '){
+            *p='_'; // no spaces allowed
+        }
+    }
+	if(nvs_config && strlen(nvs_config)>0){
+        // allocate enough memory to hold the new command line
+        size_t cmdLength = strlen(nvs_config) + strlen(cleaned_name) + strlen(parm) +1 ;
+        newCommandLine = malloc(cmdLength);
+        memset(newCommandLine,0x00, cmdLength);
+		ESP_LOGD(TAG,"Parsing command %s",nvs_config);
+		argv = (char **) calloc(22, sizeof(char *));
+		if (argv == NULL) {
+			FREE_AND_NULL(nvs_config);
+			return 1;
+		}
+		size_t argc = esp_console_split_argv(nvs_config, argv,22);
+		for(int i=0;i<argc;i++) {
+            if(i>0){
+                strcat(newCommandLine," ");
+            }
+            switch (state)
+            {
+            case SCANNING:
+                strcat(newCommandLine,argv[i]);
+                if(strcasecmp(argv[i],"--name")==0 || strcasecmp(argv[i],"-n")==0 ){
+                    state = PROCESSING_NAME;
+                }
+                break;
+            case PROCESSING_NAME:
+                bFoundParm=true;
+                strcat(newCommandLine,cleaned_name);
+                state = SCANNING;
+                break;
+            
+            default:
+                break;
+            }
+        }
+        if(!bFoundParm){
+            strcat(newCommandLine,parm);
+            strcat(newCommandLine,name);
+        }
+        fprintf(f,"Squeezelite player name changed to %s\n",newCommandLine);
+        if((err=config_set_value(NVS_TYPE_STR, "autoexec1",newCommandLine))!=ESP_OK){
+            nerrors++;
+            fprintf(f,"Failed updating squeezelite command. %s", esp_err_to_name(err));
+        }
+		
+	}
+
+	FREE_AND_NULL(nvs_config);
+	FREE_AND_NULL(argv);
+	return nerrors;
+	
+}
 static int setdevicename(int argc, char **argv)
 {
 	char * name = NULL;
     int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&name_args);
     if (nerrors != 0) {
-        return 0;
+        return 1;
     }
 
 	/* Check "--name" option */
@@ -410,32 +403,35 @@ static int setdevicename(int argc, char **argv)
 		name=strdup(name_args.name->sval[0]);
 	}
 	else {
-		log_send_messaging(MESSAGING_ERROR,"Name must be specified.");
-		return 0;
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Name must be specified.");
+		return 1;
 	}
 
 	char *buf = NULL;
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
 	if (f == NULL) {
-		log_send_messaging(MESSAGING_ERROR,"Unable to open memory stream.");
-		return 0;
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		return 1;
 	}
 	nerrors+=setnamevar("a2dp_dev_name", f, name);
 	nerrors+=setnamevar("airplay_name", f, name);
 	nerrors+=setnamevar("ap_ssid", f, name);
 	nerrors+=setnamevar("bt_name", f, name);
 	nerrors+=setnamevar("host_name", f, name);
+    nerrors+=set_squeezelite_player_name(f, name);
 	if(nerrors==0){
 		fprintf(f,"Device name changed to %s\n",name);
 	}
-
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
 	FREE_AND_NULL(name);
 	fflush (f);
-	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
 	fclose(f);
 	FREE_AND_NULL(buf);
-	return nerrors==0;
+	return nerrors;
 
 }
 
@@ -459,7 +455,7 @@ static void register_setdevicename()
 	name_args.name = arg_str0("n", "name", default_host_name, "New Name");
 	name_args.end = arg_end(8);
 	const esp_console_cmd_t set_name= {
-	 		.command = "setname",
+	 		.command = CFG_TYPE_SYST("name"),
 			.help="Device Name",
 			.hint = NULL,
 			.func = &setdevicename,
@@ -476,16 +472,16 @@ static int tasks_info(int argc, char **argv)
     const size_t bytes_per_task = 40; /* see vTaskList description */
     char *task_list_buffer = malloc(uxTaskGetNumberOfTasks() * bytes_per_task);
     if (task_list_buffer == NULL) {
-    	log_send_messaging(MESSAGING_ERROR, "failed to allocate buffer for vTaskList output");
+    	cmd_send_messaging(argv[0],MESSAGING_ERROR, "failed to allocate buffer for vTaskList output");
         return 1;
     }
-    log_send_messaging(MESSAGING_INFO,"Task Name\tStatus\tPrio\tHWM\tTask#"
+    cmd_send_messaging(argv[0],MESSAGING_INFO,"Task Name\tStatus\tPrio\tHWM\tTask#"
 #ifdef CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID
     "\tAffinity"
 #endif
     "\n");
     vTaskList(task_list_buffer);
-    log_send_messaging(MESSAGING_INFO,"%s", task_list_buffer);
+    cmd_send_messaging(argv[0],MESSAGING_INFO,"%s", task_list_buffer);
     free(task_list_buffer);
     return 0;
 }
@@ -505,7 +501,7 @@ static void register_tasks()
 
 extern esp_err_t update_certificates(bool force);
 static int force_update_cert(int argc, char **argv){
-	return update_certificates(true)==ESP_OK;
+	return update_certificates(true);
 }
 
 static void register_update_certs()
@@ -539,30 +535,31 @@ static int deep_sleep(int argc, char **argv)
     }
     if (deep_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * deep_sleep_args.wakeup_time->ival[0];
-        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
+        cmd_send_messaging(argv[0],MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
         ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
     }
     if (deep_sleep_args.wakeup_gpio_num->count) {
         int io_num = deep_sleep_args.wakeup_gpio_num->ival[0];
         if (!rtc_gpio_is_valid_gpio(io_num)) {
-        	log_send_messaging(MESSAGING_ERROR, "GPIO %d is not an RTC IO", io_num);
+        	cmd_send_messaging(argv[0],MESSAGING_ERROR, "GPIO %d is not an RTC IO", io_num);
             return 1;
         }
         int level = 0;
         if (deep_sleep_args.wakeup_gpio_level->count) {
             level = deep_sleep_args.wakeup_gpio_level->ival[0];
             if (level != 0 && level != 1) {
-            	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
+            	cmd_send_messaging(argv[0],MESSAGING_ERROR, "Invalid wakeup level: %d", level);
                 return 1;
             }
         }
-        log_send_messaging(MESSAGING_INFO, "Enabling wakeup on GPIO%d, wakeup on %s level",
+        cmd_send_messaging(argv[0],MESSAGING_INFO, "Enabling wakeup on GPIO%d, wakeup on %s level",
                  io_num, level ? "HIGH" : "LOW");
 
         ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, level) );
     }
     rtc_gpio_isolate(GPIO_NUM_12);
     esp_deep_sleep_start();
+    return 0; // this code will never run. deep sleep will cause the system to restart
 }
 
 static void register_deep_sleep()
@@ -599,30 +596,111 @@ static int enable_disable(FILE * f,char * nvs_name, struct arg_lit *arg){
 	}
 	return err;
 }
-static int do_set_services(int argc, char **argv)
-{
-    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&set_services_args);
+static int do_configure_wifi(int argc, char **argv){
+    esp_err_t err = ESP_OK;
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&wifi_parms_arg);
     if (nerrors != 0) {
-        return 0;
+        return 1;
     }
 	char *buf = NULL;
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
 	if (f == NULL) {
-		log_send_messaging(MESSAGING_ERROR,"Unable to open memory stream.");
-		return 0;
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		return 1;
+	}
+	nerrors += enable_disable(f,"disable_ps",wifi_parms_arg.disable_power_save);
+    
+    if(wifi_parms_arg.scanmode->count>0){
+        if(strcasecmp(wifi_parms_arg.scanmode->sval[0],"Comprehensive") == 0){
+            err = config_set_value(NVS_TYPE_STR, "wifi_smode", "A");
+        } 
+        else {
+            err = config_set_value(NVS_TYPE_STR, "wifi_smode", "F");
+        }
+        if(err!=ESP_OK){
+            nerrors++;
+            fprintf(f,"Error setting wifi scan mode to %s. %s\n",wifi_parms_arg.scanmode->sval[0], esp_err_to_name(err));
+        }
+        else {
+            fprintf(f,"Wifi Scan Mode changed to %s\n",wifi_parms_arg.scanmode->sval[0]);
+        }
+    }
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
+	fflush (f);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return nerrors;
+}
+static int do_set_services(int argc, char **argv)
+{
+    esp_err_t err = ESP_OK;
+    int nerrors = arg_parse_msg(argc, argv,(struct arg_hdr **)&set_services_args);
+    if (nerrors != 0) {
+        return 1;
+    }
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		return 1;
 	}
 
 	nerrors += enable_disable(f,"enable_airplay",set_services_args.airplay);
 	nerrors += enable_disable(f,"enable_bt_sink",set_services_args.btspeaker);
-	nerrors += enable_disable(f,"telnet_enable",set_services_args.telnet);
+
+    if(set_services_args.telnet->count>0){
+        if(strcasecmp(set_services_args.telnet->sval[0],"Disabled") == 0){
+            err = config_set_value(NVS_TYPE_STR, "telnet_enable", "N");
+        } 
+        else if(strcasecmp(set_services_args.telnet->sval[0],"Telnet Only") == 0){
+            err = config_set_value(NVS_TYPE_STR, "telnet_enable", "Y");
+        }
+        else if(strcasecmp(set_services_args.telnet->sval[0],"Telnet and Serial") == 0){
+            err = config_set_value(NVS_TYPE_STR, "telnet_enable", "D");
+        }
+        
+        if(err!=ESP_OK){
+            nerrors++;
+            fprintf(f,"Error setting telnet service to %s. %s\n",set_services_args.telnet->sval[0], esp_err_to_name(err));
+        }
+        else {
+            fprintf(f,"Telnet service changed to %s\n",set_services_args.telnet->sval[0]);
+        }
+    }
+
+#if WITH_TASKS_INFO    
 	nerrors += enable_disable(f,"stats",set_services_args.stats);
+#endif
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
 	fflush (f);
-	log_send_messaging(nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
 	fclose(f);
 	FREE_AND_NULL(buf);
-	return nerrors==0;
+	return nerrors;
 }
+
+cJSON * configure_wifi_cb(){
+	cJSON * values = cJSON_CreateObject();
+	char * p=NULL;
+	if ((p = config_alloc_get(NVS_TYPE_STR, "disable_ps")) != NULL) {
+		cJSON_AddBoolToObject(values,"disable_power_save",strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0);
+		FREE_AND_NULL(p);
+	}
+    if ((p = config_alloc_get(NVS_TYPE_STR, "wifi_smode")) != NULL) {
+        cJSON_AddStringToObject(values,"scanmode",strcasecmp(p,"a") == 0 ?"Comprehensive":"Fast");
+        FREE_AND_NULL(p);
+	}
+    return values;
+}
+
+
 
 cJSON * set_services_cb(){
 	cJSON * values = cJSON_CreateObject();
@@ -636,29 +714,57 @@ cJSON * set_services_cb(){
 		FREE_AND_NULL(p);
 	}
 	if ((p = config_alloc_get(NVS_TYPE_STR, "telnet_enable")) != NULL) {
-		cJSON_AddBoolToObject(values,"telnet",strcasestr("YXD",p)!=NULL);
+        if(strcasestr("YX",p)!=NULL){
+		    cJSON_AddStringToObject(values,"telnet","Telnet Only");
+        }
+        else if(strcasestr("D",p)!=NULL){
+            cJSON_AddStringToObject(values,"telnet","Telnet and Serial");
+        }
+        else {
+            cJSON_AddStringToObject(values,"telnet","Disabled");
+        }
+
 		FREE_AND_NULL(p);
 	}
+#if WITH_TASKS_INFO        
 	if((p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0))!=NULL){
 		cJSON_AddBoolToObject(values,"stats",(*p == '1' || *p == 'Y' || *p == 'y')) ;
 	}
+#endif
 	return values;
 }
 
 static void register_set_services(){
 	set_services_args.airplay = arg_lit0(NULL, "AirPlay", "AirPlay");
 	set_services_args.btspeaker = arg_lit0(NULL, "BT_Speaker", "Bluetooth Speaker");
-	set_services_args.telnet= arg_lit0(NULL, "telnet", "Telnet server. Use only for troubleshooting");
+	set_services_args.telnet= arg_str0("t", "telnet","Disabled|Telnet Only|Telnet and Serial","Telnet server. Use only for troubleshooting");
+#if WITH_TASKS_INFO    
 	set_services_args.stats= arg_lit0(NULL, "stats", "System Statistics. Use only for troubleshooting");
+#endif    
     set_services_args.end=arg_end(2);
 	const esp_console_cmd_t cmd = {
-        .command = "set_services",
+        .command = CFG_TYPE_SYST("services"),
         .help = "Services",
 		.argtable = &set_services_args,
         .hint = NULL,
         .func = &do_set_services,
     };
 	cmd_to_json_with_cb(&cmd,&set_services_cb);
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
+static void register_set_wifi_parms(){
+	wifi_parms_arg.scanmode = arg_str0(NULL, "scanmode", "Fast|Comprehensive","Sets the WiFi Scan Mode. Use Comprehensive where more than one AP has the same name on different channels. This will ensure that the AP with the strongest signal is chosen.");
+	wifi_parms_arg.disable_power_save = arg_lit0(NULL, "disable_power_save", "Disable Power Saving. This may help if the wifi connection is unstable.");
+	wifi_parms_arg.end=arg_end(2);
+	const esp_console_cmd_t cmd = {
+        .command = CFG_TYPE_SYST("wifi"),
+        .help = "WiFi",
+		.argtable = &wifi_parms_arg,
+        .hint = NULL,
+        .func = &do_configure_wifi,
+    };
+	cmd_to_json_with_cb(&cmd,&configure_wifi_cb);
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 /** 'light_sleep' command puts the chip into light sleep mode */
@@ -679,22 +785,22 @@ static int light_sleep(int argc, char **argv)
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     if (light_sleep_args.wakeup_time->count) {
         uint64_t timeout = 1000ULL * light_sleep_args.wakeup_time->ival[0];
-        log_send_messaging(MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
+        cmd_send_messaging(argv[0],MESSAGING_INFO, "Enabling timer wakeup, timeout=%lluus", timeout);
         ESP_ERROR_CHECK( esp_sleep_enable_timer_wakeup(timeout) );
     }
     int io_count = light_sleep_args.wakeup_gpio_num->count;
     if (io_count != light_sleep_args.wakeup_gpio_level->count) {
-    	log_send_messaging(MESSAGING_INFO,  "Should have same number of 'io' and 'io_level' arguments");
+    	cmd_send_messaging(argv[0],MESSAGING_INFO,  "Should have same number of 'io' and 'io_level' arguments");
         return 1;
     }
     for (int i = 0; i < io_count; ++i) {
         int io_num = light_sleep_args.wakeup_gpio_num->ival[i];
         int level = light_sleep_args.wakeup_gpio_level->ival[i];
         if (level != 0 && level != 1) {
-        	log_send_messaging(MESSAGING_ERROR, "Invalid wakeup level: %d", level);
+        	cmd_send_messaging(argv[0],MESSAGING_ERROR, "Invalid wakeup level: %d", level);
             return 1;
         }
-        log_send_messaging(MESSAGING_INFO,  "Enabling wakeup on GPIO%d, wakeup on %s level",
+        cmd_send_messaging(argv[0],MESSAGING_INFO,  "Enabling wakeup on GPIO%d, wakeup on %s level",
                  io_num, level ? "HIGH" : "LOW");
 
         ESP_ERROR_CHECK( gpio_wakeup_enable(io_num, level ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL) );
@@ -703,7 +809,7 @@ static int light_sleep(int argc, char **argv)
         ESP_ERROR_CHECK( esp_sleep_enable_gpio_wakeup() );
     }
     if (CONFIG_ESP_CONSOLE_UART_NUM <= UART_NUM_1) {
-    	log_send_messaging(MESSAGING_INFO,  "Enabling UART wakeup (press ENTER to exit light sleep)");
+    	cmd_send_messaging(argv[0],MESSAGING_INFO,  "Enabling UART wakeup (press ENTER to exit light sleep)");
         ESP_ERROR_CHECK( uart_set_wakeup_threshold(CONFIG_ESP_CONSOLE_UART_NUM, 3) );
         ESP_ERROR_CHECK( esp_sleep_enable_uart_wakeup(CONFIG_ESP_CONSOLE_UART_NUM) );
     }
@@ -726,7 +832,7 @@ static int light_sleep(int argc, char **argv)
         cause_str = "unknown";
         printf("%d\n", cause);
     }
-    log_send_messaging(MESSAGING_INFO, "Woke up from: %s", cause_str);
+    cmd_send_messaging(argv[0],MESSAGING_INFO, "Woke up from: %s", cause_str);
     return 0;
 }
 

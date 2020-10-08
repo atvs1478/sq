@@ -459,6 +459,7 @@ cJSON * wifi_manager_get_new_array_json(cJSON **old){
 	return cJSON_CreateArray();
 }
 cJSON * wifi_manager_get_basic_info(cJSON **old){
+	monitor_gpio_t *mgpio= get_jack_insertion_gpio(); 
 	const esp_app_desc_t* desc = esp_ota_get_app_description();
 	ESP_LOGV(TAG,  "wifi_manager_get_basic_info called");
 	cJSON *root = wifi_manager_get_new_json(old);
@@ -466,7 +467,7 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
 	cJSON_AddNumberToObject(root,"recovery",	is_recovery_running?1:0);
-	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(jack_inserted_svc() ? "1" : "0"));
+	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(mgpio->gpio>=0 && jack_inserted_svc() ? "1" : "0"));
 	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
 	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);

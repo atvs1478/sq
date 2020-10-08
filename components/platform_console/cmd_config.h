@@ -1,4 +1,4 @@
-/* Console example — declarations of command registration functions.
+/* cmd_i2ctools.h
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
 
@@ -6,18 +6,14 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#pragma once
 
+#pragma once
+#include "stdbool.h"
+#include "stdio.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "cmd_system.h"
-#include "cmd_wifi.h"
-#include "cmd_nvs.h"
-#include "cmd_i2ctools.h"
-#include "cmd_ota.h"
-#include "cmd_config.h"
+void register_config_cmd(void);
 #ifdef __cplusplus
 }
 #endif

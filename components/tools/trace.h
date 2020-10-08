@@ -33,6 +33,3 @@ extern const char * str_or_null(const char * str);
 #ifndef CASE_TO_STR
 #define CASE_TO_STR(x) case x: return STR(x); break;
 #endif
-#define START_FREE_MEM_CHECK(a) size_t a=heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-#define CHECK_RESET_FREE_MEM_CHECK(a,b) ESP_LOGV(__FUNCTION__ ,b "Mem used: %i",a-heap_caps_get_free_size(MALLOC_CAP_INTERNAL)); a=heap_caps_get_free_size(MALLOC_CAP_INTERNAL)
-

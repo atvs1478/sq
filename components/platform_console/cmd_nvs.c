@@ -330,11 +330,11 @@ static int set_value(int argc, char **argv)
     const char *key = set_args.key->sval[0];
     const char *type = set_args.type->sval[0];
     const char *values = set_args.value->sval[0];
-    log_send_messaging(MESSAGING_INFO, "Setting '%s' (type %s)", key,type);
+    cmd_send_messaging(argv[0],MESSAGING_INFO, "Setting '%s' (type %s)", key,type);
     esp_err_t err = set_value_in_nvs(key, type, values);
 
     if (err != ESP_OK) {
-    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
+    	cmd_send_messaging(argv[0],MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -355,7 +355,7 @@ static int get_value(int argc, char **argv)
     esp_err_t err = get_value_from_nvs(key, type);
 
     if (err != ESP_OK) {
-    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
+    	cmd_send_messaging(argv[0],MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -374,7 +374,7 @@ static int erase_value(int argc, char **argv)
     esp_err_t err = erase(key);
 
     if (err != ESP_OK) {
-    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
+    	cmd_send_messaging(argv[0],MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -392,7 +392,7 @@ static int erase_namespace(int argc, char **argv)
 
     esp_err_t err = erase_all(name);
     if (err != ESP_OK) {
-    	log_send_messaging(MESSAGING_ERROR, "%s", esp_err_to_name(err));
+    	cmd_send_messaging(argv[0],MESSAGING_ERROR, "%s", esp_err_to_name(err));
         return 1;
     }
 
@@ -411,11 +411,11 @@ static int erase_wifi_manager(int argc, char **argv)
 	}
 	nvs_close(nvs);
 	if (err != ESP_OK) {
-		log_send_messaging(MESSAGING_ERROR,  "wifi manager configuration was not erase. %s", esp_err_to_name(err));
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,  "wifi manager configuration was not erase. %s", esp_err_to_name(err));
 		return 1;
 	}
 	else {
-		log_send_messaging(MESSAGING_WARNING,  "Wifi manager configuration was erased");
+		cmd_send_messaging(argv[0],MESSAGING_WARNING,  "Wifi manager configuration was erased");
 	}
 	return 0;
 }

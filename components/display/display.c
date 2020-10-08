@@ -381,14 +381,14 @@ void displayer_control(enum displayer_cmd_e cmd, ...) {
 /****************************************************************************************
  *
  */
-bool display_is_valid_driver(char * driver){
+bool display_is_valid_driver(const char * driver){
 	return display_conf_get_driver_name(driver)!=NULL;
 }
 
 /****************************************************************************************
  *
  */
-const char *display_conf_get_driver_name(char * driver){
+const char *display_conf_get_driver_name(const char * driver){
 	for(uint8_t i=0;known_drivers[i]!=NULL && strlen(known_drivers[i])>0;i++ ){
 		if(strcasestr(driver,known_drivers[i])){
 			return known_drivers[i];

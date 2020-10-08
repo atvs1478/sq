@@ -4,11 +4,11 @@
 		<meta charset="utf-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<link rel="shortcut icon" type="image/x-icon" href="/res/favicon.ico">
 		<link rel="stylesheet" href="/res/bootstrap.css">
-		<link rel="stylesheet" href="/res/style.css">
 		<script src="/res/jquery.js"></script>
-		<script src="/res/popper.js"></script>
+		<link rel="shortcut icon" type="image/x-icon" href="/res/favicon.ico">
+		<link rel="stylesheet" href="/res/style.css">
+		<!-- <script src="/res/popper.js"></script> -->
 		<script src="/res/bootstrap.js"></script>
 		<script src="/res/code.js"></script>
 		<title>esp32-wifi-manager</title>
@@ -52,36 +52,28 @@
 					<path d="M19 8v8h-17v-8h17zm2-2h-21v12h21v-12zm1 9h.75c.69 0 1.25-.56 1.25-1.25v-3.5c0-.69-.56-1.25-1.25-1.25h-.75v6zm-16-6h-3v6h3v-6zm4 0h-3v6h3v-6zm4 0h-3v6h3v-6zm4 0h-3v6h3v-6z"/>
 				</g>
 			</svg>
+					
 		</div>
-		<ul id="navbar" class="nav nav-tabs">
+		<ul class="nav nav-tabs bg-primary" id="mainnav">
 			<li class="nav-item">
 				<a class="nav-link active" data-toggle="tab" href="#tab-wifi">WiFi</a>
 			</li>
 			<li class="nav-item">
-				<a class="nav-link" data-toggle="tab" href="#tab-audio">Audio + LMS</a>
-			</li>
+				<a class="nav-link" data-toggle="tab" href="#tab-configuration">Configuration</a>
+			</li>  
 			<li class="nav-item">
-				<a class="nav-link" data-toggle="tab" href="#tab-firmware">Firmware</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" data-toggle="tab" href="#tab-setdisplay">Configuration</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" data-toggle="tab" href="#tab-syslog">Status</a>
+				<a class="nav-link" data-toggle="tab" href="#tab-syslog">Status<span class="badge badge-success badge-pill" id="msgcnt"></span></a>
 			</li>
 			<li class="nav-item">
 				<a class="nav-link" data-toggle="tab" href="#tab-commands">Advanced</a>
-			</li>
-			<li class="nav-item">
-				<a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
 			</li>
 			<li class="nav-item">
 				<a class="nav-link" data-toggle="tab" href="#tab-credits">Credits</a>
 			</li>
 		</ul>
 		<div id="message"></div>
-		<div id="content">
-			<div id="myTabContent" class="tab-content">
+		<div id="content" >
+			<div id="myTabContent" class="tab-content mt-3">
 				<div class="tab-pane fade active show" id="tab-wifi">
 					<div id="wifi">
 						<div id="wifi-status">
@@ -205,119 +197,154 @@
 						</div>
 					</div>
 				</div>
-				<!-- wifi -->
-				<div class="tab-pane fade" id="tab-setdisplay">
-					<div id="set_services-list"></div>
-					<div id="setname-list"></div>
-					<div id="setdisplay-list"></div>
-					<div id="i2cconfig-list"></div>
-					<div id="spiconfig-list"></div>
-				</div>
-				<!-- display -->
-				<div class="tab-pane fade" id="tab-audio">
-					<div id="audioout">
-						<h1>Audio output</h1>
-						<div class="form-group">
-							<div class="custom-control custom-radio">
-								<input type="radio" id="i2s" name="audio" class="custom-control-input" checked='checked' />
-								<label for="i2s" class="custom-control-label">I2S</label>
-							</div>
-							<div class="custom-control custom-radio">
-								<input type="radio" id="spdif" name="audio" class="custom-control-input" />
-								<label for="spdif" class="custom-control-label">SPDIF</label>
-							</div>
-							<div class="custom-control custom-radio">
-								<input type="radio" id="bt" name="audio" class="custom-control-input" />
-								<label for="bt" class="custom-control-label">Bluetooth</label>
-							</div>
+                <!-- Config -->
+                <div class="tab-pane fade mt-2" id="tab-configuration">
+                    <ul class="nav nav-tabs bg-info" name="secnav">
+                        <li class="nav-link" style="padding: inherit; border: none;">
+                            <a class="nav-link active" data-toggle="tab" href="#tab-audio">Audio + LMS</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#tab-cfg-syst">System</a>
+                        </li>  
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#tab-cfg-hw"  >Hardware</a>
+                        </li>  
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#tab-cfg-fw"  >Updates</a> 
+                        </li>  
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#tab-nvs">NVS editor</a>
+                        </li>
+                    </ul>
+
+                    <div id="myTabContent2" class="tab-content mt-3">
+                        <div class="tab-pane fade" id="tab-cfg-hw"></div>
+                        <div class="tab-pane fade" id="tab-cfg-syst"></div>
+                        <div class="tab-pane fade" id="tab-cfg-gen"></div>
+                        <div class="tab-pane fade" id="tab-cfg-fw">
+                            <div id="boot-div">
+                                <form id="boot-form" action="/recovery.json" method="post" target="dummyframe">
+                                    <button id="boot-button" type="submit" class="btn btn-primary">Recovery</button>
+                                </form>
+                            </div>
+                            <h1>Check for firmware upgrade</h1>
+                            <div class="buttons">
+                                <input type="button" id="fwcheck" class="btn btn-info" value="Check for updates" />
+                            </div>
+                            <div id="searchfw" class="form-group">
+                                <select class="custom-select" id="fwbranch">
+                                    <option selected="">Choose FW branch</option>
+                                </select>
+                                <input class="form-control form-control-sm" id="searchinput" type="text" placeholder="search releases" id="inputSmall">
+                            </div>
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Firmware version</th>
+                                        <th scope="col">Release date</th>
+                                        <th scope="col">HW platform</th>
+                                        <th scope="col">IDF version</th>
+                                        <th scope="col">Branch</th>
+                                        <th scope="col">Flash this FW</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="releaseTable">
+                                </tbody>
+                            </table>
+                            <h2>Firmware URL:</h2>
+                            <textarea id="fwurl" maxlength="1000"></textarea>
+                            <div class="buttons">
+                                <input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
+                            </div>
+                            <p>OR</p>
+                            <div class="form-group">
+                                <input type="file" class="form-control-file" id="flashfilename" aria-describedby="fileHelp">
+                                <div class="buttons">
+                                    <button type="button" class="btn btn-danger" id="fwUpload">Upload!</button>
+                                </div>
+                            </div>
+                            <div id="otadiv">
+                                <div class="progress" id="progress">
+                                    <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width:0%">
+                                        0%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="tab-nvs">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Key</th>
+                                        <th scope="col">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="nvsTable">
+                                </tbody>
+                            </table>
+                            <div class="buttons">
+                                <div id="boot-div">
+                                    <form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
+                                        <button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
+                                    </form>
+                                </div>
+                                <input id="save-nvs" type="button" class="btn btn-success" value="Commit">
+                                <input id="save-as-nvs" type="button" class="btn btn-success" value="Download config">
+                                <input id="load-nvs" type="button" class="btn btn-success" value="Load File">
+                                <input aria-describedby="fileHelp" onchange="onChooseFile(event, onFileLoad.bind(this))" id="nvsfilename" type="file" style="display:none">
+                            </div>
 						</div>
-					</div>
-					<div id="btsinkdiv">
-						<input id="btsink" type="text" value="BT sink name" />
-					</div>
-					<div>
-						<h1>Player name</h1>
-						<input id="player" type="text" value="squeezelite" />
-					</div>
-					<div>
-						<h1>Optional setting (e.g. for LMS IP address)</h1>
-						<input id="optional" type="text" value="" placeholder="-s 192.168.0.1" />
-					</div>
-					<div class="buttons">
-						<input id="generate-command" type="button" class="btn btn-success" value="Generate" />
-					</div>
-					<h1>Squeezelite command to run</h1>
-					<section id="command-list">
-						<textarea id="autoexec1" maxlength="120">squeezelite -o I2S -b 500:2000 -d all=info -C 30 - W</textarea>
-					</section>
-					<div class="buttons">
-						<input id="save-autoexec1" type="button" class="btn btn-success" value="Save" />
-					</div>
-					<h1>Start Squeezelite (toggle to activate changes)</h1>
-					<div class="custom-control custom-switch">
-						<input type="checkbox" class="custom-control-input" id="autoexec-cb" checked="checked">
-						<label class="custom-control-label" for="autoexec-cb"></label>
-					</div>
-					<br />
-				</div>
-				<!-- audio -->
-				<div class="tab-pane fade" id="tab-firmware">
-					<div id="boot-div">
-						<form id="boot-form" action="/recovery.json" method="post" target="dummyframe">
-							<button id="boot-button" type="submit" class="btn btn-primary">Recovery</button>
-						</form>
-					</div>
-					<h1>Check for firmware upgrade</h1>
-					<div class="buttons">
-						<input type="button" id="fwcheck" class="btn btn-info" value="Check for updates" />
-					</div>
-					<div id="searchfw" class="form-group">
-						<select class="custom-select" id="fwbranch">
-							<option selected="">Choose FW branch</option>
-						</select>
-						<input class="form-control form-control-sm" id="searchinput" type="text" placeholder="search releases" id="inputSmall">
-					</div>
-					<table class="table table-hover">
-						<thead>
-							<tr>
-								<th scope="col">Firmware version</th>
-								<th scope="col">Release date</th>
-								<th scope="col">HW platform</th>
-								<th scope="col">IDF version</th>
-								<th scope="col">Branch</th>
-								<th scope="col">Flash this FW</th>
-							</tr>
-						</thead>
-						<tbody id="releaseTable">
-						</tbody>
-					</table>
-					<h2>Firmware URL:</h2>
-					<textarea id="fwurl" maxlength="1000"></textarea>
-					<div class="buttons">
-						<input type="button" id="flash" class="btn btn-danger" value="Flash!" /><span id="flash-status"></span>
-					</div>
-					<p>OR</p>
-					<div class="form-group">
-						<input type="file" class="form-control-file" id="flashfilename" aria-describedby="fileHelp">
-						<div class="buttons">
-							<button type="button" class="btn btn-danger" id="fwUpload">Upload!</button>
-						</div>
-					</div>
-					<div id="otadiv">
-						<div class="progress" id="progress">
-							<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width:0%">
-								0%
+						
+						<div class="tab-pane fade active show" id="tab-audio">
+							<div class="card text-white bg-primary mb-3">
+								<div class="card-header">Command Line Templates</div>
+								<div class="card-body">
+									<fieldset >
+										<fieldset class="form-group" id="output-tmpl">
+											<legend>Audio Output</legend>
+											<div class="form-check">
+												<label class="form-check-label">
+												  <input type="radio" class="form-check-input" name="output-tmpl" id="i2s" >
+												  I2S Dac
+												</label>
+											</div>
+											<div class="form-check">
+												<label class="form-check-label">
+													<input type="radio" class="form-check-input" name="output-tmpl" id="spdif" >
+													SPDIF
+												</label>
+											</div>
+											<div class="form-check">
+												<label class="form-check-label">
+													<input type="radio" class="form-check-input" name="output-tmpl" id="bt" >
+													Bluetooth
+												</label>
+											</div>
+										</fieldset>
+										<div class="form-group"><label for="player">Player Name</label><input type="text" class="form-control " placeholder="Squeezelite" id="player" ></div>
+										<div class="form-group" style="display: none;"><label for="btsinkdiv">Bluetooth Speaker Name To Connect To</label><input type="text" class="form-control" id="btsinkdiv" ></div>
+										<div class="form-group"><label for="optional">Optional setting (e.g. for LMS IP address)</label><input type="text" class="form-control"  id="optional" ></div>
+										<div class="form-group"><div class="form-check">
+											<label class="form-check-label">
+											  <input class="form-check-input" type="checkbox" id="disable-squeezelite" value="" checked="" >
+											  Disable Squeezelite
+											</label>
+										  </div></div>
+										<div class="toast show" role="alert" aria-live="assertive" aria-atomic="true" style="display: none;" id="toast_cfg-audio-tmpl"><div class="toast-header"><strong class="mr-auto">Result</strong><button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close" onclick="$(this).parent().parent().hide()"><span aria-hidden="true">×</span></button></div><div class="toast-body" id="msg_cfg-audio-tmpl"></div></div>
+										<button id="save-autoexec1" type="submit"  class="btn btn-info" cmdname="cfg-audio-tmpl" onclick="save_autoexec1(false)">Save</button>	  
+										<button id="commit-autoexec1" type="submit"  class="btn btn-warning" cmdname="cfg-audio-tmpl" onclick="save_autoexec1(true)">Apply</button>
+								   </fieldset>
+								</div>
 							</div>
-						</div>
+						</div>                    
 					</div>
-				</div>
-				<!-- firmware -->
-				<div class="tab-pane fade" id="tab-commands">
+                </div>
+				<div class="tab-pane fade " id="tab-commands">
 						<fieldset id="commands-list"></fieldset>
 				</div>
 				<!-- Status -->
-				<div class="tab-pane fade" id="tab-syslog">
-				<div class="card border-primary mb-3" style="">
+				<div class="tab-pane fade " id="tab-syslog">
+				<div class="card border-primary mb-3" >
   				<div class="card-header">Logs</div>
   				<div class="card-body">
     			<table class="table table-hover">
@@ -333,40 +360,24 @@
 					<div class="buttons">
 						<input id="clear-syslog" type="button" class="btn btn-danger btn-sm" value="Clear" />
 					</div></div></div>
-				<div class="card border-primary mb-3" style="">
+				<div class="card border-primary mb-3">
   				<div class="card-header">Pin Assignments</div>
   				<div class="card-body">
 					<table class="table table-hover">
 						<thead><tr><th scope="col">Device</th><th scope="col">Pin Name</th><th scope="col">GPIO Number</th><th scope="col">Type</th></tr></thead>
-						<tbody id="gpiotable"></tbody></table></div></div></div>
-				<!-- syslog -->
-				<div class="tab-pane fade" id="tab-nvs">
-					<table class="table table-hover">
-						<thead>
-							<tr>
-								<th scope="col">Key</th>
-								<th scope="col">Value</th>
-							</tr>
-						</thead>
-						<tbody id="nvsTable">
-						</tbody>
-					</table>
-					<div class="buttons">
-						<div id="boot-div">
-							<form id="reboot-form" action="/reboot.json" method="post" target="dummyframe">
-								<button id="reboot-button" type="submit" class="btn btn-primary">Reboot</button>
-							</form>
-						</div>
-						<input id="save-nvs" type="button" class="btn btn-success" value="Commit">
-						<input id="save-as-nvs" type="button" class="btn btn-success" value="Download config">
-						<input id="load-nvs" type="button" class="btn btn-success" value="Load File">
-						<input aria-describedby="fileHelp" onchange="onChooseFile(event, onFileLoad.bind(this))" id="nvsfilename" type="file" style="display:none">
+						<tbody id="gpiotable"></tbody></table></div></div>
+				<div class="card border-primary mb-3" style="visibility: collapse;" id="tasks_sect">
+					<div class="card-header">Tasks</div>
+					<div class="card-body">
+						<table class="table table-hover">
+							<!-- console.log(msg_time.toLocaleString() + '\tname' + '\tcpu' + '\tstate' + '\tminstk' + '\tbprio' + '\tcprio' + '\tnum'); -->
+							<thead><tr><th scope="col">#</th><th scope="col">Task Name</th><th scope="col">CPU</th><th scope="col">State</th><th scope="col">Min Stack</th><th scope="col">Base Priority</th><th scope="col">Cur Priority</th></tr></thead>
+							<tbody id="tasks"></tbody></table></div></div>					
 					</div>
-				</div>
-				<!-- nvs -->
-				<div class="tab-pane fade" id="tab-credits">
+				<!-- syslog -->
+				<div class="tab-pane fade " id="tab-credits">
 					<div class="jumbotron">
-						<p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2020, philippe44, sle118, daduke<br />Licensed under the GPL</p>
+						<p><strong><a href="https://github.com/sle118/squeezelite-esp32">squeezelite-esp32</a></strong>, &copy; 2020, philippe44, sle118, daduke<br /><a href="https://opensource.org/licenses/MIT">This software is released under the MIT License.</a></p>
 						<p>
 							This app would not be possible without the following libraries:
 						</p>
@@ -393,7 +404,10 @@
 				</div>
 				<!-- credits -->
 			</div>
-			<footer class="footer"><span id="foot-fw"></span><span id="foot-wifi"></span></footer>
+			<footer class="footer">
+				<button class="btn-warning" id="reboot_nav" type="submit" onclick="$('#reboot_nav').removeClass('active'); delay_reboot(500,'', false);" style="display: none;">Reboot</button>
+				<button class="btn-danger" id="reboot_ota_nav" type="submit" onclick="$('#reboot_ota_nav').removeClass('active'); delay_reboot(500,'', true);" style="display: none;">Exit Recovery</button><br>
+				<span id="foot-fw"></span><span id="foot-wifi"></span></footer>
 			<iframe width="0" height="0" border="0" name="dummyframe" id="dummyframe"></iframe>
 		</div>
 	</body>

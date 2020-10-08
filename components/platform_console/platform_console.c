@@ -50,7 +50,7 @@ const char* recovery_prompt = LOG_COLOR_E "recovery-squeezelite-esp32> " LOG_RES
 
 #define MOUNT_PATH "/data"
 #define HISTORY_PATH MOUNT_PATH "/history.txt"
-void run_command(char * line);
+esp_err_t run_command(char * line);
 #define ADD_TO_JSON(o,t,n) if (t->n) cJSON_AddStringToObject(o,QUOTE(n),t->n);
 #define ADD_PARMS_TO_CMD(o,t,n) { cJSON * parms = ParmsToJSON(&t.n->hdr); if(parms) cJSON_AddItemToObject(o,QUOTE(n),parms); }
 cJSON * cmdList;
@@ -99,6 +99,8 @@ cJSON * ParmsToJSON(struct arg_hdr * * argtable){
 		ADD_TO_JSON(entry,table[tabindex],shortopts);
 		cJSON_AddBoolToObject(entry, "checkbox", (table[tabindex]->flag & ARG_HASOPTVALUE)==0 && (table[tabindex]->flag & ARG_HASVALUE)==0);
 		cJSON_AddBoolToObject(entry, "hasvalue", table[tabindex]->flag & ARG_HASVALUE);
+		cJSON_AddNumberToObject(entry,"mincount",table[tabindex]->mincount);
+		cJSON_AddNumberToObject(entry,"maxcount",table[tabindex]->maxcount);
 		cJSON_AddItemToArray(arg_list, entry);
 		tabindex++;
 	}
@@ -171,7 +173,7 @@ int arg_parse_msg(int argc, char **argv, struct arg_hdr ** args){
 		if (f != NULL) {
 			arg_print_errors(f, getParmsEnd(args), argv[0]);
 			fflush (f);
-			log_send_messaging(MESSAGING_ERROR,"%s", buf);
+			cmd_send_messaging(argv[0],MESSAGING_ERROR,"%s", buf);
 		}
         fclose(f);
         FREE_AND_NULL(buf);
@@ -254,7 +256,7 @@ void initialize_console() {
 	esp_vfs_dev_uart_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
 
 	/* Initialize the console */
-	esp_console_config_t console_config = { .max_cmdline_args = 22,
+	esp_console_config_t console_config = { .max_cmdline_args = 28,
 			.max_cmdline_length = 600,
 #if CONFIG_LOG_COLORS
 			.hint_color = atoi(LOG_COLOR_CYAN)
@@ -285,7 +287,7 @@ void console_start() {
 	}
 	else {
 		/* Initialize the console */
-		esp_console_config_t console_config = { .max_cmdline_args = 22,
+		esp_console_config_t console_config = { .max_cmdline_args = 28,
 				.max_cmdline_length = 600,
 	#if CONFIG_LOG_COLORS
 				.hint_color = atoi(LOG_COLOR_CYAN)
@@ -296,8 +298,10 @@ void console_start() {
 	/* Register commands */
 	esp_console_register_help_command();
 	register_system();
+	register_config_cmd();
 	register_nvs();
 	register_wifi();
+
 	if(!is_recovery_running){
 		register_squeezelite();
 	}
@@ -364,7 +368,7 @@ void console_start() {
 	}
 
 }
-void run_command(char * line){
+esp_err_t run_command(char * line){
 	/* Try to run the command */
 	int ret;
 	esp_err_t err = esp_console_run(line, &ret);
@@ -373,13 +377,16 @@ void run_command(char * line){
 		ESP_LOGE(TAG,"Unrecognized command: %s", line);
 	} else if (err == ESP_ERR_INVALID_ARG) {
 		// command was empty
-	} else if (err == ESP_OK && ret != ESP_OK) {
+	} else if (err != ESP_OK && ret != ESP_OK) {
 		ESP_LOGW(TAG,"Command returned non-zero error code: 0x%x (%s)", ret,
-				esp_err_to_name(err));
+		esp_err_to_name(err));
+	} else if (err == ESP_OK && ret != ESP_OK) {
+		ESP_LOGW(TAG,"Command returned in error");
+		err = ESP_FAIL;
 	} else if (err != ESP_OK) {
 		ESP_LOGE(TAG,"Internal error: %s", esp_err_to_name(err));
 	}
-
+	return err;
 }
 static void * console_thread() {
 	if(!is_recovery_running){
