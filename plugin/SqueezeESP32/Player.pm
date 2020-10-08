@@ -101,7 +101,7 @@ sub initPrefs {
 	
 	$prefs->client($client)->init( { 
 		equalizer => [(0) x 10],
-		artwork => 0,	
+		artwork => { },
 	} );
 
 	$client->SUPER::initPrefs;
