@@ -178,6 +178,9 @@ static void set_jack_gpio(int gpio, char *value) {
 		jack.gpio = gpio;	
 		if ((p = strchr(value, ':')) != NULL) jack.active = atoi(p + 1);
 	}	
+	else {
+		jack.gpio = -1;
+	}
 }
 #endif
 
@@ -191,6 +194,9 @@ static void set_spkfault_gpio(int gpio, char *value) {
 		spkfault.gpio = gpio;	
 		if ((p = strchr(value, ':')) != NULL) spkfault.active = atoi(p + 1);
 	}	
+	else {
+		spkfault.gpio = -1;
+	}
 }
 #endif
 

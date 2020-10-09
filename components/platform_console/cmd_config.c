@@ -22,6 +22,7 @@
 const char * desc_squeezelite ="Squeezelite Options";
 const char * desc_dac= "DAC Options";
 const char * desc_spdif= "SPDIF Options";
+const char * desc_audio= "General Audio Options";
 
 
 #define CODECS_BASE "flac,pcm,mp3,ogg"
@@ -69,6 +70,10 @@ static struct {
 	struct arg_lit *clear;	
     struct arg_end *end;
 } spdif_args;
+static struct {
+    struct arg_str *jack_behavior;	
+    struct arg_end *end;
+} audio_args;
 static struct {
 	struct arg_str * server; // -s <server>[:<port>]\tConnect to specified server, otherwise uses autodiscovery to find server\n"
 	struct arg_str * buffers;//			   "  -b <stream>:<output>\tSpecify internal Stream and Output buffer sizes in Kbytes\n"
@@ -137,8 +142,53 @@ int check_missing_parm(struct arg_int * int_parm, FILE * f){
 	} 
 	return res;
 }
+	
+static int do_audio_cmd(int argc, char **argv){
+	esp_err_t err=ESP_OK;
+	int nerrors = arg_parse(argc, argv,(void **)&audio_args);
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
+		return 1;
+	}
+	if(nerrors >0){
+		arg_print_errors(f,audio_args.end,desc_audio);
+		return 1;
+	}
 
+    if(audio_args.jack_behavior->count>0){
+        err = ESP_OK; // suppress any error code that might have happened in a previous step
+        if(strcasecmp(audio_args.jack_behavior->sval[0],"Headphones")){
+            err = config_set_value(NVS_TYPE_STR, "jack_mutes_amp", "y");
+        }
+        else if(strcasecmp(audio_args.jack_behavior->sval[0],"Subwoofer")){
+            err = config_set_value(NVS_TYPE_STR, "jack_mutes_amp", "n");
+        }
+        else {
+            nerrors++;
+            fprintf(f,"Unknown Audio Jack Behavior %s.\n",audio_args.jack_behavior->sval[0]);
+        }
 
+        if(err!=ESP_OK){
+            nerrors++;
+            fprintf(f,"Error setting Audio Jack Behavior %s. %s\n",audio_args.jack_behavior->sval[0], esp_err_to_name(err));
+        }
+        else {
+            fprintf(f,"Audio Jack Behavior changed to %s\n",audio_args.jack_behavior->sval[0]);
+        }        
+    }
+
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
+	fflush (f);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return (nerrors==0 && err==ESP_OK)?0:1;
+}
 static int do_spdif_cmd(int argc, char **argv){
 		i2s_platform_config_t i2s_dac_pin = {
 		.i2c_addr = -1,
@@ -329,6 +379,15 @@ cJSON * spdif_cb(){
 		
 	return values;
 }
+cJSON * audio_cb(){
+	cJSON * values = cJSON_CreateObject();
+	char * 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
+    cJSON_AddBoolToObject(values,"jack_behavior",(strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0));
+    FREE_AND_NULL(p);    
+	return values;
+}
+
+
 void get_str_parm_json(struct arg_str * parm, cJSON * entry){
 	const char * name = parm->hdr.longopts?parm->hdr.longopts:parm->hdr.glossary;
 	if(parm->count>0){
@@ -468,7 +527,21 @@ static void register_i2s_config(void){
     cmd_to_json_with_cb(&cmd,&i2s_cb);
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
-static void register_spdif_config(void){
+
+
+static void register_audio_config(void){
+	audio_args.jack_behavior = arg_str0("j", "jack_behavior","Headphones|Subwoofer","On supported DAC, determines the audio jack behavior. Selecting headphones will cause the external amp to be muted on insert, while selecting Subwoofer will keep the amp active all the time.");
+    audio_args.end = arg_end(6);
+	const esp_console_cmd_t cmd = {
+        .command = CFG_TYPE_AUDIO("general"),
+        .help = desc_audio,
+        .hint = NULL,
+        .func = &do_audio_cmd,
+        .argtable = &audio_args
+    };
+    cmd_to_json_with_cb(&cmd,&audio_cb);
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}static void register_spdif_config(void){
 	spdif_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
     spdif_args.clock = arg_int1(NULL,"clock","<n>","Clock GPIO. e.g. 33");
     spdif_args.wordselect = arg_int1(NULL,"wordselect","<n>","Word Select GPIO. e.g. 25");
@@ -517,7 +590,7 @@ static void register_squeezelite_config(void){
 	squeezelite_args.rate = arg_int0("Z","max_rate", "<n>", "Report rate to server in helo as the maximum sample rate we can support");
 	squeezelite_args.end = arg_end(6);
     const esp_console_cmd_t cmd = {
-        .command = CFG_TYPE_SYST("squeezelite"),
+        .command = CFG_TYPE_AUDIO("squeezelite"),
         .help = desc_squeezelite,
         .hint = NULL,
         .func = &do_squeezelite_cmd,
@@ -528,6 +601,7 @@ static void register_squeezelite_config(void){
 }
 
 void register_config_cmd(void){
+	register_audio_config();
 	register_squeezelite_config();
 	register_i2s_config();
 	register_spdif_config();

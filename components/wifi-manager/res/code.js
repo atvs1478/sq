@@ -72,6 +72,16 @@ var escapeHTML = function(unsafe) {
 		}
 	});
 };
+function setNavColor(stylename){
+	$('[name=secnav]').removeClass('bg-secondary bg-warning');
+	$("footer.footer").removeClass('bg-secondary bg-warning');
+	$("#mainnav").removeClass('bg-secondary bg-warning');
+	if(stylename.length>0){
+		$('[name=secnav]').addClass(stylename);
+		$("footer.footer").addClass(stylename);
+		$("#mainnav").addClass(stylename);
+	}
+}
 function handleTemplateTypeRadio(outtype){
 	if (outtype == 'bt') {
 		$("#btsinkdiv").parent().show(200);
@@ -103,6 +113,7 @@ function handleTemplateTypeRadio(outtype){
 function handleExceptionResponse(xhr, ajaxOptions, thrownError){
 	console.log(xhr.status);
 	console.log(thrownError);
+	enableStatusTimer=true;
 	if (thrownError != '') showLocalMessage(thrownError, 'MESSAGING_ERROR');
 }
 function HideCmdMessage(cmdname){
@@ -278,6 +289,8 @@ function onChooseFile(event, onLoadFileHandler) {
 function delay_reboot(duration,cmdname, ota=false){
 	url= (ota?'/reboot_ota.json':'/reboot.json');
 	$("tbody#tasks").empty();
+	setNavColor('bg-secondary');
+	enableStatusTimer=false;
 	$("#tasks_sect").css('visibility','collapse');
 	Promise.resolve(cmdname).delay(duration).then(function(cmdname) {
 		if(cmdname?.length >0){
@@ -299,6 +312,7 @@ function delay_reboot(duration,cmdname, ota=false){
 			error: handleExceptionResponse,
 			complete: function(response) {
 				console.log('reboot call completed');
+				enableStatusTimer=true;
 				Promise.resolve(cmdname).delay(6000).then(function(cmdname) {
 					if(cmdname?.length >0) HideCmdMessage(cmdname);
 					getCommands();
@@ -547,6 +561,9 @@ $(document).ready(function() {
 	});
 	$("#fwUpload").on("click", function() {
 		var upload_path = "/flash.json";
+
+		if(!recovery) $('#flash-status').text('Rebooting to OTA');
+
 		var fileInput = document.getElementById("flashfilename").files;
 		if (fileInput.length == 0) {
 			alert("No file selected!");
@@ -919,9 +936,7 @@ function handleRecoveryMode(data){
 			$("#otadiv").show();
 			$('#uploaddiv').show();
 			$("footer.footer").removeClass('sl');
-			$("footer.footer").addClass('bg-warning');
-			$("#mainnav").addClass('bg-warning');
-			$('[name=secnav]').addClass('bg-warning');
+			setNavColor('bg-warning');
 			$("#boot-button").html('Reboot');
 			$("#boot-form").attr('action', '/reboot_ota.json');
 		} else {
@@ -930,9 +945,7 @@ function handleRecoveryMode(data){
 			$("#reboot_nav").show();
 			$("#otadiv").hide();
 			$('#uploaddiv').hide();
-			$("footer.footer").removeClass('bg-warning');
-			$('#mainnav').removeClass('bg-warning');
-			$('[name=secnav]').removeClass('bg-warning');
+			setNavColor('');
 			$("footer.footer").addClass('sl');
 			$("#boot-button").html('Recovery');
 			$("#boot-form").attr('action', '/recovery.json');

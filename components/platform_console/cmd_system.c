@@ -1,7 +1,7 @@
 /* Console example — various system commands
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
-
+    
    Unless required by applicable law or agreed to in writing, this
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
@@ -50,7 +50,7 @@ static struct {
  	struct arg_str *telnet;
 #if WITH_TASKS_INFO    
  	struct arg_lit *stats;
-#endif     
+#endif  
     struct arg_end *end;
 } set_services_args;
 static const char * TAG = "cmd_system";
@@ -127,30 +127,30 @@ static void register_version()
 
 esp_err_t guided_boot(esp_partition_subtype_t partition_subtype)
 {
-if(is_recovery_running){
-	if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
-		log_send_messaging(MESSAGING_WARNING,"RECOVERY application is already active");
-		if(!wait_for_commit()){
-			log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
-		}
-		
-		vTaskDelay(750/ portTICK_PERIOD_MS);
-		esp_restart();
-		return ESP_OK;
-	}
-}
-else {
-	if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
-		log_send_messaging(MESSAGING_WARNING,"SQUEEZELITE application is already active");
-		if(!wait_for_commit()){
-			log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
-		}
-		
-		vTaskDelay(750/ portTICK_PERIOD_MS);
-		esp_restart();
-		return ESP_OK;
-	}
-}
+    if(is_recovery_running){
+        if(partition_subtype ==ESP_PARTITION_SUBTYPE_APP_FACTORY){
+            log_send_messaging(MESSAGING_WARNING,"RECOVERY application is already active");
+            if(!wait_for_commit()){
+                log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
+            }
+            
+            vTaskDelay(750/ portTICK_PERIOD_MS);
+            esp_restart();
+            return ESP_OK;
+        }
+    }
+    else {
+        if(partition_subtype !=ESP_PARTITION_SUBTYPE_APP_FACTORY){
+            log_send_messaging(MESSAGING_WARNING,"SQUEEZELITE application is already active");
+            if(!wait_for_commit()){
+                log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
+            }
+            
+            vTaskDelay(750/ portTICK_PERIOD_MS);
+            esp_restart();
+            return ESP_OK;
+        }
+    }
 	esp_err_t err = ESP_OK;
 	bool bFound=false;
     log_send_messaging(MESSAGING_INFO, "Looking for partition type %u",partition_subtype);
@@ -174,9 +174,7 @@ else {
 				log_send_messaging(MESSAGING_ERROR,"Unable to select partition for reboot: %s",esp_err_to_name(err));
 			}
 			else{
-				log_send_messaging(MESSAGING_WARNING, "Application partition %s sub type %u is selected for boot", partition->label,partition_subtype);
-				bFound=true;
-				messaging_post_message(MESSAGING_WARNING,MESSAGING_CLASS_SYSTEM,"Reboot failed. Cannot iterate through partitions");
+                bFound=true;
 			}
 		}
 		else
@@ -187,9 +185,8 @@ else {
 		ESP_LOGD(TAG, "Yielding to other processes");
 		taskYIELD();
 		if(bFound) {
-			log_send_messaging(MESSAGING_WARNING,"Configuration %s changes. ",config_has_changes()?"has":"does not have");
 			if(!wait_for_commit()){
-				log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration. ");
+				log_send_messaging(MESSAGING_WARNING,"Unable to commit configuration changes. ");
 			}
 			vTaskDelay(750/ portTICK_PERIOD_MS);
 			esp_restart();

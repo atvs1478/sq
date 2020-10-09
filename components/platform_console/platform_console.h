@@ -14,6 +14,7 @@
 extern "C" {
 #endif
 #define CFG_TYPE_HW(a)     "cfg-hw-" a
+#define CFG_TYPE_AUDIO(a)     "cfg-audio-" a
 #define CFG_TYPE_SYST(a)   "cfg-syst-" a
 #define CFG_TYPE_FW(a)     "cfg-fw-" a
 #define CFG_TYPE_GEN(a)    "cfg-gen-" a
