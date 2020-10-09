@@ -154,7 +154,7 @@ static int do_spdif_cmd(int argc, char **argv){
 	esp_err_t err=ESP_OK;
 	int nerrors = arg_parse(argc, argv,(void **)&spdif_args);
 	if (spdif_args.clear->count) {
-		cmd_send_messaging(argv[0],MESSAGING_WARNING,"SPDIF config cleared");
+		cmd_send_messaging(argv[0],MESSAGING_WARNING,"SPDIF config cleared\n");
 		config_set_value(NVS_TYPE_STR, "spdif_config", "");
 		return 0;
 	}
@@ -163,7 +163,7 @@ static int do_spdif_cmd(int argc, char **argv){
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
 	if (f == NULL) {
-		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
 		return 1;
 	}
 	if(nerrors >0){
@@ -205,7 +205,7 @@ static int do_i2s_cmd(int argc, char **argv)
 	esp_err_t err=ESP_OK;
 	int nerrors = arg_parse(argc, argv,(void **)&i2s_args);
 	if (i2s_args.clear->count) {
-		cmd_send_messaging(argv[0],MESSAGING_WARNING,"DAC config cleared");
+		cmd_send_messaging(argv[0],MESSAGING_WARNING,"DAC config cleared\n");
 		config_set_value(NVS_TYPE_STR, "dac_config", "");
 		return 0;
 	}
@@ -214,7 +214,7 @@ static int do_i2s_cmd(int argc, char **argv)
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
 	if (f == NULL) {
-		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
 		return 1;
 	}
 	if(nerrors >0){
@@ -360,7 +360,7 @@ static int do_squeezelite_cmd(int argc, char **argv)
 	size_t buf_size = 0;
 	FILE *f = open_memstream(&buf, &buf_size);
 	if (f == NULL) {
-		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
 		return 1;
 	}
 	fprintf(f,"Not yet implemented!");

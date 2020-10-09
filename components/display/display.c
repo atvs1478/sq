@@ -52,7 +52,8 @@ static const char *known_drivers[] = {"SH1106",
 		"SSD1327",
 		"SSD1675",
 		"SSD1351",
-		"ST77xx",
+		"ST7735",
+		"ST7789",
 		"ILI9341",
 		NULL
 	};

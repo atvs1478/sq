@@ -343,7 +343,6 @@ const display_config_t * config_display_get(){
 		dstruct.drivername = display_conf_get_driver_name(strchr(p, '=') + 1);
 	}
 	
-	dstruct.drivername=dstruct.drivername?dstruct.drivername:"SSD1306";
 	if ((p = strcasestr(config, "width")) != NULL) dstruct.width = atoi(strchr(p, '=') + 1);
 	if ((p = strcasestr(config, "height")) != NULL) dstruct.height = atoi(strchr(p, '=') + 1);
 	if ((p = strcasestr(config, "reset")) != NULL) dstruct.RST_pin = atoi(strchr(p, '=') + 1);

@@ -284,7 +284,7 @@ function delay_reboot(duration,cmdname, ota=false){
 			showCmdMessage(cmdname,'MESSAGING_WARNING','Rebooting the ESP32.\n',true);
 		}
 		else {
-			showLocalMessage('MESSAGING_WARNING','Rebooting the ESP32.\n')
+			showLocalMessage('Rebooting the ESP32.\n','MESSAGING_WARNING')
 		}
 		console.log('now triggering reboot');
 		$.ajax({

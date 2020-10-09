@@ -365,7 +365,7 @@ static int do_i2c_set_display(int argc, char **argv)
 			config.speed = 8000000;
 		}
 		/* Check "--cs" option */
-		nerrors +=is_output_gpio(i2cdisp_args.cs,f,&config.CS_pin, true);
+		nerrors +=is_output_gpio(i2cdisp_args.cs,f,&config.CS_pin, false);
 	}
 
 	nerrors +=is_output_gpio(i2cdisp_args.reset,f,&config.RST_pin, false);
@@ -382,15 +382,12 @@ static int do_i2c_set_display(int argc, char **argv)
 	if (i2cdisp_args.driver->count) {
 		config.drivername=display_conf_get_driver_name(i2cdisp_args.driver->sval[0]) ;
 	}
-	else {
-		config.drivername = display_conf_get_driver_name("SSD1306");
-	}
 	if(i2cdisp_args.depth->count > 0 && strcasecmp(config.drivername,"SSD1326")==0) {
 		config.depth = i2cdisp_args.depth->ival[0];
 	}
 	/* Check "--back" option */
 	nerrors +=is_output_gpio(i2cdisp_args.back,f,&config.back, false);
-	if(!display_is_valid_driver(config.drivername)){
+	if(!config.drivername || !display_is_valid_driver(config.drivername)){
 		fprintf(f,"Unsupported display driver %s\n",config.drivername);
 		nerrors++;
 	}
@@ -905,7 +902,7 @@ static void register_i2c_set_display(){
 	i2cdisp_args.reset = 	arg_int0(NULL, "reset", "<n>", "Reset GPIO");
 	i2cdisp_args.hflip = 	arg_lit0(NULL, "hf", "Flip horizontally");
 	i2cdisp_args.vflip = 	arg_lit0(NULL, "vf", "Flip vertically");
-	i2cdisp_args.driver = 	arg_str0("d", "driver", supported_drivers?supported_drivers:"<string>", "Driver (default SSD1306)");
+	i2cdisp_args.driver = 	arg_str0("d", "driver", supported_drivers?supported_drivers:"<string>", "Driver");
 	i2cdisp_args.cs = 		arg_int0("b", "cs", "<n>","SPI Only. CS GPIO (for SPI displays)");
 	i2cdisp_args.speed = 	arg_int0("s", "speed", "<n>","SPI Only. Bus Speed (Default 8000000). SPI interface can work up to 26MHz~40MHz");
 	i2cdisp_args.back = 	arg_int0("b", "back", "<n>","Backlight GPIO (if applicable)");
