@@ -601,6 +601,7 @@ $(document).ready(function() {
 
 	$('#fwcheck').on("click", function() {
 		$("#releaseTable").html("");
+		$("#fwbranch").empty();
 		$.getJSON(releaseURL, function(data) {
 				var i = 0;
 				var branches = [];
