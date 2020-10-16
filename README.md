@@ -1,4 +1,6 @@
 ![I2S-4MFlash-master-cmake](https://github.com/sle118/squeezelite-esp32/workflows/I2S-4MBFlash/badge.svg?branch=master-cmake)
+![I2S-4MFlash-master-cmake](https://github.com/sle118/squeezelite-esp32/workflows/ESP32-A1S/badge.svg?branch=master-cmake)
+![I2S-4MFlash-master-cmake](https://github.com/sle118/squeezelite-esp32/workflows/SqueezeAmp/badge.svg?branch=master-cmake)
 
 # Squeezelite-esp32
 ## Supported Hardware 

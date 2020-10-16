@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: I2S-4MBFlash
+name: ESP32-A1S
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Set target
-      run: echo '::set-output name=TARGET_BUILD_NAME::I2S-4MBFlash'
+      run: echo '::set-output name=TARGET_BUILD_NAME::ESP32-A1S'
       id: target-name-generator
     - name: Get color
       run: echo "Target is ${{steps.target-name-generator.outputs.TARGET_BUILD_NAME}}"
