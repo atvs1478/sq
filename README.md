@@ -345,3 +345,6 @@ See squeezlite command line, but keys options are
 	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
 - If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
 	-  git submodule update --init --recursive
+
+## Additional notes 
+Build will start migrating to github workflows
