@@ -1,9 +1,5 @@
-# This is a basic workflow to help you get started with Actions
-
 name: I2S-4MBFlash
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ master-cmake ]
@@ -14,17 +10,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - name: Set target
+        run: echo '::set-output name=TARGET_BUILD_NAME::I2S-4MBFlash'
+        id: target-name-generator
+    - name: Get color
+        run: echo "Target is ${{steps.target-name-generator.outputs.TARGET_BUILD_NAME}}"
+
     - uses: actions/checkout@v2
       with:
         submodules: true
+    - name: Generate build number
+      id: buildnumber
+      uses: einaregilsson/build-number@v2 
+      with:
+        token: ${{secrets.github_token}}        
     - name: Cache build
       id: cache-build
       uses: actions/cache@v1
       with:
         path: ${{github.workspace}}/build
-        key: ${{ runner.os }}-I2S-4MBFlash
+        key: ${{ runner.os }}-${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}
     - name: Build the firmware
       run: |
-        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "python3 -m pip install --upgrade pip setuptools wheel && pip3 install protobuf grpcio-tools && cp build-scripts/I2S-4MFlash-sdkconfig.defaults sdkconfig && idf.py build"
-
-
+        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}-${{ steps.buildnumber.outputs.build_number }} && idf.py build"
