@@ -1,0 +1,30 @@
+# This is a basic workflow to help you get started with Actions
+
+name: I2S-4MBFlash
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master-cmake ]
+  pull_request:
+    branches: [ master-cmake ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Cache build
+      id: cache-build
+      uses: actions/cache@v1
+      with:
+        path: ${{github.workspace}}/build
+        key: ${{ runner.os }}-I2S-4MBFlash
+    - name: Build the firmware
+      run: |
+        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "python3 -m pip install --upgrade pip setuptools wheel && pip3 install protobuf grpcio-tools && cp build-scripts/I2S-4MFlash-sdkconfig.defaults sdkconfig && idf.py build"
+
+
