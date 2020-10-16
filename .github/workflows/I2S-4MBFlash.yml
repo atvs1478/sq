@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: I2S-4MBFlash
+name: I2S-4MFlash
 
 on:
   push:
