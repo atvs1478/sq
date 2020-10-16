@@ -1,4 +1,4 @@
-![I2S-4MFlash](https://github.com/sle118/squeezelite-esp32/workflows/I2S-4MFlash/badge.svg)
+![I2S-4MFlash](https://github.com/sle118/squeezelite-esp32/workflows/I2S%2D4MFlash/badge.svg)
 
 # Squeezelite-esp32
 ## Supported Hardware 
