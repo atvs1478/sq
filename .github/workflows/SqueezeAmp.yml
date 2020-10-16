@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Set target
-      run: echo '::set-output name=TARGET_BUILD_NAME::SqueezeAmp'
+      run: echo "TARGET_BUILD_NAME=SqueezeAmp" >> $GITHUB_ENV
       id: target-name-generator
-    - name: Get color
-      run: echo "Target is ${{steps.target-name-generator.outputs.TARGET_BUILD_NAME}}"
+    - name: Show Target
+      run: echo "Target is ${TARGET_BUILD_NAME}"
     - uses: actions/checkout@v2
       with:
         submodules: true
@@ -30,7 +30,7 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ${{github.workspace}}/build
-        key: ${{ runner.os }}-${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}
+        key: ${{ runner.os }}-${TARGET_BUILD_NAME}
     - name: Build the firmware
       run: |
-        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${{ steps.target-name-generator.outputs.TARGET_BUILD_NAME}}-${{ steps.buildnumber.outputs.build_number }} && idf.py build"
+        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build"
