@@ -3,6 +3,7 @@ package Plugins::SqueezeESP32::Graphics;
 use strict;
 
 use base qw(Slim::Display::Squeezebox2);
+use Storable qw(dclone);
 
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
@@ -16,6 +17,17 @@ my $VISUALIZER_SPECTRUM_ANALYZER = 2;
 my $VISUALIZER_WAVEFORM = 3;
 my $VISUALIZER_VUMETER_ESP32 = 0x11;
 my $VISUALIZER_SPECTRUM_ANALYZER_ESP32 = 0x12;
+
+my %SPECTRUM_DEFAULTS = (
+	scale => 25,
+	small => {
+		size => 25,
+		band => 5.33
+	},
+	full => {
+		band => 8
+	},
+);
 
 {
 	#__PACKAGE__->mk_accessor('array', 'modes');
@@ -33,14 +45,16 @@ sub new {
 	$cprefs->init( { 
 		width => 128,
 		small_VU => 15,
-		spectrum =>	{	scale => 25,
-						small => { size => 25, band => 5.33 },
-						full  => { band => 8 },
-				},
-		}		
-	);				
-		
-	$display->init_accessor(	
+		spectrum => \%SPECTRUM_DEFAULTS,
+	} );
+
+	$prefs->migrateClient(2, sub {
+		my ($cprefs, $client) = @_;
+		sanitizeSpectrum($cprefs->get('spectrum'));
+		1;
+	});
+
+	$display->init_accessor(
 		modes => $display->build_modes,
 		# Only seems to matter for screensaver and update to decide font. Not 
 		# any value is acceptable, so use Boom value which seems to be best 
@@ -106,6 +120,19 @@ sub displayHeight {
 	return 32;
 }
 
+sub sanitizeSpectrum {
+	my ($spectrum) = shift;
+
+	$spectrum->{small} ||= dclone($SPECTRUM_DEFAULTS{small});
+	$spectrum->{small}->{size} ||= $SPECTRUM_DEFAULTS{small}->{size};
+	$spectrum->{small}->{band} ||= $SPECTRUM_DEFAULTS{small}->{band};
+
+	$spectrum->{full} ||= dclone($SPECTRUM_DEFAULTS{full});
+	$spectrum->{full}->{band} ||= $SPECTRUM_DEFAULTS{full}->{band};
+
+	return $spectrum;
+}
+
 sub build_modes {
 	my $client = shift->client;
 	my $cprefs = $prefs->client($client);
@@ -118,9 +145,9 @@ sub build_modes {
 	my $width_low = ($artwork->{'enable'} && $artwork->{'x'} && ($artwork->{'y'} >= 32 || $disp_width - $artwork->{'x'} > 32)) ? $artwork->{'x'} : $disp_width;
 			
 	my $small_VU = $cprefs->get('small_VU');
-	my $spectrum = $cprefs->get('spectrum');
-	
-	my $small_spectrum_pos = { x => $width - int ($spectrum->{small}->{size} * $width / 100), 
+	my $spectrum = sanitizeSpectrum($cprefs->get('sprectrum'));
+
+	my $small_spectrum_pos = { x => $width - int ($spectrum->{small}->{size} * $width / 100),
 						 width => int ($spectrum->{small}->{size} * $width / 100),
 			};
 	my $small_VU_pos = { x => $width - int ($small_VU * $width / 100), 

@@ -24,6 +24,12 @@ $prefs->migrateClient(1, sub {
 	1;
 });
 
+$prefs->migrateClient(2, sub {
+	my ($cprefs, $client) = @_;
+	$cprefs->set('artwork', undef) if $cprefs->get('artwork') && ref $cprefs->get('artwork') ne 'HASH';
+	1;
+});
+
 $prefs->setChange(sub {
 	$_[2]->send_equalizer;
 }, 'equalizer');
