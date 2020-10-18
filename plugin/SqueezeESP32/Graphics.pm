@@ -3,7 +3,6 @@ package Plugins::SqueezeESP32::Graphics;
 use strict;
 
 use base qw(Slim::Display::Squeezebox2);
-use Storable qw(dclone);
 
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
@@ -123,11 +122,8 @@ sub displayHeight {
 sub sanitizeSpectrum {
 	my ($spectrum) = shift;
 
-	$spectrum->{small} ||= dclone($SPECTRUM_DEFAULTS{small});
 	$spectrum->{small}->{size} ||= $SPECTRUM_DEFAULTS{small}->{size};
 	$spectrum->{small}->{band} ||= $SPECTRUM_DEFAULTS{small}->{band};
-
-	$spectrum->{full} ||= dclone($SPECTRUM_DEFAULTS{full});
 	$spectrum->{full}->{band} ||= $SPECTRUM_DEFAULTS{full}->{band};
 
 	return $spectrum;
