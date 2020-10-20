@@ -15,4 +15,6 @@ jobs:
     - name: Set Target
       run: echo "TARGET_BUILD_NAME=SqueezeAmp" >> $GITHUB_ENV
     - name: Get Target
-      run: echo "Target is ${TARGET_BUILD_NAME}"
+      run: | 
+        echo "Target is ${TARGET_BUILD_NAME}"
+        env
