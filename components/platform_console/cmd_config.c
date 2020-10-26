@@ -25,23 +25,23 @@ const char * desc_spdif= "SPDIF Options";
 const char * desc_audio= "General Audio Options";
 
 
-#define CODECS_BASE "flac,pcm,mp3,ogg"
+#define CODECS_BASE "flac|pcm|mp3|ogg"
 #if NO_FAAD
 #define CODECS_AAC  ""
 #else
-#define CODECS_AAC  ",aac"
+#define CODECS_AAC  "|aac"
 #endif
 #if FFMPEG
-#define CODECS_FF   ",wma,alac"
+#define CODECS_FF   "|wma|alac"
 #else
 #define CODECS_FF   ""
 #endif
 #if DSD
-#define CODECS_DSD  ",dsd"
+#define CODECS_DSD  "|dsd"
 #else
 #define CODECS_DSD  ""
 #endif
-#define CODECS_MP3  " (mad,mpg for specific mp3 codec)"
+#define CODECS_MP3  "|mad|mpg"
 
 #define CODECS CODECS_BASE CODECS_AAC CODECS_FF CODECS_DSD CODECS_MP3
 #define NOT_OUTPUT "has input capabilities only"
@@ -75,6 +75,8 @@ static struct {
     struct arg_end *end;
 } audio_args;
 static struct {
+	struct arg_str * output_device; // "  -d <log>=<level>\tSet logging level, logs: all|slimproto|stream|decode|output|ir, level: info|debug|sdebug\n"
+	struct arg_str * name;//			   "  -n <name>\t\tSet the player name\n"
 	struct arg_str * server; // -s <server>[:<port>]\tConnect to specified server, otherwise uses autodiscovery to find server\n"
 	struct arg_str * buffers;//			   "  -b <stream>:<output>\tSpecify internal Stream and Output buffer sizes in Kbytes\n"
 	struct arg_str * codecs;//			   "  -c <codec1>,<codec2>\tRestrict codecs to those specified, otherwise load all available codecs; known codecs: " CODECS "\n"
@@ -88,7 +90,6 @@ static struct {
 	#if IR
 	struct arg_str * log_level_ir;
 	#endif
-	struct arg_str * output_device; // "  -d <log>=<level>\tSet logging level, logs: all|slimproto|stream|decode|output|ir, level: info|debug|sdebug\n"
 	//			   "  -e <codec1>,<codec2>\tExplicitly exclude native support of one or more codecs; known codecs: " CODECS "\n"
 	//			   "  -f <logfile>\t\tWrite debug to logfile\n"
 	//	#if IR
@@ -96,7 +97,6 @@ static struct {
 	//	#endif
 	struct arg_str * mac_addr; //			   "  -m <mac addr>\t\tSet mac address, format: ab:cd:ef:12:34:56\n"
 	struct arg_str * model_name;//			   "  -M <modelname>\tSet the squeezelite player model name sent to the server (default: " MODEL_NAME_STRING ")\n"
-	struct arg_str * name;//			   "  -n <name>\t\tSet the player name\n"
 	struct arg_lit * header_format;//			   "  -W\t\t\tRead wave and aiff format from header, ignore server parameters\n"
 	struct arg_str * rates; //			   "  -r <rates>[:<delay>]\tSample rates supported, allows output to be off when squeezelite is started; rates = <maxrate>|<minrate>-<maxrate>|<rate1>,<rate2>,<rate3>; delay = optional delay switching rates in ms\n"
 	#if RESAMPLE
@@ -160,10 +160,10 @@ static int do_audio_cmd(int argc, char **argv){
 
     if(audio_args.jack_behavior->count>0){
         err = ESP_OK; // suppress any error code that might have happened in a previous step
-        if(strcasecmp(audio_args.jack_behavior->sval[0],"Headphones")){
+        if(strcasecmp(audio_args.jack_behavior->sval[0],"Headphones")==0){
             err = config_set_value(NVS_TYPE_STR, "jack_mutes_amp", "y");
         }
-        else if(strcasecmp(audio_args.jack_behavior->sval[0],"Subwoofer")){
+        else if(strcasecmp(audio_args.jack_behavior->sval[0],"Subwoofer")==0){
             err = config_set_value(NVS_TYPE_STR, "jack_mutes_amp", "n");
         }
         else {
@@ -382,7 +382,7 @@ cJSON * spdif_cb(){
 cJSON * audio_cb(){
 	cJSON * values = cJSON_CreateObject();
 	char * 	p = config_alloc_get_default(NVS_TYPE_STR, "jack_mutes_amp", "n", 0);
-    cJSON_AddBoolToObject(values,"jack_behavior",(strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0));
+    cJSON_AddStringToObject(values,"jack_behavior",(strcmp(p,"1") == 0 ||strcasecmp(p,"y") == 0)?"Headphones":"Subwoofer");
     FREE_AND_NULL(p);    
 	return values;
 }
@@ -561,7 +561,7 @@ static void register_audio_config(void){
 static void register_squeezelite_config(void){
 	squeezelite_args.server = arg_str0("s","server","<server>[:<port>]","Connect to specified server, otherwise uses autodiscovery to find server");
 	squeezelite_args.buffers = arg_str0("b","buffers","<stream>:<output>","Internal Stream and Output buffer sizes in Kbytes");
-	squeezelite_args.codecs = arg_strn("c","codecs","<codec1>,<codec2>",0,20,"Restrict codecs to those specified, otherwise load all available codecs; known codecs");
+	squeezelite_args.codecs = arg_strn("c","codecs","+" CODECS "+",0,20,"Restrict codecs to those specified, otherwise load all available codecs; known codecs: " CODECS );
 	squeezelite_args.timeout = arg_int0("C","timeout","<n>","Close output device when idle after timeout seconds, default is to keep it open while player is 'on");
 	squeezelite_args.log_level = arg_str0("d","loglevel","log=level","Set logging level, logs: all|slimproto|stream|decode|output|ir, level: info|debug|sdebug"); // "  -d <log>=<level>\tSet logging level, logs: all|slimproto|stream|decode|output|ir, level: info|debug|sdebug\n"
 //	squeezelite_args.log_level_all = arg_str0(NULL,"all",get_log_level_options("all"),"Overall Logging Level");
@@ -573,10 +573,10 @@ static void register_squeezelite_config(void){
 	squeezelite_args.log_level_ir= arg_str0(NULL,"loglevel_ir",get_log_level_options("ir"),"IR Logging Level");
 	#endif
 
-	squeezelite_args.output_device = arg_str0("o","output_device","<string>","Output device");
-	squeezelite_args.mac_addr = arg_str0("m","mac_addr","<string>","Mac address, format: ab:cd:ef:12:34:56");
-	squeezelite_args.model_name = arg_str0("M", "modelname", "<string>","Squeezelite player model name sent to the server");
-	squeezelite_args.name = arg_str0("n","name","<string>","Player name");
+	squeezelite_args.output_device = arg_str0("o","output_device","<string>","Output device (BT, I2S or SPDIF)");
+	squeezelite_args.mac_addr = arg_str0("m","mac_addr","<string>","Mac address, format: ab:cd:ef:12:34:56.");
+	squeezelite_args.model_name = arg_str0("M", "modelname", "<string>","Set the squeezelite player model name sent to the server (default: " MODEL_NAME ")");
+	squeezelite_args.name = arg_str0("n","name","<string>","Player name, if different from the current host name. Name can alternatively be assigned from the system/device name configuration.");
 	squeezelite_args.header_format = arg_lit0("W","header_format","Read wave and aiff format from header, ignore server parameters");
 	squeezelite_args.rates = arg_str0("r","rates","<rates>[:<delay>]", "Sample rates supported, allows output to be off when squeezelite is started; rates = <maxrate>|<minrate>-<maxrate>|<rate1>,<rate2>,<rate3>; delay = optional delay switching rates in ms\n");
 	#if RESAMPLE

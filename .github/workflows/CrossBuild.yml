@@ -31,15 +31,15 @@ jobs:
       run: |
         echo "TARGET_BUILD_NAME=${{ matrix.node }}" >> $GITHUB_ENV
         echo "build_version_prefix=V0." >> $GITHUB_ENV
-    - uses: actions/checkout@v2
-      with:
-        submodules: true
     - name: Cache build
       id: cache-build
       uses: actions/cache@v1
       with:
         path: ${{github.RUNNER_WORKSPACE}}/build
         key: ${{ runner.os }}-${TARGET_BUILD_NAME}
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
     - name: Set build parameters
       run: |
         shopt -s nocasematch
@@ -70,23 +70,22 @@ jobs:
         echo "Target is ${TARGET_BUILD_NAME}"
         env
     - name: Build the firmware
-      if: env.release_flag == 1 && env.release_flag == 0
       run: |
         docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build && zip ${artifact_file_name} ../partitions*.csv *.bin ./bootloader/bootloader.bin ./partition_table/partition-table.bin flash_project_args ./size_*.txt"
-    - name: Build Mock firmware
-      run: |
-        mkdir -p build
-        cd build
-        mkdir -p partition_table
-        mkdir -p bootloader
-        echo "mock content"> squeezelite.bin
-        echo "mock content"> recovery.bin
-        echo "mock content"> ./bootloader/bootloader.bin
-        echo "mock content"> ./partition_table/partition-table.bin 
-        echo "mock content"> flash_project_args 
-        echo "mock content"> size_comp1.txt
-        echo "mock content"> size_comp2.txt
-        echo "mock content"> ../partitions.csv
+    # - name: Build Mock firmware
+    #   run: |
+    #     mkdir -p build
+    #     cd build
+    #     mkdir -p partition_table
+    #     mkdir -p bootloader
+    #     echo "mock content"> squeezelite.bin
+    #     echo "mock content"> recovery.bin
+    #     echo "mock content"> ./bootloader/bootloader.bin
+    #     echo "mock content"> ./partition_table/partition-table.bin 
+    #     echo "mock content"> flash_project_args 
+    #     echo "mock content"> size_comp1.txt
+    #     echo "mock content"> size_comp2.txt
+    #     echo "mock content"> ../partitions.csv
     - uses: actions/upload-artifact@v2
       with:
         name: ${{ env.artifact_file_name }}
@@ -104,19 +103,19 @@ jobs:
         path: |
           build/squeezelite.bin
 
-    - name: Create Release
-      if: env.release_flag == 1     
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-      with:
-        tag_name: ${{ env.tag }}
+    # - name: Create Release
+    #   if: env.release_flag == 1     
+    #   id: create_release
+    #   uses: actions/create-release@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+    #   with:
+    #     tag_name: ${{ env.tag }}
 
-        release_name: ${{ env.name }}
-        body: ${{ env.description }}
-        draft: false
-        prerelease: true
+    #     release_name: ${{ env.name }}
+    #     body: ${{ env.description }}
+    #     draft: false
+    #     prerelease: true
 
 
 

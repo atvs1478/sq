@@ -1169,7 +1169,8 @@ function getCommands() {
 							} else {
 								innerhtml += '<div class="form-group" ><label for="' + ctrlname + '">' + arg.glossary.encodeHTML() + '</label>';
 								if (placeholder.includes('|')) {
-									placeholder = placeholder.replace('<', '').replace('>', '');
+									extraclass = (placeholder.startsWith('+')? ' multiple ':'');
+									placeholder = placeholder.replace('<', '').replace('=', '').replace('>', '');
 									innerhtml += '<select ' + attributes + ' class="form-control '+extraclass+'"';
 									placeholder = '--|' + placeholder;
 									placeholder.split('|').forEach(function(choice) {
@@ -1243,7 +1244,7 @@ function getConfig() {
 						} else {
 							$("#disable-squeezelite")[0].checked = false;
 						}
-					} else if (key == 'autoexec1') {
+					} else if (key == 'autoexec1') {						
 						var re = /-o\s?(["][^"]*["]|[^-]+)/g;
 						var m = re.exec(val);
 						if (m[1].toUpperCase().startsWith('I2S')) {
@@ -1263,6 +1264,7 @@ function getConfig() {
 						$("input#dhcp-name1").val(val);
 						$("input#dhcp-name2").val(val);
 						$("#player").val(val);
+						document.title=val;
 					}
 
 					$("tbody#nvsTable").append(
