@@ -39,7 +39,7 @@ jobs:
       id: cache-build
       uses: actions/cache@v1
       with:
-        path: ${{github.RUNNER_WORKSPACE}}/build
+        path: ${{github.workspace}}/build
         key: ${{ runner.os }}-${{ matrix.node }}
     - name: Set build parameters
       run: |
@@ -64,12 +64,8 @@ jobs:
         description=${description}$'------------------------------\n### Revision Log\n\n'
         description="$description$(git log --pretty=format:'%h %s (%cI) <%an>' --abbrev-commit --max-count=15 | sed --r 's/(^[\*]+)/\\\1/g') "        
         echo 'description<<~EOD' >> $GITHUB_ENV
-        echo '${description}'>> $GITHUB_ENV
+        echo ${description}>> $GITHUB_ENV
         echo '~EOD' >> $GITHUB_ENV        
-        echo ####### 
-        echo ####### Release description 
-        echo ####### 
-        echo ${description}
         echo ####### 
         echo ####### Environment
         echo ####### 
@@ -77,7 +73,7 @@ jobs:
         echo ####### 
         echo ####### GITHUB ENV
         echo ####### 
-        echo $GITHUB_ENV
+        cat $GITHUB_ENV
     - name: Build the firmware
       run: |
         docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build && zip build/${artifact_file_name} partitions*.csv build/*.bin build/bootloader/bootloader.bin build/partition_table/partition-table.bin build/flash_project_args build/size_*.txt"
@@ -123,3 +119,23 @@ jobs:
         body: ${{ env.description }}
         draft: false
         prerelease: true
+    - name: Upload Release Asset - Squeezelite binary file
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: build/squeezelite.bin
+        asset_name: ${{ env.artifact_bin_file_name }}
+        asset_content_type: application/octet-stream        
+    - name: Upload Release Asset - Zip file
+      id: upload-release-asset-zip
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: build/${artifact_file_name}
+        asset_name: ${artifact_file_name}
+        asset_content_type: application/octet-stream                
