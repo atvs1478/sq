@@ -31,15 +31,15 @@ jobs:
       run: |
         echo "TARGET_BUILD_NAME=${{ matrix.node }}" >> $GITHUB_ENV
         echo "build_version_prefix=V0." >> $GITHUB_ENV
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
     - name: Cache build
       id: cache-build
       uses: actions/cache@v1
       with:
         path: ${{github.RUNNER_WORKSPACE}}/build
-        key: ${{ runner.os }}-${TARGET_BUILD_NAME}
-    - uses: actions/checkout@v2
-      with:
-        submodules: true
+        key: ${{ runner.os }}-${{ matrix.node }}
     - name: Set build parameters
       run: |
         shopt -s nocasematch
@@ -48,6 +48,7 @@ jobs:
         BUILD_NUMBER=${{ needs.job1.outputs.build_number }}
         echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
         tag="${build_version_prefix}${BUILD_NUMBER}-${TARGET_BUILD_NAME}-${branch_name}"
+        echo "tag=${tag}" >> $GITHUB_ENV
         last_commit="$(git log --pretty=format:'%s' --max-count=1)"
         if [[ "$last_commit" =~ .*"Release".* ]]; then echo "release_flag=1" >> $GITHUB_ENV; else echo "release_flag=0" >> $GITHUB_ENV; fi
         name="${build_version_prefix}${BUILD_NUMBER}.${branch_name}#v4.0#${TARGET_BUILD_NAME}#${branch_name}"
@@ -61,13 +62,22 @@ jobs:
         description=""
         description=${description}$'------------------------------\n### Revision Log\n\n'
         description="$description$(git log --pretty=format:'%h %s (%cI) <%an>' --abbrev-commit --max-count=15 | sed --r 's/(^[\*]+)/\\\1/g') "        
-        echo ${description}
-        echo ${description} >>release_desc.txt
         description="${description//'%'/'%25'}"
         description="${description//$'\n'/'%0A'}"
         description="${description//$'\r'/'%0D'}"        
         echo "description=${description}" >> $GITHUB_ENV
-        cat release_desc.txt
+        echo ####### 
+        echo ####### Release description 
+        echo ####### 
+        echo ${description}
+        echo ####### 
+        echo ####### Environment
+        echo ####### 
+        env
+        echo ####### 
+        echo ####### GITHUB ENV
+        echo ####### 
+        echo $GITHUB_ENV
     - name: Build the firmware
       run: |
         docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build && zip build/${artifact_file_name} partitions*.csv build/*.bin build/bootloader/bootloader.bin build/partition_table/partition-table.bin build/flash_project_args build/size_*.txt"
@@ -101,33 +111,15 @@ jobs:
         name: ${{ env.artifact_bin_file_name }}
         path: |
           build/squeezelite.bin
-
-    # - name: Create Release
-    #   if: env.release_flag == 1     
-    #   id: create_release
-    #   uses: actions/create-release@v1
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-    #   with:
-    #     tag_name: ${{ env.tag }}
-
-    #     release_name: ${{ env.name }}
-    #     body: ${{ env.description }}
-    #     draft: false
-    #     prerelease: true
-
-
-
-
-
-
-
-
-    - name: Prepare release
-      if: env.release_flag == 1    
-      run: |
-        description=""
-        description=${description}$'------------------------------\n### Revision Log\n\n'
-        description="$description$(git -C ${RUNNER_WORKSPACE} log --pretty=format:'%h %s (%cI) <%an>' --abbrev-commit --max-count=15 | sed --r 's/(^[\*]+)/\\\1/g') "
-        
-        
+    - name: Create Release
+      if: env.release_flag == 1     
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      with:
+        tag_name: ${{ env.tag }}
+        release_name: ${{ env.name }}
+        body: ${{ env.description }}
+        draft: false
+        prerelease: true
