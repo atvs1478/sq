@@ -64,7 +64,7 @@ jobs:
         description=${description}$'------------------------------\n### Revision Log\n\n'
         description="$description$(git log --pretty=format:'%h %s (%cI) <%an>' --abbrev-commit --max-count=15 | sed --r 's/(^[\*]+)/\\\1/g') "        
         echo 'description<<~EOD' >> $GITHUB_ENV
-        curl '${description}'>> $GITHUB_ENV
+        echo '${description}'>> $GITHUB_ENV
         echo '~EOD' >> $GITHUB_ENV        
         echo ####### 
         echo ####### Release description 
