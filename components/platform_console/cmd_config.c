@@ -43,6 +43,19 @@ const char * desc_audio= "General Audio Options";
 #endif
 #define CODECS_MP3  "|mad|mpg"
 
+
+#if !defined(MODEL_NAME)
+#define MODEL_NAME SqueezeLite
+#endif
+
+#ifndef QUOTE
+#define QUOTE(name) #name
+#define STR(macro)  QUOTE(macro)
+#endif
+#ifndef MODEL_NAME_STRING
+#define MODEL_NAME_STRING STR(MODEL_NAME)
+#endif
+
 #define CODECS CODECS_BASE CODECS_AAC CODECS_FF CODECS_DSD CODECS_MP3
 #define NOT_OUTPUT "has input capabilities only"
 #define NOT_GPIO "is not a GPIO"
@@ -575,7 +588,7 @@ static void register_squeezelite_config(void){
 
 	squeezelite_args.output_device = arg_str0("o","output_device","<string>","Output device (BT, I2S or SPDIF)");
 	squeezelite_args.mac_addr = arg_str0("m","mac_addr","<string>","Mac address, format: ab:cd:ef:12:34:56.");
-	squeezelite_args.model_name = arg_str0("M", "modelname", "<string>","Set the squeezelite player model name sent to the server (default: " MODEL_NAME ")");
+	squeezelite_args.model_name = arg_str0("M", "modelname", "<string>","Set the squeezelite player model name sent to the server (default: " MODEL_NAME_STRING ")");
 	squeezelite_args.name = arg_str0("n","name","<string>","Player name, if different from the current host name. Name can alternatively be assigned from the system/device name configuration.");
 	squeezelite_args.header_format = arg_lit0("W","header_format","Read wave and aiff format from header, ignore server parameters");
 	squeezelite_args.rates = arg_str0("r","rates","<rates>[:<delay>]", "Sample rates supported, allows output to be off when squeezelite is started; rates = <maxrate>|<minrate>-<maxrate>|<rate1>,<rate2>,<rate3>; delay = optional delay switching rates in ms\n");
