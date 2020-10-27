@@ -615,7 +615,7 @@ static void register_squeezelite_config(void){
 
 void register_config_cmd(void){
 	register_audio_config();
-	register_squeezelite_config();
+//	register_squeezelite_config();
 	register_i2s_config();
 	register_spdif_config();
 }
