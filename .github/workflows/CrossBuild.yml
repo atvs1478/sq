@@ -33,6 +33,7 @@ jobs:
         echo "build_version_prefix=V0." >> $GITHUB_ENV
     - uses: actions/checkout@v2
       with:
+        fetch-depth: 15
         submodules: true
     - name: Cache build
       id: cache-build
@@ -47,11 +48,11 @@ jobs:
         branch_name="${branch_name//[^a-zA-Z0-9\-~!@_\.]/}"
         BUILD_NUMBER=${{ needs.job1.outputs.build_number }}
         echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
-        tag="${build_version_prefix}${BUILD_NUMBER}-${TARGET_BUILD_NAME}-${branch_name}"
+        tag="${TARGET_BUILD_NAME}-development-${BUILD_NUMBER}-${branch_name}"
         echo "tag=${tag}" >> $GITHUB_ENV
         last_commit="$(git log --pretty=format:'%s' --max-count=1)"
         if [[ "$last_commit" =~ .*"Release".* ]]; then echo "release_flag=1" >> $GITHUB_ENV; else echo "release_flag=0" >> $GITHUB_ENV; fi
-        name="${build_version_prefix}${BUILD_NUMBER}.${branch_name}#v4.0#${TARGET_BUILD_NAME}#${branch_name}"
+        name="development.${BUILD_NUMBER}#v4.0#${TARGET_BUILD_NAME}#${branch_name}"
         artifact_prefix="squeezelite-esp32-${branch_name}-${TARGET_BUILD_NAME}-${build_version_prefix}${BUILD_NUMBER}"
         artifact_file_name="${artifact_prefix}.zip"
         artifact_bin_file_name="${artifact_prefix}.bin"
@@ -62,10 +63,9 @@ jobs:
         description=""
         description=${description}$'------------------------------\n### Revision Log\n\n'
         description="$description$(git log --pretty=format:'%h %s (%cI) <%an>' --abbrev-commit --max-count=15 | sed --r 's/(^[\*]+)/\\\1/g') "        
-        description="${description//'%'/'%25'}"
-        description="${description//$'\n'/'%0A'}"
-        description="${description//$'\r'/'%0D'}"        
-        echo "description=${description}" >> $GITHUB_ENV
+        echo 'description<<~EOD' >> $GITHUB_ENV
+        curl '${description}'>> $GITHUB_ENV
+        echo '~EOD' >> $GITHUB_ENV        
         echo ####### 
         echo ####### Release description 
         echo ####### 
