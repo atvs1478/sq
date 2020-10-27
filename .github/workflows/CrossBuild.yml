@@ -68,13 +68,9 @@ jobs:
         description="${description//$'\r'/'%0D'}"        
         echo "description=${description}" >> $GITHUB_ENV
         cat release_desc.txt
-    - name: Show Target
-      run: |
-        echo "Target is ${TARGET_BUILD_NAME}"
-        env
     - name: Build the firmware
       run: |
-        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build && zip ${artifact_file_name} ../partitions*.csv *.bin ./bootloader/bootloader.bin ./partition_table/partition-table.bin flash_project_args ./size_*.txt"
+        docker run --rm -v $PWD:/project -w /project espressif/idf:release-v4.0 /bin/bash -c "cp build-scripts/${TARGET_BUILD_NAME}-sdkconfig.defaults sdkconfig && export PROJECT_VER=${TARGET_BUILD_NAME}-${{ steps.buildnumber.outputs.build_number }} && idf.py build && zip build/${artifact_file_name} partitions*.csv build/*.bin build/bootloader/bootloader.bin build/partition_table/partition-table.bin build/flash_project_args build/size_*.txt"
     # - name: Build Mock firmware
     #   run: |
     #     mkdir -p build
