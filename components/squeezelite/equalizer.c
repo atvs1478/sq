@@ -76,7 +76,7 @@ void equalizer_update(s8_t *gain) {
  * process equalizer 
  */
 void equalizer_process(u8_t *buf, u32_t bytes, u32_t sample_rate) {
-	// don't want to process with output locked, so tak ethe small risk to miss one parametric update
+	// don't want to process with output locked, so take the small risk to miss one parametric update
 	if (equalizer.update) {
 		equalizer_close();
 		equalizer_open(sample_rate);

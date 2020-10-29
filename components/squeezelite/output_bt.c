@@ -131,24 +131,29 @@ int32_t output_bt_data(uint8_t *data, int32_t len) {
 
 	// This is how the BTC layer calculates the number of bytes to
 	// for us to send. (BTC_SBC_DEC_PCM_DATA_LEN * sizeof(OI_INT16) - availPcmBytes
-	wanted_len=len;
 	SET_MIN_MAX(len,req);
 	TIME_MEASUREMENT_START(start_timer);
 	LOCK;
-	output.device_frames = 0; // todo: check if this is the right way do to this.
+	
+	len /= BYTES_PER_FRAME;
+	wanted_len = len;
+	
+	output.device_frames = 0; 
 	output.updated = gettime_ms();
 	output.frames_played_dmp = output.frames_played;
+	
 	SET_MIN_MAX_SIZED(_buf_used(outputbuf),bt,outputbuf->size);
+	
 	do {
-		avail_data = _output_frames( wanted_len/BYTES_PER_FRAME )*BYTES_PER_FRAME; // Keep the transfer buffer full
-		wanted_len-=avail_data;
+		avail_data = _output_frames(wanted_len); 
+		wanted_len -= avail_data;
 	} while (wanted_len > 0 && avail_data != 0);
 	
 	if (wanted_len > 0) {
-		SET_MIN_MAX(wanted_len, under);
+		SET_MIN_MAX(wanted_len * BYTES_PER_FRAME, under);
 	}
-	output.frames_in_process = len-wanted_len;
 	
+	output.frames_in_process = len - wanted_len;
 	equalizer_process(data, (len - wanted_len) * BYTES_PER_FRAME, output.current_sample_rate);
 
 	UNLOCK;
@@ -156,7 +161,7 @@ int32_t output_bt_data(uint8_t *data, int32_t len) {
 	SET_MIN_MAX((len-wanted_len), rec);
 	TIME_MEASUREMENT_START(start_timer);
 
-	return len-wanted_len;
+	return (len - wanted_len) * BYTES_PER_FRAME;
 }
 
 void output_bt_tick(void) {
