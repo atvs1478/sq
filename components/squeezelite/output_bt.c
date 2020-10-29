@@ -115,12 +115,14 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 	}
 	
 	output_visu_export((s16_t*) (btout + oframes * BYTES_PER_FRAME), out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
+	
+	oframes += out_frames;
 
 	return (int)out_frames;
 }
 
 int32_t output_bt_data(uint8_t *data, int32_t len) {
-	int32_t avail_data = 0, wanted_len = 0, start_timer = 0;
+	int32_t iframes = len / BYTES_PER_FRAME, start_timer = 0;
 
 	if (len < 0 || data == NULL || !running) {
 		return 0;
@@ -133,35 +135,23 @@ int32_t output_bt_data(uint8_t *data, int32_t len) {
 	// for us to send. (BTC_SBC_DEC_PCM_DATA_LEN * sizeof(OI_INT16) - availPcmBytes
 	SET_MIN_MAX(len,req);
 	TIME_MEASUREMENT_START(start_timer);
-	LOCK;
+	SET_MIN_MAX_SIZED(_buf_used(outputbuf),bt,outputbuf->size);
 	
-	len /= BYTES_PER_FRAME;
-	wanted_len = len;
-	
+	LOCK;	
 	output.device_frames = 0; 
 	output.updated = gettime_ms();
 	output.frames_played_dmp = output.frames_played;
-	
-	SET_MIN_MAX_SIZED(_buf_used(outputbuf),bt,outputbuf->size);
-	
-	do {
-		avail_data = _output_frames(wanted_len); 
-		wanted_len -= avail_data;
-	} while (wanted_len > 0 && avail_data != 0);
-	
-	if (wanted_len > 0) {
-		SET_MIN_MAX(wanted_len * BYTES_PER_FRAME, under);
-	}
-	
-	output.frames_in_process = len - wanted_len;
-	equalizer_process(data, (len - wanted_len) * BYTES_PER_FRAME, output.current_sample_rate);
-
+	_output_frames(iframes); 
+	output.frames_in_process = oframes;
 	UNLOCK;
+	
+	equalizer_process(data, oframes * BYTES_PER_FRAME, output.current_sample_rate);
+
 	SET_MIN_MAX(TIME_MEASUREMENT_GET(start_timer),lock_out_time);
-	SET_MIN_MAX((len-wanted_len), rec);
+	SET_MIN_MAX((len-oframes*BYTES_PER_FRAME), rec);
 	TIME_MEASUREMENT_START(start_timer);
 
-	return (len - wanted_len) * BYTES_PER_FRAME;
+	return oframes * BYTES_PER_FRAME;
 }
 
 void output_bt_tick(void) {
