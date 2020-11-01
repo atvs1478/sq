@@ -432,34 +432,33 @@ python.exe <idf_path>\components\esptool_py\esptool\esptool.py -p COM<n> -b 9216
 ```
 Use 'idf monitor' to monitor the application (see esp-idf documentation)
 ## Additional misc notes to do you build (kitchen sink)
+- don't forget to set IDF_PATH, ESPPORT and ESPBAUD
+- When initially cloning the repo, make sure you do it recursively. For example: 
+	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
+- If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
+	-  git submodule update --init --recursive
 - as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
+- misc compiler #define
+	- use no resampling or set RESAMPLE (soxr - but overloads CPU) or set RESAMPLE16 for fast fixed 16 bits resampling
+	- use LOOPBACK (mandatory)
+	- use BYTES_PER_FRAME=4 (8 is not fully functionnal)
+	- LINKALL (mandatory)
+	- NO_FAAD unless you want to us faad, which currently overloads the CPU
+	- TREMOR_ONLY (mandatory)
+### codecs
 - for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
-- libfaad does not really support real time, but if you want to try
+- libfaad does not really support real time, but if you want to try (but using helixaac is a better option)
 	- -O3 -DFIXED_POINT -DSMALL_STACK
 	- change ac_link in configure and case ac_files, remove ''
 	- compiler but in cfft.c and cffti1, must disable optimization using
 			#pragma GCC push_options
 			#pragma GCC optimize ("O0")
 			#pragma GCC pop_options
-- better use helixaac						
 - opus & opusfile
 	- for opus, the ESP-provided library seems to work, but opusfile is still needed
 	- per mad & few others, edit configure and change $ac_link to add -c (faking link)
 	- change ac_files to remove ''
 	- add DEPS_CFLAGS and DEPS_LIBS to avoid pkg-config to be required
 	- stack consumption can be very high with some codec variants, so set NONTHREADSAFE_PSEUDOSTACK and GLOBAL_STACK_SIZE=32000 and unset VAR_ARRAYS in config.h
-- set IDF_PATH=/home/esp-idf
-- other compiler #define
-	- use no resampling or set RESAMPLE (soxr) or set RESAMPLE16 for fast fixed 16 bits resampling
-	- use LOOPBACK (mandatory)
-	- use BYTES_PER_FRAME=4 (8 is not fully functionnal)
-	- LINKALL (mandatory)
-	- NO_FAAD unless you want to us faad, which currently overloads the CPU
-	- TREMOR_ONLY (mandatory)
-- better use helixaac		
-- libmad has been patched to avoid using a lot of stack. There is an issue with sycn detection in 1.15.1b from where the original stack patch was done but since a few fixes have been made wrt sync detection. This 1.15.1b-10 found on debian fixes the issue where mad thinks it has reached sync but has not and so returns a wrong sample rate. It comes at the expense of 8KB (!) of code where a simple check in squeezelite/mad.c that next_frame[0] is 0xff and next_frame[1] & 0xf0 is 0xf0 does the trick ...
-- When initially cloning the repo, make sure you do it recursively. For example: 
-	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
-- If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
-	-  git submodule update --init --recursive
+- libmad has been patched to avoid using a lot of stack and is not provided here. There is an issue with sync detection in 1.15.1b from where the original stack patch was done but since a few fixes have been made wrt sync detection. This 1.15.1b-10 found on debian fixes the issue where mad thinks it has reached sync but has not and so returns a wrong sample rate. It comes at the expense of 8KB (!) of code where a simple check in squeezelite/mad.c that next_frame[0] is 0xff and next_frame[1] & 0xf0 is 0xf0 does the trick ...
