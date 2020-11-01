@@ -1,11 +1,41 @@
 # Squeezelite-esp32
-## Supported Hardware 
+# What is this
+Squeezelite-esp32 is an audio software suite made to run on espressif's ESP32 wifi (b/g/n) and bluetooth chipset. It offers the following capabilities
+
+- Stream your local music and connect to all major on-line provider (Spotify, Deezer, Tidal, Qobuz) using [Logitech Media Server - a.k.a LMS](https://forums.slimdevices.com/) and enjoy multi-room audio synchronization. LMS can be extended by numerous plugins and can be controlled using a Web browser or dedicated applications (iPhone, Android). It can also send audio to UPnP, Sonos, ChromeCast and AirPlay speakers/devices.
+- Stream from a Bluetooth device (iPhone, Android)
+- Stream from an AirPlay controller (iPhone, iTunes ...) and enjoy synchronization multiroom as well (although it's AirPlay 1 only)
+
+Depending on the hardware connected to the ESP32, you can send audio to a local DAC, to SPDIF or to a Bluetooth speaker. The bare minimum required hardware is a WROVER module with 4MB of Flash and 4MB of PSRAM (https://www.espressif.com/en/products/modules/esp32). With that module standalone, just apply power and you can stream to a Bluetooth speaker. You can also send audio to most I2S DAC as well as to SPDIF receivers using just a cable or an optical transducer (you'll need *one* resistor...)
+
+But squeezelite-esp32 is highly extensible and you can add
+
+- Buttons and Rotary Encoder and map/combine them to various functions (play, pause, volume, next ...)
+- IR receiver (no pullup resistor or capacitor needed, just the 38kHz receiver)
+- Monochrome, GrayScale or Color displays using SPI or I2S (supported drivers are SH1106, SSD1306, SSD1322, SSD1326/7, SSD1351, ST7735 and ST7789).
+
+Other features include
+
+ - Resampling 
+ - 10-bands equalizer
+ - Automatic initial setup using any WiFi device 
+ - Full web interface for further configuration/management
+ - Firmware over-the-air update 
+
+## Supported Hardware
+Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below. 
+### Raw WROVER module
+Per above description, a [WROVER module](https://www.espressif.com/en/products/modules/esp32) is enough to run Squeezelite-esp32, but that requires a bit of tinkering to extend it to have analogue audio or hardware buttons. 
+
+Please note that when sending to a Bluetooth speaker, then resampling *must* be enabled (using -R) option if you want to send audio with rate other than 44.1kHz. Similarly, when using SPDIF, only 44.1kHz and 48kHz are supported so you might have to enbale resampling as well. If you connect a DAC, choice will depends on its capabilities. See below for more details.
+
+Most DAC will work out of the box with simply an I2S connection, but some require specific commands to be sent using I2C. See DAC option below to understand how to send these dedicated commands. There is build-in support for TAS575x, TAS5780, TAS5713 and AC101 DAC.
 ### SqueezeAMP
-Works with the SqueezeAMP see [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP).
+This is the main hardware companion of Squeezelite-esp32 and has been developped together. Details on capabilities can be found [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP).
 
 if you want to rebuild, use the `squeezelite-esp32-SqueezeAmp-sdkconfig.defaults` configuration file.
 
-NB: You can use the pre-build binaries SqueezeAMP4MBFlash/SqueezeAMP8MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
+NB: You can use the pre-build binaries SqueezeAMP4MBFlash which has all the hardware I/O set properly. You can also use the generic binary I2S4MBFlash in which case the NVS parameters shall be set to get the exact same behavior
 - set_GPIO: 12=green,13=red,34=jack,2=spkfault
 - batt_config: channel=7,scale=20.24
 - dac_config: model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0
