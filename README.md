@@ -1,8 +1,8 @@
 # Squeezelite-esp32
-# What is this
+## What is this
 Squeezelite-esp32 is an audio software suite made to run on espressif's ESP32 wifi (b/g/n) and bluetooth chipset. It offers the following capabilities
 
-- Stream your local music and connect to all major on-line provider (Spotify, Deezer, Tidal, Qobuz) using [Logitech Media Server - a.k.a LMS](https://forums.slimdevices.com/) and enjoy multi-room audio synchronization. LMS can be extended by numerous plugins and can be controlled using a Web browser or dedicated applications (iPhone, Android). It can also send audio to UPnP, Sonos, ChromeCast and AirPlay speakers/devices.
+- Stream your local music and connect to all major on-line music providers (Spotify, Deezer, Tidal, Qobuz) using [Logitech Media Server - a.k.a LMS](https://forums.slimdevices.com/) and enjoy multi-room audio synchronization. LMS can be extended by numerous plugins and can be controlled using a Web browser or dedicated applications (iPhone, Android). It can also send audio to UPnP, Sonos, ChromeCast and AirPlay speakers/devices.
 - Stream from a Bluetooth device (iPhone, Android)
 - Stream from an AirPlay controller (iPhone, iTunes ...) and enjoy synchronization multiroom as well (although it's AirPlay 1 only)
 
@@ -23,13 +23,13 @@ Other features include
  - Firmware over-the-air update 
 
 ## Supported Hardware
-Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below. 
+Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below, but any should work.
 ### Raw WROVER module
-Per above description, a [WROVER module](https://www.espressif.com/en/products/modules/esp32) is enough to run Squeezelite-esp32, but that requires a bit of tinkering to extend it to have analogue audio or hardware buttons. 
+Per above description, a [WROVER module](https://www.espressif.com/en/products/modules/esp32) is enough to run Squeezelite-esp32, but that requires a bit of tinkering to extend it to have analogue audio or hardware buttons (e.g.) 
 
-Please note that when sending to a Bluetooth speaker, then resampling *must* be enabled (using -R) option if you want to send audio with rate other than 44.1kHz. Similarly, when using SPDIF, only 44.1kHz and 48kHz are supported so you might have to enbale resampling as well. If you connect a DAC, choice will depends on its capabilities. See below for more details.
+Please note that when sending to a Bluetooth speaker, then resampling *must* be enabled (using -R) option if you want to send audio with rate other than 44.1kHz. Similarly, when using SPDIF, only 44.1kHz and 48kHz are supported so you might have to enable resampling as well. If you connect a DAC, choice will depends on its capabilities. See below for more details.
 
-Most DAC will work out of the box with simply an I2S connection, but some require specific commands to be sent using I2C. See DAC option below to understand how to send these dedicated commands. There is build-in support for TAS575x, TAS5780, TAS5713 and AC101 DAC.
+Most DAC will work out-of-the-box with simply an I2S connection, but some require specific commands to be sent using I2C. See DAC option below to understand how to send these dedicated commands. There is build-in support for TAS575x, TAS5780, TAS5713 and AC101 DAC.
 ### SqueezeAMP
 This is the main hardware companion of Squeezelite-esp32 and has been developped together. Details on capabilities can be found [here](https://forums.slimdevices.com/showthread.php?110926-pre-ANNOUNCE-SqueezeAMP-and-SqueezeliteESP32) and [here](https://github.com/philippe44/SqueezeAMP).
 
