@@ -7,7 +7,6 @@
 */
 
 #include "bt_app_core.h"
-
 #include <stdint.h>
 #include "esp_system.h"
 #include <string.h>

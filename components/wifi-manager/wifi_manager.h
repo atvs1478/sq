@@ -191,7 +191,8 @@ typedef enum message_code_t {
 	ORDER_RESTART_RECOVERY = 16,
 	ORDER_RESTART_OTA_URL = 17,
 	ORDER_RESTART = 18,
-	MESSAGE_CODE_COUNT = 19 /* important for the callback array */
+	ORDER_UPDATE_STATUS = 19,
+	MESSAGE_CODE_COUNT = 20 /* important for the callback array */
 
 }message_code_t;
 
@@ -202,7 +203,7 @@ typedef enum reboot_type_t{
 } reboot_type_t;
 void wifi_manager_reboot(reboot_type_t rtype);
 void wifi_manager_reboot_ota(char * url);
-
+void wifi_manager_update_status();
 
 
 /**

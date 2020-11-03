@@ -33,7 +33,10 @@
 #include "platform_console.h"
 #include "trace.h"
 #ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+#pragma message("Runtime stats enabled")
 #define WITH_TASKS_INFO 1
+#else 
+#pragma message("Runtime stats disabled")
 #endif
 static struct {
 	struct arg_str *scanmode;

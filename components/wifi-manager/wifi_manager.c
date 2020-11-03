@@ -63,6 +63,7 @@ Contains the freeRTOS task and all necessary support
 #include "trace.h"
 #include "cmd_system.h"
 #include "messaging.h"
+#include "bt_app_core.h"
 
 #include "http_server_handlers.h"
 #include "monitor.h"
@@ -187,6 +188,9 @@ char * get_disconnect_code_desc(uint8_t reason){
 		default: return "UNKNOWN"; break;
 	}
 	return "";
+}
+void wifi_manager_update_status(){
+	wifi_manager_send_message(ORDER_UPDATE_STATUS,NULL);
 }
 void set_host_name(){
 	esp_err_t err;
@@ -458,6 +462,38 @@ cJSON * wifi_manager_get_new_array_json(cJSON **old){
 	ESP_LOGV(TAG,  "wifi_manager_get_new_array_json done");
 	return cJSON_CreateArray();
 }
+void wifi_manager_update_basic_info(){
+	if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
+
+		monitor_gpio_t *mgpio= get_jack_insertion_gpio(); 
+		
+		cJSON * voltage = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "Voltage");
+		if(voltage){
+			cJSON_SetNumberValue(voltage,	battery_value_svc());
+		}
+		cJSON * bt_status = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "bt_status");
+		if(bt_status){
+			cJSON_SetNumberValue(bt_status,	bt_app_source_get_a2d_state());
+		}
+		cJSON * bt_sub_status = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "bt_sub_status");
+		if(bt_sub_status){
+			cJSON_SetNumberValue(bt_sub_status,	bt_app_source_get_media_state());
+		}
+		cJSON * jack = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "Jack");
+		if(jack){
+			jack->type=mgpio->gpio>=0 && jack_inserted_svc()?cJSON_True:cJSON_False;
+		}
+		cJSON * disconnect_count = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "disconnect_count");
+		if(disconnect_count){
+			cJSON_SetNumberValue(disconnect_count,	num_disconnect);
+		}
+		cJSON * avg_conn_time = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "avg_conn_time");
+		if(avg_conn_time){
+			cJSON_SetNumberValue(avg_conn_time,	num_disconnect>0?(total_connected_time/num_disconnect):0);
+		}	
+		wifi_manager_unlock_json_buffer();
+	}
+}
 cJSON * wifi_manager_get_basic_info(cJSON **old){
 	monitor_gpio_t *mgpio= get_jack_insertion_gpio(); 
 	const esp_app_desc_t* desc = esp_ota_get_app_description();
@@ -467,10 +503,12 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
 	cJSON_AddNumberToObject(root,"recovery",	is_recovery_running?1:0);
-	cJSON_AddItemToObject(root, "Jack", cJSON_CreateString(mgpio->gpio>=0 && jack_inserted_svc() ? "1" : "0"));
+	cJSON_AddBoolToObject(root, "Jack", mgpio->gpio>=0 && jack_inserted_svc() );
 	cJSON_AddNumberToObject(root,"Voltage",	battery_value_svc());
 	cJSON_AddNumberToObject(root,"disconnect_count", num_disconnect	);
 	cJSON_AddNumberToObject(root,"avg_conn_time", num_disconnect>0?(total_connected_time/num_disconnect):0	);
+	cJSON_AddNumberToObject(root,"bt_status", bt_app_source_get_a2d_state());
+	cJSON_AddNumberToObject(root,"bt_sub_status", bt_app_source_get_media_state());
 #if CONFIG_I2C_LOCKED
 	cJSON_AddTrueToObject(root, "is_i2c_locked");
 #else
@@ -1536,6 +1574,9 @@ void wifi_manager( void * pvParameters ){
 			case	ORDER_RESTART:
 				ESP_LOGD(TAG,   "Calling simple_restart.");
 				simple_restart();
+				break;
+			case ORDER_UPDATE_STATUS:
+				wifi_manager_update_basic_info();
 				break;
 			default:
 				break;

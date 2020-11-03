@@ -12,7 +12,8 @@ typedef enum {
 	MESSAGING_CLASS_OTA,
 	MESSAGING_CLASS_SYSTEM,
 	MESSAGING_CLASS_STATS,
-	MESSAGING_CLASS_CFGCMD
+	MESSAGING_CLASS_CFGCMD,
+	MESSAGING_CLASS_BT
 } messaging_classes;
 
 typedef struct messaging_list_t *messaging_handle_t;

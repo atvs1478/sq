@@ -23,6 +23,7 @@ const char * desc_squeezelite ="Squeezelite Options";
 const char * desc_dac= "DAC Options";
 const char * desc_spdif= "SPDIF Options";
 const char * desc_audio= "General Audio Options";
+const char * desc_bt_source= "Bluetooth Audio Output Options";
 
 
 #define CODECS_BASE "flac|pcm|mp3|ogg"
@@ -59,7 +60,14 @@ const char * desc_audio= "General Audio Options";
 #define CODECS CODECS_BASE CODECS_AAC CODECS_FF CODECS_DSD CODECS_MP3
 #define NOT_OUTPUT "has input capabilities only"
 #define NOT_GPIO "is not a GPIO"
-
+typedef enum {
+    SEARCHING_FOR_BT,
+    SEARCHING_FOR_NAME,
+    SEARCHING_FOR_NAME_START,
+    SEARCHING_FOR_NAME_END,
+    SEARCHING_FOR_BT_CMD_END,
+    FINISHING
+} parse_state_t;
 static const char *TAG = "cmd_config";
 extern struct arg_end *getParmsEnd(struct arg_hdr * * argtable);
 //bck=<gpio>,ws=<gpio>,do=<gpio>[,mute=<gpio>[:0|1][,model=TAS57xx|TAS5713|AC101|I2S][,sda=<gpio>,scl=gpio[,i2c=<addr>]]
@@ -76,6 +84,15 @@ static struct {
 	struct arg_lit *clear;
     struct arg_end *end;
 } i2s_args;
+
+static struct{
+		struct arg_str *sink_name;
+		struct arg_str *pin_code;
+//		struct arg_dbl *connect_timeout_delay;
+//		struct arg_dbl *control_delay;
+		struct arg_end *end;
+} bt_source_args;
+
 static struct {
     struct arg_int *clock;
     struct arg_int *wordselect;
@@ -155,7 +172,224 @@ int check_missing_parm(struct arg_int * int_parm, FILE * f){
 	} 
 	return res;
 }
-	
+char * strip_bt_name(char * opt_str)
+{
+    char *result = malloc(strlen(opt_str)+1);
+    memset(result, 0x00, strlen(opt_str)+1);
+    char *str = strdup(opt_str);
+    const char * output_marker=" -o";
+    
+    if(!result ){
+        ESP_LOGE(TAG,"Error allocating memory for result.");
+        return opt_str;
+    }
+    if(!str){
+        ESP_LOGE(TAG,"Error duplicating command line string.");
+        return opt_str;
+    }	
+    bool quoted=false;
+    parse_state_t state = SEARCHING_FOR_BT;
+    char *start = strstr(str, output_marker);
+    if (start)
+    { 
+        ESP_LOGV(TAG,"Found output option : %s\n",start);
+        start+=strlen(output_marker);
+        strncpy(result, str, (size_t)(start - str));
+        char * pch=strtok(start," ");
+        while(pch){
+            ESP_LOGV(TAG,"Current output: %s\n[%s]",result,pch);
+            switch (state)
+            {
+                case SEARCHING_FOR_BT:
+                    if (strcasestr(pch, "BT") )
+                    {
+                        state = SEARCHING_FOR_NAME;
+                        quoted=strcasestr(pch, "BT")!=NULL;
+                        ESP_LOGV(TAG," - fount BT Start %s", quoted?"quoted":"");
+                    }
+                    else
+                    {
+                        ESP_LOGV(TAG," - Searching for BT, Ignoring");
+                    }
+                    strcat(result, " ");
+                    strcat(result, pch);
+                    break;
+                case SEARCHING_FOR_NAME:
+                    if (strcasestr(pch, "name") || strcasestr(pch, "n"))
+                    {
+                        ESP_LOGV(TAG," - Found name tag");
+                        state = SEARCHING_FOR_NAME_START;
+                    }
+                    else
+                    {
+                        strcat(result, " ");
+                        strcat(result, pch);
+                        ESP_LOGV(TAG," - Searching for name - added ");;
+                    }
+                    break;
+                case SEARCHING_FOR_NAME_START:
+                    ESP_LOGV(TAG," - Name start");
+                    state = SEARCHING_FOR_NAME_END;
+                break;
+                case SEARCHING_FOR_NAME_END:
+                    if (strcasestr(pch, "\"")){
+                        ESP_LOGV(TAG," - got quoted string");
+                        state = FINISHING;
+                    } 
+                    else if(pch[0]== '-'){
+                        strcat(result, " ");
+                        strcat(result, pch);
+                        ESP_LOGV(TAG," - got parameter marker");
+                        state = quoted?SEARCHING_FOR_BT_CMD_END:FINISHING;
+                    }
+                    else {
+                        ESP_LOGV(TAG," - name continued");
+                    }
+                    break;
+                case SEARCHING_FOR_BT_CMD_END:
+                    ESP_LOGV(TAG," - looking for quoted BT cmd end");
+                    if (strcasestr(pch, "\"")){
+                        ESP_LOGV(TAG," - got quote termination");
+                        state = FINISHING;
+                    } 
+                    strcat(result, " ");
+                    strcat(result, pch);
+                    break;
+                case FINISHING:
+                    strcat(result, " ");
+                    strcat(result, pch);
+                    break;
+                default:
+    
+                    break;
+            }
+            pch = strtok(NULL, " ");
+            ESP_LOGV(TAG,"\n");
+        }
+      
+    }
+    else
+    {
+        ESP_LOGE(TAG,"output option not found in %s\n",str);
+        strcpy(result,str);
+    }
+
+    ESP_LOGV(TAG,"Result commmand : %s\n", result);
+    free(str);
+    return result;
+}
+
+static int do_bt_source_cmd(int argc, char **argv){
+	esp_err_t err=ESP_OK;
+	int nerrors = arg_parse(argc, argv,(void **)&bt_source_args);
+	char *buf = NULL;
+	size_t buf_size = 0;
+//	char value[100] ={0};
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
+		return 1;
+	}
+	if(nerrors >0){
+		arg_print_errors(f,bt_source_args.end,desc_bt_source);
+		return 1;
+	}
+
+	if(bt_source_args.sink_name->count >0){
+		err = config_set_value(NVS_TYPE_STR, "a2dp_sink_name", bt_source_args.sink_name->sval[0]);
+		if(err!=ESP_OK){
+            nerrors++;
+            fprintf(f,"Error setting Bluetooth audio device name %s. %s\n",bt_source_args.sink_name->sval[0], esp_err_to_name(err));
+        }
+        else {
+            fprintf(f,"Bluetooth audio device name changed to %s\n",bt_source_args.sink_name->sval[0]);
+        }        
+		char * squeezelite_cmd = config_alloc_get_default(NVS_TYPE_STR, "autoexec1", NULL, 0);
+		if( squeezelite_cmd && strstr(squeezelite_cmd," -o ") ){
+			char * new_cmd = strip_bt_name(squeezelite_cmd);
+			if(strcmp(new_cmd,squeezelite_cmd)!=0){
+				fprintf(f,"Replacing old squeezelite command [%s] with [%s].\n",squeezelite_cmd,new_cmd);
+				config_set_value(NVS_TYPE_STR, "autoexec1", new_cmd);
+				if(err!=ESP_OK){
+					nerrors++;
+					fprintf(f,"Error updating squeezelite command line options . %s\n", esp_err_to_name(err));
+				}			
+			}
+			free(squeezelite_cmd);
+			free(new_cmd);
+		}
+
+	}
+	if(bt_source_args.pin_code->count >0){
+		const char * v=bt_source_args.pin_code->sval[0];
+		bool bInvalid=false;
+		for(int i=0;i<strlen(v) && !bInvalid;i++){
+			if(v[i]<'0' || v[i]>'9'){
+				bInvalid=true;
+			}
+		}
+		if(bInvalid || strlen(bt_source_args.pin_code->sval[0])>16 || strlen(bt_source_args.pin_code->sval[0])<4){
+            nerrors++;
+            fprintf(f,"Pin code %s invalid. Should be numbers only with length between 4 and 16 characters. \n",bt_source_args.pin_code->sval[0]);
+		}
+		else {
+			err = config_set_value(NVS_TYPE_STR, "a2dp_spin", bt_source_args.pin_code->sval[0]);
+			if(err!=ESP_OK){
+				nerrors++;
+				fprintf(f,"Error setting Bluetooth source pin to %s. %s\n",bt_source_args.pin_code->sval[0], esp_err_to_name(err));
+			}
+			else {
+				fprintf(f,"Bluetooth source pin changed to %s\n",bt_source_args.pin_code->sval[0]);
+			}        
+		}
+	}	
+	// if(bt_source_args.connect_timeout_delay->count >0){
+		
+	// 	snprintf(value,sizeof(value),"%d",(int)(bt_source_args.connect_timeout_delay->dval[0]*1000.0));
+	// 	if(bt_source_args.connect_timeout_delay->dval[0] <0.5 || bt_source_args.connect_timeout_delay->dval[0] >5.0){
+	// 		nerrors++;
+	// 		fprintf(f,"Invalid connection timeout %0.0f (%s milliseconds). Value must be between 0.5 sec and 5 sec.\n", bt_source_args.connect_timeout_delay->dval[0], value );
+	// 	}
+	// 	else {
+	// 		err = config_set_value(NVS_TYPE_STR, "a2dp_ctmt", value);
+	// 		if(err!=ESP_OK){
+	// 			nerrors++;
+	// 			fprintf(f,"Error setting connection timeout %0.0f sec (%s milliseconds). %s\n", bt_source_args.connect_timeout_delay->dval[0],value, esp_err_to_name(err));
+	// 		}
+	// 		else {
+	// 			fprintf(f,"Connection timeout changed to %0.0f sec (%s milliseconds)\n",bt_source_args.connect_timeout_delay->dval[0],value);
+	// 		}     
+	// 	}   
+	// }
+
+	// if(bt_source_args.control_delay->count >0){
+	// 	snprintf(value,sizeof(value),"%d",(int)(bt_source_args.control_delay->dval[0]*1000.0));
+	// 	if(bt_source_args.control_delay->dval[0] <0.1 || bt_source_args.control_delay->dval[0] >2.0){
+	// 		nerrors++;
+	// 		fprintf(f,"Invalid control delay %0.0f (%s milliseconds). Value must be between 0.1s and 2s.\n", bt_source_args.control_delay->dval[0], value );
+	// 	}
+	// 	else {
+	// 		err = config_set_value(NVS_TYPE_STR, "a2dp_ctrld", value);
+	// 		if(err!=ESP_OK){
+	// 			nerrors++;
+	// 			fprintf(f,"Error setting control delay to %0.0f sec (%s milliseconds). %s\n",bt_source_args.control_delay->dval[0],value, esp_err_to_name(err));
+	// 		}
+	// 		else {
+	// 			fprintf(f,"Control delay changed to %0.0f sec (%s milliseconds)\n",bt_source_args.control_delay->dval[0],value);
+	// 		}     
+	// 	}   
+	// }
+
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
+	fflush (f);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return (nerrors==0 && err==ESP_OK)?0:1;
+
+}
 static int do_audio_cmd(int argc, char **argv){
 	esp_err_t err=ESP_OK;
 	int nerrors = arg_parse(argc, argv,(void **)&audio_args);
@@ -399,6 +633,30 @@ cJSON * audio_cb(){
     FREE_AND_NULL(p);    
 	return values;
 }
+cJSON * bt_source_cb(){
+	cJSON * values = cJSON_CreateObject();
+	char * 	p = config_alloc_get_default(NVS_TYPE_STR, "a2dp_sink_name", NULL, 0);
+	if(p){
+		cJSON_AddStringToObject(values,"sink_name",p);
+	}
+	FREE_AND_NULL(p);    
+	// p = config_alloc_get_default(NVS_TYPE_STR, "a2dp_ctmt", NULL, 0);
+	// if(p){
+	// 	cJSON_AddNumberToObject(values,"connect_timeout_delay",((double)atoi(p)/1000.0));
+	// }
+	// FREE_AND_NULL(p);   
+	p = config_alloc_get_default(NVS_TYPE_STR, "a2dp_spin", "0000", 0);
+	if(p){
+		cJSON_AddStringToObject(values,"pin_code",p);
+	}
+	FREE_AND_NULL(p);   
+	// p = config_alloc_get_default(NVS_TYPE_STR, "a2dp_ctrld", NULL, 0);
+	// if(p){
+	// 	cJSON_AddNumberToObject(values,"control_delay",((double)atoi(p)/1000.0));
+	// }
+	// FREE_AND_NULL(p);   
+	return values;
+}
 
 
 void get_str_parm_json(struct arg_str * parm, cJSON * entry){
@@ -541,6 +799,24 @@ static void register_i2s_config(void){
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+static void register_bt_source_config(void){
+	
+	bt_source_args.sink_name= arg_str1("n","sink_name", "name","Bluetooth audio device name. This applies when output mode is Bluetooth");
+	bt_source_args.pin_code= arg_str1("p","pin_code", "pin","Bluetooth security/pin code. Usually 0000. This applies when output mode is Bluetooth");
+//	bt_source_args.control_delay= arg_dbl0("d","control_delay","seconds","Control response delay, in seconds. This determines the response time of the system Bluetooth events. The default value should work for the majority of cases and changing this could lead to instabilities.");
+//	bt_source_args.connect_timeout_delay= arg_dbl0("t","connect_timeout_delay","seconds","Connection timeout. Determines the maximum amount of time, in seconds, that the system will wait when connecting to a bluetooth device. Beyond this delay, a new connect attempt will be made.");
+	bt_source_args.end= arg_end(1);
+	const esp_console_cmd_t cmd = {
+        .command = CFG_TYPE_AUDIO("bt_source"),
+        .help = desc_bt_source,
+        .hint = NULL,
+        .func = &do_bt_source_cmd,
+        .argtable = &bt_source_args
+    };
+    cmd_to_json_with_cb(&cmd,&bt_source_cb);
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
 
 static void register_audio_config(void){
 	audio_args.jack_behavior = arg_str0("j", "jack_behavior","Headphones|Subwoofer","On supported DAC, determines the audio jack behavior. Selecting headphones will cause the external amp to be muted on insert, while selecting Subwoofer will keep the amp active all the time.");
@@ -616,6 +892,7 @@ static void register_squeezelite_config(void){
 void register_config_cmd(void){
 	register_audio_config();
 //	register_squeezelite_config();
+	register_bt_source_config();
 	register_i2s_config();
 	register_spdif_config();
 }

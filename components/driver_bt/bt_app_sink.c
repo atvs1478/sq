@@ -63,6 +63,7 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param);
 /* avrc TG event handler */
 static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param);
 static void volume_set_by_local_host(uint8_t volume);
+static void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_parameter);
 
 static const char *s_a2d_conn_state_str[] = {"Disconnected", "Connecting", "Connected", "Disconnecting"};
 static const char *s_a2d_audio_state_str[] = {"Suspended", "Stopped", "Started"};
@@ -378,7 +379,7 @@ static void bt_av_play_pos_changed(void)
     }
 }
 
-void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_parameter)
+static void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_parameter)
 {
     switch (event_id) {
     case ESP_AVRC_RN_TRACK_CHANGE:

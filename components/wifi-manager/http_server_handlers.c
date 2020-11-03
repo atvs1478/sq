@@ -548,7 +548,7 @@ esp_err_t ap_get_handler(httpd_req_t *req){
     }
     /* if we can get the mutex, write the last version of the AP list */
 	esp_err_t err = set_content_type_from_req(req);
-	if( err == ESP_OK && wifi_manager_lock_json_buffer(( TickType_t ) 10)){
+	if( err == ESP_OK && wifi_manager_lock_json_buffer(( TickType_t ) 200/portTICK_PERIOD_MS)){
 		char *buff = wifi_manager_alloc_get_ap_list_json();
 		wifi_manager_unlock_json_buffer();
 		if(buff!=NULL){
@@ -1168,7 +1168,7 @@ esp_err_t status_get_handler(httpd_req_t *req){
 		return err;
 	}
 
-	if(wifi_manager_lock_json_buffer(( TickType_t ) 10)) {
+	if(wifi_manager_lock_json_buffer(( TickType_t ) 200/portTICK_PERIOD_MS)) {
 		char *buff = wifi_manager_alloc_get_ip_info_json();
 		wifi_manager_unlock_json_buffer();
 		if(buff) {

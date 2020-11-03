@@ -41,6 +41,31 @@ var nvs_type_t = {
 	/*!< Type blob */
 	NVS_TYPE_ANY: 0xff /*!< Must be last */
 };
+var bt_icons = {
+	'bt_playing':'<path d="M15.98,10.28 L14.6,11.66 C14.4,11.86 14.4,12.17 14.6,12.37 L15.98,13.75 C16.26,14.03 16.73,13.9 16.83,13.52 C16.94,13.02 17,12.52 17,12 C17,11.49 16.94,10.99 16.82,10.52 C16.73,10.14 16.26,10 15.98,10.28 Z M20.1,7.78 C19.85,7.23 19.12,7.11 18.7,7.54 C18.44,7.8 18.39,8.18 18.53,8.52 C18.99,9.59 19.25,10.76 19.25,11.99 C19.25,13.23 18.99,14.41 18.52,15.48 C18.38,15.8 18.43,16.17 18.68,16.42 C19.09,16.83 19.78,16.71 20.03,16.19 C20.66,14.89 21.01,13.43 21.01,11.89 C21,10.44 20.68,9.04 20.1,7.78 Z M11.39,12 L14.98,8.42 C15.37,8.03 15.37,7.4 14.98,7 L10.69,2.71 C10.06,2.08 8.98,2.53 8.98,3.42 L8.98,9.6 L5.09,5.7 C4.7,5.31 4.07,5.31 3.68,5.7 C3.29,6.09 3.29,6.72 3.68,7.11 L8.57,12 L3.68,16.89 C3.29,17.28 3.29,17.91 3.68,18.3 C4.07,18.69 4.7,18.69 5.09,18.3 L8.98,14.41 L8.98,20.59 C8.98,21.48 10.06,21.93 10.69,21.3 L14.99,17 C15.38,16.61 15.38,15.98 14.99,15.58 L11.39,12 Z M10.98,5.83 L12.86,7.71 L10.98,9.59 L10.98,5.83 Z M10.98,18.17 L10.98,14.41 L12.86,16.29 L10.98,18.17 Z" id="🔹-Icon-Color" fill="#1D1D1D"></path>',
+	'bt_disconnected':'<path d="M13.41,12l3.8-3.79a1,1,0,0,0,0-1.42l-4.5-4.5a1,1,0,0,0-.33-.21,1,1,0,0,0-.76,0,1,1,0,0,0-.54.54A1,1,0,0,0,11,3V9.59L8.21,6.79A1,1,0,1,0,6.79,8.21L10.59,12l-3.8,3.79a1,1,0,1,0,1.42,1.42L11,14.41V21a1,1,0,0,0,.08.38,1,1,0,0,0,.54.54.94.94,0,0,0,.76,0,1,1,0,0,0,.33-.21l4.5-4.5a1,1,0,0,0,0-1.42ZM13,5.41,15.09,7.5,13,9.59Zm0,13.18V14.41l2.09,2.09Z"/>',
+	'bt_neutral':'<path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>',
+	'bt_connected':'<path d="M7 12l-2-2-2 2 2 2 2-2zm10.71-4.29L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88zM19 10l-2 2 2 2 2-2-2-2z"/>',
+	'bt_disabled':'<path d="M13 5.83l1.88 1.88-1.6 1.6 1.41 1.41 3.02-3.02L12 2h-1v5.03l2 2v-3.2zM5.41 4L4 5.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l4.29-4.29 2.3 2.29L20 18.59 5.41 4zM13 18.17v-3.76l1.88 1.88L13 18.17z"/>',
+	'bt_searching':'<path d="M14.24 12.01l2.32 2.32c.28-.72.44-1.51.44-2.33 0-.82-.16-1.59-.43-2.31l-2.33 2.32zm5.29-5.3l-1.26 1.26c.63 1.21.98 2.57.98 4.02s-.36 2.82-.98 4.02l1.2 1.2c.97-1.54 1.54-3.36 1.54-5.31-.01-1.89-.55-3.67-1.48-5.19zm-3.82 1L10 2H9v7.59L4.41 5 3 6.41 8.59 12 3 17.59 4.41 19 9 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM11 5.83l1.88 1.88L11 9.59V5.83zm1.88 10.46L11 18.17v-3.76l1.88 1.88z"/>',
+	'play_circle_outline':'<path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>',
+	'play_circle_filled':'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>',
+	'play_arrow':'<path d="M0 0h24v24H0z" fill="none"/><path d="M8 5v14l11-7z"/>',
+	'pause':'<path d="M0 0h24v24H0z" fill="none"/><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+	'stop':'<path d="M0 0h24v24H0z" fill="none"/><path d="M6 6h12v12H6z"/>',
+	'':''
+};
+
+var bt_state_icon = [
+	{"desc":"Idle", "sub":["bt_neutral"]},
+	{"desc":"Discovering","sub":["bt_searching"]},
+	{"desc":"Discovered","sub":["bt_searching"]},
+	{"desc":"Unconnected","sub":["bt_disabled"]},
+	{"desc":"Connecting","sub":["bt_disabled"]},
+	{"desc":"Connected","sub":["bt_connected", "play_circle_outline", "bt_playing", "pause", "stop"]},
+	{"desc":"Disconnecting","sub":["bt_neutral"]},
+];
+
 pillcolors = {
 	'MESSAGING_INFO' : 'badge-success',
 	'MESSAGING_WARNING' : 'badge-warning',
@@ -72,6 +97,24 @@ var escapeHTML = function(unsafe) {
 		}
 	});
 };
+
+function handlebtstate(data){
+	var icon = '';
+	var tt='';
+	if (data['bt_status']!=undefined && data['bt_sub_status']!=undefined) {
+		var iconsvg=bt_state_icon[data['bt_status']]?.sub[data['bt_sub_status']];
+		if(iconsvg){
+			icon =  bt_icons[iconsvg];
+			tt=bt_state_icon[data['bt_status']]?.desc;
+		}
+		else {
+			icon = bt_icons.bt_connected;
+			tt='Output status';
+		}
+	}
+	o_type.title=tt;
+	$('#o_bt').html(icon);
+}
 function setNavColor(stylename){
 	$('[name=secnav]').removeClass('bg-secondary bg-warning');
 	$("footer.footer").removeClass('bg-secondary bg-warning');
@@ -84,24 +127,18 @@ function setNavColor(stylename){
 }
 function handleTemplateTypeRadio(outtype){
 	if (outtype == 'bt') {
-		$("#btsinkdiv").parent().show(200);
-		$("#btsinkdiv").show();
 		$('#bt').prop('checked',true);
-		o_bt.setAttribute("display", "inline");		
+		o_bt.setAttribute("display", "inline");				
 		o_spdif.setAttribute("display", "none");	
 		o_i2s.setAttribute("display", "none");			
 		output = 'bt';
 	} else if (outtype == 'spdif') {
-		$("#btsinkdiv").parent().hide(200);
-		$("#btsinkdiv").show();
 		$('#spdif').prop('checked',true);
 		o_bt.setAttribute("display", "none");		
 		o_spdif.setAttribute("display", "inline");	
 		o_i2s.setAttribute("display", "none");			
 		output = 'spdif';
 	} else {
-		$("#btsinkdiv").parent().hide(200);
-		$("#btsinkdiv").show();
 		$('#i2s').prop('checked',true);
 		o_bt.setAttribute("display", "none");		
 		o_spdif.setAttribute("display", "none");	
@@ -326,13 +363,8 @@ function save_autoexec1(apply){
 	showCmdMessage('cfg-audio-tmpl','MESSAGING_INFO',"Saving.\n",false);
 	var commandLine = commandHeader + ' -n "' + $("#player").val() + '"';
 	if (output == 'bt') {
-		if($("#btsinkdiv").val()?.length!=0){
-			commandLine += ' -o "BT -n \'' + $("#btsinkdiv").val() + '\'" -Z 192000';
-		}
-		else {
-			showCmdMessage('cfg-audio-tmpl','MESSAGING_ERROR',"BT Sink Name required for output bluetooth.\n",true);
-			return;
-		}
+		commandLine += ' -o "BT" -R -Z 192000';
+		showCmdMessage('cfg-audio-tmpl','MESSAGING_INFO',"Remember to configure the Bluetooth audio device name.\n",true);
 	} else if (output == 'spdif') {
 		commandLine += ' -o SPDIF -Z 192000';
 	} else {
@@ -939,6 +971,8 @@ function handleRecoveryMode(data){
 			setNavColor('bg-warning');
 			$("#boot-button").html('Reboot');
 			$("#boot-form").attr('action', '/reboot_ota.json');
+			$("flashfilename").show();
+			$("fwUpload").show();
 		} else {
 			recovery = false;
 			$("#reboot_ota_nav").hide();
@@ -949,6 +983,8 @@ function handleRecoveryMode(data){
 			$("footer.footer").addClass('sl');
 			$("#boot-button").html('Recovery');
 			$("#boot-form").attr('action', '/recovery.json');
+			$("flashfilename").hide();
+			$("fwUpload").hide();
 		}
 	}
 }
@@ -1029,6 +1065,7 @@ function checkStatus() {
 	$.getJSON("/status.json", function(data) {
 		handleRecoveryMode(data);
 		handleWifiStatus(data);
+		handlebtstate(data);
 		if (data.hasOwnProperty('project_name') && data['project_name'] != '') {
 			pname = data['project_name'];
 		}
@@ -1066,7 +1103,7 @@ function checkStatus() {
 		}
 		if (data.hasOwnProperty('Jack')) {
 			var jack = data['Jack'];
-			if (jack == '1') {
+			if (jack) {
 				o_jack.setAttribute("display", "inline");
 			}
 		}
@@ -1253,11 +1290,6 @@ function getConfig() {
 							handleTemplateTypeRadio('spdif');
 						} else if (m[1].toUpperCase().startsWith('"BT')) {
 							handleTemplateTypeRadio('bt');
-							var re2=/["]BT\s*-n\s*'([^"]+)'/g;
-							var m2=re2.exec(m[1]);
-							if(m2.length>=2){
-								$("#btsinkdiv").val(m2[1]);
-							}
 						}
 					} else if (key == 'host_name') {
 						val = val.replaceAll('"', '');

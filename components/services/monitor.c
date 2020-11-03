@@ -41,11 +41,14 @@ bool jack_inserted_svc(void);
 void (*spkfault_handler_svc)(bool inserted);
 bool spkfault_svc(void);
 
+extern void wifi_manager_update_status();
+
 /****************************************************************************************
  * 
  */
 static void task_stats( cJSON* top ) {
 #ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY 
+#pragma message("Compiled with trace facility")
 	static struct {
 		TaskStatus_t *tasks;
 		uint32_t total, n;
@@ -60,6 +63,7 @@ static void task_stats( cJSON* top ) {
 	*scratch = '\0';
 
 #ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+#pragma message("Compiled with runtime stats")
 	uint32_t elapsed = current.total - previous.total;
     
 	for(int i = 0, n = 0; i < current.n; i++ ) {
@@ -87,6 +91,8 @@ static void task_stats( cJSON* top ) {
 		}
 	}	
 #else
+#pragma message("Compiled WITHOUT runtime stats")
+
 	for (int i = 0, n = 0; i < current.n; i ++) {
 		n += sprintf(scratch + n, "%16s s:%5u\t", current.tasks[i].pcTaskName, current.tasks[i].usStackHighWaterMark);
 		cJSON * t=cJSON_CreateObject();
@@ -106,6 +112,8 @@ static void task_stats( cJSON* top ) {
 	cJSON_AddItemToObject(top,"tasks",tlist);
 	if (previous.tasks) free(previous.tasks);
 	previous = current;
+#else 
+#pragma message("Compiled WITHOUT trace facility")	
 #endif	
 }
  
@@ -140,6 +148,7 @@ static void monitor_callback(TimerHandle_t xTimer) {
 static void jack_handler_default(void *id, button_event_e event, button_press_e mode, bool long_press) {
 	ESP_LOGD(TAG, "Jack %s", event == BUTTON_PRESSED ? "inserted" : "removed");
 	messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_SYSTEM,"jack is %s",BUTTON_PRESSED ? "inserted" : "removed");
+	wifi_manager_update_status();
 	if (jack_handler_svc) (*jack_handler_svc)(event == BUTTON_PRESSED);
 }
 

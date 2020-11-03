@@ -437,14 +437,16 @@ void app_main()
 		bypass_wifi_manager=(strcmp(bypass_wm,"1")==0 ||strcasecmp(bypass_wm,"y")==0);
 	}
 
-	ESP_LOGD(TAG,"Getting audio control mapping ");
-	char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
-	if (actrls_init(actrls_config) == ESP_OK) {
-		ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
-	} else {
-		ESP_LOGD(TAG,"No audio control buttons");
+	if(!is_recovery_running){
+		ESP_LOGD(TAG,"Getting audio control mapping ");
+		char *actrls_config = config_alloc_get_default(NVS_TYPE_STR, "actrls_config", NULL, 0);
+		if (actrls_init(actrls_config) == ESP_OK) {
+			ESP_LOGD(TAG,"Initializing audio control buttons type %s", actrls_config);	
+		} else {
+			ESP_LOGD(TAG,"No audio control buttons");
+		}
+		if (actrls_config) free(actrls_config);
 	}
-	if (actrls_config) free(actrls_config);
 
 	/* start the wifi manager */
 	ESP_LOGD(TAG,"Blinking led");
