@@ -38,7 +38,7 @@
 static const char *TAG = "services";
 const char *i2c_name_type="I2C";
 const char *spi_name_type="SPI";
-static cJSON * gpio_list=NULL;
+cJSON * gpio_list=NULL;
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #ifndef QUOTE
 	#define QUOTE(name) #name
@@ -395,6 +395,80 @@ const i2c_config_t * config_i2c_get(int * i2c_port) {
 /****************************************************************************************
  * 
  */
+const gpio_with_level_t * get_gpio_struct_member(const char * nvs_item, const char * name){
+	static gpio_with_level_t gpio_member={
+		.gpio=-1,
+		.level=0
+	};
+	if(!nvs_item) return &gpio_member;
+	const char * p=nvs_item;
+	char type[20]={0};
+	int match=0;
+	do {
+		if ((match=sscanf(p, "%d=%19[^,:]:%d", &gpio_member.gpio, type,&gpio_member.level)) >0 && (GPIO_IS_VALID_GPIO(gpio_member.gpio) ||  gpio_member.gpio==GPIO_NUM_NC) && strcasestr(type,name)){
+            return &gpio_member;
+		}
+		p = strchr(p, ',');
+	} while (p++);
+	gpio_member.gpio=-1;
+	gpio_member.level=0;
+    return &gpio_member;
+}
+
+#define HANDLE_GPIO_STRUCT_MEMBER(name,fixval) memcpy(&gpio_struct.name, get_gpio_struct_member(nvs_item, QUOTE(name)), sizeof(gpio_struct.name)); gpio_struct.name.fixed=fixval
+#define ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(array,structvar,name,type) if(((set_GPIO_struct_t *)structvar)->name.gpio>=0){cJSON_AddItemToArray(array,get_gpio_entry(QUOTE(name),type,((set_GPIO_struct_t *)structvar)->name.gpio, ((set_GPIO_struct_t *)structvar)->name.fixed));}
+/****************************************************************************************
+ * 
+ */
+const set_GPIO_struct_t * get_gpio_struct(){
+	static set_GPIO_struct_t gpio_struct;
+	char * nvs_item=config_alloc_get(NVS_TYPE_STR, "set_GPIO");
+#ifdef CONFIG_LED_GREEN_GPIO_LEVEL
+		gpio_struct.green.level = CONFIG_LED_GREEN_GPIO_LEVEL;
+#endif
+#ifdef CONFIG_LED_GREEN_GPIO
+		gpio_struct.green.gpio = CONFIG_LED_GREEN_GPIO;
+#endif
+#ifdef CONFIG_LED_RED_GPIO_LEVEL
+		gpio_struct.green.level = CONFIG_LED_RED_GPIO_LEVEL;
+#endif
+#ifdef CONFIG_LED_RED_GPIO
+		gpio_struct.red.gpio = CONFIG_LED_RED_GPIO;
+#endif	
+	if(nvs_item){
+		HANDLE_GPIO_STRUCT_MEMBER(amp,false);
+#ifndef CONFIG_LED_LOCKED
+		HANDLE_GPIO_STRUCT_MEMBER(green,false);
+		HANDLE_GPIO_STRUCT_MEMBER(red,false);
+#endif
+		HANDLE_GPIO_STRUCT_MEMBER(jack,false);
+		HANDLE_GPIO_STRUCT_MEMBER(spkfault,false);
+		HANDLE_GPIO_STRUCT_MEMBER(vcc,false);
+		HANDLE_GPIO_STRUCT_MEMBER(gnd,false);
+		HANDLE_GPIO_STRUCT_MEMBER(ir,false);
+		free(nvs_item);
+	}
+
+#ifdef CONFIG_LED_LOCKED
+		gpio_struct.red.locked=true;
+		gpio_struct.green.locked=true;
+#endif	
+#ifdef CONFIG_JACK_LOCKED
+		gpio_struct.jack.gpio=CONFIG_JACK_GPIO
+		gpio_struct.jack.fixed=true;
+		gpio_struct.jack.level=CONFIG_JACK_GPIO_LEVEL;
+#endif
+#ifdef CONFIG_SPKFAULT_LOCKED
+		gpio_struct.spkfault.gpio=CONFIG_SPKFAULT_GPIO
+		gpio_struct.spkfault.fixed=true;
+		gpio_struct.spkfault.level=CONFIG_SPKFAULT_GPIO_LEVEL;
+#endif
+	return &gpio_struct;	
+}
+
+/****************************************************************************************
+ * 
+ */
 const spi_bus_config_t * config_spi_get(spi_host_device_t * spi_host) {
 	char *nvs_item, *p;
 	static spi_bus_config_t spi = {
@@ -451,52 +525,31 @@ cJSON * get_gpio_entry(const char * name, const char * prefix, int gpio, bool fi
 /****************************************************************************************
  *
  */
+cJSON * add_gpio_for_name(cJSON * list,const char * nvs_entry,const char * name, const char * prefix, bool fixed){
+	cJSON * llist = list?list:cJSON_CreateArray();
+	char *p;
+	int gpioNum=0;
+	if ((p = strcasestr(nvs_entry, name)) != NULL) {
+		gpioNum = atoi(strchr(p, '=') + 1);
+		cJSON_AddItemToArray(llist,get_gpio_entry(name,prefix,gpioNum,fixed));
+	}
+	return llist;
+}
+
+/****************************************************************************************
+ *
+ */
 cJSON * get_GPIO_nvs_list(cJSON * list) {
 	cJSON * ilist = list?list:cJSON_CreateArray();
-	char *nvs_item, *p, type[16];
-	int gpio;
-	bool fixed=false;	
-#ifdef CONFIG_JACK_LOCKED	
-	bool bFoundJack=false;
-#endif
-#ifdef CONFIG_SPKFAULT_LOCKED
-	bool bFoundSpkFault = false;
-#endif
-	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, "set_GPIO")) == NULL) return ilist;
-	p = nvs_item;
-
-	do {
-		fixed=false;
-		if (sscanf(p, "%d=%15[^,]", &gpio, type) > 0 && (GPIO_IS_VALID_GPIO(gpio) ||  gpio==GPIO_NUM_NC)){
-#ifdef CONFIG_JACK_LOCKED
-			if(strcasecmp(type,"jack")==0){
-				fixed=true;
-				bFoundJack=true;
-			}
-#endif
-#ifdef CONFIG_SPKFAULT_LOCKED
-			if(strcasecmp(type,"spkfault")==0){
-				fixed=true;
-				bFoundSpkFault=true;
-			}		
-#endif	
-			cJSON_AddItemToArray(ilist,get_gpio_entry(type,"gpio", gpio, fixed));
-		}
-		p = strchr(p, ',');
-	} while (p++);
-#ifdef CONFIG_JACK_LOCKED
-	if(!bFoundJack){
-		monitor_gpio_t *jack= get_jack_insertion_gpio(); 		
-		cJSON_AddItemToArray(list,get_gpio_entry("jack", "other", jack->gpio, true));
-	}
-#endif
-#ifdef CONFIG_SPKFAULT_LOCKED	
-	if(!bFoundSpkFault){
-		monitor_gpio_t *jack= get_spkfault_gpio(); 		
-		cJSON_AddItemToArray(list,get_gpio_entry("spkfault", "other", jack->gpio, true));
-	}
-#endif	
-	free(nvs_item);
+	const set_GPIO_struct_t * gpios = get_gpio_struct();
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,vcc,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,gnd,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,amp,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,ir,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,jack,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,green,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,red,"other");
+	ADD_GPIO_STRUCT_MEMBER_TO_ARRAY(ilist,gpios,spkfault,"other");
 	return ilist;
 }
 
@@ -585,47 +638,30 @@ cJSON * get_SPI_GPIO(cJSON * list){
 /****************************************************************************************
  *
  */
-cJSON * get_GPIO_from_string(const char * nvs_item, const char * prefix, cJSON * list, bool fixed){
-	cJSON * llist = list;
-	int gpio=0,offset=0,soffset=0,ret1=0,sret=0;
-
-	if(!llist){
-		llist = cJSON_CreateArray();
-	}
-	const char  *p=NULL;
-	char type[16];
-	int slen=strlen(nvs_item)+1;
-	char * buf1=malloc(slen);
-	char * buf2=malloc(slen);
-	ESP_LOGD(TAG,"Parsing string %s",nvs_item);
-	p = strchr(nvs_item, ':');
-	p=p?p+1:nvs_item;
-	while((((ret1=sscanf(p, "%[^=]=%d%n", type,&gpio,&offset)) ==2) || ((sret=sscanf(p, "%[^=]=%[^, ],%n", buf1,buf2,&soffset)) > 0 )) && (offset || soffset)){
-		if(ret1==2 && (GPIO_IS_VALID_GPIO(gpio) ||  gpio==GPIO_NUM_NC)){
-			if(gpio>0){
-				cJSON_AddItemToArray(llist,get_gpio_entry(type,prefix,gpio,fixed));
-			}
-			p+=offset;
-		} else {
-			p+=soffset;
-		}
-		while(*p==' ' || *p==',') p++;
-		gpio=-1;
-	}
-	free(buf1);
-	free(buf2);
+cJSON * get_SPDIF_GPIO(cJSON * list, bool fixed){
+	cJSON * llist = list?list:cJSON_CreateArray();
+	char * spdif_config = config_spdif_get_string();
+	if(spdif_config){
+		llist = add_gpio_for_name(llist,spdif_config,"bck", "spdif", fixed);
+		llist = add_gpio_for_name(llist,spdif_config,"ws",  "spdif", fixed);
+		llist = add_gpio_for_name(llist,spdif_config,"do",  "spdif", fixed);
+		free(spdif_config);	
+	}	
 	return llist;
 }
 
 /****************************************************************************************
  *
  */
-cJSON * get_GPIO_from_nvs(const char * item, const char * prefix, cJSON * list, bool fixed){
-	char * nvs_item=NULL;
-	cJSON * llist=list;
-	if ((nvs_item = config_alloc_get(NVS_TYPE_STR, item)) == NULL) return list;
-	llist = get_GPIO_from_string(nvs_item,prefix,list, fixed);
-	free(nvs_item);
+cJSON * get_Rotary_GPIO(cJSON * list){
+	cJSON * llist = list?list:cJSON_CreateArray();
+	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+	if(config){
+		llist = add_gpio_for_name(llist,config,"A", "rotary", false);
+		llist = add_gpio_for_name(llist,config,"B", "rotary", false);
+		llist = add_gpio_for_name(llist,config,"SW", "rotary", false);
+		free(config);	
+	}	
 	return llist;
 }
 
@@ -687,9 +723,7 @@ esp_err_t free_gpio_entry( gpio_entry_t ** gpio) {
 gpio_entry_t * get_gpio_by_no(int gpionum, bool refresh){
 	cJSON * gpio_header=NULL;
 	gpio_entry_t * gpio=NULL;
-	if(refresh){
-			get_gpio_list();
-	}
+	get_gpio_list(refresh);
 	cJSON_ArrayForEach(gpio_header,gpio_list)
 	{
 		if(get_gpio_structure(gpio_header, &gpio)==ESP_OK && gpio->gpio==gpionum){
@@ -704,10 +738,8 @@ gpio_entry_t * get_gpio_by_no(int gpionum, bool refresh){
  */
 gpio_entry_t * get_gpio_by_name(char * name,char * group, bool refresh){
 	cJSON * gpio_header=NULL;
-	if(refresh){
-		get_gpio_list();
-	}
 	gpio_entry_t * gpio=NULL;
+	get_gpio_list(refresh);
 	cJSON_ArrayForEach(gpio_header,gpio_list)
 	{
 		if(get_gpio_structure(gpio_header, &gpio)==ESP_OK && strcasecmp(gpio->name,name)&& strcasecmp(gpio->group,group)){
@@ -809,12 +841,17 @@ cJSON * get_psram_gpio_list(cJSON * list){
 /****************************************************************************************
  *
  */
-cJSON * get_gpio_list() {
+cJSON * get_gpio_list(bool refresh) {
 	gpio_num_t gpio_num;
+	if(gpio_list && !refresh){
+		return gpio_list;
+	}
+	
 	if(gpio_list){
 		cJSON_Delete(gpio_list);
 	}
-	gpio_list = cJSON_CreateArray();	
+	gpio_list= cJSON_CreateArray();
+	
 #ifndef CONFIG_BAT_LOCKED
 	char *bat_config = config_alloc_get_default(NVS_TYPE_STR, "bat_config", NULL, 0);
 	if (bat_config) {
@@ -835,10 +872,9 @@ cJSON * get_gpio_list() {
 			cJSON_AddItemToArray(gpio_list,get_gpio_entry("bat","other",gpio_num,true));
 		}
 #endif
-	gpio_list = get_GPIO_nvs_list(gpio_list);
-	char * spdif_config = config_spdif_get_string();
-	gpio_list=get_GPIO_from_string(spdif_config,"spdif", gpio_list, is_spdif_config_locked());
-	free(spdif_config);
+	gpio_list=get_GPIO_nvs_list(gpio_list);
+	gpio_list=get_SPDIF_GPIO(gpio_list,is_spdif_config_locked());
+	gpio_list=get_Rotary_GPIO(gpio_list);
 	gpio_list=get_Display_GPIO(gpio_list);
 	gpio_list=get_SPI_GPIO(gpio_list);
 	gpio_list=get_I2C_GPIO(gpio_list);
