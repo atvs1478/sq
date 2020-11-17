@@ -38,9 +38,9 @@ jobs:
         submodules: true
     - name: Cache build
       id: cache-build
-      uses: actions/cache@v1
+      uses: actions/cache@v2
       with:
-        path: ${{github.workspace}}/build
+        path: build
         key: ${{ runner.os }}-${{ matrix.node }}
     - name: Set build parameters
       run: |

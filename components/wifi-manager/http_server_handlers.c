@@ -584,7 +584,7 @@ esp_err_t config_get_handler(httpd_req_t *req){
 		}
 		else {
 			ESP_LOGD_LOC(TAG,  "config json : %s",json );
-			cJSON * gplist=get_gpio_list();
+			cJSON * gplist=get_gpio_list(false);
 			char * gpliststr=cJSON_PrintUnformatted(gplist);
 			httpd_resp_sendstr_chunk(req,"{ \"gpio\":");
 			httpd_resp_sendstr_chunk(req,gpliststr);

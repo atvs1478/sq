@@ -39,6 +39,24 @@ typedef struct {
 	int sda;
 	int scl;
 } i2s_platform_config_t;
+
+typedef struct {
+	int gpio;
+	int level;
+	bool fixed;
+} gpio_with_level_t;
+
+typedef struct {
+	gpio_with_level_t vcc;
+	gpio_with_level_t gnd;
+	gpio_with_level_t amp;
+	gpio_with_level_t ir;
+	gpio_with_level_t jack;
+	gpio_with_level_t green;
+	gpio_with_level_t red;
+	gpio_with_level_t spkfault;	
+} set_GPIO_struct_t;
+
 typedef struct {
 	bool fixed;
 	char * name;
@@ -61,6 +79,6 @@ bool 						is_spdif_config_locked();
 esp_err_t 					free_gpio_entry( gpio_entry_t ** gpio);
 gpio_entry_t * 				get_gpio_by_name(char * name,char * group, bool refresh);
 gpio_entry_t * 				get_gpio_by_no(int gpionum, bool refresh);
-cJSON * 					get_gpio_list();
+cJSON * 					get_gpio_list(bool refresh);
 bool 						is_dac_config_locked();
 bool 						are_statistics_enabled();
