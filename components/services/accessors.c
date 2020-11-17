@@ -450,16 +450,16 @@ const set_GPIO_struct_t * get_gpio_struct(){
 	}
 
 #ifdef CONFIG_LED_LOCKED
-		gpio_struct.red.locked=true;
-		gpio_struct.green.locked=true;
+		gpio_struct.red.fixed=true;
+		gpio_struct.green.fixed=true;
 #endif	
-#ifdef CONFIG_JACK_LOCKED
-		gpio_struct.jack.gpio=CONFIG_JACK_GPIO
+#ifdef CONFIG_JACK_LOCKED 
+		gpio_struct.jack.gpio=CONFIG_JACK_GPIO;
 		gpio_struct.jack.fixed=true;
 		gpio_struct.jack.level=CONFIG_JACK_GPIO_LEVEL;
 #endif
 #ifdef CONFIG_SPKFAULT_LOCKED
-		gpio_struct.spkfault.gpio=CONFIG_SPKFAULT_GPIO
+		gpio_struct.spkfault.gpio=CONFIG_SPKFAULT_GPIO;
 		gpio_struct.spkfault.fixed=true;
 		gpio_struct.spkfault.level=CONFIG_SPKFAULT_GPIO_LEVEL;
 #endif
