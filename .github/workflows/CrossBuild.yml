@@ -4,9 +4,9 @@ name: Cross-Build
 
 on:
   push:
-    branches: [ master-cmake ]
+    branches-ignore: [ master ]
   pull_request:
-    branches: [ master-cmake ]
+    branches-ignore: [ master ]
 
 jobs:
   job1:
