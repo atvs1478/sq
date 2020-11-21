@@ -1182,6 +1182,8 @@ esp_err_t status_get_handler(httpd_req_t *req){
 	else {
 		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR , "Error retrieving status object");
 	}
+	// update status for next status call
+	wifi_manager_update_status();
 
 	return ESP_OK;
 }

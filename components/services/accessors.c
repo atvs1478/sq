@@ -531,7 +531,9 @@ cJSON * add_gpio_for_name(cJSON * list,const char * nvs_entry,const char * name,
 	int gpioNum=0;
 	if ((p = strcasestr(nvs_entry, name)) != NULL) {
 		gpioNum = atoi(strchr(p, '=') + 1);
-		cJSON_AddItemToArray(llist,get_gpio_entry(name,prefix,gpioNum,fixed));
+		if(gpioNum>=0){
+			cJSON_AddItemToArray(llist,get_gpio_entry(name,prefix,gpioNum,fixed));
+		}
 	}
 	return llist;
 }

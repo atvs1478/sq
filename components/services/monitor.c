@@ -41,7 +41,6 @@ bool jack_inserted_svc(void);
 void (*spkfault_handler_svc)(bool inserted);
 bool spkfault_svc(void);
 
-extern void wifi_manager_update_status();
 
 /****************************************************************************************
  * 
@@ -147,8 +146,6 @@ static void monitor_callback(TimerHandle_t xTimer) {
  */
 static void jack_handler_default(void *id, button_event_e event, button_press_e mode, bool long_press) {
 	ESP_LOGD(TAG, "Jack %s", event == BUTTON_PRESSED ? "inserted" : "removed");
-	messaging_post_message(MESSAGING_INFO, MESSAGING_CLASS_SYSTEM,"jack is %s",BUTTON_PRESSED ? "inserted" : "removed");
-	wifi_manager_update_status();
 	if (jack_handler_svc) (*jack_handler_svc)(event == BUTTON_PRESSED);
 }
 

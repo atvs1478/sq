@@ -40,8 +40,6 @@ static struct {
 	.cells = 2,
 };	
 
-extern void wifi_manager_update_status();
-
 /****************************************************************************************
  * 
  */
@@ -66,7 +64,6 @@ static void battery_callback(TimerHandle_t xTimer) {
 		battery.avg = battery.sum / battery.count;
 		battery.sum = battery.count = 0;
 		ESP_LOGI(TAG, "Voltage %.2fV", battery.avg);
-		wifi_manager_update_status();
 	}	
 }
 

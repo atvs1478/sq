@@ -28,10 +28,6 @@ extern void 	output_bt_tick(void);
 extern char*	output_state_str(void);
 extern bool		output_stopped(void);
 
-extern void wifi_manager_update_status();
-
-//int64_t connecting_timeout = 0;
-
 static void bt_app_av_state_connecting(uint16_t event, void *param);
 static void filter_inquiry_scan_result(esp_bt_gap_cb_param_t *param);
 
@@ -206,13 +202,11 @@ void set_app_source_state(int new_state){
     if(bt_app_source_a2d_state!=new_state){
         ESP_LOGD(TAG, "Updating state from %s to %s", APP_AV_STATE_DESC[bt_app_source_a2d_state], APP_AV_STATE_DESC[new_state]);
         bt_app_source_a2d_state=new_state;
-        wifi_manager_update_status();
     }
 }
 void set_a2dp_media_state(int new_state){
     if(bt_app_source_media_state!=new_state){
         bt_app_source_media_state=new_state;
-        wifi_manager_update_status();
     }
 }
 void hal_bluetooth_init(const char * options)
