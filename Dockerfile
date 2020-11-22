@@ -18,8 +18,6 @@ RUN wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a
 RUN tar -xzf xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
 RUN rm xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
 
-# Patch I2S in esp-idf
-RUN cp /workspace/squeezelite-esp32/idf-patch/i2s.c /workspace/esp-idf/components/driver/i2s.c
 RUN rm -r /workspace/squeezelite-esp32
 RUN mkdir /workspace/squeezelite-esp32
 
