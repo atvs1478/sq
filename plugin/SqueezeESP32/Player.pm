@@ -187,11 +187,13 @@ sub update_artwork {
 	my $cprefs = $prefs->client($client);
 
 	my $artwork = $cprefs->get('artwork') || return;
-
 	return unless $artwork->{'enable'};
+	
+	my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
+	$client->sendFrame( grfa => \$header );
+	$client->display->update;
 
 	my $s = min($cprefs->get('height') - $artwork->{'y'}, $cprefs->get('width') - $artwork->{'x'});
-
 	my $params = { force => shift || 0 };
 	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
 	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $params, \&send_artwork, undef, HTTP::Response->new);
@@ -251,6 +253,7 @@ sub config_artwork {
 	if ( my $artwork = $prefs->client($client)->get('artwork') ) {
 		my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
 		$client->sendFrame( grfa => \$header );
+		$client->display->update;
 	}
 }
 

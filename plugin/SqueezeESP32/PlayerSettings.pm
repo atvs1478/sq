@@ -58,13 +58,14 @@ sub handler {
 			$cprefs->set('spectrum', $spectrum);
 
 			my $artwork = {
-				enable => $paramRef->{'pref_artwork_enable'},
+				enable => $paramRef->{'pref_artwork_enable'} eq 'on',
 				x => $paramRef->{'pref_artwork_x'} || 0,
 				y => $paramRef->{'pref_artwork_y'} || 0,
 			};
+			
 			$cprefs->set('artwork', $artwork);
 			$client->display->modes($client->display->build_modes);
-			$client->display->update;
+			# the display update will be done below, after all is completed
 
 			# force update or disable artwork
 			if ($artwork->{'enable'}) {
@@ -72,6 +73,7 @@ sub handler {
 			} else {
 				$client->config_artwork();
 			}
+
 		}
 
 		my $equalizer = $cprefs->get('equalizer');
