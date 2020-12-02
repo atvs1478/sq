@@ -91,16 +91,19 @@ sub init {
 	}
 	
 	$client->SUPER::init(@_);
-	$client->config_artwork;
-	$client->send_equalizer;
-	
 	main::INFOLOG && $log->is_info && $log->info("SqueezeESP player connected: " . $client->id);
 }	
 
 sub initPrefs {
 	my $client = shift;
+	
 	$sprefs->client($client)->init($defaultPrefs);
-	$prefs->client($client)->init( { equalizer => [(0) x 10] } );
+	
+	$prefs->client($client)->init( { 
+		equalizer => [(0) x 10],
+		artwork => undef,
+	} );
+
 	$client->SUPER::initPrefs;
 }
 
@@ -184,11 +187,13 @@ sub update_artwork {
 	my $cprefs = $prefs->client($client);
 
 	my $artwork = $cprefs->get('artwork') || return;
-
 	return unless $artwork->{'enable'};
+	
+	my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
+	$client->sendFrame( grfa => \$header );
+	$client->display->update;
 
 	my $s = min($cprefs->get('height') - $artwork->{'y'}, $cprefs->get('width') - $artwork->{'x'});
-
 	my $params = { force => shift || 0 };
 	my $path = 'music/current/cover_' . $s . 'x' . $s . '_o.jpg';
 	my $body = Slim::Web::Graphics::artworkRequest($client, $path, $params, \&send_artwork, undef, HTTP::Response->new);
@@ -248,13 +253,17 @@ sub config_artwork {
 	if ( my $artwork = $prefs->client($client)->get('artwork') ) {
 		my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
 		$client->sendFrame( grfa => \$header );
+		$client->display->update;
 	}
 }
 
 sub reconnect {
 	my $client = shift;
-	$client->pluginData('artwork_md5', '');
 	$client->SUPER::reconnect(@_);
+	
+	$client->pluginData('artwork_md5', '');
+	$client->config_artwork;
+	$client->send_equalizer;
 }
 
 # Change the analog output mode between headphone and sub-woofer
