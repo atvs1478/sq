@@ -141,7 +141,7 @@ sub build_modes {
 	my $width_low = ($artwork->{'enable'} && $artwork->{'x'} && ($artwork->{'y'} >= 32 || $disp_width - $artwork->{'x'} > 32)) ? $artwork->{'x'} : $disp_width;
 			
 	my $small_VU = $cprefs->get('small_VU');
-	my $spectrum = sanitizeSpectrum($cprefs->get('sprectrum'));
+	my $spectrum = sanitizeSpectrum($cprefs->get('spectrum'));
 
 	my $small_spectrum_pos = { x => $width - int ($spectrum->{small}->{size} * $width / 100),
 						 width => int ($spectrum->{small}->{size} * $width / 100),
