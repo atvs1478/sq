@@ -1045,7 +1045,7 @@ static void visu_handler( u8_t *data, int len) {
 	// little trick to clean the taller screens when switching visu 
 	if (visu.row >= displayer.height) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
 
-	if ((visu.mode = pkt->which) != 0) {
+	if (visu.mode) {
 		// these will be overidden if necessary
 		visu.col = visu.border = 0;
 		visu.rotate = false;

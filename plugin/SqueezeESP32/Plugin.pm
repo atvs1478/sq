@@ -73,8 +73,9 @@ sub onNotification {
 	my $request = shift;
 	my $client  = $request->client || return;
 
-	if ($client->isa('Plugins::SqueezeESP32::Player')) {
-		$client->update_artwork();
+	foreach my $player ($client->syncGroupActiveMembers) {
+		next unless $player->isa('Plugins::SqueezeESP32::Player');
+		$player->update_artwork;
 	}
 }
 
