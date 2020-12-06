@@ -822,14 +822,14 @@ in_addr_t discover_server(char *default_server, int max) {
 		memset(&s, 0, sizeof(s));
 
 		if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
-			LOG_INFO("error sending disovery");
+			LOG_INFO("error sending discovery");
 		}
 
 		if (poll(&pollinfo, 1, 5000) == 1) {
-			char readbuf[32], *p;
+			char readbuf[64], *p;
 			socklen_t slen = sizeof(s);
-			memset(readbuf, 0, 32);
-			recvfrom(disc_sock, readbuf, 32 - 1, 0, (struct sockaddr *)&s, &slen);
+			memset(readbuf, 0, sizeof(readbuf));
+			recvfrom(disc_sock, readbuf, sizeof(readbuf) - 1, 0, (struct sockaddr *)&s, &slen);
 			LOG_INFO("got response from: %s:%d", inet_ntoa(s.sin_addr), ntohs(s.sin_port));
 
 			 if ((p = strstr(readbuf, port_d)) != NULL) {
