@@ -877,7 +877,7 @@ static void visu_update(void) {
 		
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
 			for (int i = visu.n; --i >= 0;) {	 
-				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 7 : 1))) - 0.2543f);
+				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 8 : 1))) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
@@ -919,7 +919,7 @@ static void visu_update(void) {
 				}	
 			
 				// convert to dB and bars, same back-off
-				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/(visu_export.gain == FIXED_ONE ? 128 : 2)*2)) - 0.2543f);
+				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN*(visu_export.gain == FIXED_ONE ? 256 : 2))) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}	
