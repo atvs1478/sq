@@ -97,6 +97,13 @@ static void sendIR(u16_t addr, u16_t cmd) {
 	UNLOCK_P;
 }
 
+static void lms_power(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_POWER_FRONT, pressed);
+	} else {
+		cli_send_cmd("button power");
+	}	
+}
 static void lms_volume_up(bool pressed) {
 	if (raw_mode) {
 		sendBUTN(BUTN_VOLUP_FRONT, pressed);
@@ -205,6 +212,55 @@ static void lms_right(bool pressed) {
 	}	
 }
 
+static void lms_pre1(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_1, pressed);
+	} else {
+		cli_send_cmd("button preset_1.single");
+	}	
+}
+
+static void lms_pre2(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_2, pressed);
+	} else {
+		cli_send_cmd("button preset_2.single");
+	}	
+}
+
+static void lms_pre3(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_3, pressed);
+	} else {
+		cli_send_cmd("button preset_3.single");
+	}	
+}
+
+static void lms_pre4(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_4, pressed);
+	} else {
+		cli_send_cmd("button preset_4.single");
+	}	
+}
+
+static void lms_pre5(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_5, pressed);
+	} else {
+		cli_send_cmd("button preset_5.single");
+	}	
+}
+
+static void lms_pre6(bool pressed) {
+	if (raw_mode) {
+		sendBUTN(BUTN_PRESET_6, pressed);
+	} else {
+		cli_send_cmd("button preset_6.single");
+	}	
+}
+
+
 static void lms_knob_left(bool pressed) {
 	if (raw_mode) {
 		sendBUTN(BUTN_KNOB_LEFT, pressed);
@@ -230,6 +286,7 @@ static void lms_knob_push(bool pressed) {
 }
 
 const actrls_t LMS_controls = {
+	lms_power,
 	lms_volume_up, lms_volume_down,	// volume up, volume down
 	lms_toggle, lms_play,	// toggle, play
 	lms_pause, lms_stop,	// pause, stop
@@ -237,6 +294,7 @@ const actrls_t LMS_controls = {
 	lms_prev, lms_next,		// prev, next
 	lms_up, lms_down,
 	lms_left, lms_right, 
+	lms_pre1, lms_pre2, lms_pre3, lms_pre4, lms_pre5, lms_pre6,
 	lms_knob_left, lms_knob_right, lms_knob_push,
 };
 
