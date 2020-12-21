@@ -2,8 +2,8 @@
 webpack_headers
 Hash: e644c04d107606ae748d
 Version: webpack 4.44.2
-Time: 6267ms
-Built at: 2020-12-21 10 h 59 min 46 s
+Time: 6142ms
+Built at: 2020-12-21 12 h 10 min 00 s
                                 Asset       Size  Chunks                                Chunk Names
           ./js/index.e644c0.bundle.js    230 KiB       0  [emitted] [immutable]         index
        ./js/index.e644c0.bundle.js.br   31.3 KiB          [emitted]                     

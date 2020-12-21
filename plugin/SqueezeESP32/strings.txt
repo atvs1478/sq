@@ -80,8 +80,10 @@ PLUGIN_SQUEEZEESP32_ARTWORK
 PLUGIN_SQUEEZEESP32_ARTWORK_DESC
 	DE	Wenn die Y Position kleiner als 32 ist, dann werden Plattenhüllen auf der rechten Seite angezeigt, und x definiert die Startposition.
 	DE	Plattenhüllen werden auf Displays mit weniger als 16 Graustufen in sehr geringer Qualität angezeigt.
-	EN	When Y position is less than 32, then artwork is displayed at the right of the main screen and x defines the starting position
-	EN	Using artwork on less than 16-levels grayscale display if really poor quality
+	EN	When Y position is less than 32, then artwork is displayed at the right of the main screen and X defines the starting position
+	EN	<br>On large screen, it's possible to rotate the VU/Spectrum by setting a small X offset (typically 32). That will push the 
+	EN	artwork to the right and make space for a vertical VU to its left.
+	EN	<br>Note that using artwork on less than 16-levels grayscale display if really poor quality
 
 PLUGIN_SQUEEZEESP32_ARTWORK_ENABLE
 	DE	Aktivieren

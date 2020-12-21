@@ -43,22 +43,29 @@ sub handler {
 	if ($paramRef->{'saveSettings'}) {
 		if ($client->displayWidth) {
 			$cprefs->set('small_VU', $paramRef->{'pref_small_VU'} || 15);
-			my $spectrum = {
-				scale => $paramRef->{'pref_spectrum_scale'} || 25,
-				small => { 	size => $paramRef->{'pref_spectrum_small_size'} || 25,
-				band  => $paramRef->{'pref_spectrum_small_band'} || 5.33 },
-				full  => { 	band => $paramRef->{'pref_spectrum_full_band'} } || 8,
-			};
+
+			require Plugins::SqueezeESP32::Graphics;
+			my $spectrum = Plugins::SqueezeESP32::Graphics::sanitizeSpectrum({
+				scale => $paramRef->{'pref_spectrum_scale'},
+				small => {
+					size => $paramRef->{'pref_spectrum_small_size'},
+					band => $paramRef->{'pref_spectrum_small_band'}
+				},
+				full => {
+					band => $paramRef->{'pref_spectrum_full_band'}
+				},
+			});
 			$cprefs->set('spectrum', $spectrum);
 
 			my $artwork = {
-				enable => $paramRef->{'pref_artwork_enable'},
+				enable => $paramRef->{'pref_artwork_enable'} eq 'on',
 				x => $paramRef->{'pref_artwork_x'} || 0,
 				y => $paramRef->{'pref_artwork_y'} || 0,
 			};
+			
 			$cprefs->set('artwork', $artwork);
 			$client->display->modes($client->display->build_modes);
-			$client->display->update;
+			# the display update will be done below, after all is completed
 
 			# force update or disable artwork
 			if ($artwork->{'enable'}) {
@@ -66,6 +73,7 @@ sub handler {
 			} else {
 				$client->config_artwork();
 			}
+
 		}
 
 		my $equalizer = $cprefs->get('equalizer');

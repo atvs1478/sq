@@ -124,7 +124,7 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 int32_t output_bt_data(uint8_t *data, int32_t len) {
 	int32_t iframes = len / BYTES_PER_FRAME, start_timer = 0;
 
-	if (len < 0 || data == NULL || !running) {
+	if (iframes <= 0 || data == NULL || !running) {
 		return 0;
 	}
 	
@@ -135,9 +135,9 @@ int32_t output_bt_data(uint8_t *data, int32_t len) {
 	// for us to send. (BTC_SBC_DEC_PCM_DATA_LEN * sizeof(OI_INT16) - availPcmBytes
 	SET_MIN_MAX(len,req);
 	TIME_MEASUREMENT_START(start_timer);
-	SET_MIN_MAX_SIZED(_buf_used(outputbuf),bt,outputbuf->size);
 	
 	LOCK;	
+	SET_MIN_MAX_SIZED(_buf_used(outputbuf),bt,outputbuf->size);
 	output.device_frames = 0; 
 	output.updated = gettime_ms();
 	output.frames_played_dmp = output.frames_played;

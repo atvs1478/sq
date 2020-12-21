@@ -808,6 +808,8 @@ static void grfa_handler(u8_t *data, int len) {
 			artwork.y = htons(pkt->y);		
 		} else if (artwork.size) GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
 		
+		LOG_INFO("gfra en:%u x:%hu, y:%hu", artwork.enable, artwork.x, artwork.y);
+		
 		// done in any case
 		return;
 	}
@@ -875,7 +877,7 @@ static void visu_update(void) {
 		
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
 			for (int i = visu.n; --i >= 0;) {	 
-				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 7 : 1))) - 0.2543f);
+				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 8 : 1))) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
@@ -917,7 +919,7 @@ static void visu_update(void) {
 				}	
 			
 				// convert to dB and bars, same back-off
-				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN/(visu_export.gain == FIXED_ONE ? 128 : 2)*2)) - 0.2543f);
+				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN*(visu_export.gain == FIXED_ONE ? 256 : 2))) - 0.2543f);
 				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}	
@@ -1042,7 +1044,7 @@ static void visu_handler( u8_t *data, int len) {
 	
 	// little trick to clean the taller screens when switching visu 
 	if (visu.row >= displayer.height) GDS_ClearExt(display, false, true, visu.col, visu.row, visu.col + visu.width - 1, visu.row + visu.height - 1);
-	
+
 	if (visu.mode) {
 		// these will be overidden if necessary
 		visu.col = visu.border = 0;
@@ -1065,13 +1067,27 @@ static void visu_handler( u8_t *data, int len) {
 				bars = htonl(pkt->bars);
 				visu.spectrum_scale = htonl(pkt->spectrum_scale) / 100.;
 			} else {
-				// full screen visu, try to use bottom screen if available
+				// full screen visu, try to optimize orientation/shape
 				visu.width = htonl(pkt->full.width);
-				visu.height = GDS_GetHeight(display) > displayer.height ? GDS_GetHeight(display) - displayer.height : GDS_GetHeight(display);
-				visu.row = GDS_GetHeight(display) - visu.height;			
+				visu.height = GDS_GetHeight(display);					
 				
-				// try to estimate if we should rotate visu
-				if (visu.height > displayer.height && visu.height > 2*visu.width) visu.rotate = true;
+				// do we have enough height to play with layout
+				if (GDS_GetHeight(display) > displayer.height) {
+					// by default, use up to the bottom of the display
+					visu.height -= displayer.height;					
+					visu.row = displayer.height;
+
+					if (artwork.enable && artwork.y) {
+						// server sets width to artwork X offset to tell us to rotate
+						if (visu.width != artwork.x) {
+							visu.height = artwork.y - displayer.height;
+							if (visu.height <= 0) {
+								visu.height = displayer.height;
+								LOG_WARN("No room left for visualizer, disable it or increase artwork offset %d", artwork.y);
+							}				
+						} else visu.rotate = true;
+					}		
+				} else visu.row = 0;
 				
 				// is this spectrum or analogue/digital
 				if ((visu.mode & ~VISU_ESP32) == VISU_SPECTRUM) {
@@ -1094,8 +1110,9 @@ static void visu_handler( u8_t *data, int len) {
 				visu.style = htonl(pkt->classical_vu.style);
 				if (visu.style) visu.row = visu.height - VU_HEIGHT;
 			}	
-			if (bars > MAX_BARS) bars = MAX_BARS;
 		}	
+		
+		if (bars > MAX_BARS) bars = MAX_BARS;
 		
 		// for rotate, swap width & height
 		if (visu.rotate) visu_fit(bars, visu.height, visu.width);
