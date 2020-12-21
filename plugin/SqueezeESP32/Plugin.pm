@@ -24,6 +24,12 @@ $prefs->migrateClient(1, sub {
 	1;
 });
 
+$prefs->migrateClient(2, sub {
+	my ($cprefs, $client) = @_;
+	$cprefs->set('artwork', undef) if $cprefs->get('artwork') && ref $cprefs->get('artwork') ne 'HASH';
+	1;
+});
+
 $prefs->setChange(sub {
 	$_[2]->send_equalizer;
 }, 'equalizer');
@@ -67,8 +73,9 @@ sub onNotification {
 	my $request = shift;
 	my $client  = $request->client || return;
 
-	if ($client->isa('Plugins::SqueezeESP32::Player')) {
-		$client->update_artwork();
+	foreach my $player ($client->syncGroupActiveMembers) {
+		next unless $player->isa('Plugins::SqueezeESP32::Player');
+		$player->update_artwork;
 	}
 }
 

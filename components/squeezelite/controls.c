@@ -279,6 +279,7 @@ static void notify(in_addr_t ip, u16_t hport, u16_t cport) {
 
 	if (connect(cli_sock, (struct sockaddr *) &addr, addrlen) < 0) {
 		LOG_ERROR("unable to connect to server %s:%hu with cli", inet_ntoa(server_ip), server_cport);
+		closesocket(cli_sock);
 		cli_sock = -1;
 	}
 	
