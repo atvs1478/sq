@@ -38,8 +38,12 @@ rest_server_context_t *rest_context = NULL;
 RingbufHandle_t messaging=NULL;
 
 void register_common_handlers(httpd_handle_t server){
-	httpd_uri_t res_get = { .uri = "/res/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
-	httpd_register_uri_handler(server, &res_get);
+	httpd_uri_t css_get = { .uri = "/css/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &css_get);
+	httpd_uri_t js_get = { .uri = "/js/*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &js_get);
+	httpd_uri_t icon_get = { .uri = "/icons*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &icon_get);	
 
 }
 void register_regular_handlers(httpd_handle_t server){

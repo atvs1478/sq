@@ -120,6 +120,7 @@ const char * messaging_get_class_desc(messaging_classes msg_class){
 	CASE_TO_STR(MESSAGING_CLASS_SYSTEM);
 	CASE_TO_STR(MESSAGING_CLASS_STATS);
 	CASE_TO_STR(MESSAGING_CLASS_CFGCMD);
+	CASE_TO_STR(MESSAGING_CLASS_BT);
 		default:
 			return "Unknown";
 			break;

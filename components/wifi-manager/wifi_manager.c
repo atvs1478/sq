@@ -153,6 +153,9 @@ const int WIFI_MANAGER_SCAN_BIT = BIT7;
 /* @brief When set, means user requested for a disconnect */
 const int WIFI_MANAGER_REQUEST_DISCONNECT_BIT = BIT8;
 
+/* @brief When set, means user requested connecting to a new network and it failed */
+const int WIFI_MANAGER_REQUEST_STA_CONNECT_FAILED_BIT = BIT9;
+
 
 char * get_disconnect_code_desc(uint8_t reason){
 	switch (reason) {
@@ -539,8 +542,9 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 
 	cJSON_AddNumberToObject(ip_info_cjson, "urc", update_reason_code);
 	if(config){
-		cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
-
+		if(update_reason_code == UPDATE_CONNECTION_OK || update_reason_code == UPDATE_LOST_CONNECTION || update_reason_code == UPDATE_FAILED_ATTEMPT){
+			cJSON_AddItemToObject(ip_info_cjson, "ssid", cJSON_CreateString((char *)config->sta.ssid));
+		}
 		if(update_reason_code == UPDATE_CONNECTION_OK){
 			/* rest of the information is copied after the ssid */
 			tcpip_adapter_ip_info_t ip_info;
@@ -548,8 +552,12 @@ void wifi_manager_generate_ip_info_json(update_reason_code_t update_reason_code)
 			cJSON_AddItemToObject(ip_info_cjson, "ip", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.ip)));
 			cJSON_AddItemToObject(ip_info_cjson, "netmask", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.netmask)));
 			cJSON_AddItemToObject(ip_info_cjson, "gw", cJSON_CreateString(ip4addr_ntoa((ip4_addr_t *)&ip_info.gw)));
+			wifi_ap_record_t ap;
+			esp_wifi_sta_get_ap_info(&ap);
+			cJSON_AddItemToObject(ip_info_cjson, "rssi", cJSON_CreateNumber(ap.rssi));
 		}
 	}
+
 	ESP_LOGV(TAG,  "wifi_manager_generate_ip_info_json done");
 }
 #define LOCAL_MAC_SIZE 20
@@ -1273,6 +1281,7 @@ void wifi_manager( void * pvParameters ){
 				if((BaseType_t)msg.param == CONNECTION_REQUEST_USER) {
 					ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - Connection request with no nvs connection saved yet");
 					xEventGroupSetBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+					xEventGroupClearBits(wifi_manager_event_group,WIFI_MANAGER_REQUEST_STA_CONNECT_FAILED_BIT);
 				}
 				else if((BaseType_t)msg.param == CONNECTION_REQUEST_RESTORE_CONNECTION) {
 					ESP_LOGD(TAG,   "MESSAGE: ORDER_CONNECT_STA - Connection request after restoring the AP configuration");
@@ -1296,12 +1305,12 @@ void wifi_manager( void * pvParameters ){
 						/* start DHCP client if not started*/
 						tcpip_adapter_dhcp_status_t status;
 						ESP_LOGD(TAG,   "wifi_manager: Checking if DHCP client for STA interface is running");
-						ESP_ERROR_CHECK(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
+						ESP_ERROR_CHECK_WITHOUT_ABORT(tcpip_adapter_dhcpc_get_status(TCPIP_ADAPTER_IF_STA, &status));
 						if (status!=TCPIP_ADAPTER_DHCP_STARTED) {
 							ESP_LOGD(TAG,   "wifi_manager: Start DHCP client for STA interface");
-							ESP_ERROR_CHECK(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
-//						}
-					}
+							ESP_ERROR_CHECK_WITHOUT_ABORT(tcpip_adapter_dhcpc_start(TCPIP_ADAPTER_IF_STA));
+						}
+					//}
 				}
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
@@ -1420,26 +1429,32 @@ void wifi_manager( void * pvParameters ){
 
 				uxBits = xEventGroupGetBits(wifi_manager_event_group);
 				if( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_BIT ){
+					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
 					ESP_LOGW(TAG,   "WiFi Disconnected while processing user connect request.  Wrong password?");
 					/* there are no retries when it's a user requested connection by design. This avoids a user hanging too much
 					 * in case they typed a wrong password for instance. Here we simply clear the request bit and move on */
-					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_STA_CONNECT_BIT);
+					
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_FAILED_ATTEMPT );
 						wifi_manager_unlock_json_buffer();
 					}
-
+					wifi_mode_t mode;
+					esp_wifi_get_mode(&mode);
+					if( WIFI_MODE_STA ==mode ){
+						xEventGroupSetBits(wifi_manager_event_group,WIFI_MANAGER_REQUEST_STA_CONNECT_FAILED_BIT);
+						// if wifi was STA, attempt to reload the previous network connection
+						ESP_LOGW(TAG,"Attempting to restore previous network"); 
+						wifi_manager_send_message(ORDER_LOAD_AND_RESTORE_STA, NULL);
+					}
 				}
 				else if (uxBits & WIFI_MANAGER_REQUEST_DISCONNECT_BIT){
 					ESP_LOGD(TAG,   "WiFi disconnected by user");
 					/* user manually requested a disconnect so the lost connection is a normal event. Clear the flag and restart the AP */
 					xEventGroupClearBits(wifi_manager_event_group, WIFI_MANAGER_REQUEST_DISCONNECT_BIT);
-
 					if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 						wifi_manager_generate_ip_info_json( UPDATE_USER_DISCONNECT );
 						wifi_manager_unlock_json_buffer();
 					}
-
 					/* erase configuration */
 					if(wifi_manager_config_sta){
 						ESP_LOGI(TAG,   "Erasing WiFi Configuration.");
@@ -1521,7 +1536,7 @@ void wifi_manager( void * pvParameters ){
 				/* refresh JSON with the new IP */
 				if(wifi_manager_lock_json_buffer( portMAX_DELAY )){
 					/* generate the connection info with success */
-					wifi_manager_generate_ip_info_json( UPDATE_CONNECTION_OK );
+					wifi_manager_generate_ip_info_json( uxBits & WIFI_MANAGER_REQUEST_STA_CONNECT_FAILED_BIT?UPDATE_FAILED_ATTEMPT_AND_RESTORE:UPDATE_CONNECTION_OK );
 					wifi_manager_unlock_json_buffer();
 				}
 				else {

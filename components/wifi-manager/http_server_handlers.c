@@ -54,6 +54,7 @@ function to process requests, decode URLs, serve files, etc. etc.
 #include "argtable3/argtable3.h"
 #include "platform_console.h"
 #include "accessors.h"
+#include "webapp/webpack.h"
  
 #define HTTP_STACK_SIZE	(5*1024)
 const char str_na[]="N/A";
@@ -89,22 +90,7 @@ static const char redirect_payload3[]="'>here</a> to login.</p></body></html>";
  * @see file "component.mk"
  * @see https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#embedding-binary-data
  */
-extern const uint8_t style_css_start[] asm("_binary_style_css_gz_start");
-extern const uint8_t style_css_end[]   asm("_binary_style_css_gz_end");
-extern const uint8_t jquery_gz_start[] asm("_binary_jquery_js_gz_start");
-extern const uint8_t jquery_gz_end[] asm("_binary_jquery_js_gz_end");
-// extern const uint8_t popper_gz_start[] asm("_binary_popper_min_js_gz_start");
-// extern const uint8_t popper_gz_end[] asm("_binary_popper_min_js_gz_end");
-extern const uint8_t bootstrap_js_gz_start[] asm("_binary_bootstrap_js_gz_start");
-extern const uint8_t bootstrap_js_gz_end[] asm("_binary_bootstrap_js_gz_end");
-extern const uint8_t bootstrap_css_gz_start[] asm("_binary_bootstrap_css_gz_start");
-extern const uint8_t bootstrap_css_gz_end[] asm("_binary_bootstrap_css_gz_end");
-extern const uint8_t code_js_start[] asm("_binary_code_js_gz_start");
-extern const uint8_t code_js_end[] asm("_binary_code_js_gz_end");
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
-extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
+
 esp_err_t redirect_processor(httpd_req_t *req, httpd_err_code_t error);
 
 
@@ -334,8 +320,8 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
         return httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
     } else if (IS_FILE_EXT(filename, ".jpeg")) {
         return httpd_resp_set_type(req, "image/jpeg");
-    } else if (IS_FILE_EXT(filename, ".ico")) {
-        return httpd_resp_set_type(req, "image/x-icon");
+    } else if (IS_FILE_EXT(filename, ".png")) {
+        return httpd_resp_set_type(req, "image/png");
     } else if (IS_FILE_EXT(filename, ".ico")) {
         return httpd_resp_set_type(req, "image/x-icon");
     } else if (IS_FILE_EXT(filename, ".css")) {
@@ -370,8 +356,16 @@ static esp_err_t set_content_type_from_req(httpd_req_t *req)
    return ESP_OK;
 }
 
-
+int resource_get_index(const char * fileName){
+	for(int i=0;resource_lookups[i][0]!='\0';i++){
+		if(strstr(resource_lookups[i], fileName)){
+			return i;
+		}
+	}
+	return -1;
+}
 esp_err_t root_get_handler(httpd_req_t *req){
+	esp_err_t err = ESP_OK;
     ESP_LOGD_LOC(TAG, "serving [%s]", req->uri);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Accept-Encoding", "identity");
@@ -379,14 +373,23 @@ esp_err_t root_get_handler(httpd_req_t *req){
     if(!is_user_authenticated(req)){
     	// todo:  send password entry page and return
     }
-    const size_t file_size = (index_html_end - index_html_start);
-	esp_err_t err = set_content_type_from_req(req);
-	if(err == ESP_OK){
-		httpd_resp_send(req, (const char *)index_html_start, file_size);
+	int idx=-1;
+	if((idx=resource_get_index("index.html"))>=0){
+		const size_t file_size = (resource_map_end[idx] - resource_map_start[idx]);
+		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+		err = set_content_type_from_req(req);
+		if(err == ESP_OK){
+			httpd_resp_send(req, (const char *)resource_map_start[idx], file_size);
+		} 
+	}
+    else{
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "index.html not found");
+	   return ESP_FAIL;
 	}
 	ESP_LOGD_LOC(TAG, "done serving [%s]", req->uri);
     return err;
 }
+
 
 esp_err_t resource_filehandler(httpd_req_t *req){
     char filepath[FILE_PATH_MAX];
@@ -407,41 +410,17 @@ esp_err_t resource_filehandler(httpd_req_t *req){
 	   return ESP_FAIL;
    }
 
-   if(strstr(filename, "code.js")) {
+
+	int idx=-1;
+	if((idx=resource_get_index(filename))>=0){
 	    set_content_type_from_file(req, filename);
-		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-	    const size_t file_size = (code_js_end - code_js_start);
-	    httpd_resp_send(req, (const char *)code_js_start, file_size);
-	} else if(strstr(filename, "style.css")) {
-		set_content_type_from_file(req, filename);
-		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-	    const size_t file_size = (style_css_end - style_css_start);
-	    httpd_resp_send(req, (const char *)style_css_start, file_size);
-    } else if(strstr(filename, "favicon.ico")) {
-		set_content_type_from_file(req, filename);
-	    const size_t file_size = (favicon_ico_end - favicon_ico_start);
-	    httpd_resp_send(req, (const char *)favicon_ico_start, file_size);
-	} else if(strstr(filename, "jquery.js")) {
-		set_content_type_from_file(req, filename);
-		httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-	    const size_t file_size = (jquery_gz_end - jquery_gz_start);
-	    httpd_resp_send(req, (const char *)jquery_gz_start, file_size);
-	// } else if(strstr(filename, "popper.js")) {
-	// 	set_content_type_from_file(req, filename);
-	// 	httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-	//     const size_t file_size = (popper_gz_end - popper_gz_start);
-	//     httpd_resp_send(req, (const char *)popper_gz_start, file_size);
-	} else if(strstr(filename, "bootstrap.js")) {
-			set_content_type_from_file(req, filename);
+		if(strstr(resource_lookups[idx], ".gz")) {
 			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-		    const size_t file_size = (bootstrap_js_gz_end - bootstrap_js_gz_start);
-		    httpd_resp_send(req, (const char *)bootstrap_js_gz_start, file_size);
-	} else if(strstr(filename, "bootstrap.css")) {
-			set_content_type_from_file(req, filename);
-			httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-		    const size_t file_size = (bootstrap_css_gz_end - bootstrap_css_gz_start);
-		    httpd_resp_send(req, (const char *)bootstrap_css_gz_start, file_size);
-    } else {
+		}
+	    const size_t file_size = (resource_map_end[idx] - resource_map_start[idx]);
+	    httpd_resp_send(req, (const char *)resource_map_start[idx], file_size);
+	}
+	else {
 	   ESP_LOGE_LOC(TAG, "Unknown resource [%s] from path [%s] ", filename,filepath);
 	   /* Respond with 404 Not Found */
 	   httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File does not exist");

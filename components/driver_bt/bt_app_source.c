@@ -189,13 +189,13 @@ static void peers_list_maintain(const char * s_peer_bdname, int32_t rssi){
         free(list_json);
     }    
 }
-        
+
 int bt_app_source_get_a2d_state(){
-    ESP_LOGW(TAG,"a2dp status: %u = %s", bt_app_source_a2d_state, APP_AV_STATE_DESC[bt_app_source_a2d_state]);
+    ESP_LOGD(TAG,"a2dp status: %u = %s", bt_app_source_a2d_state, APP_AV_STATE_DESC[bt_app_source_a2d_state]);
     return bt_app_source_a2d_state;
 }
 int bt_app_source_get_media_state(){
-    ESP_LOGW(TAG,"media state : %u ", bt_app_source_media_state);
+    ESP_LOGD(TAG,"media state : %u ", bt_app_source_media_state);
     return bt_app_source_media_state;
 }
 void set_app_source_state(int new_state){

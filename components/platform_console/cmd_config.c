@@ -139,7 +139,6 @@ static struct {
 	//			   "   \t\t\t b = basic linear interpolation, l = 13 taps, m = 21 taps, i = interpolate filter coefficients\n"
 	#endif
 	struct arg_int * rate;//			   "  -Z <rate>\t\tReport rate to server in helo as the maximum sample rate we can support\n"
-
     struct arg_end *end;
 } squeezelite_args;
 
@@ -266,7 +265,6 @@ char * strip_bt_name(char * opt_str)
             pch = strtok(NULL, " ");
             ESP_LOGV(TAG,"\n");
         }
-      
     }
     else
     {

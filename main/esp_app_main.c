@@ -45,6 +45,7 @@
 #include "gds_font.h"
 #include "display.h"
 #include "accessors.h"
+#include "cmd_system.h"
 static const char certs_namespace[] = "certificates";
 static const char certs_key[] = "blob";
 static const char certs_version[] = "version";
@@ -59,6 +60,7 @@ const int CONNECTED_BIT = BIT0;
 static const char TAG[] = "esp_app_main";
 #define DEFAULT_HOST_NAME "squeezelite"
 char * fwurl = NULL;
+RTC_NOINIT_ATTR uint32_t RebootCounter ;
 
 static bool bWifiConnected=false;
 extern const uint8_t server_cert_pem_start[] asm("_binary_github_pem_start");
@@ -384,10 +386,30 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }
 
+uint32_t halSTORAGE_RebootCounterRead(void) { return RebootCounter ; }
+uint32_t halSTORAGE_RebootCounterUpdate(int32_t xValue) { return (RebootCounter = (xValue != 0) ? (RebootCounter + xValue) : 0) ; }
+
+void handle_ap_connect(){
+	start_telnet(NULL);
+	halSTORAGE_RebootCounterUpdate(0);
+}
 void app_main()
 {
 	const esp_partition_t *running = esp_ota_get_running_partition();
 	is_recovery_running = (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+	esp_reset_reason_t xReason = esp_reset_reason();
+	ESP_LOGI(TAG,"Reset reason is: %u", xReason);
+	if(!is_recovery_running && xReason != ESP_RST_SW && xReason != ESP_RST_POWERON )  {
+		/* unscheduled restart (HW, Watchdog or similar) thus increment dynamic
+	 	* counter then log current boot statistics as a warning */
+		uint32_t Counter = halSTORAGE_RebootCounterUpdate(1) ;		// increment counter
+		ESP_LOGI(TAG,"Reboot counter=%u\n", Counter) ;
+		if (Counter == 5) {
+			// before we change the partition, update the info for current running partition.
+			halSTORAGE_RebootCounterUpdate(0);
+			guided_factory();
+		}
+	}
 
 	char * fwurl = NULL;
 	ESP_LOGI(TAG,"Starting app_main");
@@ -464,8 +486,8 @@ void app_main()
 		wifi_manager_set_callback(EVENT_STA_DISCONNECTED, &cb_connection_sta_disconnected);
 		/* Start the telnet service after we are certain that the network stack has been properly initialized.
 		 * This can be either after we're started the AP mode, or after we've started the STA mode  */
-		wifi_manager_set_callback(ORDER_START_AP, &start_telnet);
-		wifi_manager_set_callback(ORDER_CONNECT_STA, &start_telnet);
+		wifi_manager_set_callback(ORDER_START_AP, &handle_ap_connect);
+		wifi_manager_set_callback(ORDER_CONNECT_STA, &handle_ap_connect);
 	}
 	console_start();
 	if(fwurl && strlen(fwurl)>0){

@@ -558,7 +558,7 @@ void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb)
 	cmd_handler_chain = cmd_cb;
   	bt_app_a2d_data_cb = data_cb;
 	
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
+    esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     if ((err = esp_bt_controller_init(&bt_cfg)) != ESP_OK) {

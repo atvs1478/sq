@@ -215,7 +215,9 @@ typedef enum update_reason_code_t {
 	UPDATE_CONNECTION_OK = 0,
 	UPDATE_FAILED_ATTEMPT = 1,
 	UPDATE_USER_DISCONNECT = 2,
-	UPDATE_LOST_CONNECTION = 3
+	UPDATE_LOST_CONNECTION = 3,
+	UPDATE_FAILED_ATTEMPT_AND_RESTORE = 4,
+
 }update_reason_code_t;
 
 typedef enum connection_request_made_by_code_t{
