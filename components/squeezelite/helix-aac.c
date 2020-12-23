@@ -430,14 +430,20 @@ static decode_state helixaac_decode(void) {
 		}
 	}
 
-	// we always have at least WRAPBUF_LEN unless it's the end of a stream
+	// we always have at least WRAPBUF_LEN unless it's the end of a stream	
+	/* There is a bug in helixaac where it overflows its buffer when not having 
+	 * samples and enters an infinite loop so we can't do here the proper test
+	 *        if (bytes_wrap < WRAPBUF_LEN && bytes_wrap != bytes_total)
+	 * but instead we'll zero the wrap buf and provide a safe overflow space 
+	 * for the decoder
+	*/ 
 	if (bytes_wrap < WRAPBUF_LEN) {
 		// build a linear buffer if we are crossing the end of streambuf
 		memcpy(a->wrap_buf, streambuf->readp, bytes_wrap);
-		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, min(WRAPBUF_LEN, bytes_total) - bytes_wrap);
-		
+		memcpy(a->wrap_buf + bytes_wrap, streambuf->buf, min(WRAPBUF_LEN, bytes_total) - bytes_wrap);		
 		sptr = a->wrap_buf;
-		bytes = bytes_wrap = min(WRAPBUF_LEN, bytes_total);
+		if (bytes_total < WRAPBUF_LEN) memset(a->wrap_buf + bytes_total, 0, WRAPBUF_LEN - bytes_total);
+		else bytes = bytes_wrap = min(WRAPBUF_LEN, bytes_total);
 	} else {
 		sptr = streambuf->readp;
 		bytes = bytes_wrap;
