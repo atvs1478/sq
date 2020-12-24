@@ -341,9 +341,7 @@ static decode_state helixaac_decode(void) {
 	bytes_total = _buf_used(streambuf);
 	bytes_wrap  = min(bytes_total, _buf_cont_read(streambuf));
 	
-	// Helixaac locks when not having enough samples (~7ms lost)
-	if (stream.state <= DISCONNECT && bytes_total < 128) {
-		LOG_WARN("decoder missed %zu bytes at the end", $bytes_total);		
+	if (stream.state <= DISCONNECT && !bytes_total) {
 		UNLOCK_S;
 		return DECODE_COMPLETE;
 	}
