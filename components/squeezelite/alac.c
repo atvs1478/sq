@@ -119,8 +119,16 @@ static int read_mp4_header(void) {
 		// extract audio config from within alac
 		if (!strcmp(type, "alac") && bytes > len) {
 			u8_t *ptr = streambuf->readp + 36;
-			l->decoder = alac_create_decoder(len - 36, ptr, &l->sample_size, &l->sample_rate, &l->channels);
-			l->play = l->trak;
+			unsigned int block_size;
+			l->decoder = alac_create_decoder(len - 36, ptr, &l->sample_size, &l->sample_rate, &l->channels, &block_size);
+			l->play = l->trak;			
+			l->writebuf = malloc(block_size + 256);
+			if (!l->writebuf) {
+				LOG_ERROR("cannot allocate write buffer for %u bytes", block_size);
+				return -1;
+			} else {
+				LOG_INFO("write buffer of %u bytes", block_size);
+            }
 		}
 
 		// extract the total number of samples from stts
@@ -510,12 +518,11 @@ static decode_state alac_decode(void) {
 
 static void alac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 	if (l->decoder)	alac_delete_decoder(l->decoder);
-	else l->writebuf = malloc(BLOCK_SIZE * 2);
-	
+	if (l->writebuf) free(l->writebuf);
 	if (l->chunkinfo) free(l->chunkinfo);
 	if (l->block_size) free(l->block_size);
 	if (l->stsc) free(l->stsc);
-	l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
+	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
 	l->skip = 0;
 	l->samples = l->sttssamples = 0;
 	l->empty = false;
@@ -524,11 +531,11 @@ static void alac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 
 static void alac_close(void) {
 	if (l->decoder) alac_delete_decoder(l->decoder);
+	if (l->writebuf) free(l->writebuf);	
 	if (l->chunkinfo) free(l->chunkinfo);
 	if (l->block_size) free(l->block_size);
 	if (l->stsc) free(l->stsc);
-	l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
-	free(l->writebuf);
+	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
 }
 
 struct codec *register_alac(void) {
@@ -547,7 +554,7 @@ struct codec *register_alac(void) {
 		return NULL;
 	}	
 	
-	l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
+	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
 	
 	LOG_INFO("using alac to decode alc");
 	return &ret;

@@ -168,7 +168,7 @@ static void 	rtp_thread_func(void *arg);
 /*---------------------------------------------------------------------------*/
 static struct alac_codec_s* alac_init(int fmtp[32]) {
 	struct alac_codec_s *alac;
-	unsigned sample_rate;
+	unsigned sample_rate, block_size;
 	unsigned char sample_size, channels;
 	struct {
 		uint32_t	frameLength;
@@ -196,7 +196,7 @@ static struct alac_codec_s* alac_init(int fmtp[32]) {
 	config.avgBitRate = htonl(fmtp[10]);
 	config.sampleRate = htonl(fmtp[11]);
 
-	alac = alac_create_decoder(sizeof(config), (unsigned char*) &config, &sample_size, &sample_rate, &channels);
+	alac = alac_create_decoder(sizeof(config), (unsigned char*) &config, &sample_size, &sample_rate, &channels, &block_size);
 	if (!alac) {
 		LOG_ERROR("cannot create alac codec", NULL);
 		return NULL;
