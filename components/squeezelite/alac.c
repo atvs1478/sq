@@ -374,10 +374,9 @@ static decode_state alac_decode(void) {
 
 	// need to create a buffer with contiguous data
 	if (bytes < block_size) {
-		u8_t *buffer = malloc(block_size);
-		memcpy(buffer, streambuf->readp, bytes);
-		memcpy(buffer + bytes, streambuf->buf, block_size - bytes);
-		iptr = buffer;
+		iptr = malloc(block_size);
+		memcpy(iptr, streambuf->readp, bytes);
+		memcpy(iptr + bytes, streambuf->buf, block_size - bytes);
 	} else iptr = streambuf->readp;
 
 	if (!alac_to_pcm(l->decoder, iptr, l->writebuf, 2, &frames)) {

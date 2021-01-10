@@ -972,7 +972,7 @@ static void visu_update(void) {
 				}
 			}
 		}
-	} else if (displayer.width / 2 >  3 * VU_WIDTH / 4) {
+	} else if (displayer.width / 2 >=  3 * VU_WIDTH / 4) {
 		if (visu.rotate) {
 			draw_VU(display, vu_bitmap, visu.bars[0].current, 0, visu.row, visu.height / 2, visu.rotate);
 			draw_VU(display, vu_bitmap, visu.bars[1].current, 0, visu.row + visu.height / 2, visu.height / 2, visu.rotate);
