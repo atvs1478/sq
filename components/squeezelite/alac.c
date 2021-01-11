@@ -516,26 +516,17 @@ static decode_state alac_decode(void) {
 	return DECODE_RUNNING;
 }
 
-static void alac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
-	if (l->decoder)	alac_delete_decoder(l->decoder);
-	if (l->writebuf) free(l->writebuf);
-	if (l->chunkinfo) free(l->chunkinfo);
-	if (l->block_size) free(l->block_size);
-	if (l->stsc) free(l->stsc);
-	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
-	l->skip = 0;
-	l->samples = l->sttssamples = 0;
-	l->empty = false;
-	l->pos = l->consume = l->sample = l->nextchunk = 0;
-}
-
 static void alac_close(void) {
 	if (l->decoder) alac_delete_decoder(l->decoder);
 	if (l->writebuf) free(l->writebuf);	
 	if (l->chunkinfo) free(l->chunkinfo);
 	if (l->block_size) free(l->block_size);
 	if (l->stsc) free(l->stsc);
-	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
+	memset(l, 0, sizeof(struct alac));	
+}
+
+static void alac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
+	alac_close();
 }
 
 struct codec *register_alac(void) {
@@ -549,13 +540,9 @@ struct codec *register_alac(void) {
 		alac_decode,    // decode
 	};
 	
-	l =  malloc(sizeof(struct alac));
-	if (!l) {
-		return NULL;
-	}	
-	
-	l->writebuf = l->decoder = l->chunkinfo = l->stsc = l->block_size = NULL;
-	
+	l =  calloc(1, sizeof(struct alac));
+	if (!l) return NULL;
+		
 	LOG_INFO("using alac to decode alc");
 	return &ret;
 }
