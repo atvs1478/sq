@@ -120,15 +120,14 @@ static int read_mp4_header(void) {
 		if (!strcmp(type, "alac") && bytes > len) {
 			u8_t *ptr = streambuf->readp + 36;
 			unsigned int block_size;
+			l->play = l->trak;						
 			l->decoder = alac_create_decoder(len - 36, ptr, &l->sample_size, &l->sample_rate, &l->channels, &block_size);
-			l->play = l->trak;			
 			l->writebuf = malloc(block_size + 256);
+			LOG_INFO("allocated write buffer of %u bytes", block_size);
 			if (!l->writebuf) {
-				LOG_ERROR("cannot allocate write buffer for %u bytes", block_size);
+				LOG_ERROR("allocation failed");
 				return -1;
-			} else {
-				LOG_INFO("write buffer of %u bytes", block_size);
-            }
+			}
 		}
 
 		// extract the total number of samples from stts
