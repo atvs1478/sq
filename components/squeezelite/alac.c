@@ -478,6 +478,7 @@ static decode_state alac_decode(void) {
 			}
 		} else if (l->sample_size == 16) {
 			u16_t *_iptr = (u16_t*) iptr;
+			iptr += count * 4;
 			while (count--) {
 				*optr++ = ALIGN16(*_iptr++);
 				*optr++ = ALIGN16(*_iptr++);
@@ -490,6 +491,7 @@ static decode_state alac_decode(void) {
 			}
 		} else if (l->sample_size == 32) {
 			u32_t *_iptr = (u32_t*) iptr;
+			iptr += count * 8;
 			while (count--) {
 				*optr++ = ALIGN32(*_iptr++);
 				*optr++ = ALIGN32(*_iptr++);
