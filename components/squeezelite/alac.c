@@ -21,7 +21,7 @@
 
 #include "squeezelite.h"
 
-#include <alac_wrapper.h>
+#include "alac_wrapper.h"
 
 #if BYTES_PER_FRAME == 4		
 #define ALIGN8(n) 	(n << 8)		
