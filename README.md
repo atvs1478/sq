@@ -52,6 +52,9 @@ The board showed above has the following IO set
 - jack insertion: GPIO39 (inserted low)
 - D4 -> GPIO22 used for green LED (active low)
 - D5 -> GPIO19 as well
+- The IO connector also brings GPIO5, GPIO18, GPIO19, GPIO21, GPIO22 and GPIO23
+- JTAG and SD-card use GPIO13 and GPIO15 (see dip switches)
+- JTAG also brings GPIO12 and GPIO14
 (note that GPIOs need pullups)
 
 So a possible config would be
