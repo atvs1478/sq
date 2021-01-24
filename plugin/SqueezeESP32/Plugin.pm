@@ -65,7 +65,7 @@ sub onStopClear {
 	my $client  = $request->client || return;
 
 	if ($client->isa('Plugins::SqueezeESP32::Player')) {
-		$client->clear_artwork($request);
+		$client->clear_artwork(0, $request->getRequestString());
 	}
 }
 

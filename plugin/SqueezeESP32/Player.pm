@@ -107,6 +107,22 @@ sub initPrefs {
 	$client->SUPER::initPrefs;
 }
 
+sub power {
+	my $client = shift;
+	my $on     = shift;
+
+	my $res = $client->SUPER::power($on, @_);
+	return $res unless defined $on;
+	
+	if ($on) {
+		$client->update_artwork(1);
+	} else {
+		$client->clear_artwork(1);
+	}
+	
+	return $res;
+}	
+
 # Allow the player to define it's display width (and probably more)
 sub playerSettingsFrame {
 	my $client   = shift;
@@ -232,16 +248,16 @@ sub send_artwork {
 }
 
 sub clear_artwork {
-	my ($client, $request) = @_;
+	my ($client, $force, $from) = @_;
 
 	my $artwork = $prefs->client($client)->get('artwork');
 
 	if ($artwork && $artwork->{'enable'}) {
-		main::INFOLOG && $log->is_info && $log->info("artwork stop/clear " . $request->getRequestString());
+		main::INFOLOG && $log->is_info && $log->info("artwork stop/clear " . ($from || ""));
 		$client->pluginData('artwork_md5', '');
 		# refresh screen and disable artwork when artwork was full screen (hack)
-		if (!$artwork->{'x'} && !$artwork->{'y'}) {
-			$client->sendFrame(grfa => \("\x00"x4)) unless $artwork->{'x'} || $artwork->{'y'};
+		if ((!$artwork->{'x'} && !$artwork->{'y'}) || $force) {
+			$client->sendFrame(grfa => \("\x00"x4));
 			$client->display->update;
 		}	
 	}
