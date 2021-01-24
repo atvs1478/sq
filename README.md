@@ -53,7 +53,7 @@ The board showed above has the following IO set
 - D4 -> GPIO22 used for green LED (active low)
 - D5 -> GPIO19 (muxed with key3)
 - The IO connector also brings GPIO5, GPIO18, GPIO19, GPIO21, GPIO22 and GPIO23 (don't forget it's muxed with keys!)
-- The JTAG connector uses GPIO 12, 13, 14 and 15 (see dip switched) but these are also used for SD-card (and 13 is key2)
+- The JTAG connector uses GPIO 12, 13, 14 and 15 (see dip switch) but these are also used for SD-card (and GPIO13 is key2 as well)
 - It's always possible to re-use GPIOO (download at boot) and GPIO1/GPIO3 which are RX/TX of UART0 but you'll lose trace
 
 (note that some GPIO need pullups)
