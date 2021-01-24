@@ -50,8 +50,9 @@ The board showed above has the following IO set
 - key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed with dip switches)
 - key1: not sure, something with GPIO36
 - jack insertion: GPIO39 (inserted low)
-- LED: GPIO22 (active low)
-(note that GPIO need pullups)
+- D4 -> LED: GPIO22 (active low)
+- D5 -> GPIO19 as well
+(note that GPIOs need pullups)
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
