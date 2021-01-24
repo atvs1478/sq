@@ -51,11 +51,12 @@ The board showed above has the following IO set
 - key1: not sure, using GPIO36 in a matrix
 - jack insertion: GPIO39 (inserted low)
 - D4 -> GPIO22 used for green LED (active low)
-- D5 -> GPIO19 as well
-- The IO connector also brings GPIO5, GPIO18, GPIO19, GPIO21, GPIO22 and GPIO23
-- JTAG and SD-card use GPIO13 and GPIO15 (see dip switches)
-- JTAG also brings GPIO12 and GPIO14
-(note that GPIOs need pullups)
+- D5 -> GPIO19 as well (muxed with key3)
+- The IO connector also brings GPIO5, GPIO18, GPIO19, GPIO21, GPIO22 and GPIO23 (don't forget it's muxed with keys!)
+- The JTAG connector uses GPIO 12, 13, 14 and 15 (see dip switched) but these are also used for SD-card (and 13 is key2)
+- It's alwats possible to re-use GPIOO (download at boot) and GPIO1/GPIO3 which are RX/TX of UART0 but you'll lose trace
+
+(note that some GPIO need pullups)
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
