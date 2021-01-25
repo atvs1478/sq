@@ -45,7 +45,7 @@ NB: You can use the pre-build binaries SqueezeAMP4MBFlash which has all the hard
 ### ESP32-A1S
 Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4000765857347.html?spm=2114.12010615.8148356.11.5d963cd0j669ns) or an external amplifier if you want direct speaker connection. 
 
-The board showed above has the following IO set
+The board shown above has the following IO set
 - amplifier: GPIO21
 - key2: GPIO13, key3: GPIO19, key4: GPIO23, key5: GPIO18, key6: GPIO5 (to be confirmed with dip switches)
 - key1: not sure, using GPIO36 in a matrix
