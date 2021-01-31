@@ -222,6 +222,8 @@ A=<gpio>,B=<gpio>[,SW=gpio>[[,knobonly[=<ms>]]|[[,volume][,longpress]]]]
 
 HW note: all gpio used for rotary have internal pull-up so normally there is no need to provide Vcc to the encoder. Nevertheless if the encoder board you're using also has its own pull-up that are stronger than ESP32's ones (which is likely the case), then there will be crosstalk between gpio, so you must bring Vcc. Look at your board schematic and you'll understand that these board pull-up create a "winning" pull-down when any other pin is grounded. 
 
+The SW gpio is optional, you can re-affect it to a pure button if you prefer but the volume, longpress and knobonly options make little sense as the missing switch plays an important role in these modes. You could still have the "volume" mode, but you won't be able to use it for *anything* expect volume up and down. So be aware that the use of syntax [] is a bit misleading hereabove.
+
 See also the "IMPORTANT NOTE" on the "Buttons" section and remember that when 'lms_ctrls_raw' (see below) is activated, none of these knobonly,volume,longpress options apply, raw button codes (not actions) are simply sent to LMS
 
 ### Buttons
