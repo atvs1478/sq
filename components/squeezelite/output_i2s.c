@@ -410,10 +410,7 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 		}
 		
 #if BYTES_PER_FRAME == 4
-		if (gainL != FIXED_ONE || gainR!= FIXED_ONE) {
-			_apply_gain(outputbuf, out_frames, gainL, gainR);
-		}
-			
+		_apply_gain(outputbuf, out_frames, gainL, gainR);
 		memcpy(obuf + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
 #else
 		optr = (s32_t*) outputbuf->readp;	

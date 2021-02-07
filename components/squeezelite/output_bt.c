@@ -90,9 +90,7 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 			_apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
 		}
 
-		if (gainL != FIXED_ONE || gainR!= FIXED_ONE) {
-			_apply_gain(outputbuf, out_frames, gainL, gainR);
-		}
+		_apply_gain(outputbuf, out_frames, gainL, gainR);
 
 #if BYTES_PER_FRAME == 4
 		memcpy(btout + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);

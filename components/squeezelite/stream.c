@@ -521,19 +521,16 @@ void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, un
 	
 #if USE_SSL
 	if (ntohs(port) == 443) {
-		char *server = strcasestr(header, "Host:");
+		char server[256], *p;
 
 		ssl = SSL_new(SSLctx);
 		SSL_set_fd(ssl, sock);
 
 		// add SNI
+		sscanf(header, "Host:%255s", server);
 		if (server) {
-			char *p, *servername = malloc(1024);
-
-			sscanf(server, "Host:%255[^:]s", servername);
-			for (p = servername; *p == ' '; p++);
-			SSL_set_tlsext_host_name(ssl, p);
-			free(servername);
+			if ((p = strchr(server, ':')) != NULL) *p = '\0';
+			SSL_set_tlsext_host_name(ssl, server);
 		}
 		
 		while (1) {

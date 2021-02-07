@@ -471,7 +471,8 @@ void _wake_create(event_event*);
 
 #define MAX_SILENCE_FRAMES 2048
 
-#define FIXED_ONE 0x10000
+#define FIXED_ONE 	0x10000
+#define MONO_MUTED	(FIXED_ONE + 1)
 
 #ifndef BYTES_PER_FRAME
 #define BYTES_PER_FRAME 8
@@ -660,6 +661,7 @@ typedef enum { FADE_NONE = 0, FADE_CROSSFADE, FADE_IN, FADE_OUT, FADE_INOUT } fa
 struct outputstate {
 	output_state state;
 	output_format format;
+	u8_t  channels;            
 	const char *device;
 	int external;
 	u32_t init_size;
