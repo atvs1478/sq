@@ -60,8 +60,8 @@ static const char *known_drivers[] = {"SH1106",
 static void displayer_task(void *args);
 
 struct GDS_Device *display;   
-extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect;
-GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, NULL };
+extern GDS_DetectFunc SSD1306_Detect, SSD132x_Detect, SH1106_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, ILI9341_Detect;
+GDS_DetectFunc *drivers[] = { SH1106_Detect, SSD1306_Detect, SSD132x_Detect, SSD1675_Detect, SSD1322_Detect, SSD1351_Detect, ST77xx_Detect, ILI9341_Detect, NULL };
 
 /****************************************************************************************
  * 
@@ -84,8 +84,8 @@ void display_init(char *welcome) {
 		display = GDS_AutoDetect(drivername, drivers, &PWMConfig);
 	} else {
 		display = GDS_AutoDetect(drivername, drivers, NULL);
-	}	
-		
+	}
+	
 	// so far so good
 	if (display && width > 0 && height > 0) {
 		int RST_pin = -1;
