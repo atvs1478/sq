@@ -97,29 +97,6 @@ static void sendIR(u16_t addr, u16_t cmd) {
 	UNLOCK_P;
 }
 
-static void lms_power(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_POWER_FRONT, pressed);
-	} else {
-		cli_send_cmd("button power");
-	}	
-}
-static void lms_volume_up(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_VOLUP_FRONT, pressed);
-	} else {
-		cli_send_cmd("button volup");
-	}	
-}
-
-static void lms_volume_down(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_VOLDOWN_FRONT, pressed);
-	} else {
-		cli_send_cmd("button voldown");
-	}	
-}
-
 static void lms_toggle(bool pressed) {
 	if (raw_mode) {
 		sendBUTN(BUTN_PAUSE, pressed);
@@ -136,158 +113,49 @@ static void lms_pause(bool pressed) {
 	}	
 }
 
-static void lms_play(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PLAY, pressed);
-	} else {
-		cli_send_cmd("button play.single");
-	}	
-}
-
 static void lms_stop(bool pressed) {
 	cli_send_cmd("button stop");
 }
 
-static void lms_rew(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_REW, pressed);
-	} else {
-		cli_send_cmd("button rew.repeat");
-	}	
+#define LMS_CALLBACK(N,B,E)					\
+static void lms_##N (bool pressed) {    	\
+	if (raw_mode) {							\
+		sendBUTN( BUTN_##B , pressed );		\
+	} else {								\
+		cli_send_cmd("button" " " #E); 		\
+	}                                       \
 }
 
-static void lms_fwd(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_FWD, pressed);
-	} else {
-		cli_send_cmd("button fwd.repeat");
-	}	
-}
+LMS_CALLBACK(power, POWER_FRONT, power)
+LMS_CALLBACK(play, PLAY, play.single)
 
-static void lms_prev(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_REW, pressed);
-	} else {
-		cli_send_cmd("button rew");
-	}	
-}
+LMS_CALLBACK(volup, VOLUP_FRONT, volup)
+LMS_CALLBACK(voldown, VOLDOWN_FRONT, voldown)
 
-static void lms_next(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_FWD, pressed);
-	} else {
-		cli_send_cmd("button fwd");
-	}
-}
+LMS_CALLBACK(rew, REW, rew.repeat)
+LMS_CALLBACK(fwd, FWD, fwd.repeat)
+LMS_CALLBACK(prev, REW, rew)
+LMS_CALLBACK(next, FWD, fwd)
 
-static void lms_up(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_ARROW_UP, pressed);
-	} else {
-		cli_send_cmd("button arrow_up");
-	}	
-}
+LMS_CALLBACK(up, ARROW_UP, arrow_up)
+LMS_CALLBACK(down, ARROW_DOWN, arrow_down)
+LMS_CALLBACK(left, ARROW_LEFT, arrow_left)
+LMS_CALLBACK(right, ARROW_RIGHT, arrow_right)
 
-static void lms_down(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_ARROW_DOWN, pressed);
-	} else {
-		cli_send_cmd("button arrow_down");
-	}	
-}
+LMS_CALLBACK(pre1, PRESET_1, preset1.single)
+LMS_CALLBACK(pre2, PRESET_2, preset2.single)
+LMS_CALLBACK(pre3, PRESET_3, preset3.single)
+LMS_CALLBACK(pre4, PRESET_4, preset4.single)
+LMS_CALLBACK(pre5, PRESET_5, preset5.single)
+LMS_CALLBACK(pre6, PRESET_6, preset6.single)
 
-static void lms_left(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_ARROW_LEFT, pressed);
-	} else {
-		cli_send_cmd("button arrow_left");
-	}	
-}
-
-static void lms_right(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_ARROW_RIGHT, pressed);
-	} else {
-		cli_send_cmd("button arrow_right");
-	}	
-}
-
-static void lms_pre1(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_1, pressed);
-	} else {
-		cli_send_cmd("button preset_1.single");
-	}	
-}
-
-static void lms_pre2(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_2, pressed);
-	} else {
-		cli_send_cmd("button preset_2.single");
-	}	
-}
-
-static void lms_pre3(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_3, pressed);
-	} else {
-		cli_send_cmd("button preset_3.single");
-	}	
-}
-
-static void lms_pre4(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_4, pressed);
-	} else {
-		cli_send_cmd("button preset_4.single");
-	}	
-}
-
-static void lms_pre5(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_5, pressed);
-	} else {
-		cli_send_cmd("button preset_5.single");
-	}	
-}
-
-static void lms_pre6(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_PRESET_6, pressed);
-	} else {
-		cli_send_cmd("button preset_6.single");
-	}	
-}
-
-
-static void lms_knob_left(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_KNOB_LEFT, pressed);
-	} else {
-		cli_send_cmd("button knob_left");
-	}	
-}
-
-static void lms_knob_right(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_KNOB_RIGHT, pressed);
-	} else {
-		cli_send_cmd("button knob_right");
-	}	
-}
-
-static void lms_knob_push(bool pressed) {
-	if (raw_mode) {
-		sendBUTN(BUTN_KNOB_PUSH, pressed);
-	} else {
-		cli_send_cmd("button knob_push");
-	}	
-}
+LMS_CALLBACK(knob_left, KNOB_LEFT, knob_left)
+LMS_CALLBACK(knob_right, KNOB_RIGHT, knob_right)
+LMS_CALLBACK(knob_push, KNOB_PUSH, knob_push)
 
 const actrls_t LMS_controls = {
 	lms_power,
-	lms_volume_up, lms_volume_down,	// volume up, volume down
+	lms_volup, lms_voldown,	// volume up, volume down
 	lms_toggle, lms_play,	// toggle, play
 	lms_pause, lms_stop,	// pause, stop
 	lms_rew, lms_fwd,		// rew, fwd

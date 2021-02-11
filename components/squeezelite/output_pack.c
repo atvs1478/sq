@@ -364,13 +364,13 @@ inline
 void _apply_gain(struct buffer *outputbuf, frames_t count, s32_t gainL, s32_t gainR) {
 	if (gainL == FIXED_ONE && gainR == FIXED_ONE) {
 		return;
-	} else if (gainL == MONO_MUTED) {
+	} else if (gainL == COPY_MONO) {
 		ISAMPLE_T *ptr = (ISAMPLE_T *)(void *)outputbuf->readp + 1;
 		while (count--) {
 			*(ptr - 1) = *ptr = gain(gainR, *ptr);
 			ptr += 2;
 		}
-	} else if (gainR == MONO_MUTED) {
+	} else if (gainR == COPY_MONO) {
 		ISAMPLE_T *ptr = (ISAMPLE_T *)(void *)outputbuf->readp;
 		while (count--) {
 			*(ptr + 1) = *ptr = gain(gainL, *ptr);
