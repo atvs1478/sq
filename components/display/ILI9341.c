@@ -1,6 +1,7 @@
 /**
  * Copyright (c) 2017-2018 Tara Keeling
  *				 2020 Philippe G.
+ *				 2021 Mumpf and Harry1999
  * 
  * This software is released under the MIT License.
  * https://opensource.org/licenses/MIT
@@ -10,356 +11,392 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/gpio.h"
-
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 
 #include "gds.h"
 #include "gds_private.h"
 
-//#define SHADOW_BUFFER
-#define PAGE_BLOCK	1024
+#define SHADOW_BUFFER
+#define USE_IRAM
+#define PAGE_BLOCK		2048
+#define ENABLE_WRITE	0x2c
+//(MADCTL_MX | TFT_RGB_BGR)
+#define MADCTL_MX  0x40
+#define TFT_RGB_BGR  0x08
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 
 static char TAG[] = "ILI9341";
 
-
-#define L1_CMD_NOP 0X00
-#define L1_CMD_SOFTWARE_RESET 0X01
-#define L1_CMD_READ_DISPLAY_IDENTIFICATION_INFORMATION 0X04
-#define L1_CMD_READ_DISPLAY_STATUS 0X09
-#define L1_CMD_READ_DISPLAY_POWER_MODE 0X0A
-#define L1_CMD_READ_DISPLAY_MADCTL 0X0B
-#define L1_CMD_READ_DISPLAY_PIXEL_FORMAT 0X0C
-#define L1_CMD_READ_DISPLAY_IMAGE_FORMAT 0X0D
-#define L1_CMD_READ_DISPLAY_SIGNAL_MODE 0X0E
-#define L1_CMD_READ_DISPLAY_SELF_DIAGNOSTIC_RESULT 0X0F
-#define L1_CMD_ENTER_SLEEP_MODE 0X10
-#define L1_CMD_SLEEP_OUT 0X11
-#define L1_CMD_PARTIAL_MODE_ON 0X12
-#define L1_CMD_NORMAL_DISPLAY_MODE_ON 0X13
-#define L1_CMD_DISPLAY_INVERSION_OFF 0X20
-#define L1_CMD_DISPLAY_INVERSION_ON 0X21
-#define L1_CMD_GAMMA_SET 0X26
-#define L1_CMD_DISPLAY_OFF 0X28
-#define L1_CMD_DISPLAY_ON 0X29
-#define L1_CMD_COLUMN_ADDRESS_SET 0X2A
-#define L1_CMD_PAGE_ADDRESS_SET 0X2B
-#define L1_CMD_MEMORY_WRITE 0X2C
-#define L1_CMD_COLOR_SET 0X2D
-#define L1_CMD_MEMORY_READ 0X2E
-#define L1_CMD_PARTIAL_AREA 0X30
-#define L1_CMD_VERTICAL_SCROLLING_DEFINITION 0X33
-#define L1_CMD_TEARING_EFFECT_LINE_OFF 0X34
-#define L1_CMD_TEARING_EFFECT_LINE_ON 0X35
-#define L1_CMD_MEMORY_ACCESS_CONTROL 0X36
-#define L1_CMD_VERTICAL_SCROLLING_START_ADDRESS 0X37
-#define L1_CMD_IDLE_MODE_OFF 0X38
-#define L1_CMD_IDLE_MODE_ON 0X39
-#define L1_CMD_COLMOD_PIXEL_FORMAT_SET 0X3A
-#define L1_CMD_WRITE_MEMORY_CONTINUE 0X3C
-#define L1_CMD_READ_MEMORY_CONTINUE 0X3E
-#define L1_CMD_SET_TEAR_SCANLINE 0X44
-#define L1_CMD_GET_SCANLINE 0X45
-#define L1_CMD_WRITE_DISPLAY_BRIGHTNESS 0X51
-#define L1_CMD_READ_DISPLAY_BRIGHTNESS 0X52
-#define L1_CMD_WRITE_CTRL_DISPLAY 0X53
-#define L1_CMD_READ_CTRL_DISPLAY 0X54
-#define L1_CMD_WRITE_CONTENT_ADAPTIVE_BRIGHTNESS_CONTROL 0X55
-#define L1_CMD_READ_CONTENT_ADAPTIVE_BRIGHTNESS_CONTROL 0X56
-#define L1_CMD_WRITE_CABC_MINIMUM_BRIGHTNESS 0X5E
-#define L1_CMD_READ_CABC_MINIMUM_BRIGHTNESS 0X5F
-#define L1_CMD_READ_ID1 0XDA
-#define L1_CMD_READ_ID2 0XDB
-#define L1_CMD_READ_ID3 0XDC
-
-#define L2_CMD_RGB_INTERFACE_SIGNAL_CONTROL 0XB0
-#define L2_CMD_FRAME_RATE_CONTROL_IN_NORMAL_MODE_FULL_COLORS 0XB1
-#define L2_CMD_FRAME_RATE_CONTROL_IN_IDLE_MODE_8_COLORS 0XB2
-#define L2_CMD_FRAME_RATE_CONTROL_IN_PARTIAL_MODE_FULL_COLORS 0XB3
-#define L2_CMD_DISPLAY_INVERSION_CONTROL 0XB4
-#define L2_CMD_BLANKING_PORCH_CONTROL 0XB5
-#define L2_CMD_DISPLAY_FUNCTION_CONTROL 0XB6
-#define L2_CMD_ENTRY_MODE_SET 0XB7
-#define L2_CMD_BACKLIGHT_CONTROL_1 0XB8
-#define L2_CMD_BACKLIGHT_CONTROL_2 0XB9
-#define L2_CMD_BACKLIGHT_CONTROL_3 0XBA
-#define L2_CMD_BACKLIGHT_CONTROL_4 0XBB
-#define L2_CMD_BACKLIGHT_CONTROL_5 0XBC
-#define L2_CMD_BACKLIGHT_CONTROL_7 0XBE
-#define L2_CMD_BACKLIGHT_CONTROL_8 0XBF
-#define L2_CMD_POWER_CONTROL_1 0XC0
-#define L2_CMD_POWER_CONTROL_2 0XC1
-#define L2_CMD_VCOM_CONTROL_1 0XC5
-#define L2_CMD_VCOM_CONTROL_2 0XC7
-#define L2_CMD_NV_MEMORY_WRITE 0XD0
-#define L2_CMD_NV_MEMORY_PROTECTION_KEY 0XD1
-#define L2_CMD_NV_MEMORY_STATUS_READ 0XD2
-#define L2_CMD_READ_ID4 0XD3
-#define L2_CMD_POSITIVE_GAMMA_CORRECTION 0XE0
-#define L2_CMD_NEGATIVE_GAMMA_CORRECTION 0XE1
-#define L2_CMD_DIGITAL_GAMMA_CONTROL_1 0XE2
-#define L2_CMD_DIGITAL_GAMMA_CONTROL_2 0XE3
-#define L2_CMD_INTERFACE_CONTROL 0XF6
-
-
-
-/*
- The LCD needs a bunch of command/argument values to be initialized. They are stored in this struct.
-*/
-typedef struct {
-    uint8_t cmd;
-    uint8_t data[16];
-    uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
-} lcd_init_cmd_t;
-
-
-
-static const lcd_init_cmd_t ili_init_cmds[]={
-    /* Power contorl B, power control = 0, DC_ENA = 1 */
-    {0xCF, {0x00, 0x83, 0X30}, 3},
-    /* Power on sequence control,
-     * cp1 keeps 1 frame, 1st frame enable
-     * vcl = 0, ddvdh=3, vgh=1, vgl=2
-     * DDVDH_ENH=1
-     */
-    {0xED, {0x64, 0x03, 0X12, 0X81}, 4},
-    /* Driver timing control A,
-     * non-overlap=default +1
-     * EQ=default - 1, CR=default
-     * pre-charge=default - 1
-     */
-    {0xE8, {0x85, 0x01, 0x79}, 3},
-    /* Power control A, Vcore=1.6V, DDVDH=5.6V */
-    {0xCB, {0x39, 0x2C, 0x00, 0x34, 0x02}, 5},
-    /* Pump ratio control, DDVDH=2xVCl */
-    {0xF7, {0x20}, 1},
-    /* Driver timing control, all=0 unit */
-    {0xEA, {0x00, 0x00}, 2},
-    /* Power control 1, GVDD=4.75V */
-    {0xC0, {0x26}, 1},
-    /* Power control 2, DDVDH=VCl*2, VGH=VCl*7, VGL=-VCl*3 */
-    {0xC1, {0x11}, 1},
-    /* VCOM control 1, VCOMH=4.025V, VCOML=-0.950V */
-    {0xC5, {0x35, 0x3E}, 2},
-    /* VCOM control 2, VCOMH=VMH-2, VCOML=VML-2 */
-    {0xC7, {0xBE}, 1},
-    /* Memory access contorl, MX=MY=0, MV=1, ML=0, BGR=1, MH=0 */
-    {0x36, {0x28}, 1},
-    /* Pixel format, 16bits/pixel for RGB/MCU interface */
-    {0x3A, {0x55}, 1},
-    /* Frame rate control, f=fosc, 70Hz fps */
-    {0xB1, {0x00, 0x1B}, 2},
-    /* Enable 3G, disabled */
-    {0xF2, {0x08}, 1},
-    /* Gamma set, curve 1 */
-    {0x26, {0x01}, 1},
-    /* Positive gamma correction */
-    {0xE0, {0x1F, 0x1A, 0x18, 0x0A, 0x0F, 0x06, 0x45, 0X87, 0x32, 0x0A, 0x07, 0x02, 0x07, 0x05, 0x00}, 15},
-    /* Negative gamma correction */
-    {0XE1, {0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3A, 0x78, 0x4D, 0x05, 0x18, 0x0D, 0x38, 0x3A, 0x1F}, 15},
-    /* Column address set, SC=0, EC=0xEF */
-    {0x2A, {0x00, 0x00, 0x00, 0xEF}, 4},
-    /* Page address set, SP=0, EP=0x013F */
-    {0x2B, {0x00, 0x00, 0x01, 0x3f}, 4},
-    /* Memory write */
-    {0x2C, {0}, 0},
-    /* Entry mode set, Low vol detect disabled, normal display */
-    {0xB7, {0x07}, 1},
-    /* Display function control */
-    {0xB6, {0x0A, 0x82, 0x27, 0x00}, 4},
-    /* Sleep out */
-    {0x11, {0}, 0x80},
-    /* Display on */
-    {0x29, {0}, 0x80},
-    {0, {0}, 0xff},
-};
-
-//To speed up transfers, every SPI transfer sends a bunch of lines. This define specifies how many. More means more memory use,
-//but less overhead for setting up / finishing transfers. Make sure 240 is dividable by this.
-#define PARALLEL_LINES 16
+enum { ILI9341, ILI9341_24 };	//ILI9341_24 for future use...
 
 struct PrivateSpace {
 	uint8_t *iRAM, *Shadowbuffer;
-	uint8_t ReMap, PageSize;
-	uint8_t Offset;
+	struct {
+		uint16_t Height, Width;
+	} Offset;
+	uint8_t MADCtl, PageSize;
+	uint8_t Model;
 };
 
 // Functions are not declared to minimize # of lines
 
-static void WriteDataByte( struct GDS_Device* Device, uint8_t Data ) {
-	Device->WriteData( Device, &Data, 1);
+static void WriteByte( struct GDS_Device* Device, uint8_t Data ) {
+	Device->WriteData( Device, &Data, 1 );
 }
 
-static void SetColumnAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End ) {
-	Device->WriteCommand( Device, L1_CMD_COLUMN_ADDRESS_SET );
-	Device->WriteData( Device, &Start, 1 );
-	Device->WriteData( Device, &End, 1 );
-}
-static void SetRowAddress( struct GDS_Device* Device, uint8_t Start, uint8_t End ) {
-	Device->WriteCommand( Device, L1_CMD_PAGE_ADDRESS_SET );
-	Device->WriteData( Device, &Start, 1 );
-	Device->WriteData( Device, &End, 1 );
+static void SetColumnAddress( struct GDS_Device* Device, uint16_t Start, uint16_t End ) {
+	uint32_t Addr = __builtin_bswap16(Start) | (__builtin_bswap16(End) << 16);
+	Device->WriteCommand( Device, 0x2A );
+	Device->WriteData( Device, (uint8_t*) &Addr, 4 );
 }
 
+static void SetRowAddress( struct GDS_Device* Device, uint16_t Start, uint16_t End ) {
+	uint32_t Addr = __builtin_bswap16(Start) | (__builtin_bswap16(End) << 16);
+	Device->WriteCommand( Device, 0x2B );
+	Device->WriteData( Device, (uint8_t*) &Addr, 4 );
+}
 
-
-static void Update( struct GDS_Device* Device ) {
+static void Update16( struct GDS_Device* Device ) {
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
 		
-	//SetColumnAddress( Device, Private->Offset, Private->Offset + Device->Width / 4 - 1);
-	SetColumnAddress( Device, Private->Offset, Private->Offset + Device->Width - 1);
-	
 #ifdef SHADOW_BUFFER
-	uint16_t *optr = (uint16_t*) Private->Shadowbuffer, *iptr = (uint16_t*) Device->Framebuffer;
-	bool dirty = false;
+	uint32_t *optr = (uint32_t*) Private->Shadowbuffer, *iptr = (uint32_t*) Device->Framebuffer;
+	int FirstCol = Device->Width / 2, LastCol = 0, FirstRow = -1, LastRow = 0;  
 	
-	for (int r = 0, page = 0; r < Device->Height; r++) {
-		// look for change and update shadow (cheap optimization = width always / by 2)
-		for (int c = Device->Width / 2 / 2; --c >= 0;) {
+	for (int r = 0; r < Device->Height; r++) {
+		// look for change and update shadow (cheap optimization = width is always a multiple of 2)
+		for (int c = 0; c < Device->Width / 2; c++, iptr++, optr++) {
 			if (*optr != *iptr) {
-				dirty = true;
 				*optr = *iptr;
+				if (c < FirstCol) FirstCol = c;	
+				if (c > LastCol) LastCol = c;
+				if (FirstRow < 0) FirstRow = r;
+				LastRow = r;
 			}
-			iptr++; optr++;
 		}
+
+		// wait for a large enough window - careful that window size might increase by more than a line at once !
+		if (FirstRow < 0 || ((LastCol - FirstCol + 1) * (r - FirstRow + 1) * 4 < PAGE_BLOCK && r != Device->Height - 1)) continue;
 		
-		// one line done, check for page boundary
-		if (++page == Private->PageSize) {
-			if (dirty) {
-				uint16_t *optr = (uint16_t*) Private->iRAM, *iptr = (uint16_t*) (Private->Shadowbuffer + (r - page + 1) * Device->Width / 2);
-				SetRowAddress( Device, r - page + 1, r );
-				for (int i = page * Device->Width / 2 / 2; --i >= 0; iptr++) *optr++ = (*iptr >> 8) | (*iptr << 8);
-				//memcpy(Private->iRAM, Private->Shadowbuffer + (r - page + 1) * Device->Width / 2, page * Device->Width / 2 );
-				Device->WriteCommand( Device, 0x5c );
-				Device->WriteData( Device, Private->iRAM, Device->Width * page / 2 );
-				dirty = false;
-			}	
-			page = 0;
+		FirstCol *= 2;
+		LastCol = LastCol * 2 + 1;
+		SetRowAddress( Device, FirstRow + Private->Offset.Height, LastRow + Private->Offset.Height);
+		SetColumnAddress( Device, FirstCol + Private->Offset.Width, LastCol + Private->Offset.Width );
+		Device->WriteCommand( Device, ENABLE_WRITE );
+			
+		int ChunkSize = (LastCol - FirstCol + 1) * 2;
+			
+		// own use of IRAM has not proven to be much better than letting SPI do its copy
+		if (Private->iRAM) {
+			uint8_t *optr = Private->iRAM;
+			for (int i = FirstRow; i <= LastRow; i++) {
+				memcpy(optr, Private->Shadowbuffer + (i * Device->Width + FirstCol) * 2, ChunkSize);
+				optr += ChunkSize;
+				if (optr - Private->iRAM <= (PAGE_BLOCK - ChunkSize) && i < LastRow) continue;
+				Device->WriteData(Device, Private->iRAM, optr - Private->iRAM);
+				optr = Private->iRAM;
+			}
+		} else for (int i = FirstRow; i <= LastRow; i++) {
+			Device->WriteData( Device, Private->Shadowbuffer + (i * Device->Width + FirstCol) * 2, ChunkSize );
 		}	
+
+		FirstCol = Device->Width / 2; LastCol = 0;
+		FirstRow = -1;
 	}	
 #else
-	for (int r = 0; r < Device->Height; r += Private->PageSize) {
-		SetRowAddress( Device, r, r + Private->PageSize - 1 );
-		Device->WriteCommand( Device, L1_CMD_MEMORY_WRITE );
+	// always update by full lines
+	SetColumnAddress( Device, Private->Offset.Width, Device->Width - 1);
+	
+	for (int r = 0; r < Device->Height; r += min(Private->PageSize, Device->Height - r)) {
+		int Height = min(Private->PageSize, Device->Height - r);
+		
+		SetRowAddress( Device, Private->Offset.Height + r, Private->Offset.Height + r + Height - 1 );
+		Device->WriteCommand(Device, ENABLE_WRITE);
+		
 		if (Private->iRAM) {
-			uint16_t *optr = (uint16_t*) Private->iRAM, *iptr = (uint16_t*) (Device->Framebuffer + r * Device->Width / 2);
-			for (int i = Private->PageSize * Device->Width / 2 / 2; --i >= 0; iptr++) *optr++ = (*iptr >> 8) | (*iptr << 8);
-			//memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width / 2, Private->PageSize * Device->Width / 2 );
-			Device->WriteData( Device, Private->iRAM, Private->PageSize * Device->Width / 2 );
+			memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width * 2, Height * Device->Width * 2 );
+			Device->WriteData( Device, Private->iRAM, Height * Device->Width * 2 );
 		} else	{
-			Device->WriteData( Device, Device->Framebuffer + r * Device->Width / 2, Private->PageSize * Device->Width / 2 );
+			Device->WriteData( Device, Device->Framebuffer + r * Device->Width * 2, Height * Device->Width * 2 );
 		}	
 	}	
 #endif	
 }
 
-//Bit 	Name 						Description
-//---	---------------------------	------------------------------------------------------
-//MY  	Row Address Order 	 		MCU to memory write/read direction.
-//MX 	Column Address Order 		MCU to memory write/read direction.
-//MV 	Row / Column Exchange 		MCU to memory write/read direction.
-//ML 	Vertical Refresh Order 		LCD vertical refresh direction control.
-//BGR 	RGB-BGR Order 				Color selector switch control
-//									(0=RGB color filter panel, 1=BGR color filter panel)
-//MH 	Horizontal Refresh ORDER 	LCD horizontal refreshing direction control.
-// Bits 17-0
-//		XX XX XX XX XX XX XX XX XX XX MY MX MV ML BGR MH 0 0
-typedef enum  {
-	MAC_BIT_MH=2,
-	MAC_BIT_BGR,
-	MAC_BIT_ML,
-	MAC_BIT_MV,
-	MAC_BIT_MX,
-	MAC_BIT_MY,
-} mac_bits;
+static void Update24( struct GDS_Device* Device ) {
+	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
+		
+#ifdef SHADOW_BUFFER
+	uint16_t *optr = (uint16_t*) Private->Shadowbuffer, *iptr = (uint16_t*) Device->Framebuffer;
+	int FirstCol = (Device->Width * 3) / 2, LastCol = 0, FirstRow = -1, LastRow = 0;  
 
-uint16_t set_mac_bit(mac_bits bit, uint16_t val){
-	return (1 << bit) | val;
-}
-uint16_t unset_mac_bit(mac_bits bit, uint16_t val){
-	return ~(1 << bit) & val;
+	for (int r = 0; r < Device->Height; r++) {
+		// look for change and update shadow (cheap optimization = width always / by 2)
+		for (int c = 0; c < (Device->Width * 3) / 2; c++, optr++, iptr++) {
+			if (*optr != *iptr) {
+				*optr = *iptr;
+				if (c < FirstCol) FirstCol = c;	
+				if (c > LastCol) LastCol = c;
+				if (FirstRow < 0) FirstRow = r;
+				LastRow = r;
+			}
+		}
+
+		// do we have enough to send (cols are divided by 3/2)
+		if (FirstRow < 0 || ((((LastCol - FirstCol + 1) * 2 ) / 3) * (r - FirstRow + 1) * 4 < PAGE_BLOCK && r != Device->Height - 1)) continue;
+		
+		FirstCol = (FirstCol * 2) / 3;
+		LastCol = (LastCol * 2 + 1 ) / 3; 
+		SetRowAddress( Device, FirstRow + Private->Offset.Height, LastRow + Private->Offset.Height);
+		SetColumnAddress( Device, FirstCol + Private->Offset.Width, LastCol + Private->Offset.Width );
+		Device->WriteCommand( Device, ENABLE_WRITE );
+			
+		int ChunkSize = (LastCol - FirstCol + 1) * 3;
+					
+		// own use of IRAM has not proven to be much better than letting SPI do its copy
+		if (Private->iRAM) {
+			uint8_t *optr = Private->iRAM;
+			for (int i = FirstRow; i <= LastRow; i++) {
+				memcpy(optr, Private->Shadowbuffer + (i * Device->Width + FirstCol) * 3, ChunkSize);
+				optr += ChunkSize;
+				if (optr - Private->iRAM <= (PAGE_BLOCK - ChunkSize) && i < LastRow) continue;
+				Device->WriteData(Device, Private->iRAM, optr - Private->iRAM);
+				optr = Private->iRAM;
+			}	
+		} else for (int i = FirstRow; i <= LastRow; i++) {
+			Device->WriteData( Device, Private->Shadowbuffer + (i * Device->Width + FirstCol) * 3, ChunkSize );
+		}	
+
+		FirstCol = (Device->Width * 3) / 2; LastCol = 0;
+		FirstRow = -1;
+	}	
+#else
+	// always update by full lines
+	SetColumnAddress( Device, Private->Offset.Width, Device->Width - 1);
+	
+	for (int r = 0; r < Device->Height; r += min(Private->PageSize, Device->Height - r)) {
+		int Height = min(Private->PageSize, Device->Height - r);
+		
+		SetRowAddress( Device, Private->Offset.Height + r, Private->Offset.Height + r + Height - 1 );
+		Device->WriteCommand(Device, ENABLE_WRITE);
+		
+		if (Private->iRAM) {
+			memcpy(Private->iRAM, Device->Framebuffer + r * Device->Width * 3, Height * Device->Width * 3 );
+			Device->WriteData( Device, Private->iRAM, Height * Device->Width * 3 );
+		} else	{
+			Device->WriteData( Device, Device->Framebuffer + r * Device->Width * 3, Height * Device->Width * 3 );
+		}	
+	}	
+#endif	
 }
 
 static void SetLayout( struct GDS_Device* Device, bool HFlip, bool VFlip, bool Rotate ) { 
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
-	Private->ReMap = HFlip ? (Private->ReMap & ~(1 << MAC_BIT_MX)) : (Private->ReMap | (1 << MAC_BIT_MX));
-	Private->ReMap = VFlip ? (Private->ReMap | (1 << MAC_BIT_MY)) : (Private->ReMap & ~(1 << MAC_BIT_MY));
-	Device->WriteCommand( Device, L1_CMD_MEMORY_ACCESS_CONTROL );
-	Device->WriteData( Device, &Private->ReMap, 1 );
-	WriteDataByte(Device,0x00);
+	ESP_LOGI(TAG, "SetLayout 197 HFlip=%d VFlip=%d Rotate=%d (1=true)", HFlip, VFlip, Rotate);
+	//        D/CX RDX WRX D17-8 D7 D6 D5 D4 D3  D2 D1 D0 HEX
+	//Command   0   1   ↑    XX  0  0  1  1  0   1  1  0  36h
+	//Parameter 1   1   ↑    XX  MY MX MV ML BGR MH 0  0  00
+	//Orientation 0: MADCtl = 0x80  =   1000 0000 (MY=1)
+	if ((Device->Height)>(Device->Width)){		//Resolution = 320x240
+		Private->MADCtl = (1 << 7);				// 0x80 = default (no Rotation an no Flip)
+		if (HFlip) {							//Flip Horizontal
+			int a = Private->MADCtl;
+			Private->MADCtl = (a ^ (1 << 7));
+		}
+		if (Rotate) {							//Rotate 180 degr.
+			int a = Private->MADCtl;
+			a = (a ^ (1 << 7));
+			Private->MADCtl = (a ^ (1 << 6));
+		}
+		if (VFlip) {							//Flip Vertical
+			int a = Private->MADCtl;
+			Private->MADCtl = (a ^ (1 << 6));
+		}
+	} else {									//Resolution = 240x320
+		Private->MADCtl = (1 << 5);				// 0x20 = default (no Rotation an no Flip)
+		if (HFlip) {							//Flip Horizontal
+			int a = Private->MADCtl;
+			Private->MADCtl = (a ^ (1 << 6));
+		}
+		if (Rotate) {							//Rotate 180 degr.
+			int a = Private->MADCtl;
+			a = (a ^ (1 << 7));
+			Private->MADCtl = (a ^ (1 << 6));
+		}
+		if (VFlip) {							//Flip Vertical
+			int a = Private->MADCtl;
+			Private->MADCtl = (a ^ (1 << 7));
+		}
+	}
+
+	/*//----- Or Rotation: -----
+	Private->MADCtl = 0x80;				//Orientation 0 degree
+	if (HFlip) {						//Orientation 90 degree
+		Private->MADCtl = 0x20;
+		int a = Device->Height;
+		int b = Device->Width;
+		Device->Height = b;
+		Device->Width = a;
+	}
+	if (Rotate) {						//Orientation 180 degree
+		Private->MADCtl = 0x40;
+	}
+	if (VFlip) {						//Orientation 270 degree
+		Private->MADCtl = 0xE0;
+		int a = Device->Height;
+		int b = Device->Width;
+		Device->Height = b;
+		Device->Width = a;
+	}
+	*/
+
+	ESP_LOGI(TAG, "SetLayout 255 Private->MADCtl=%hhu", Private->MADCtl);
+
+	Device->WriteCommand( Device, 0x36 );
+	WriteByte( Device, Private->MADCtl );
+
+#ifdef SHADOW_BUFFER
+	// force a full refresh (almost ...)
+	memset(Private->Shadowbuffer, 0xAA, Device->FramebufferSize);
+#endif	
 }	
 
-static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, L1_CMD_DISPLAY_ON ); }
-static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, L1_CMD_DISPLAY_OFF ); }
+static void DisplayOn( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0x29 ); }	//DISPON =0x29
+static void DisplayOff( struct GDS_Device* Device ) { Device->WriteCommand( Device, 0x28 ); }	//DISPOFF=0x28
 
 static void SetContrast( struct GDS_Device* Device, uint8_t Contrast ) {
-    Device->WriteCommand( Device, L1_CMD_WRITE_DISPLAY_BRIGHTNESS );
-    uint8_t loc_contrast =  (uint8_t)((float)Contrast/5.0f*  255.0f);
-    Device->WriteData( Device, &loc_contrast , 1 );
-    WriteDataByte(Device,0x00);
+	Device->WriteCommand( Device, 0x51 );
+	WriteByte( Device, Contrast );
+	
+	Device->SetContrast = NULL;
+	GDS_SetContrast( Device, Contrast );
+	Device->SetContrast = SetContrast;	// 0x00 value means the lowest brightness and 0xFF value means the highest brightness.
 }
 
 static bool Init( struct GDS_Device* Device ) {
 	struct PrivateSpace *Private = (struct PrivateSpace*) Device->Private;
+	int Depth = (Device->Depth + 8 - 1) / 8;
 	
+	Private->PageSize = min(8, PAGE_BLOCK / (Device->Width * Depth));
 
-//	Private->Offset = (480 - Device->Width) / 4 / 2;
-	
-	// find a page size that is not too small is an integer of height
-	Private->PageSize = min(8, PAGE_BLOCK / (Device->Width / 2));
-	Private->PageSize = Device->Height / (Device->Height / Private->PageSize) ;
-	
 #ifdef SHADOW_BUFFER	
-//	Private->Shadowbuffer = malloc( Device->FramebufferSize );
-//	memset(Private->Shadowbuffer, 0xFF, Device->FramebufferSize);
+	Private->Shadowbuffer = malloc( Device->FramebufferSize );	
+	memset(Private->Shadowbuffer, 0xFF, Device->FramebufferSize);
 #endif
-	Private->iRAM =NULL;
-	//Private->iRAM =heap_caps_malloc(320*PARALLEL_LINES*sizeof(uint16_t), MALLOC_CAP_DMA);
+#ifdef USE_IRAM
+	Private->iRAM = heap_caps_malloc( (Private->PageSize + 1) * Device->Width * Depth, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA );
+#endif
 
-
-	//ESP_LOGI(TAG, "ILI9341 with offset %u, page %u, iRAM %p", Private->Offset, Private->PageSize, Private->iRAM);
-	ESP_LOGI(TAG, "ILI9341 ");
-
-	// need to be off and disable display RAM
-	Device->DisplayOff( Device );
-	int cmd=0;
-	//Send all the commands
-	while (ili_init_cmds[cmd].databytes!=0xff) {
-		Device->WriteCommand( Device, ili_init_cmds[cmd].cmd );
-		Device->WriteData(Device,ili_init_cmds[cmd].data,ili_init_cmds[cmd].databytes&0x1F);
-		if (ili_init_cmds[cmd].databytes&0x80) {
-			vTaskDelay(100 / portTICK_RATE_MS);
-		}
-		cmd++;
-	}
+	ESP_LOGI(TAG, "ILI9341 with bit default-depth %u, page %u, iRAM %p", Device->Depth, Private->PageSize, Private->iRAM);
 	
+	// Sleepout + Booster
+	Device->WriteCommand( Device, 0x11 );
+		
+	// need BGR & Address Mode
+	//Private->MADCtl = 1 << 3;		// for ST77xx = 0x40
+	//Private->MADCtl = 1 << 7;		// for ILI9341 = 0x80 (320x240) or 0x20 (240x320)
+	//Device->WriteCommand( Device, 0x36 );
+	//WriteByte( Device, Private->MADCtl );	
+		
+	// set flip modes & contrast
+	GDS_SetContrast( Device, 0x7f );
+	Device->SetLayout( Device, false, false, false );
+	
+	// set screen depth (16/18) *** INTERFACE PIXEL FORMAT: 0x66=18 bit; 0x55=16 bit
+	Device->WriteCommand( Device, 0x3A );
+	if (Private->Model == ILI9341_24) WriteByte( Device, Device->Depth == 24 ? 0x66 : 0x55 );
+	else WriteByte( Device, Device->Depth == 24 ? 0x66 : 0x55 );
+
+	ESP_LOGI(TAG, "ILI9341_Init 312 device-depth %u, 0x66/0x55=0x%X", Device->Depth, Device->Depth == 24 ? 0x66 : 0x55);
+
+	// no Display Inversion (INVOFF=0x20 INVON=0x21)
+	Device->WriteCommand( Device, 0x20 );
+
+	//Gamma Correction: Enable next two line and enabel one of the Test0x Section... or build you own 15 Parameter...
+	Device->WriteCommand( Device, 0xF2 ); WriteByte( Device, 0x03 );	// 3Gamma Function: Disable = default (0x02), Enable (0x03)
+	Device->WriteCommand( Device, 0x26 ); WriteByte( Device, 0x01 );	// Gamma curve selected (0x01, 0x02, 0x04, 0x08) - A maximum of 4 fixed gamma curves can be selected
+	//Gamma Correction Test01
+	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x2B ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x0E );
+	 WriteByte( Device, 0x08 ); WriteByte( Device, 0x4E ); WriteByte( Device, 0xF1 ); WriteByte( Device, 0x37 ); WriteByte( Device, 0x07 );
+	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x09 ); WriteByte( Device, 0x00 );
+	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x14 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x11 );
+	 WriteByte( Device, 0x07 ); WriteByte( Device, 0x31 ); WriteByte( Device, 0xC1 ); WriteByte( Device, 0x48 ); WriteByte( Device, 0x08 );
+	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x36 ); WriteByte( Device, 0x0F );
+	 
+	/*//Gamma Correction Test02
+	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x1F ); WriteByte( Device, 0x1A ); WriteByte( Device, 0x18 ); WriteByte( Device, 0x0A ); WriteByte( Device, 0x0F );
+	 WriteByte( Device, 0x06 ); WriteByte( Device, 0x45 ); WriteByte( Device, 0x87 ); WriteByte( Device, 0x32 ); WriteByte( Device, 0x0a );
+	 WriteByte( Device, 0x07 ); WriteByte( Device, 0x02 ); WriteByte( Device, 0x07 ); WriteByte( Device, 0x05 ); WriteByte( Device, 0x00 );
+	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x25 ); WriteByte( Device, 0x27 ); WriteByte( Device, 0x05 ); WriteByte( Device, 0x10 );
+	 WriteByte( Device, 0x09 ); WriteByte( Device, 0x3a ); WriteByte( Device, 0x78 ); WriteByte( Device, 0x4d ); WriteByte( Device, 0x05 );
+	 WriteByte( Device, 0x18 ); WriteByte( Device, 0x0d ); WriteByte( Device, 0x38 ); WriteByte( Device, 0x3a ); WriteByte( Device, 0x1F );
+	 */
+	/*//Gamma Correction Test03
+	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x3F ); WriteByte( Device, 0x2F ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x10 );
+	 WriteByte( Device, 0x0A ); WriteByte( Device, 0x53 ); WriteByte( Device, 0xD5 ); WriteByte( Device, 0x40 ); WriteByte( Device, 0x0A );
+	 WriteByte( Device, 0x13 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x08 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x00 );
+	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x00 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x0F );
+	 WriteByte( Device, 0x05 ); WriteByte( Device, 0x2C ); WriteByte( Device, 0xA2 ); WriteByte( Device, 0x3F ); WriteByte( Device, 0x05 );
+	 WriteByte( Device, 0x0E ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x37 ); WriteByte( Device, 0x3c ); WriteByte( Device, 0x0F );
+	 */
+	/*//Gamma Correction Test04 (no real values... only to test, that Gamme Correction works... you see very light cover-images)
+	 Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
+	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
+	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
+	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
+	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
+	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
+	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
+	 */
+
 	// gone with the wind
 	Device->DisplayOn( Device );
 	Device->Update( Device );
-	
+
 	return true;
 }	
 
-static const struct GDS_Device ILI9341 = {
-	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff, .SetContrast = SetContrast,
+static const struct GDS_Device ILI9341_X = {
+	.DisplayOn = DisplayOn, .DisplayOff = DisplayOff,
 	.SetLayout = SetLayout,
-	.Update = Update, .Init = Init,
-};	
+	.Update = Update16, .Init = Init,
+	.Mode = GDS_RGB565, .Depth = 16,
+};		
 
 struct GDS_Device* ILI9341_Detect(char *Driver, struct GDS_Device* Device) {
-	if (!strcasestr(Driver, "ILI9341")) return NULL;
+	uint8_t Model;
+	//int Depth=18;		// 18bit (=24bit) colordepth
+	int Depth=16;		// 16bit colordepth
+	
+	if (strcasestr(Driver, "ILI9341")) Model = ILI9341;
+	else if (strcasestr(Driver, "ILI9341_24")) Model = ILI9341_24;	//for future use...
+	else return NULL;
+	//ESP_LOGI(TAG, "ILI9341_Detect 383 Model=%hhu (0=ILI9341, 1=ILI9341_24) and Depth=%d", Model,Depth);
 		
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
-	
-	*Device = ILI9341;
-	Device->Depth = 4;
 		
+	*Device = ILI9341_X;	
+	sscanf(Driver, "%*[^:]:%u", &Depth);		// NVS-Parameter driver=ILI9341[:16|18]
+	struct PrivateSpace* Private = (struct PrivateSpace*) Device->Private;
+	Private->Model = Model;
+		ESP_LOGI(TAG, "ILI9341_Detect 391 Driver= %s   Depth=%d", Driver, Depth);
+
+	if (Depth == 18) {
+		Device->Mode = GDS_RGB888;
+		Device->Depth = 24;
+		Device->Update = Update24;
+	} 	
+	
+	if (Model == ILI9341_24) Device->SetContrast = SetContrast;
+
 	return Device;
 }
-
-
