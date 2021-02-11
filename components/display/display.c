@@ -85,7 +85,7 @@ void display_init(char *welcome) {
 	} else {
 		display = GDS_AutoDetect(drivername, drivers, NULL);
 	}
-	
+
 	// so far so good
 	if (display && width > 0 && height > 0) {
 		int RST_pin = -1;

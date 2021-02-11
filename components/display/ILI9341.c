@@ -231,27 +231,6 @@ static void SetLayout( struct GDS_Device* Device, bool HFlip, bool VFlip, bool R
 		}
 	}
 
-	/*//----- Or Rotation: -----
-	Private->MADCtl = 0x80;				//Orientation 0 degree
-	if (HFlip) {						//Orientation 90 degree
-		Private->MADCtl = 0x20;
-		int a = Device->Height;
-		int b = Device->Width;
-		Device->Height = b;
-		Device->Width = a;
-	}
-	if (Rotate) {						//Orientation 180 degree
-		Private->MADCtl = 0x40;
-	}
-	if (VFlip) {						//Orientation 270 degree
-		Private->MADCtl = 0xE0;
-		int a = Device->Height;
-		int b = Device->Width;
-		Device->Height = b;
-		Device->Width = a;
-	}
-	*/
-
 	ESP_LOGI(TAG, "SetLayout 255 Private->MADCtl=%hhu", Private->MADCtl);
 
 	Device->WriteCommand( Device, 0x36 );
@@ -293,13 +272,7 @@ static bool Init( struct GDS_Device* Device ) {
 	
 	// Sleepout + Booster
 	Device->WriteCommand( Device, 0x11 );
-		
-	// need BGR & Address Mode
-	//Private->MADCtl = 1 << 3;		// for ST77xx = 0x40
-	//Private->MADCtl = 1 << 7;		// for ILI9341 = 0x80 (320x240) or 0x20 (240x320)
-	//Device->WriteCommand( Device, 0x36 );
-	//WriteByte( Device, Private->MADCtl );	
-		
+			
 	// set flip modes & contrast
 	GDS_SetContrast( Device, 0x7f );
 	Device->SetLayout( Device, false, false, false );
@@ -319,45 +292,14 @@ static bool Init( struct GDS_Device* Device ) {
 	Device->WriteCommand( Device, 0x26 ); WriteByte( Device, 0x01 );	// Gamma curve selected (0x01, 0x02, 0x04, 0x08) - A maximum of 4 fixed gamma curves can be selected
 	//Gamma Correction Test01
 	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x2B ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x0E );
-	 WriteByte( Device, 0x08 ); WriteByte( Device, 0x4E ); WriteByte( Device, 0xF1 ); WriteByte( Device, 0x37 ); WriteByte( Device, 0x07 );
-	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x09 ); WriteByte( Device, 0x00 );
+	WriteByte( Device, 0x0F ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x2B ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x0E );
+	WriteByte( Device, 0x08 ); WriteByte( Device, 0x4E ); WriteByte( Device, 0xF1 ); WriteByte( Device, 0x37 ); WriteByte( Device, 0x07 );
+	WriteByte( Device, 0x10 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x09 ); WriteByte( Device, 0x00 );
 	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x14 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x11 );
-	 WriteByte( Device, 0x07 ); WriteByte( Device, 0x31 ); WriteByte( Device, 0xC1 ); WriteByte( Device, 0x48 ); WriteByte( Device, 0x08 );
-	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x36 ); WriteByte( Device, 0x0F );
+	WriteByte( Device, 0x00 ); WriteByte( Device, 0x0E ); WriteByte( Device, 0x14 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x11 );
+	WriteByte( Device, 0x07 ); WriteByte( Device, 0x31 ); WriteByte( Device, 0xC1 ); WriteByte( Device, 0x48 ); WriteByte( Device, 0x08 );
+	WriteByte( Device, 0x0F ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x31 ); WriteByte( Device, 0x36 ); WriteByte( Device, 0x0F );
 	 
-	/*//Gamma Correction Test02
-	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x1F ); WriteByte( Device, 0x1A ); WriteByte( Device, 0x18 ); WriteByte( Device, 0x0A ); WriteByte( Device, 0x0F );
-	 WriteByte( Device, 0x06 ); WriteByte( Device, 0x45 ); WriteByte( Device, 0x87 ); WriteByte( Device, 0x32 ); WriteByte( Device, 0x0a );
-	 WriteByte( Device, 0x07 ); WriteByte( Device, 0x02 ); WriteByte( Device, 0x07 ); WriteByte( Device, 0x05 ); WriteByte( Device, 0x00 );
-	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x25 ); WriteByte( Device, 0x27 ); WriteByte( Device, 0x05 ); WriteByte( Device, 0x10 );
-	 WriteByte( Device, 0x09 ); WriteByte( Device, 0x3a ); WriteByte( Device, 0x78 ); WriteByte( Device, 0x4d ); WriteByte( Device, 0x05 );
-	 WriteByte( Device, 0x18 ); WriteByte( Device, 0x0d ); WriteByte( Device, 0x38 ); WriteByte( Device, 0x3a ); WriteByte( Device, 0x1F );
-	 */
-	/*//Gamma Correction Test03
-	Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x0F ); WriteByte( Device, 0x3F ); WriteByte( Device, 0x2F ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x10 );
-	 WriteByte( Device, 0x0A ); WriteByte( Device, 0x53 ); WriteByte( Device, 0xD5 ); WriteByte( Device, 0x40 ); WriteByte( Device, 0x0A );
-	 WriteByte( Device, 0x13 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x08 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x00 );
-	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x00 ); WriteByte( Device, 0x00 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x03 ); WriteByte( Device, 0x0F );
-	 WriteByte( Device, 0x05 ); WriteByte( Device, 0x2C ); WriteByte( Device, 0xA2 ); WriteByte( Device, 0x3F ); WriteByte( Device, 0x05 );
-	 WriteByte( Device, 0x0E ); WriteByte( Device, 0x0C ); WriteByte( Device, 0x37 ); WriteByte( Device, 0x3c ); WriteByte( Device, 0x0F );
-	 */
-	/*//Gamma Correction Test04 (no real values... only to test, that Gamme Correction works... you see very light cover-images)
-	 Device->WriteCommand( Device, 0xE0 );								// Positive Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
-	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
-	 WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 ); WriteByte( Device, 0x22 );
-	Device->WriteCommand( Device, 0xE1 ); 								// Negative Gamma Correction (15 Parameter)
-	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
-	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
-	 WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 ); WriteByte( Device, 0x10 );
-	 */
-
 	// gone with the wind
 	Device->DisplayOn( Device );
 	Device->Update( Device );
@@ -374,13 +316,11 @@ static const struct GDS_Device ILI9341_X = {
 
 struct GDS_Device* ILI9341_Detect(char *Driver, struct GDS_Device* Device) {
 	uint8_t Model;
-	//int Depth=18;		// 18bit (=24bit) colordepth
 	int Depth=16;		// 16bit colordepth
 	
 	if (strcasestr(Driver, "ILI9341")) Model = ILI9341;
 	else if (strcasestr(Driver, "ILI9341_24")) Model = ILI9341_24;	//for future use...
 	else return NULL;
-	//ESP_LOGI(TAG, "ILI9341_Detect 383 Model=%hhu (0=ILI9341, 1=ILI9341_24) and Depth=%d", Model,Depth);
 		
 	if (!Device) Device = calloc(1, sizeof(struct GDS_Device));
 		
