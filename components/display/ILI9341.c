@@ -21,7 +21,6 @@
 #define USE_IRAM
 #define PAGE_BLOCK		2048
 #define ENABLE_WRITE	0x2c
-//(MADCTL_MX | TFT_RGB_BGR)
 #define MADCTL_MX  0x40
 #define TFT_RGB_BGR  0x08
 
