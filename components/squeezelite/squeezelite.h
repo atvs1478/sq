@@ -472,7 +472,7 @@ void _wake_create(event_event*);
 #define MAX_SILENCE_FRAMES 2048
 
 #define FIXED_ONE 	0x10000
-#define COPY_MONO	(FIXED_ONE + 1)
+#define MONO_FLAG	0x20000
 
 #ifndef BYTES_PER_FRAME
 #define BYTES_PER_FRAME 8
