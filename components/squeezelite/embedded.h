@@ -42,7 +42,7 @@ typedef unsigned long long u64_t;
 #define PLAYER_ID custom_player_id
 extern u8_t custom_player_id;
 
-#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=" VERSION
+#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION
 // to force some special buffer attribute
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 
