@@ -76,12 +76,14 @@ sub handler {
 
 		}
 
-		my $equalizer = $cprefs->get('equalizer');
-		for my $i (0 .. $#{$equalizer}) {
-			$equalizer->[$i] = $paramRef->{"pref_equalizer.$i"} || 0;
-		}
-		$cprefs->set('equalizer', $equalizer);
-		$client->update_tones($equalizer);
+		if ($client->depth == 16) {
+			my $equalizer = $cprefs->get('equalizer');
+			for my $i (0 .. $#{$equalizer}) {
+				$equalizer->[$i] = $paramRef->{"pref_equalizer.$i"} || 0;
+			}
+			$cprefs->set('equalizer', $equalizer);
+			$client->update_tones($equalizer);
+		}		
 	}
 
 	if ($client->displayWidth) {
@@ -91,7 +93,7 @@ sub handler {
 		$paramRef->{'pref_artwork'} = $cprefs->get('artwork');
 	}
 
-	$paramRef->{'pref_equalizer'} = $cprefs->get('equalizer');
+	$paramRef->{'pref_equalizer'} = $cprefs->get('equalizer') if $client->depth == 16;
 
 	return $class->SUPER::handler($client, $paramRef);
 }

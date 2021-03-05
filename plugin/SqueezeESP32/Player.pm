@@ -14,7 +14,7 @@ my $prefs = preferences('plugin.squeezeesp32');
 my $log   = logger('plugin.squeezeesp32');
 
 {
-	__PACKAGE__->mk_accessor('rw', 'tone_update');
+	__PACKAGE__->mk_accessor('rw', qw(tone_update depth));
 }
 
 sub new {
@@ -64,6 +64,10 @@ sub minBass { -13 }
 
 sub init {
 	my $client = shift;
+	my ($id, $caps) = @_;
+	
+	my ($depth) = $caps =~ /Depth=(\d+)/;
+	$client->depth($depth || 16);
 	
 	if (!$handlersAdded) {
 	
