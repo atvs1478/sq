@@ -23,6 +23,18 @@ Other features include
  - Full web interface for further configuration/management
  - Firmware over-the-air update 
 
+**Important note** (philippe44 writing)
+
+The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode by changing the cmake file in components/squeezelite. Note the following limitation in 32 bits
+
+- no resampling
+- no equalizer
+- buffer are smaller, so crossfade will be at best 5s at 44.1 kHz
+- SPDIF remains 16 bits
+- display will be slower
+
+I've not tested all codecs, I've only verified it with TAS57xx DAC and in general I've not tested that mode more than a few minutes. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). On memory Some might correctly comment that wrover module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that.
+
 ## Supported Hardware
 Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below, but any should work. You can find various help & instructions [here](https://forums.slimdevices.com/showthread.php?112697-ANNOUNCE-Squeezelite-ESP32-(dedicated-thread))
 ### Raw WROVER module
