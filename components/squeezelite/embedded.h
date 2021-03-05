@@ -22,7 +22,7 @@ typedef int16_t   s16_t;
 typedef int32_t   s32_t;
 typedef int64_t   s64_t;
 typedef unsigned long long u64_t;
-	
+
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN	256
 #endif
@@ -42,7 +42,12 @@ typedef unsigned long long u64_t;
 #define PLAYER_ID custom_player_id
 extern u8_t custom_player_id;
 
-#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION
+#if BYTES_PER_FRAME == 8
+#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Depth=32,Firmware=" VERSION 
+#else
+#define BASE_CAP "Model=squeezeesp32,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Depth=16,Firmware=" VERSION 
+#endif
+
 // to force some special buffer attribute
 #define EXT_BSS __attribute__((section(".ext_ram.bss"))) 
 
@@ -78,10 +83,10 @@ u8_t	get_battery(void);		// must provide 0..15 or define as 0x0
 extern struct visu_export_s {
 	pthread_mutex_t mutex;
 	u32_t level, size, rate, gain;
-	s16_t *buffer;
+	void *buffer;
 	bool running;
 } visu_export;
-void 		output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain);
+void 		output_visu_export(void *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain);
 void 		output_visu_init(log_level level);
 void 		output_visu_close(void);
 

@@ -23,14 +23,8 @@
 
 #include "squeezelite.h"
 
-#if BYTES_PER_FRAM == 4
-#define MAX_VAL16 0x7fffffffLL
 #define MAX_SCALESAMPLE 0x7fffffffffffLL
 #define MIN_SCALESAMPLE -MAX_SCALESAMPLE
-#else
-#define MAX_SCALESAMPLE 0x7fffffffffffLL
-#define MIN_SCALESAMPLE -MAX_SCALESAMPLE
-#endif
 
 // inlining these on windows prevents them being linkable...
 #if !WIN

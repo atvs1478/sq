@@ -29,7 +29,7 @@ static struct visu_export_s *visu = &visu_export;
 
 static log_level loglevel = lINFO;
 
-void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain) {
+void output_visu_export(void *frames, frames_t out_frames, u32_t rate, bool silence, u32_t gain) {
 	
 	// no data to process
 	if (silence) {
@@ -44,10 +44,10 @@ void output_visu_export(s16_t *frames, frames_t out_frames, u32_t rate, bool sil
 		
 		// stuff buffer up and wait for consumer to read it (should reset level)
 		if (visu->level < visu->size) {
-			u32_t space = min(visu->size - visu->level, out_frames * 2) * 2;
+			u32_t space = min(visu->size - visu->level, out_frames) * BYTES_PER_FRAME;
 			memcpy(visu->buffer + visu->level, frames, space);
 			
-			visu->level += space / 2;
+			visu->level += space / BYTES_PER_FRAME;
 			visu->running = true;
 			visu->rate = rate ? rate : 44100;
 			visu->gain = gain;
@@ -71,7 +71,7 @@ void output_visu_init(log_level level) {
 	visu->size = VISUEXPORT_SIZE;
 	visu->running = false;
 	visu->rate = 44100;
-	visu->buffer = malloc(VISUEXPORT_SIZE * sizeof(s16_t) * 2);
-	LOG_INFO("Initialize VISUEXPORT %u 16 bits samples", VISUEXPORT_SIZE);
+	visu->buffer = malloc(VISUEXPORT_SIZE * BYTES_PER_FRAME);
+	LOG_INFO("Initialize VISUEXPORT %u %u bits samples", VISUEXPORT_SIZE, BYTES_PER_FRAME * 4);
 }
 

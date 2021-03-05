@@ -400,42 +400,18 @@ bool output_volume_i2s(unsigned left, unsigned right) {
  */
 static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr) {
-#if BYTES_PER_FRAME == 8									
-	s32_t *optr;
-#endif	
-	
 	if (!silence) {
 		if (output.fade == FADE_ACTIVE && output.fade_dir == FADE_CROSS && *cross_ptr) {
 			_apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
 		}
 		
-#if BYTES_PER_FRAME == 4
 		_apply_gain(outputbuf, out_frames, gainL, gainR);
 		memcpy(obuf + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
-#else
-		optr = (s32_t*) outputbuf->readp;	
-#endif		
 	} else {
-#if BYTES_PER_FRAME == 4		
 		memcpy(obuf + oframes * BYTES_PER_FRAME, silencebuf, out_frames * BYTES_PER_FRAME);
-#else		
-		optr = (s32_t*) silencebuf;
-#endif	
 	}
 
-#if BYTES_PER_FRAME == 8
-	IF_DSD(
-	if (output.outfmt == DOP) {
-			update_dop((u32_t *) optr, out_frames, output.invert);
-		} else if (output.outfmt != PCM && output.invert)
-			dsd_invert((u32_t *) optr, out_frames);
-	)
-
-	_scale_and_pack_frames(obuf + oframes * BYTES_PER_FRAME, optr, out_frames, gainL, gainR, output.format);
-#endif	
-
-	output_visu_export((s16_t*) (obuf + oframes * BYTES_PER_FRAME), out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
-
+	output_visu_export(obuf + oframes * BYTES_PER_FRAME, out_frames, output.current_sample_rate, silence, ((gainL & ~MONO_FLAG) + (gainR & ~MONO_FLAG)) / 2);
 	oframes += out_frames;
 	
 	return out_frames;
@@ -556,8 +532,10 @@ static void *output_thread_i2s(void *arg) {
 			//return;
 		}
 		
+#if BYTES_PER_FRAME == 4		
 		// run equalizer
 		equalizer_process(obuf, oframes * BYTES_PER_FRAME, output.current_sample_rate);
+#endif		
 		
 		// we assume that here we have been able to entirely fill the DMA buffers
 		if (spdif) {

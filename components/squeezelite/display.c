@@ -853,8 +853,8 @@ static void visu_update(void) {
 	
 	int mode = visu.mode & ~VISU_ESP32;
 				
-	// not enough samples
-	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) * 2 && visu_export.running) {
+	// not enough frames
+	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) && visu_export.running) {
 		pthread_mutex_unlock(&visu_export.mutex);
 		return;
 	}
@@ -865,14 +865,14 @@ static void visu_update(void) {
 	if (visu_export.running) {
 					
 		if (mode == VISU_VUMETER) {
-			s16_t *iptr = visu_export.buffer;
+			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
 			
 			// calculate sum(L²+R²), try to not overflow at the expense of some precision
 			for (int i = RMS_LEN; --i >= 0;) {
 				visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr++;
+				iptr += BYTES_PER_FRAME / 4;
 				visu.bars[1].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr++;
+				iptr += BYTES_PER_FRAME / 4;
 			}	
 		
 			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
@@ -882,11 +882,13 @@ static void visu_update(void) {
 				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
 			}
 		} else {
+			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
 			// on xtensa/esp32 the floating point FFT takes 1/2 cycles of the fixed point
 			for (int i = 0 ; i < FFT_LEN ; i++) {
 				// don't normalize here, but we are due INT16_MAX and FFT_LEN / 2 / 2
-				visu.samples[i * 2 + 0] = (float) (visu_export.buffer[2*i] + visu_export.buffer[2*i + 1]) * visu.hanning[i];
+				visu.samples[i * 2 + 0] = (float) (*iptr + *(iptr+BYTES_PER_FRAME/4)) * visu.hanning[i];
 				visu.samples[i * 2 + 1] = 0;
+				iptr += 2 * BYTES_PER_FRAME / 4;
 			}
 
 			// actual FFT that might be less cycle than all the crap below		
