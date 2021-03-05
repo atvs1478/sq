@@ -97,3 +97,4 @@ components/wifi-manager/res/backup/
 test/.vscode/
 
 node_modules/*
+esp-dsp/
