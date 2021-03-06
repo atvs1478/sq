@@ -453,7 +453,7 @@ void stream_file(const char *header, size_t header_len, unsigned threshold) {
 	buf_flush(streambuf);
 
 	LOCK;
-	
+
 	stream.header_len = header_len;
 	memcpy(stream.header, header, header_len);
 	*(stream.header+header_len) = '\0';
@@ -492,7 +492,7 @@ void stream_sock(u32_t ip, u16_t port, const char *header, size_t header_len, un
 	// wait till we are not polling anymore
 	while (polling && running) { usleep(10000);	}	
 #endif	
-	
+
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (sock < 0) {

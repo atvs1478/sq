@@ -253,7 +253,7 @@ frames_t _output_frames(frames_t avail) {
 		}
 		
 		out_frames = !silence ? min(size, cont_frames) : size;
-		
+
 		if (output.channels & 0x01) gainR |= MONO_FLAG;
 		if (output.channels & 0x02) gainL |= MONO_FLAG;
 

@@ -541,7 +541,7 @@ static void *output_thread_i2s(void *arg) {
 		if (spdif) {
 			spdif_convert((ISAMPLE_T*) obuf, oframes, (u32_t*) sbuf, &count);
 			i2s_write(CONFIG_I2S_NUM, sbuf, oframes * 16, &bytes, portMAX_DELAY);
-			bytes /= 4;
+			bytes /= 16 / BYTES_PER_FRAME;
 #if BYTES_PER_FRAME == 4		
 		} else if (i2s_config.bits_per_sample == 32) {  
 			i2s_write_expand(CONFIG_I2S_NUM, obuf, oframes * BYTES_PER_FRAME, 16, 32, &bytes, portMAX_DELAY);
@@ -621,8 +621,9 @@ extern const u16_t spdif_bmclookup[256];
 */
 void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count) {
 	u16_t hi, lo, aux;
+	register size_t cnt = *count;
 	
-	// frames are 2 channels of 16 bits
+	// frames are 2 channels of 16/32 bits
 	frames *= 2;
 
 	while (frames--) {
@@ -631,28 +632,38 @@ void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count) {
 		lo  = spdif_bmclookup[(u8_t) *src];
 #else
 		hi  = spdif_bmclookup[(u8_t)(*src >> 24)];
-		lo  = spdif_bmclookup[(u8_t) *src >> 16];
+		lo  = spdif_bmclookup[(u8_t)(*src >> 16)];
 #endif	
+		// invert if last preceeding bit is 1
 		lo ^= ~((s16_t)hi) >> 16;
 
-		// 16 bits sample:
+		// first 16 bits
 		*(dst+0) = ((u32_t)lo << 16) | hi;
 
 		// 4 bits auxillary-audio-databits, the first used as parity
+#if BYTES_PER_FRAME == 4
 		aux = 0xb333 ^ (((u32_t)((s16_t)lo)) >> 17);
+#else 
+		// we use 20 bits samples as we need to force parity
+		aux = spdif_bmclookup[(u8_t)(*src >> 12)];
+		aux = (u8_t) (aux ^ (~((s16_t)lo) >> 16));
+		aux |= (0xb3 ^ (((u16_t)((s8_t)aux)) >> 9)) << 8;
+#endif
 
 		// VUCP-Bits: Valid, Subcode, Channelstatus, Parity = 0
 		// As parity is always 0, we can use fixed preambles
-		if (++(*count) > 383) {
+		if (++cnt > 383) {
 			*(dst+1) =  VUCP | (PREAMBLE_B << 16 ) | aux; //special preamble for one of 192 frames
-			*count = 0;
+			cnt = 0;
 		} else {
-			*(dst+1) = VUCP | ((((*count) & 0x01) ? PREAMBLE_W : PREAMBLE_M) << 16) | aux;
+			*(dst+1) = VUCP | (((cnt & 0x01) ? PREAMBLE_W : PREAMBLE_M) << 16) | aux;
 		}
 		
 		src++;
 		dst += 2;
 	}
+	
+	*count = cnt;
 }
 
 const u16_t spdif_bmclookup[256] = { //biphase mark encoded values (least significant bit first)
