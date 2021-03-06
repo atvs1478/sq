@@ -30,7 +30,7 @@ The main build of squeezelite-esp32 is a 16 bits internal core with all calculat
 - no resampling
 - no equalizer
 - buffer are smaller, so crossfade will be at best 5s at 44.1 kHz
-- SPDIF is 20 bits maximum(1)
+- SPDIF is 20 bits maximum *(1)*
 - display will be slower
 
 I've not tested all codecs, I've only verified it with TAS57xx DAC and in general I've not tested that mode more than a few minutes. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). On memory Some might correctly comment that wrover module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that.
