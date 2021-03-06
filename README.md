@@ -30,7 +30,7 @@ The main build of squeezelite-esp32 is a 16 bits internal core with all calculat
 - no resampling
 - no equalizer
 - buffer are smaller, so crossfade will be at best 5s at 44.1 kHz
-- SPDIF remains 16 bits
+- SPDIF is 20 bits maximum(1)
 - display will be slower
 
 I've not tested all codecs, I've only verified it with TAS57xx DAC and in general I've not tested that mode more than a few minutes. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). On memory Some might correctly comment that wrover module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that.
@@ -482,3 +482,6 @@ Use 'idf monitor' to monitor the application (see esp-idf documentation)
 	- add DEPS_CFLAGS and DEPS_LIBS to avoid pkg-config to be required
 	- stack consumption can be very high with some codec variants, so set NONTHREADSAFE_PSEUDOSTACK and GLOBAL_STACK_SIZE=32000 and unset VAR_ARRAYS in config.h
 - libmad has been patched to avoid using a lot of stack and is not provided here. There is an issue with sync detection in 1.15.1b from where the original stack patch was done but since a few fixes have been made wrt sync detection. This 1.15.1b-10 found on debian fixes the issue where mad thinks it has reached sync but has not and so returns a wrong sample rate. It comes at the expense of 8KB (!) of code where a simple check in squeezelite/mad.c that next_frame[0] is 0xff and next_frame[1] & 0xf0 is 0xf0 does the trick ...
+
+# footnotes
+(1) SPDIF is made by tricking the I2S bus but this consumes a fair bit of CPU as it multiplies by four the throughput on the i2s bus. To optimize some computation, the parity of the spdif frames must always be 0, so at least one bit has to be available to force it. As SPDIF samples are 20+4 bits length maximum, the LSB is used for that purpose, so the bit 24 is randomly toggling. It does not matter for 16 bits samples but it has been chosen to truncate the last 4 bits for 24 bits samples.
