@@ -31,7 +31,9 @@ extern log_level loglevel;
 static bool enable_bt_sink;
 static bool enable_airplay;
 
-#define RAOP_OUTPUT_SIZE 	(RAOP_SAMPLE_RATE * 2 * 2 * 2 * 1.2)
+static unsigned bt_volume;
+
+#define RAOP_OUTPUT_SIZE (((RAOP_SAMPLE_RATE * BYTES_PER_FRAME * 2 * 120) / 100) & ~BYTES_PER_FRAME)
 #define SYNC_WIN_SLOW	32
 #define SYNC_WIN_CHECK	8
 #define SYNC_WIN_FAST	2
@@ -63,19 +65,19 @@ static void sink_data_handler(const uint8_t *data, uint32_t len)
 	while (len) {
 		LOCK_O;
 
-		bytes = min(_buf_space(outputbuf), _buf_cont_write(outputbuf));
+		bytes = min(_buf_space(outputbuf), _buf_cont_write(outputbuf)) / (BYTES_PER_FRAME / 4);
 		bytes = min(len, bytes);
 #if BYTES_PER_FRAME == 4
 		memcpy(outputbuf->writep, data, bytes);
 #else
 		{
 			s16_t *iptr = (s16_t*) data;
-			ISAMPLE_T *optr = (ISAMPLE_T*) outputbuf->writep;
-			size_t n = bytes / BYTES_PER_FRAME * 2;
+			ISAMPLE_T *optr = (ISAMPLE_T *) outputbuf->writep;
+			size_t n = bytes / 2;
 			while (n--) *optr++ = *iptr++ << 16;
 		}
 #endif	
-		_buf_inc_writep(outputbuf, bytes);
+		_buf_inc_writep(outputbuf, bytes * BYTES_PER_FRAME / 4);
 		space = _buf_space(outputbuf);
 		
 		len -= bytes;
@@ -106,10 +108,12 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 
 	LOCK_D;
 
-	if (cmd != BT_SINK_VOLUME) LOCK_O;
+	if (cmd != BT_SINK_VOLUME && cmd != BT_SINK_AUDIO_STARTED) LOCK_O;
 		
 	switch(cmd) {
 	case BT_SINK_AUDIO_STARTED:
+		if (output.external != DECODE_BT) set_volume(bt_volume, bt_volume);
+		LOCK_O;
 		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
 		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
@@ -147,6 +151,7 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		u32_t volume = va_arg(args, u32_t);
 		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
+		bt_volume = volume;
 		break;
 	default:
 		break;
@@ -188,7 +193,6 @@ static bool raop_sink_cmd_handler(raop_event_t event, va_list args)
 	// this is async, so player might have been deleted
 	switch (event) {
 		case RAOP_TIMING: {
-									
 			if (!raop_sync.enabled || output.state != OUTPUT_RUNNING || output.frames_played_dmp < output.device_frames) break;
 
 			u32_t ms, now = gettime_ms();
