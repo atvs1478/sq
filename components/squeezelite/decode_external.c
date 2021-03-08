@@ -31,8 +31,6 @@ extern log_level loglevel;
 static bool enable_bt_sink;
 static bool enable_airplay;
 
-static unsigned bt_volume;
-
 #define RAOP_OUTPUT_SIZE (((RAOP_SAMPLE_RATE * BYTES_PER_FRAME * 2 * 120) / 100) & ~BYTES_PER_FRAME)
 #define SYNC_WIN_SLOW	32
 #define SYNC_WIN_CHECK	8
@@ -108,12 +106,10 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 
 	LOCK_D;
 
-	if (cmd != BT_SINK_VOLUME && cmd != BT_SINK_AUDIO_STARTED) LOCK_O;
+	if (cmd != BT_SINK_VOLUME) LOCK_O;
 		
 	switch(cmd) {
 	case BT_SINK_AUDIO_STARTED:
-		if (output.external != DECODE_BT) set_volume(bt_volume, bt_volume);
-		LOCK_O;
 		output.next_sample_rate = output.current_sample_rate = va_arg(args, u32_t);
 		output.external = DECODE_BT;
 		output.state = OUTPUT_STOPPED;
@@ -151,7 +147,6 @@ static bool bt_sink_cmd_handler(bt_sink_cmd_t cmd, va_list args)
 		u32_t volume = va_arg(args, u32_t);
 		volume = 65536 * powf(volume / 128.0f, 3);
 		set_volume(volume, volume);
-		bt_volume = volume;
 		break;
 	default:
 		break;

@@ -295,6 +295,9 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
 
         if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
 			s_audio = AUDIO_CONNECTED;
+
+			// send memorized volume for devices that can't do absolute volume
+			(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 			
 			// verify that we can take control
 			if ((*bt_app_a2d_cmd_cb)(BT_SINK_AUDIO_STARTED, s_sample_rate)) {
