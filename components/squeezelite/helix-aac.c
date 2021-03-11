@@ -30,7 +30,7 @@
 #if BYTES_PER_FRAME == 4		
 #define ALIGN(n) 	(n)
 #else
-#define ALIGN(n) 	(n << 8)		
+#define ALIGN(n) 	(n << 16)		
 #endif
 
 #define WRAPBUF_LEN 2048
@@ -332,7 +332,7 @@ static decode_state helixaac_decode(void) {
 	size_t bytes_total, bytes_wrap;
 	int res, bytes;
 	static AACFrameInfo info;
-	ISAMPLE_T *iptr;
+	s16_t *iptr;
 	u8_t *sptr;
 	bool endstream;
 	frames_t frames;
@@ -372,7 +372,7 @@ static decode_state helixaac_decode(void) {
 				u8_t *p = streambuf->readp + n;
 				int bytes = bytes_wrap - n;
 				
-				if (!HAAC(a, Decode, a->hAac, &p, &bytes, (short*) a->write_buf)) {
+				if (!HAAC(a, Decode, a->hAac, &p, &bytes, (s16_t*) a->write_buf)) {
 					HAAC(a, GetLastFrameInfo, a->hAac, &info);
 					channels = info.nChans;
 					samplerate = info.sampRateOut;
@@ -443,13 +443,13 @@ static decode_state helixaac_decode(void) {
 	}
 	
 	// decode function changes iptr, so can't use streambuf->readp (same for bytes)
-	res = HAAC(a, Decode, a->hAac, &sptr, &bytes, (short*) a->write_buf);
+	res = HAAC(a, Decode, a->hAac, &sptr, &bytes, (s16_t*) a->write_buf);
 	if (res  < 0) {
 		LOG_WARN("AAC decode error %d", res);
 	}
 
 	HAAC(a, GetLastFrameInfo, a->hAac, &info);
-	iptr = (ISAMPLE_T *) a->write_buf;
+	iptr = (s16_t*) a->write_buf;
 	bytes = bytes_wrap - bytes;
 	endstream = false;
 
@@ -543,8 +543,8 @@ static decode_state helixaac_decode(void) {
 			iptr += count * 2;
 #else 			
 			while (count--) {
-				*optr++ = *iptr++ << 8;
-				*optr++ = *iptr++ << 8;
+				*optr++ = ALIGN(*iptr++);
+				*optr++ = ALIGN(*iptr++);
 			}
 #endif			
 		} else if (info.nChans == 1) {
@@ -597,7 +597,7 @@ static void helixaac_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
 		// always free decoder as flush only works when no parameter has changed
 		HAAC(a, FreeDecoder, a->hAac);			
 	} else {
-		a->write_buf = malloc(FRAME_BUF * BYTES_PER_FRAME);
+		a->write_buf = malloc(FRAME_BUF * 4);
 		a->wrap_buf = malloc(WRAPBUF_LEN);
 	}
 	
