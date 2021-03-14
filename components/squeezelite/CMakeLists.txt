@@ -33,8 +33,12 @@ set_source_files_properties(flac.c
     -Wno-maybe-uninitialized
 )
 
+if(${DEPTH} EQUAL "32")
+add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=8)
+else()
 add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DRESAMPLE16 -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=4)
-# add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=8)
+endif()
+
 add_compile_options (-O3 ) 
 
 
