@@ -27,10 +27,11 @@ jobs:
       max-parallel: 1
       matrix:
         node: [I2S-4MFlash, ESP32-A1S, SqueezeAmp]
+        depth: [16, 32]
     steps:
     - name: Set target name
       run: |
-        echo "TARGET_BUILD_NAME=${{ matrix.node }}" >> $GITHUB_ENV
+        echo "TARGET_BUILD_NAME=${{ matrix.node }}-${{ matrix.depth }}" >> $GITHUB_ENV
         echo "build_version_prefix=V0." >> $GITHUB_ENV
     - uses: actions/checkout@v2
       with:
