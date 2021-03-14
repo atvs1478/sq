@@ -31,7 +31,7 @@ jobs:
     steps:
     - name: Set target name
       run: |
-        echo "TARGET_BUILD_NAME=${{ matrix.node }}-${{ matrix.depth }}" >> $GITHUB_ENV
+        echo "TARGET_BUILD_NAME=${{ matrix.node }}" >> $GITHUB_ENV
         echo "build_version_prefix=V0." >> $GITHUB_ENV
     - uses: actions/checkout@v2
       with:
@@ -55,7 +55,7 @@ jobs:
         last_commit="$(git log --pretty=format:'%s' --max-count=1)"
         if [[ "$last_commit" =~ .*"Release".* ]]; then echo "release_flag=1" >> $GITHUB_ENV; else echo "release_flag=0" >> $GITHUB_ENV; fi
         name="dev.${BUILD_NUMBER}#v4.0#${TARGET_BUILD_NAME}#${branch_name}"
-        artifact_prefix="squeezelite-esp32-${branch_name}-${TARGET_BUILD_NAME}-${build_version_prefix}${BUILD_NUMBER}"
+        artifact_prefix="squeezelite-esp32-${branch_name}-${TARGET_BUILD_NAME}-${{matrix.depth}}-${build_version_prefix}${BUILD_NUMBER}"
         artifact_file_name="${artifact_prefix}.zip"
         artifact_bin_file_name="${artifact_prefix}.bin"
         echo "name=${name}" >> $GITHUB_ENV
