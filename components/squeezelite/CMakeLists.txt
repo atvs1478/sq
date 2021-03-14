@@ -40,7 +40,3 @@ add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DRESAMPLE16 -DEMBEDDED -DTREMOR_
 endif()
 
 add_compile_options (-O3 ) 
-
-
-
-  
