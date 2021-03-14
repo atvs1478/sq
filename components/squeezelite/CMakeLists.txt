@@ -1,5 +1,3 @@
-
-
 idf_component_register( SRC_DIRS . external ac101 tas57xx
 						INCLUDE_DIRS .  ac101 
 						PRIV_REQUIRES 	
