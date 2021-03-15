@@ -15,8 +15,6 @@ idf_component_register( SRC_DIRS . external ac101 tas57xx
 						 EMBED_FILES vu.data
 )
 
-
-
 set_source_files_properties(mad.c
     PROPERTIES COMPILE_FLAGS
     -Wno-maybe-uninitialized 
