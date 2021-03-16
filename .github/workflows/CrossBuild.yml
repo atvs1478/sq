@@ -43,8 +43,8 @@ jobs:
       with:
         path: |
           build
-          
-        key: ${{ runner.os }}-${{ matrix.node }}
+          /var/lib/docker
+        key: ${{ runner.os }}-${{ matrix.node }}-${{ matrix.depth }}
     - name: Set build parameters
       run: |
         shopt -s nocasematch
