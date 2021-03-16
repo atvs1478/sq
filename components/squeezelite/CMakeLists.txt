@@ -29,10 +29,11 @@ set_source_files_properties(flac.c
     -Wno-maybe-uninitialized
 )
 
+add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DEMBEDDED -DTREMOR_ONLY -DCUSTOM_VERSION=${BUILD_NUMBER})
 if(${DEPTH} EQUAL "32")
-add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=8)
+add_definitions(-DBYTES_PER_FRAME=8)
 else()
-add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DRESAMPLE16 -DEMBEDDED -DTREMOR_ONLY -DBYTES_PER_FRAME=4)
+add_definitions(-DBYTES_PER_FRAME=4)
 endif()
 
 add_compile_options (-O3 ) 
