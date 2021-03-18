@@ -101,7 +101,7 @@ static struct {
 
 DECLARE_ALL_MIN_MAX;
 
-static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
+static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR, u8_t flags,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
 static void *output_thread_i2s(void *arg);
 static void output_thread_i2s_stats(void *arg);
@@ -398,20 +398,20 @@ bool output_volume_i2s(unsigned left, unsigned right) {
 /****************************************************************************************
  * Write frames to the output buffer
  */
-static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
+static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR, u8_t flags,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr) {
 	if (!silence) {
 		if (output.fade == FADE_ACTIVE && output.fade_dir == FADE_CROSS && *cross_ptr) {
 			_apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
 		}
 		
-		_apply_gain(outputbuf, out_frames, gainL, gainR);
+		_apply_gain(outputbuf, out_frames, gainL, gainR, flags);
 		memcpy(obuf + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
 	} else {
 		memcpy(obuf + oframes * BYTES_PER_FRAME, silencebuf, out_frames * BYTES_PER_FRAME);
 	}
 
-	output_visu_export(obuf + oframes * BYTES_PER_FRAME, out_frames, output.current_sample_rate, silence, ((gainL & ~MONO_FLAG) + (gainR & ~MONO_FLAG)) / 2);
+	output_visu_export(obuf + oframes * BYTES_PER_FRAME, out_frames, output.current_sample_rate, silence, (gainL + gainR) / 2);
 	oframes += out_frames;
 	
 	return out_frames;

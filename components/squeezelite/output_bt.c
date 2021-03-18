@@ -40,7 +40,7 @@ static uint8_t *btout;
 static frames_t oframes;
 static bool stats;
 
-static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
+static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR, u8_t flags,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
 								
 #define DECLARE_ALL_MIN_MAX \
@@ -79,7 +79,7 @@ void output_close_bt(void) {
 	equalizer_close();
 }	
 
-static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR,
+static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR, u8_t flags,
 						 s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr) {
 	
 	assert(btout != NULL);
@@ -90,7 +90,7 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 			_apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
 		}
 
-		_apply_gain(outputbuf, out_frames, gainL, gainR);
+		_apply_gain(outputbuf, out_frames, gainL, gainR, flags);
 
 #if BYTES_PER_FRAME == 4
 		memcpy(btout + oframes * BYTES_PER_FRAME, outputbuf->readp, out_frames * BYTES_PER_FRAME);
@@ -112,7 +112,7 @@ static int _write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t g
 		memcpy(btout + oframes * BYTES_PER_FRAME, buf, out_frames * BYTES_PER_FRAME);
 	}
 	
-	output_visu_export(btout + oframes * BYTES_PER_FRAME, out_frames, output.current_sample_rate, silence, ((gainL & ~MONO_FLAG) + (gainR & ~MONO_FLAG)) / 2);
+	output_visu_export(btout + oframes * BYTES_PER_FRAME, out_frames, output.current_sample_rate, silence, (gainL  + gainR) / 2);
 	
 	oframes += out_frames;
 

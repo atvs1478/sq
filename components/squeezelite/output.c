@@ -254,10 +254,7 @@ frames_t _output_frames(frames_t avail) {
 		
 		out_frames = !silence ? min(size, cont_frames) : size;
 
-		if (output.channels & 0x01) gainR |= MONO_FLAG;
-		if (output.channels & 0x02) gainL |= MONO_FLAG;
-
-		wrote = output.write_cb(out_frames, silence, gainL, gainR, cross_gain_in, cross_gain_out, &cross_ptr);
+		wrote = output.write_cb(out_frames, silence, gainL, gainR, output.channels, cross_gain_in, cross_gain_out, &cross_ptr);
 
 		if (wrote <= 0) {
 			frames -= size;
