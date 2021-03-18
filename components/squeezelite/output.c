@@ -47,6 +47,7 @@ frames_t _output_frames(frames_t avail) {
 
 	frames_t frames, size;
 	bool silence;
+	u8_t flags = output.channels;
 	
 	s32_t cross_gain_in = 0, cross_gain_out = 0; ISAMPLE_T *cross_ptr = NULL;
 	
@@ -253,8 +254,14 @@ frames_t _output_frames(frames_t avail) {
 		}
 		
 		out_frames = !silence ? min(size, cont_frames) : size;
+		
+		IF_DSD(
+			if (output.outfmt != PCM) {
+				flags = 0;
+			}
+		)
 
-		wrote = output.write_cb(out_frames, silence, gainL, gainR, output.channels, cross_gain_in, cross_gain_out, &cross_ptr);
+		wrote = output.write_cb(out_frames, silence, gainL, gainR, flags, cross_gain_in, cross_gain_out, &cross_ptr);
 
 		if (wrote <= 0) {
 			frames -= size;
