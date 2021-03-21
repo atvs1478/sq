@@ -327,6 +327,8 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
 
 The benefit of the "raw" mode is that you can build a player which is as close as possible to a Boom (e.g.) but you can't use the remapping function nor longress or shift logics to do your own mapping when you have a limited set of buttons. In 'raw' mode, all you really need to define is the mapping between the gpio and the button. As far as LMS is concerned, any other option in these JSON payloads does not matter. Now, when you use BT or AirPlay, the full JSON construct described above fully applies, so the shift, longpress, remapping options still work. 
 
+**Be aware that when using non "raw" mode, the CLI (Command Line Interface) of LMS is used and *must* be available without password**
+
 There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
 
 ### Battery / ADC
