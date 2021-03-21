@@ -7,7 +7,7 @@ Squeezelite-esp32 is an audio software suite made to run on espressif's ESP32 wi
 - Stream from a Bluetooth device (iPhone, Android)
 - Stream from an AirPlay controller (iPhone, iTunes ...) and enjoy synchronization multiroom as well (although it's AirPlay 1 only)
 
-Depending on the hardware connected to the ESP32, you can send audio to a local DAC, to SPDIF or to a Bluetooth speaker. The bare minimum required hardware is a WROVER module with 4MB of Flash and 4MB of PSRAM (https://www.espressif.com/en/products/modules/esp32). With that module standalone, just apply power and you can stream to a Bluetooth speaker. You can also send audio to most I2S DAC as well as to SPDIF receivers using just a cable or an optical transducer
+Depending on the hardware connected to the ESP32, you can send audio to a local DAC, to SPDIF or to a Bluetooth speaker. The bare minimum required hardware is a WROVER module with 4MB of Flash and 4MB of PSRAM (https://www.espressif.com/en/products/modules/esp32). With that module standalone, just apply power and you can stream to a Bluetooth speaker. You can also send audio to most I2S DAC as well as to SPDIF receivers using just a cable or an optical transducer.
 
 But squeezelite-esp32 is highly extensible and you can add
 
@@ -25,7 +25,7 @@ Other features include
 
 **Important note** (philippe44 writing)
 
-The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode by changing the cmake file in components/squeezelite. Note the following limitation in 32 bits
+The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode. Note the following limitation in 32 bits
 
 - no resampling
 - no equalizer
