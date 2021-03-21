@@ -147,6 +147,18 @@ Leave it blank to disable SPDIF usage, you can also define them at compile time 
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
 NB: For well-known configuration, this is ignored
+
+To optimize speed, a bit-manipulation trick is used and as a result, the bit depth is limited to 20 bits, even in 32 bits mode. As said before, this is more than enough for any human ear. In theory, it could be extended up to 23 bits but I don't see the need. Now, you can also get SPDIF using a specialized chip that offers a I2S interface like a DAC but spits out SPDIF (optical and coax). Refers to DAC chapter then.
+
+If you want coax, you can also use a poor-man's trick to generate signal from a 3.3V GPIO. All that does is dividing the 3.3V to generate a 0.6V peak-to-peak and then remove DC
+```
+                          100nF
+GPIO  ----210ohm-----------||---- coax S/PDIF signal out
+                    |
+                  110ohm
+                    |
+Ground -------------------------- coax signal ground
+```
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
@@ -167,6 +179,7 @@ SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,back=<gpio>][,reset=<gpio>][,speed
 - SSD1675 is an e-ink paper and is experimental as e-ink is really not suitable for LMS du to its very low refresh rate
 - ST7735 is a 128x160 65k color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/1.8inch-lcd-module.htm). This needs a backlight control
 - ST7789 is a 240x320 65k (262k not enabled) color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/2inch-lcd-module.htm). It also exist with 240x240 displays. See **rotate** for use in portrait mode
+- IL9341 is another 240x320 65k (262k capable) color SPI. I've not used it much, the driver it has been provided by one external contributor to the project
 
 To use the display on LMS, add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml. You will then be able to tweak how the vu-meter and spectrum analyzer are displayed, as well as size of artwork. You can also install the excellent plugin "Music Information Screen" which is super useful to tweak the layout.
 
