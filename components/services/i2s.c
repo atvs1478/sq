@@ -409,7 +409,7 @@ esp_err_t i2s_set_clk(i2s_port_t i2s_num, uint32_t rate, i2s_bits_per_sample_t b
     }
 
     double mclk;
-    int sdm0, sdm1, sdm2, odir, m_scale = 8;
+    int sdm0, sdm1, sdm2, odir, m_scale = (rate > 96000 && bits > 16) ? 4 : 8;
     int fi2s_clk = rate*channel*bits*m_scale;
     if (p_i2s_obj[i2s_num]->mode & (I2S_MODE_DAC_BUILT_IN | I2S_MODE_ADC_BUILT_IN)) {
         //DAC uses bclk as sample clock, not WS. WS can be something arbitrary.
@@ -463,7 +463,7 @@ esp_err_t i2s_set_clk(i2s_port_t i2s_num, uint32_t rate, i2s_bits_per_sample_t b
         double fi2s_rate = i2s_apll_get_fi2s(bits, sdm0, sdm1, sdm2, odir);
         p_i2s_obj[i2s_num]->real_rate = fi2s_rate/bits/channel/m_scale;
         ESP_LOGI(I2S_TAG, "APLL: Req RATE: %d, real rate: %0.3f, BITS: %u, CLKM: %u, BCK_M: %u, MCLK: %0.3f, SCLK: %f, diva: %d, divb: %d",
-            rate, fi2s_rate/bits/channel/m_scale, bits, 1, m_scale, fi2s_rate, fi2s_rate/8, 1, 0);
+            rate, fi2s_rate/bits/channel/m_scale, bits, 1, m_scale, fi2s_rate, fi2s_rate/m_scale, 1, 0);
     } else {
         I2S[i2s_num]->clkm_conf.clka_en = 0;
         I2S[i2s_num]->clkm_conf.clkm_div_a = 63;
