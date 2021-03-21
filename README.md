@@ -409,23 +409,23 @@ for you to then follow the below build steps
 ### Manual Install of ESP-IDF
 You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/ or see here https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html for a direct install. 
 
-**Use the esp-idf 4.0 https://github.com/espressif/esp-idf/tree/release/v4.0** and add esp-dsp
+**Use the esp-idf 4.0 https://github.com/espressif/esp-idf/tree/release/v4.0 and a recent add esp-dsp (after 08/2020)**
 
 ## Building Squeezelite-esp32
 When initially cloning the repo, make sure you do it recursively. For example: `git clone --recursive https://github.com/sle118/squeezelite-esp32.git`
 	
-Don't forget the to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)
+Don't forget to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. **The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)**
 
-Create you config using `idf.py menuconfig` (select your target) then build binaries using `idf.py all`. It will build the recovery and the application (squeezelite) itself. then use `idf.py flash` to write everything. Otherwise, if you just want to download squeezelite, do (assuming you have set ESPPORT (e.g. COM10) and ESPBAUD (e.g. 921600)
+Create and tweak your config using `idf.py menuconfig` then build binaries using `idf.py all`. It will build the recovery and the application (squeezelite). then use `idf.py flash` to write everything. Otherwise, if you just want to download squeezelite, do (assuming you have set ESPPORT (e.g. COM10) and ESPBAUD (e.g. 921600)
 ```
-<path_to_your_python>/python.exe <path_to_your_esptool>/esptool.py -p %ESPPORT% -b %ESPBAUD% --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build\squeezelite.bin
+<path_to_your_python>/python.exe <path_to_your_esptool>/esptool.py -p %ESPPORT% -b %ESPBAUD% --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build/squeezelite.bin
 ```
 Use `idf.py monitor` to monitor the application (see esp-idf documentation)
 
-You can use `idf.py build -DDEPTH=32` to build the 32 bits version and add the `-DVERSION=<your_version>` to add a custom version name (it will be 0.0-<your_version>). If you want to change the whole version string, see squeezelite.h
+Note: You can use `idf.py build -DDEPTH=32` to build the 32 bits version and add the `-DVERSION=<your_version>` to add a custom version name (it will be 0.0-<your_version>). If you want to change the whole version string, see squeezelite.h
 
 If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location: `git submodule update --init --recursive`
-### codecs (highly recommended to NOT try that)
+### rebuild codecs (highly recommended to NOT try that)
 - for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
 - libfaad does not really support real time, but if you want to try (but using helixaac is a better option)
