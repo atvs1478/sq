@@ -7,13 +7,13 @@ Squeezelite-esp32 is an audio software suite made to run on espressif's ESP32 wi
 - Stream from a Bluetooth device (iPhone, Android)
 - Stream from an AirPlay controller (iPhone, iTunes ...) and enjoy synchronization multiroom as well (although it's AirPlay 1 only)
 
-Depending on the hardware connected to the ESP32, you can send audio to a local DAC, to SPDIF or to a Bluetooth speaker. The bare minimum required hardware is a WROVER module with 4MB of Flash and 4MB of PSRAM (https://www.espressif.com/en/products/modules/esp32). With that module standalone, just apply power and you can stream to a Bluetooth speaker. You can also send audio to most I2S DAC as well as to SPDIF receivers using just a cable or an optical transducer (you'll need *one* resistor...)
+Depending on the hardware connected to the ESP32, you can send audio to a local DAC, to SPDIF or to a Bluetooth speaker. The bare minimum required hardware is a WROVER module with 4MB of Flash and 4MB of PSRAM (https://www.espressif.com/en/products/modules/esp32). With that module standalone, just apply power and you can stream to a Bluetooth speaker. You can also send audio to most I2S DAC as well as to SPDIF receivers using just a cable or an optical transducer.
 
 But squeezelite-esp32 is highly extensible and you can add
 
 - Buttons and Rotary Encoder and map/combine them to various functions (play, pause, volume, next ...)
 - IR receiver (no pullup resistor or capacitor needed, just the 38kHz receiver)
-- Monochrome, GrayScale or Color displays using SPI or I2S (supported drivers are SH1106, SSD1306, SSD1322, SSD1326/7, SSD1351, ST7735 and ST7789).
+- Monochrome, GrayScale or Color displays using SPI or I2S (supported drivers are SH1106, SSD1306, SSD1322, SSD1326/7, SSD1351, ST7735, ST7789 and IL9341).
 
 Other features include
 
@@ -25,7 +25,7 @@ Other features include
 
 **Important note** (philippe44 writing)
 
-The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode by changing the cmake file in components/squeezelite. Note the following limitation in 32 bits
+The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode. Note the following limitation in 32 bits
 
 - no resampling
 - no equalizer
@@ -40,7 +40,7 @@ Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be cap
 ### Raw WROVER module
 Per above description, a [WROVER module](https://www.espressif.com/en/products/modules/esp32) is enough to run Squeezelite-esp32, but that requires a bit of tinkering to extend it to have analogue audio or hardware buttons (e.g.) 
 
-Please note that when sending to a Bluetooth speaker, then resampling *must* be enabled (using -R) option if you want to send audio with rate other than 44.1kHz. Similarly, when using SPDIF, only 44.1kHz and 48kHz are supported so you might have to enable resampling as well. If you connect a DAC, choice will depends on its capabilities. See below for more details.
+Please note that when sending to a Bluetooth speaker (source), only 44.1 kHz can be used, so you either let LMS do the resampling, but you must make sure it only sends 44.1kHz tracks or enable internal resampling (using -R) option. If you connect a DAC, choice of sample rates will depends on its capabilities. See below for more details.
 
 Most DAC will work out-of-the-box with simply an I2S connection, but some require specific commands to be sent using I2C. See DAC option below to understand how to send these dedicated commands. There is build-in support for TAS575x, TAS5780, TAS5713 and AC101 DAC.
 ### SqueezeAMP
@@ -147,6 +147,18 @@ Leave it blank to disable SPDIF usage, you can also define them at compile time 
 bck=<gpio>,ws=<gpio>,do=<gpio>
 ```
 NB: For well-known configuration, this is ignored
+
+To optimize speed, a bit-manipulation trick is used and as a result, the bit depth is limited to 20 bits, even in 32 bits mode. As said before, this is more than enough for any human ear. In theory, it could be extended up to 23 bits but I don't see the need. Now, you can also get SPDIF using a specialized chip that offers a I2S interface like a DAC but spits out SPDIF (optical and coax). Refers to DAC chapter then.
+
+If you want coax, you can also use a poor-man's trick to generate signal from a 3.3V GPIO. All that does is dividing the 3.3V to generate a 0.6V peak-to-peak and then remove DC
+```
+                          100nF
+GPIO  ----210ohm-----------||---- coax S/PDIF signal out
+                    |
+                  110ohm
+                    |
+Ground -------------------------- coax signal ground
+```
 ### Display
 The NVS parameter "display_config" sets the parameters for an optional display. Syntax is
 ```
@@ -167,6 +179,7 @@ SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,back=<gpio>][,reset=<gpio>][,speed
 - SSD1675 is an e-ink paper and is experimental as e-ink is really not suitable for LMS du to its very low refresh rate
 - ST7735 is a 128x160 65k color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/1.8inch-lcd-module.htm). This needs a backlight control
 - ST7789 is a 240x320 65k (262k not enabled) color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/2inch-lcd-module.htm). It also exist with 240x240 displays. See **rotate** for use in portrait mode
+- IL9341 is another 240x320 65k (262k capable) color SPI. I've not used it much, the driver it has been provided by one external contributor to the project
 
 To use the display on LMS, add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml. You will then be able to tweak how the vu-meter and spectrum analyzer are displayed, as well as size of artwork. You can also install the excellent plugin "Music Information Screen" which is super useful to tweak the layout.
 
@@ -327,6 +340,8 @@ Below is a difficult but functional 2-buttons interface for your decoding pleasu
 
 The benefit of the "raw" mode is that you can build a player which is as close as possible to a Boom (e.g.) but you can't use the remapping function nor longress or shift logics to do your own mapping when you have a limited set of buttons. In 'raw' mode, all you really need to define is the mapping between the gpio and the button. As far as LMS is concerned, any other option in these JSON payloads does not matter. Now, when you use BT or AirPlay, the full JSON construct described above fully applies, so the shift, longpress, remapping options still work. 
 
+**Be aware that when using non "raw" mode, the CLI (Command Line Interface) of LMS is used and *must* be available without password**
+
 There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
 
 ### Battery / ADC
@@ -405,67 +420,25 @@ The above command will mount this repo into the docker container and start a bas
 for you to then follow the below build steps
 
 ### Manual Install of ESP-IDF
-<strong>Currently the master branch of this project requires this [IDF](https://github.com/espressif/esp-idf/tree/28f1cdf5ed7149d146ad5019c265c8bc3bfa2ac9) with gcc 5.2 (toolschain dated 20181001)
-If you want to use a more recent version of gcc and IDF (4.0 stable), move to cmake-master branch</strong>
+You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/ or see here https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html for a direct install. 
 
-You can install IDF manually on Linux or Windows (using the Subsystem for Linux) following the instructions at: https://www.instructables.com/id/ESP32-Development-on-Windows-Subsystem-for-Linux/
-And then copying the i2s.c patch file from this repo over to the esp-idf folder
-You also need to use esp-dsp recent version or at least make sure you have this patch https://github.com/espressif/esp-dsp/pull/12/commits/8b082c1071497d49346ee6ed55351470c1cb4264. As of this writing (08.2020), espressif has patched esp-dsp so this is no more needed
+**Use the esp-idf 4.0 https://github.com/espressif/esp-idf/tree/release/v4.0 and a recent add esp-dsp (after 08/2020)**
 
 ## Building Squeezelite-esp32
-Don't forget the to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)
-### Using make (deprecated)
-MOST IMPORTANT: create the right default config file
-- make defconfig
-(Note: You can also copy over config files from the build-scripts folder to ./sdkconfig)
-Then adapt the config file to your wifi/BT/I2C device (can also be done on the command line)
-- make menuconfig
-Then
+When initially cloning the repo, make sure you do it recursively. For example: `git clone --recursive https://github.com/sle118/squeezelite-esp32.git`
+	
+Don't forget to choose one of the config files in build_scripts/ and rename it sdkconfig.defaults or sdkconfig as many important WiFi/BT options are set there. **The codecs libraries will not be rebuilt by these scripts (it's a tedious process - see below)**
 
+Create and tweak your config using `idf.py menuconfig` then build binaries using `idf.py all`. It will build the recovery and the application (squeezelite). then use `idf.py flash` to write everything. Otherwise, if you just want to download squeezelite, do (assuming you have set ESPPORT (e.g. COM10) and ESPBAUD (e.g. 921600)
 ```
-# Build recovery.bin, bootloader.bin, ota_data_initial.bin, partitions.bin  
-# force appropriate rebuild by touching all the files which may have a RECOVERY_APPLICATION specific source compile logic
-	find . \( -name "*.cpp" -o -name "*.c" -o -name "*.h" \) -type f -print0 | xargs -0 grep -l "RECOVERY_APPLICATION" | xargs touch
-	export PROJECT_NAME="recovery" 
-	make -j4 all EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=1'
-make flash
-#
-# Build squeezelite.bin
-# Now force a rebuild by touching all the files which may have a RECOVERY_APPLICATION specific source compile logic
-find . \( -name "*.cpp" -o -name "*.c" -o -name "*.h" \) -type f -print0 | xargs -0 grep -l "RECOVERY_APPLICATION" | xargs touch
-export PROJECT_NAME="squeezelite" 
-make -j4 app EXTRA_CPPFLAGS='-DRECOVERY_APPLICATION=0'
-python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port ${ESPPORT} --baud ${ESPBAUD} --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0x150000 ./build/squeezelite.bin  
-# monitor serial output
-make monitor
+<path_to_your_python>/python.exe <path_to_your_esptool>/esptool.py -p %ESPPORT% -b %ESPBAUD% --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build/squeezelite.bin
+```
+Use `idf.py monitor` to monitor the application (see esp-idf documentation)
 
-```
+Note: You can use `idf.py build -DDEPTH=32` to build the 32 bits version and add the `-DVERSION=<your_version>` to add a custom version name (it will be 0.0-<your_version>). If you want to change the whole version string, see squeezelite.h
 
-You can also manually download the recovery & initial boot
-```
-python ${IDF_PATH}/components/esptool_py/esptool/esptool.py --chip esp32 --port ${ESPPORT} --baud ${ESPBAUD} --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0xd000 ./build/ota_data_initial.bin 0x1000 ./build/bootloader/bootloader.bin 0x10000 ./build/recovery.bin 0x8000 ./build/partitions.bin
-```
-### Using cmake
-Create you config using 'idf.py menuconfig' then build binaries using 'idf.py all'. It will build the recovery and the application (squeezelite) itself. See the recommended command to upload everything. Otherwise, if you just want to download squeezelite, do
-```
-python.exe <idf_path>\components\esptool_py\esptool\esptool.py -p COM<n> -b 921600 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x150000 build\squeezelite.bin
-```
-Use 'idf monitor' to monitor the application (see esp-idf documentation)
-## Additional misc notes to do you build (kitchen sink)
-- don't forget to set IDF_PATH, ESPPORT and ESPBAUD
-- When initially cloning the repo, make sure you do it recursively. For example: 
-	- git clone --recursive https://github.com/sle118/squeezelite-esp32.git
-- If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location
-	-  git submodule update --init --recursive
-- as of this writing, ESP-IDF has a bug int he way the PLL values are calculated for i2s, so you *must* use the i2s.c file in the patch directory
-- misc compiler #define
-	- use no resampling or set RESAMPLE (soxr - but overloads CPU) or set RESAMPLE16 for fast fixed 16 bits resampling
-	- use LOOPBACK (mandatory)
-	- use BYTES_PER_FRAME=4 (8 is not fully functionnal)
-	- LINKALL (mandatory)
-	- NO_FAAD unless you want to us faad, which currently overloads the CPU
-	- TREMOR_ONLY (mandatory)
-### codecs
+If you have already cloned the repository and you are getting compile errors on one of the submodules (e.g. telnet), run the following git command in the root of the repository location: `git submodule update --init --recursive`
+### Rebuild codecs (highly recommended to NOT try that)
 - for codecs libraries, add -mlongcalls if you want to rebuild them, but you should not (use the provided ones in codecs/lib). if you really want to rebuild them, open an issue
 - libmad, libflac (no esp's version), libvorbis (tremor - not esp's version), alac work
 - libfaad does not really support real time, but if you want to try (but using helixaac is a better option)
