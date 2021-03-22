@@ -14,7 +14,7 @@
 #include "esp_app_format.h"
 extern esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t length);
 static const char * TAG = "squeezelite_cmd";
-#define SQUEEZELITE_THREAD_STACK_SIZE (6*1024)
+#define SQUEEZELITE_THREAD_STACK_SIZE (4*1024)
 
 
 

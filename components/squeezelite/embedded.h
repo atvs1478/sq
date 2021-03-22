@@ -30,10 +30,10 @@ typedef unsigned long long u64_t;
 #define _CONST
 #endif
 
-#define STREAM_THREAD_STACK_SIZE  6 * 1024
-#define DECODE_THREAD_STACK_SIZE 16 * 1024
-#define OUTPUT_THREAD_STACK_SIZE  6 * 1024
-#define IR_THREAD_STACK_SIZE      6 * 1024
+#define STREAM_THREAD_STACK_SIZE  4 * 1024
+#define DECODE_THREAD_STACK_SIZE 14 * 1024
+#define OUTPUT_THREAD_STACK_SIZE  4 * 1024
+#define IR_THREAD_STACK_SIZE      4 * 1024
 
 // number of times the 5s search for a server will happen before slimproto exits (0 = no limit)
 #define MAX_SERVER_RETRIES	5

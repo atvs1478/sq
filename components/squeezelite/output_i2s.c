@@ -51,6 +51,7 @@ sure that using rate_delay would fix that
 #define UNLOCK mutex_unlock(outputbuf->mutex)
 
 #define FRAME_BLOCK MAX_SILENCE_FRAMES
+#define SPDIF_BLOCK	256
 
 // must have an integer ratio with FRAME_BLOCK (see spdif comment)
 #define DMA_BUF_LEN		512	
@@ -85,14 +86,17 @@ static log_level loglevel;
 
 static bool (*slimp_handler_chain)(u8_t *data, int len);
 static bool jack_mutes_amp;
-static bool running, isI2SStarted;
+static bool running, isI2SStarted, ended;
 static i2s_config_t i2s_config;
 static u8_t *obuf;
 static frames_t oframes;
-static bool spdif;
+static struct {
+	bool enabled;
+	u8_t *buf;
+	size_t count;
+} spdif;
 static size_t dma_buf_frames;
-static pthread_t thread;
-static TaskHandle_t stats_task;
+static TaskHandle_t stats_task, output_i2s_task;
 static bool stats;
 static struct {
 	int gpio, active;
@@ -103,7 +107,7 @@ DECLARE_ALL_MIN_MAX;
 
 static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32_t gainR, u8_t flags,
 								s32_t cross_gain_in, s32_t cross_gain_out, ISAMPLE_T **cross_ptr);
-static void *output_thread_i2s(void *arg);
+static void output_thread_i2s(void *arg);
 static void output_thread_i2s_stats(void *arg);
 static void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count);
 static void (*jack_handler_chain)(bool inserted);
@@ -249,8 +253,11 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1; //Interrupt level 1
 	
 	if (strcasestr(device, "spdif")) {
-		spdif = true;	
-
+		spdif.enabled = true;	
+		if ((spdif.buf = heap_caps_malloc(SPDIF_BLOCK * 16, MALLOC_CAP_INTERNAL)) == NULL) {
+			LOG_ERROR("Cannot allocate SPDIF buffer");
+		}
+	
 		if (i2s_spdif_pin.bck_io_num == -1 || i2s_spdif_pin.ws_io_num == -1 || i2s_spdif_pin.data_out_num == -1) {
 			LOG_WARN("Cannot initialize I2S for SPDIF bck:%d ws:%d do:%d", i2s_spdif_pin.bck_io_num, 
 																		   i2s_spdif_pin.ws_io_num, 
@@ -327,7 +334,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	}	
 
 	LOG_INFO("Initializing I2S mode %s with rate: %d, bits per sample: %d, buffer frames: %d, number of buffers: %d ", 
-			spdif ? "S/PDIF" : "normal", 
+			spdif.enabled ? "S/PDIF" : "normal", 
 			i2s_config.sample_rate, i2s_config.bits_per_sample, i2s_config.dma_buf_len, i2s_config.dma_buf_count);
 	
 	i2s_stop(CONFIG_I2S_NUM);
@@ -345,15 +352,14 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	adac->headset(jack_inserted_svc());
 	
 	parse_set_GPIO(set_amp_gpio);
-		
-	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-	
-    cfg.thread_name= "output_i2s";
-    cfg.inherit_cfg = false;
-	cfg.prio = CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1;
-    cfg.stack_size = PTHREAD_STACK_MIN + OUTPUT_THREAD_STACK_SIZE;
-    esp_pthread_set_cfg(&cfg);
-	pthread_create(&thread, NULL, output_thread_i2s, NULL);
+
+	// create task as a FreeRTOS task but uses stack in internal RAM
+	{
+		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
+		static DRAM_ATTR StackType_t xStack[OUTPUT_THREAD_STACK_SIZE] __attribute__ ((aligned (4)));
+		output_i2s_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s, "output_i2s", OUTPUT_THREAD_STACK_SIZE, 
+											  NULL, CONFIG_ESP32_PTHREAD_TASK_PRIO_DEFAULT + 1, xStack, &xTaskBuffer );
+	}
 	
 	// do we want stats
 	p = config_alloc_get_default(NVS_TYPE_STR, "stats", "n", 0);
@@ -364,7 +370,8 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 	if (stats) {
 		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 		static EXT_RAM_ATTR StackType_t xStack[STAT_STACK_SIZE] __attribute__ ((aligned (4)));
-		stats_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s_stats, "output_i2s_sts", STAT_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+		stats_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s_stats, "output_i2s_sts", STAT_STACK_SIZE, 
+										 NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	}	
 }
 
@@ -376,7 +383,9 @@ void output_close_i2s(void) {
 	LOCK;
 	running = false;
 	UNLOCK;
-	pthread_join(thread, NULL);
+	
+	while (!ended) usleep(20*1000);
+	vTaskDelete(output_i2s_task);
 	if (stats) vTaskDelete(stats_task);
 	
 	i2s_driver_uninstall(CONFIG_I2S_NUM);
@@ -420,20 +429,14 @@ static int _i2s_write_frames(frames_t out_frames, bool silence, s32_t gainL, s32
 /****************************************************************************************
  * Main output thread
  */
-static void *output_thread_i2s(void *arg) {
-	size_t count = 0, bytes;
+static void output_thread_i2s(void *arg) {
+	size_t bytes;
 	frames_t iframes = FRAME_BLOCK;
 	uint32_t timer_start = 0;
 	int discard = 0;
 	uint32_t fullness = gettime_ms();
 	bool synced;
 	output_state state = OUTPUT_OFF - 1;
-	char *sbuf = NULL;
-	
-	// spdif needs 16 bytes per frame : 32 bits/sample, 2 channels, BMC encoded
-	if (spdif && (sbuf = malloc(FRAME_BLOCK * 16)) == NULL) {
-		LOG_ERROR("Cannot allocate SPDIF buffer");
-	}
 	
 	while (running) {
 			
@@ -464,7 +467,7 @@ static void *output_thread_i2s(void *arg) {
 				isI2SStarted = false;
 				i2s_stop(CONFIG_I2S_NUM);
 				adac->power(ADAC_STANDBY);
-				count = 0;
+				spdif.count = 0;
 			}
 			usleep(100000);
 			continue;
@@ -524,24 +527,32 @@ static void *output_thread_i2s(void *arg) {
 			*/		
 			}	
 			i2s_config.sample_rate = output.current_sample_rate;
-			i2s_set_sample_rates(CONFIG_I2S_NUM, spdif ? i2s_config.sample_rate * 2 : i2s_config.sample_rate);
+			i2s_set_sample_rates(CONFIG_I2S_NUM, spdif.enabled ? i2s_config.sample_rate * 2 : i2s_config.sample_rate);
 			i2s_zero_dma_buffer(CONFIG_I2S_NUM);
-			
+
+#if BYTES_PER_FRAME == 4		
 			equalizer_close();
 			equalizer_open(output.current_sample_rate);
-			//return;
+#endif			
 		}
 		
 #if BYTES_PER_FRAME == 4		
 		// run equalizer
 		equalizer_process(obuf, oframes * BYTES_PER_FRAME, output.current_sample_rate);
 #endif		
-		
+
 		// we assume that here we have been able to entirely fill the DMA buffers
-		if (spdif) {
-			spdif_convert((ISAMPLE_T*) obuf, oframes, (u32_t*) sbuf, &count);
-			i2s_write(CONFIG_I2S_NUM, sbuf, oframes * 16, &bytes, portMAX_DELAY);
-			bytes /= 16 / BYTES_PER_FRAME;
+		if (spdif.enabled) {
+			size_t obytes, count = 0;
+			bytes = 0;
+			// need IRAM for speed but can't allocate a FRAME_BLOCK * 16, so process by smaller chunks
+			while (count < oframes) {
+				size_t chunk = min(SPDIF_BLOCK, oframes - count);
+				spdif_convert((ISAMPLE_T*) obuf + count * 2, chunk, (u32_t*) spdif.buf, &spdif.count);
+				i2s_write(CONFIG_I2S_NUM, spdif.buf, chunk * 16, &obytes, portMAX_DELAY);
+				bytes += obytes / (16 / BYTES_PER_FRAME);
+				count += chunk;
+			}	
 #if BYTES_PER_FRAME == 4		
 		} else if (i2s_config.bits_per_sample == 32) {  
 			i2s_write_expand(CONFIG_I2S_NUM, obuf, oframes * BYTES_PER_FRAME, 16, 32, &bytes, portMAX_DELAY);
@@ -551,7 +562,7 @@ static void *output_thread_i2s(void *arg) {
 		}
 
 		fullness = gettime_ms();
-			
+
 		if (bytes != oframes * BYTES_PER_FRAME) {
 			LOG_WARN("I2S DMA Overflow! available bytes: %d, I2S wrote %d bytes", oframes * BYTES_PER_FRAME, bytes);
 		}
@@ -560,9 +571,8 @@ static void *output_thread_i2s(void *arg) {
 		
 	}
 	
-	if (spdif) free(sbuf);
-	
-	return 0;
+	if (spdif.enabled) free(spdif.buf);
+	ended = true;
 }
 
 /****************************************************************************************
@@ -608,65 +618,7 @@ static void output_thread_i2s_stats(void *arg) {
 #define VUCP   		((0xCC) << 24)
 #define VUCP_MUTE 	((0xD4) << 24)	// To mute PCM, set VUCP = invalid.
 
-extern const u16_t spdif_bmclookup[256];
-
-/* 
- SPDIF is supposed to be (before BMC encoding, from LSB to MSB)				
-	PPPP AAAA  SSSS SSSS  SSSS SSSS  SSSS VUCP				
- after BMC encoding, each bits becomes 2 hence this becomes a 64 bits word. The
- the trick is to start not with a PPPP sequence but with an VUCP sequence to that
- the 16 bits samples are aligned with a BMC word boundary. Note that the LSB of the
- audio is transmitted first (not the MSB) and that ESP32 libray sends R then L, 
- contrary to what seems to be usually done, so (dst) order had to be changed
-*/
-void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count) {
-	u16_t hi, lo, aux;
-	register size_t cnt = *count;
-	
-	// frames are 2 channels of 16/32 bits
-	frames *= 2;
-
-	while (frames--) {
-#if BYTES_PER_FRAME == 4		
-		hi  = spdif_bmclookup[(u8_t)(*src >> 8)];
-		lo  = spdif_bmclookup[(u8_t) *src];
-#else
-		hi  = spdif_bmclookup[(u8_t)(*src >> 24)];
-		lo  = spdif_bmclookup[(u8_t)(*src >> 16)];
-#endif	
-		// invert if last preceeding bit is 1
-		lo ^= ~((s16_t)hi) >> 16;
-
-		// first 16 bits
-		*(dst+0) = ((u32_t)lo << 16) | hi;
-
-		// 4 bits auxillary-audio-databits, the first used as parity
-#if BYTES_PER_FRAME == 4
-		aux = 0xb333 ^ (((u32_t)((s16_t)lo)) >> 17);
-#else 
-		// we use 20 bits samples as we need to force parity
-		aux = spdif_bmclookup[(u8_t)(*src >> 12)];
-		aux = (u8_t) (aux ^ (~((s16_t)lo) >> 16));
-		aux |= (0xb3 ^ (((u16_t)((s8_t)aux)) >> 9)) << 8;
-#endif
-
-		// VUCP-Bits: Valid, Subcode, Channelstatus, Parity = 0
-		// As parity is always 0, we can use fixed preambles
-		if (++cnt > 383) {
-			*(dst+1) =  VUCP | (PREAMBLE_B << 16 ) | aux; //special preamble for one of 192 frames
-			cnt = 0;
-		} else {
-			*(dst+1) = VUCP | (((cnt & 0x01) ? PREAMBLE_W : PREAMBLE_M) << 16) | aux;
-		}
-		
-		src++;
-		dst += 2;
-	}
-	
-	*count = cnt;
-}
-
-const u16_t spdif_bmclookup[256] = { //biphase mark encoded values (least significant bit first)
+static const u16_t spdif_bmclookup[256] = { //biphase mark encoded values (least significant bit first)
 	0xcccc, 0x4ccc, 0x2ccc, 0xaccc, 0x34cc, 0xb4cc, 0xd4cc, 0x54cc,
 	0x32cc, 0xb2cc, 0xd2cc, 0x52cc, 0xcacc, 0x4acc, 0x2acc, 0xaacc,
 	0x334c, 0xb34c, 0xd34c, 0x534c, 0xcb4c, 0x4b4c, 0x2b4c, 0xab4c,
@@ -701,7 +653,74 @@ const u16_t spdif_bmclookup[256] = { //biphase mark encoded values (least signif
 	0x32aa, 0xb2aa, 0xd2aa, 0x52aa, 0xcaaa, 0x4aaa, 0x2aaa, 0xaaaa
 };
 
+/* 
+ SPDIF is supposed to be (before BMC encoding, from LSB to MSB)				
+	PPPP AAAA  SSSS SSSS  SSSS SSSS  SSSS VUCP				
+ after BMC encoding, each bits becomes 2 hence this becomes a 64 bits word. The
+ the trick is to start not with a PPPP sequence but with an VUCP sequence to that
+ the 16 bits samples are aligned with a BMC word boundary. Note that the LSB of the
+ audio is transmitted first (not the MSB) and that ESP32 libray sends R then L, 
+ contrary to what seems to be usually done, so (dst) order had to be changed
+*/
+void spdif_convert(ISAMPLE_T *src, size_t frames, u32_t *dst, size_t *count) {
+	register u16_t hi, lo, aux;
+	size_t cnt = *count;
+	
+	while (frames--) {
+		// start with left channel
+#if BYTES_PER_FRAME == 4		
+		hi  = spdif_bmclookup[(u8_t)(*src >> 8)];
+		lo  = spdif_bmclookup[(u8_t) *src++];
+		
+		// invert if last preceeding bit is 1
+		lo ^= ~((s16_t)hi) >> 16;
+		// first 16 bits
+		*dst++ = ((u32_t)lo << 16) | hi;		
+		aux = 0xb333 ^ (((u32_t)((s16_t)lo)) >> 17);
+#else
+		hi  = spdif_bmclookup[(u8_t)(*src >> 24)];
+		lo  = spdif_bmclookup[(u8_t)(*src >> 16)];
+		
+		// invert if last preceeding bit is 1
+		lo ^= ~((s16_t)hi) >> 16;
+		// first 16 bits
+		*dst++ = ((u32_t)lo << 16) | hi;		
+		// we use 20 bits samples as we need to force parity
+		aux = spdif_bmclookup[(u8_t)(*src++ >> 12)];
+		aux = (u8_t) (aux ^ (~((s16_t)lo) >> 16));
+		aux |= (0xb3 ^ (((u16_t)((s8_t)aux)) >> 9)) << 8;
+#endif	
+		
+		// VUCP-Bits: Valid, Subcode, Channelstatus, Parity = 0
+		// As parity is always 0, we can use fixed preambles
+		if (++cnt > 191) {
+			*dst++ =  VUCP | (PREAMBLE_B << 16 ) | aux; //special preamble for one of 192 frames
+			cnt = 0;
+		} else {
+			*dst++ = VUCP | (PREAMBLE_M << 16) | aux;
+		}
 
+		// then do right channel, no need to check PREAMBLE_B
+#if BYTES_PER_FRAME == 4		
+		hi  = spdif_bmclookup[(u8_t)(*src >> 8)];
+		lo  = spdif_bmclookup[(u8_t) *src++];
+		lo ^= ~((s16_t)hi) >> 16;
+		*dst++ = ((u32_t)lo << 16) | hi;
+		aux = 0xb333 ^ (((u32_t)((s16_t)lo)) >> 17);
+#else
+		hi  = spdif_bmclookup[(u8_t)(*src >> 24)];
+		lo  = spdif_bmclookup[(u8_t)(*src >> 16)];
+		lo ^= ~((s16_t)hi) >> 16;
+		*dst++ = ((u32_t)lo << 16) | hi;
+		aux = spdif_bmclookup[(u8_t)(*src++ >> 12)];
+		aux = (u8_t) (aux ^ (~((s16_t)lo) >> 16));
+		aux |= (0xb3 ^ (((u16_t)((s8_t)aux)) >> 9)) << 8;
+#endif	
+		*dst++ = VUCP | (PREAMBLE_W << 16) | aux;
+	}
+	
+	*count = cnt;
+}
 
 
 
