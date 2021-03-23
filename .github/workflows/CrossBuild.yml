@@ -114,6 +114,7 @@ jobs:
           build/size_comp2.txt
           partitions.csv
           build_output.zip
+          sdkconfig
     - uses: actions/upload-artifact@v2
       with:
         name: ${{ env.artifact_bin_file_name }}
