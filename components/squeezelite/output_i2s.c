@@ -371,7 +371,7 @@ void output_init_i2s(log_level level, char *device, unsigned output_buf_size, ch
 		static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 		static EXT_RAM_ATTR StackType_t xStack[STAT_STACK_SIZE] __attribute__ ((aligned (4)));
 		stats_task = xTaskCreateStatic( (TaskFunction_t) output_thread_i2s_stats, "output_i2s_sts", STAT_STACK_SIZE, 
-										 NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
+										 NULL, ESP_TASK_PRIO_MIN, xStack, &xTaskBuffer);
 	}	
 }
 
@@ -384,8 +384,7 @@ void output_close_i2s(void) {
 	running = false;
 	UNLOCK;
 	
-	while (!ended) usleep(20*1000);
-	vTaskDelete(output_i2s_task);
+	while (!ended) vTaskDelay(20 / portTICK_PERIOD_MS);
 	if (stats) vTaskDelete(stats_task);
 	
 	i2s_driver_uninstall(CONFIG_I2S_NUM);
@@ -571,6 +570,7 @@ static void output_thread_i2s(void *arg) {
 		
 	}
 	
+	vTaskDelete(NULL);
 	if (spdif.enabled) free(spdif.buf);
 	ended = true;
 }

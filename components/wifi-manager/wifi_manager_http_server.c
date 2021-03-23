@@ -135,6 +135,7 @@ esp_err_t http_server_start()
     config.max_uri_handlers = 25;
     config.max_open_sockets = 8;
     config.uri_match_fn = httpd_uri_match_wildcard;
+	config.task_priority = ESP_TASK_PRIO_MIN;
     //todo:  use the endpoint below to configure session token?
     // config.open_fn
 
