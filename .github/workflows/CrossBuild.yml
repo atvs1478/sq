@@ -26,7 +26,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        node: [I2S-4MFlash, SqueezeAMP, ESP32-A1S]
+        node: [I2S-4MFlash, SqueezeAmp, ESP32-A1S]
         depth: [16, 32]
     steps:
     - name: Set target name
