@@ -69,8 +69,9 @@ Contains the freeRTOS task and all necessary support
 #include "monitor.h"
 #include "globdefs.h"
 
-#ifndef SQUEEZELITE_ESP32_RELEASE_URL
-#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+#ifndef CONFIG_SQUEEZELITE_ESP32_RELEASE_URL
+#pragma message "Defaulting release url"
+#define CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
 
 #define STR_OR_BLANK(p) p==NULL?"":p
@@ -330,7 +331,7 @@ void wifi_manager_start(){
 	wifi_manager_safe_update_sta_ip_string(NULL);
 
 	ESP_LOGD(TAG,   "Getting release url ");
-	char * release_url = (char * )config_alloc_get_default(NVS_TYPE_STR, "release_url", QUOTE(SQUEEZELITE_ESP32_RELEASE_URL), 0);
+	char * release_url = (char * )config_alloc_get_default(NVS_TYPE_STR, "release_url", QUOTE(CONFIG_SQUEEZELITE_ESP32_RELEASE_URL), 0);
 	if(release_url == NULL){
 		ESP_LOGE(TAG,  "Unable to retrieve the release url from nvs");
 	}

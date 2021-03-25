@@ -12,8 +12,8 @@
 #pragma once
 
 #include "esp_pthread.h"
-#ifndef SQUEEZELITE_ESP32_RELEASE_URL
-#define SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+#ifndef CONFIG_SQUEEZELITE_ESP32_RELEASE_URL
+#define CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #endif
 
 extern void run_command(char * line);

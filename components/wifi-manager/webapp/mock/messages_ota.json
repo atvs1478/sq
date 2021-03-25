@@ -1,0 +1,51 @@
+[{
+		"message":	"{\"ota_dsc\":\"Initializing...\",\"ota_pct\":0}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119203,
+		"current_time":	121837
+	}, {
+		"message":	"{\"ota_dsc\":\"Starting OTA...\",\"ota_pct\":0}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Erasing...\",\"ota_pct\":0}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Erasing...\",\"ota_pct\":10}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Erasing...\",\"ota_pct\":100}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Flashing...\",\"ota_pct\":10}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Erasing...\",\"ota_pct\":90}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}, {
+		"message":	"{\"ota_dsc\":\"Success!\",\"ota_pct\":100}",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_OTA",
+		"sent_time":	119255,
+		"current_time":	121838
+	}
+	
+	]

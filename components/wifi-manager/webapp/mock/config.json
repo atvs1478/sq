@@ -338,6 +338,11 @@
 			"type": 33,
 			"value": "D",
 			"chg": false
+		},
+		"rel_api": {
+			"type": 33,
+			"value": "https://api.github.com/repos/sle118/squeezelite-esp32/releases",
+			"chg": false
 		}
-	}
+  	}
 }

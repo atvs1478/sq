@@ -97,24 +97,347 @@ const connectReturnCode = {
 }
 const taskStates = {
   0: 'eRunning',
-
   /*! < A task is querying the state of itself, so must be running. */
   1: 'eReady',
-
   /*! < The task being queried is in a read or pending ready list. */
   2: 'eBlocked',
-
   /*! < The task being queried is in the Blocked state. */
   3: 'eSuspended',
-
   /*! < The task being queried is in the Suspended state, or is in the Blocked state with an infinite time out. */
   4: 'eDeleted',
 };
+const flash_status_codes = {
+  NONE : 0,
+  DOWNLOADING_FILE: 1,
+  REBOOT_TO_RECOVERY: 2,
+  CHECK_FOR_UPLOAD: 3,
+  UPLOADING: 4,
+  SET_FWURL: 5,
+  FLASHING: 6,
+  DOWNLOADING_COMPLETE: 7,
+};
+let flash_state=flash_status_codes.FLASH_NONE;
+let flash_ota_dsc='';
+let flash_ota_pct=0;
+function isFlashExecuting(){
+  return flash_ota_dsc!='' || flash_ota_pct>0;
+}
+// function z(){
+  
+//   const data = {
+//     timestamp: Date.now(),
+//   };
+//   if (blockFlashButton) {
+//     return;
+//   }
+//   blockFlashButton = true;
+//   const url = $('#fw-url-input').val();
+//   data.config = {
+//     fwurl: {
+//       value: url,
+//       type: 33,
+//     },
+//   };
 
+//   $.ajax({
+//     url: '/config.json',
+//     dataType: 'text',
+//     method: 'POST',
+//     cache: false,
+//     contentType: 'application/json; charset=utf-8',
+//     data: JSON.stringify(data),
+//     error: handleExceptionResponse,
+//   });
+// }
+const flash_events={
+  START_OTA : function(data) {
+    if (flash_state == flash_status_codes.NONE) {
+      console.log('Starting OTA process');
+      flash_state=flash_status_codes.DOWNLOADING_FILE;
+      // 1. Create a new XMLHttpRequest object
+      let xhr = new XMLHttpRequest();
+      
+      // 2. Configure it: GET-request for the URL /article/.../load
+      xhr.open('GET', data.url);
+      xhr.responseType = "blob";
+      // 4. This will be called after the response is received
+      xhr.onload = function() {
+        if (xhr.status != 200) { // analyze HTTP status of the response
+          console.log(`Error ${xhr.status}: ${xhr.statusText}`); // e.g. 404: Not Found
+        } else { // show the result
+          console.log(`Done, got ${xhr.response.length} bytes`); // response is the server response
+        }
+      };
+
+      xhr.onprogress = function(event) {
+        if (event.lengthComputable) {
+          console.log(`Received ${event.loaded} of ${event.total} bytes`);
+        } else {
+          console.log(`Received ${event.loaded} bytes`); // no Content-Length
+        }
+
+      };
+
+      xhr.onerror = function() {
+        console.log("Request failed");
+      };      
+      xhr.send();
+    }
+    else {
+      console.warn('Unexpected status while starting flashing');
+    }    
+
+  },
+  FOUND_RECOVERY: function(data) {
+    console.log(JSON.stringify(data));
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }
+  },
+  UPLOAD_YES: function(data) {
+    console.log(JSON.stringify(data));
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }
+  },
+  UPLOAD_NO: function(data) {
+    console.log(JSON.stringify(data));
+
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }
+  },
+  DOWNLOAD_COMPLETE: function(data) {
+    console.log(JSON.stringify(data));
+
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }
+  },
+  MESSAGES: function(data) {
+    console.log(JSON.stringify(data));
+    if(data.ota_dsc){
+      flash_ota_dsc=data.ota_dsc;
+    }
+    if(data.ota_pct){
+      flash_ota_pct=data.ota_pct;
+    }
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }    
+  },
+  STATUS: function(data) {
+    console.log(JSON.stringify(data));
+
+    if(data.ota_dsc){
+      flash_ota_dsc=data.ota_dsc;
+    }
+    if(data.ota_pct){
+      flash_ota_pct=data.ota_pct;
+    }
+    switch (flash_state) {
+      case flash_status_codes.NONE:
+
+          console.log('Current Flash state is NONE');
+        break;
+        case flash_status_codes.DOWNLOADING_FILE:
+          console.log('DOWNLOADING_FILE');
+        break;
+        case flash_status_codes.DOWNLOADING_COMPLETE:
+          console.log('DOWNLOADING_COMPLETE');
+        break;        
+        case flash_status_codes.REBOOT_TO_RECOVERY:
+          console.log('REBOOT_TO_RECOVERY');
+        break;
+        case flash_status_codes.CHECK_FOR_UPLOAD:
+          console.log('CHECK_FOR_UPLOAD');
+        break;
+        case flash_status_codes.UPLOADING:
+          console.log('UPLOADING');
+        break;
+        case flash_status_codes.SET_FWURL:
+          console.log('SET_FWURL');
+        break;
+        case flash_status_codes.FLASHING:
+          console.log('FLASHING');
+        break;
+    
+      default:
+        break;
+    }    
+  }
+};
 window.hideSurrounding = function(obj){
-  $(obj).parent().parent().hide()
+  $(obj).parent().parent().hide();
 }
 
+
+function handle_flash_state(data) {
+  if(isFlashExecuting()) {
+    flash_state= flash_status_codes.FLASHING;
+  }
+  if(data.event)  {
+    data.event(data);
+  } 
+
+
+  if(flash_state!=flash_status_codes.NONE){
+    $('#otadiv').modal();
+    if (flash_ota_pct !== 0) {
+      $('.progress-bar')
+        .css('width', flash_ota_pct + '%')
+        .attr('aria-valuenow', flash_ota_pct);
+      $('.progress-bar').html(flash_ota_pct + '%');
+    }
+    if (flash_ota_dsc !== '') {
+      $('span#flash-status').html(flash_ota_dsc);
+      if ((data.type ?? '') === 'MESSAGING_ERROR' || flash_ota_pct > 95) {
+        //blockFlashButton = false;
+      }
+    }      
+  }
+  else {
+    flash_ota_pct=0;
+    flash_ota_dsc='';
+  }
+}
+window.hFlash = function(){
+  handle_flash_state({ event: flash_events.START_OTA, url: $('#fw-url-input').val() });
+}
 window.handleReboot = function(ota){
   if(ota){
     $('#reboot_ota_nav').removeClass('active'); delayReboot(500,'', true);
@@ -167,7 +490,6 @@ function handleTemplateTypeRadio(outtype) {
 function handleExceptionResponse(xhr, _ajaxOptions, thrownError) {
   console.log(xhr.status);
   console.log(thrownError);
-  enableStatusTimer = true;
   if (thrownError !== '') {
     showLocalMessage(thrownError, 'MESSAGING_ERROR');
   }
@@ -205,14 +527,13 @@ function showCmdMessage(cmdname, msgtype, msgtext, append = false) {
   $('#msg_' + cmdname).html(escapedtext);
 }
 
-const releaseURL =
+let releaseURL =
   'https://api.github.com/repos/sle118/squeezelite-esp32/releases';
+  
 let recovery = false;
-var enableStatusTimer = true;
 const commandHeader = 'squeezelite -b 500:2000 -d all=info -C 30 -W';
-let otapct, otadsc;
 let blockAjax = false;
-let blockFlashButton = false;
+//let blockFlashButton = false;
 let apList = null;
 //let selectedSSID = '';
 //let checkStatusInterval = null;
@@ -224,8 +545,9 @@ let SystemConfig={};
 let LastCommandsState = null;
 var output = '';
 let hostName = '';
-let versionName='SqueezeESP32';
-let appTitle=versionName;
+let versionName='Squeezelite-ESP32';
+let project_name=versionName;
+let btSinkNamesOptSel='#cfg-audio-bt_source-sink_name';
 let ConnectedToSSID={};
 let ConnectingToSSID={};
 const ConnectingToActions = {
@@ -356,7 +678,6 @@ function onChooseFile(event, onLoadFileHandler) {
 function delayReboot(duration, cmdname, ota = false) {
   const url = ota ? '/reboot_ota.json' : '/reboot.json';
   $('tbody#tasks').empty();
-  enableStatusTimer = false;
   $('#tasks_sect').css('visibility', 'collapse');
   Promise.resolve({ cmdname: cmdname, url: url })
     .delay(duration)
@@ -384,7 +705,6 @@ function delayReboot(duration, cmdname, ota = false) {
         error: handleExceptionResponse,
         complete: function() {
           console.log('reboot call completed');
-          enableStatusTimer = true;
           Promise.resolve(data)
             .delay(6000)
             .then(function(rdata) {
@@ -505,7 +825,40 @@ window.handleConnect = function(){
 
 }
 $(document).ready(function() {
+  $('#wifiTable').on('click','tr', function() {
+
+  });
+  $('#fw-url-input').on('input', function() {
+    if($(this).val().length>8 && ($(this).val().startsWith('http://') || $(this).val().startsWith('https://'))){
+      $('#start-flash').show();
+    } 
+    else {
+      $('#start-flash').hide();
+    }
+  });
+  $('.upSrch').on('input', function() {
+    const val = this.value;
+    
+    if(val.length==0) {
+      $("#rTable tr").removeClass(this.id+'_hide');
+    }
+    else {
+      $(`#rTable td:nth-child(${$(this).parent().index()+1})`).filter(function(){ 
+        return !$(this).text().toUpperCase().includes(val.toUpperCase());
+      }).parent().addClass(this.id+'_hide');
+    }
+    $('[class*="_hide"]').hide();
+    $('#rTable tr').not('[class*="_hide"]').show()
+
+  });
   setTimeout(refreshAP,1500);
+
+  
+  $('#otadiv').on('hidden.bs.modal', function () {
+    // reset flash status. This should stop the state machine from
+    // executing steps up to flashing itself.
+    flash_state=flash_status_codes.NONE;
+  });
   $('#WifiConnectDialog').on('shown.bs.modal', function () {
     $("*[class*='connecting']").hide();
     if(ConnectingToSSID.Action!==ConnectingToActions.STS){
@@ -520,7 +873,10 @@ $(document).ready(function() {
     $('#WifiConnectDialog input').val('');
   })
   
-  
+  $('#uCnfrm').on('shown.bs.modal', function () {
+    $('#selectedFWURL').text($('#fw-url-input').val());
+  })
+ 
   $('input#show-commands')[0].checked = LastCommandsState === 1;
   $('a[href^="#tab-commands"]').hide();
   $('#load-nvs').on('click', function() {
@@ -704,41 +1060,112 @@ $(document).ready(function() {
       xhttp.open('POST', uploadPath, true);
       xhttp.send(file);
     }
-    enableStatusTimer = true;
   });
-  $('#flash').on('click', function() {
-    const data = {
-      timestamp: Date.now(),
-    };
-    if (blockFlashButton) {
-      return;
-    }
-    blockFlashButton = true;
-    const url = $('#fwurl').val();
-    data.config = {
-      fwurl: {
-        value: url,
-        type: 33,
-      },
-    };
+  // $('#flash').on('click', function() {
+  //   const data = {
+  //     timestamp: Date.now(),
+  //   };
+  //   if (blockFlashButton) {
+  //     return;
+  //   }
+  //   blockFlashButton = true;
+  //   const url = $('#fwurl').val();
+  //   data.config = {
+  //     fwurl: {
+  //       value: url,
+  //       type: 33,
+  //     },
+  //   };
 
-    $.ajax({
-      url: '/config.json',
-      dataType: 'text',
-      method: 'POST',
-      cache: false,
-      contentType: 'application/json; charset=utf-8',
-      data: JSON.stringify(data),
-      error: handleExceptionResponse,
-    });
-    enableStatusTimer = true;
-  });
+  //   $.ajax({
+  //     url: '/config.json',
+  //     dataType: 'text',
+  //     method: 'POST',
+  //     cache: false,
+  //     contentType: 'application/json; charset=utf-8',
+  //     data: JSON.stringify(data),
+  //     error: handleExceptionResponse,
+  //   });
+  //   enableStatusTimer = true;
+  // });
 
   $('[name=output-tmpl]').on('click', function() {
     handleTemplateTypeRadio(this.id);
   });
 
-  $('#fwcheck').on('click', function() {
+  $('#chkUpdates').on('click', function() {
+    $('#rTable').html('');
+    $.getJSON(releaseURL, function(data) {
+      let i = 0;
+      const branches = [];
+      data.forEach(function(release) {
+        const namecomponents = release.name.split('#');
+        const branch = namecomponents[3];
+        if (!branches.includes(branch)) {
+          branches.push(branch);
+        }
+      });
+      let fwb='';
+      branches.forEach(function(branch) {
+        fwb += '<option value="' + branch + '">' + branch + '</option>';
+      });
+      $('#fwbranch').append(fwb);
+
+      data.forEach(function(release) {
+        let url = '';
+        release.assets.forEach(function(asset) {
+          if (asset.name.match(/\.bin$/)) {
+            url = asset.browser_download_url;
+          }
+        });
+        const namecomponents = release.name.split('#');
+        const ver = namecomponents[0];
+        const cfg = namecomponents[2];
+        const branch = namecomponents[3];
+        var bits = ver.substr(ver.lastIndexOf('-')+1);
+        bits = (bits =='32' || bits == '16')?bits:'';
+
+        let body = release.body;
+        body = body.replace(/'/gi, '"');
+        body = body.replace(
+          /[\s\S]+(### Revision Log[\s\S]+)### ESP-IDF Version Used[\s\S]+/,
+          '$1'
+        );
+        body = body.replace(/- \(.+?\) /g, '- ');
+        $('#rTable').append(`<tr class='release ' fwurl='${url}'>
+        <td data-toggle='tooltip' title='${body}'>${ver}</td><td>${new Date(release.created_at).toLocalShort()}
+        </td><td class='upf'>${cfg}</td><td>${branch}</td><td>${bits}</td></tr>`
+        );
+      });
+      if (i > 7) {
+        $('#releaseTable').append(
+          "<tr id='showall'>" +
+            "<td colspan='6'>" +
+            "<input type='button' id='showallbutton' class='btn btn-info' value='Show older releases' />" +
+            '</td>' +
+            '</tr>'
+        );
+        $('#showallbutton').on('click', function() {
+          $('tr.hide').removeClass('hide');
+          $('tr#showall').addClass('hide');
+        });
+      }
+      $('#searchfw').css('display', 'inline');
+      if($('.upf').filter(function(){ return $(this).text().toUpperCase()===project_name.toUpperCase()}).length>0){
+        $('#splf').val(project_name).trigger('input');
+      }
+      $('#rTable tr.release').on('click', function() {
+        $('#fw-url-input').val(this.attributes['fwurl'].value);
+        $('#start-flash').show();
+        $('#rTable tr.release').removeClass('table-success table-warning');
+        $(this).addClass('table-success table-warning');
+      });
+
+    }).fail(function() {
+      alert('failed to fetch release history!');
+    });    
+  });
+    $('#fwcheck').on('click', function() {    
     $('#releaseTable').html('');
     $('#fwbranch').empty();
     $.getJSON(releaseURL, function(data) {
@@ -824,61 +1251,54 @@ $(document).ready(function() {
     });
   });
 
-  $('input#searchinput').on('input', function() {
-    const s = $('input#searchinput').val();
-    const re = new RegExp(s, 'gi');
-    if (s.length === 0) {
-      $('tr.release').removeClass('hide');
-    } else if (s.length < 3) {
-      $('tr.release').addClass('hide');
-    } else {
-      $('tr.release').addClass('hide');
-      $('tr.release').each(function() {
-        $(this)
-          .find('td')
-          .each(function() {
-            if (
-              $(this)
-                .html()
-                .match(re)
-            ) {
-              $(this)
-                .parent()
-                .removeClass('hide');
-            }
-          });
-      });
-    }
-  });
+  // $('input#searchinput').on('input', function() {
+  //   const s = $('input#searchinput').val();
+  //   const re = new RegExp(s, 'gi');
+  //   if (s.length === 0) {
+  //     $('tr.release').removeClass('hide');
+  //   } else if (s.length < 3) {
+  //     $('tr.release').addClass('hide');
+  //   } else {
+  //     $('tr.release').addClass('hide');
+  //     $('tr.release').each(function() {
+  //       $(this)
+  //         .find('td')
+  //         .each(function() {
+  //           if (
+  //             $(this)
+  //               .html()
+  //               .match(re)
+  //           ) {
+  //             $(this)
+  //               .parent()
+  //               .removeClass('hide');
+  //           }
+  //         });
+  //     });
+  //   }
+  // });
 
-  $('#fwbranch').on('change', function() {
-    const branch = this.value;
-    const re = new RegExp('^' + branch + '$', 'gi');
-    $('tr.release').addClass('hide');
-    $('tr.release').each(function() {
-      $(this)
-        .find('td')
-        .each(function() {
-          console.log($(this).html());
-          if (
-            $(this)
-              .html()
-              .match(re)
-          ) {
-            $(this)
-              .parent()
-              .removeClass('hide');
-          }
-        });
-    });
-  });
-
-  $('#boot-button').on('click', function() {
-    enableStatusTimer = true;
-  });
-  $('#reboot-button').on('click', function() {
-    enableStatusTimer = true;
-  });
+  // $('#fwbranch').on('change', function() {
+  //   const branch = this.value;
+  //   const re = new RegExp('^' + branch + '$', 'gi');
+  //   $('tr.release').addClass('hide');
+  //   $('tr.release').each(function() {
+  //     $(this)
+  //       .find('td')
+  //       .each(function() {
+  //         console.log($(this).html());
+  //         if (
+  //           $(this)
+  //             .html()
+  //             .match(re)
+  //         ) {
+  //           $(this)
+  //             .parent()
+  //             .removeClass('hide');
+  //         }
+  //       });
+  //   });
+  // });
 
   $('#updateAP').on('click', function() {
     refreshAP();
@@ -1023,7 +1443,7 @@ function refreshAPHTML2(data) {
       $('#wifiTable').prepend(`${formatAP(ConnectedToSSID.ssid, ConnectedToSSID.rssi ?? 0, 0)}`);
     }
     $(wifiSelector).filter(function() {return $(this).text() === ConnectedToSSID.ssid;  }).siblings().first().html('&check;').parent().addClass((ConnectedToSSID.urc === connectReturnCode.UPDATE_CONNECTION_OK?'table-success':'table-warning'));
-    $('span#foot-wifi').html(`, SSID: <strong>${ConnectedToSSID.ssid}</strong>, IP: <strong>${ConnectedToSSID.ip}</strong>`);    
+    $('span#foot-wifi').html(`SSID: <strong>${ConnectedToSSID.ssid}</strong>, IP: <strong>${ConnectedToSSID.ip}</strong>`);    
     $('#wifiStsIcon').attr('xlink:href',rssiToIcon(ConnectedToSSID.rssi));
   }
   else {
@@ -1067,6 +1487,12 @@ function showTask(task) {
       '</td></tr>'
   );
 }
+function btExists(name){
+  return getBTSinkOpt(name).length>0;
+}
+function getBTSinkOpt(name){
+  return $(`${btSinkNamesOptSel} option:contains('${name}')`);
+}
 function getMessages() {
   $.getJSON('/messages.json?1', async function(data) {
     for (const msg of data) {
@@ -1075,23 +1501,13 @@ function getMessages() {
       msgTime.setTime(msgTime.getTime() - msgAge);
       switch (msg.class) {
         case 'MESSAGING_CLASS_OTA':
-          // message: "{"ota_dsc":"Erasing flash complete","ota_pct":0}"
           var otaData = JSON.parse(msg.message);
-          if ((otaData.ota_pct ?? 0) !== 0) {
-            otapct = otaData.ota_pct;
-            $('.progress-bar')
-              .css('width', otapct + '%')
-              .attr('aria-valuenow', otapct);
-            $('.progress-bar').html(otapct + '%');
-          }
-          if ((otaData.ota_dsc ??'') !== '') {
-            otadsc = otaData.ota_dsc;
-            $('span#flash-status').html(otadsc);
-            if (msg.type === 'MESSAGING_ERROR' || otapct > 95) {
-              blockFlashButton = false;
-              enableStatusTimer = true;
-            }
-          }
+          handle_flash_state({
+            ota_pct: (otaData.ota_pct ?? 0),
+            ota_dsc: (otaData.ota_dsc ??''),
+            type: msg.type,
+            event: flash_events.MESSAGES
+          });
           break;
         case 'MESSAGING_CLASS_STATS':
           // for task states, check structure : task_state_t
@@ -1134,9 +1550,34 @@ function getMessages() {
           showCmdMessage(msgparts[1], msg.type, msgparts[2], true);
           break;
         case 'MESSAGING_CLASS_BT':
+          if($("#cfg-audio-bt_source-sink_name").is('input')){
+          var attr=$("#cfg-audio-bt_source-sink_name")[0].attributes;
+          var attrs='';
+          for (var j = 0; j < attr.length; j++) {
+              if(attr.item(j).name!="type"){
+                attrs+=`${attr.item(j).name } = "${attr.item(j).value}" `;
+              }
+          }
+          var curOpt=$("#cfg-audio-bt_source-sink_name")[0].value;
+            $("#cfg-audio-bt_source-sink_name").replaceWith(`<select id="cfg-audio-bt_source-sink_name" ${attrs}><option value="${curOpt}" data-description="${curOpt}">${curOpt}</option></select> `);
+          }
           JSON.parse(msg.message).forEach(function(btEntry) {
-            showMessage({ type:msg.type, message:`BT Audio device found: ${btEntry.name} RSSI: ${btEntry.rssi} `}, msgTime);
+            //<input type="text" class="form-control bg-success" placeholder="name" hasvalue="true" longopts="sink_name" shortopts="n" checkbox="false" cmdname="cfg-audio-bt_source" id="cfg-audio-bt_source-sink_name" name="cfg-audio-bt_source-sink_name">
+            //<select hasvalue="true" longopts="jack_behavior" shortopts="j" checkbox="false" cmdname="cfg-audio-general" id="cfg-audio-general-jack_behavior" name="cfg-audio-general-jack_behavior" class="form-control "><option>--</option><option>Headphones</option><option>Subwoofer</option></select>            
+            if(!btExists(btEntry.name)){
+              $("#cfg-audio-bt_source-sink_name").append(`<option>${btEntry.name}</option>`);
+              showMessage({ type:msg.type, message:`BT Audio device found: ${btEntry.name} RSSI: ${btEntry.rssi} `}, msgTime);
+            }
+            getBTSinkOpt(btEntry.name).attr('data-description', `${btEntry.name} (${btEntry.rssi}dB)`)
+                                      .attr('rssi',btEntry.rssi)
+                                      .attr('value',btEntry.name)
+                                      .text(`${btEntry.name} [${btEntry.rssi}dB]`).trigger('change');
+            
           });
+          $(btSinkNamesOptSel).append($(`${btSinkNamesOptSel} option`).remove().sort(function(a, b) { 
+              console.log(`${parseInt($(a).attr('rssi'))} < ${parseInt( $(b).attr('rssi'))} ? `);
+              return parseInt($(a).attr('rssi')) < parseInt( $(b).attr('rssi')) ? 1 : -1; 
+            }));
           break;
         default:
           break;
@@ -1165,7 +1606,6 @@ function handleRecoveryMode(data) {
   } else {
     $('*[href*="-nvs"]').hide();
   }
-  enableStatusTimer = true;
   if (locRecovery === 1) {
     recovery = true;
     $('.recovery_element').show();
@@ -1297,9 +1737,6 @@ function batteryToIcon(voltage) {
 }
 function checkStatus() {
   RepeatCheckStatusInterval();
-  if (!enableStatusTimer) {
-    return;
-  }
   if (blockAjax) {
     return;
   }
@@ -1309,15 +1746,14 @@ function checkStatus() {
     handleRecoveryMode(data);
     handleWifiStatus(data);
     handlebtstate(data);
-    let pname = '';
+    handle_flash_state(data);
     if (data.project_name && data.project_name !== '') {
-      pname = data.project_name;
+      project_name = data.project_name;
     }
     if (data.version && data.version !== '') {
       versionName=data.version;
-      appTitle= (versionName.toLowerCase().includes('squeezeamp')?"SqueezeAmp":"SqueezeESP32");
-      $("#navtitle").text= `${appTitle}`;
-      $('span#foot-fw').html(`fw: <strong>${versionName}</strong>, mode: <strong>${pname}</strong>`);
+      $("#navtitle").html(`${project_name}${recovery?'<br>[recovery]':''}`);
+      $('span#foot-fw').html(`fw: <strong>${versionName}</strong>, mode: <strong>${recovery?"Recovery":project_name}</strong>`);
     } else {
       $('span#flash-status').html('');
     }
@@ -1352,8 +1788,11 @@ window.runCommand = function(button, reboot) {
       const attr = allfields[i].attributes;
       let qts = '';
       let opt = '';
-      let isSelect = allfields[i].attributes.class.value === 'custom-select';
-      if ((isSelect && allfields[i].selectedIndex !== 0) || !isSelect) {
+      let isSelect = $(allfields[i]).is('select');
+      const hasValue=attr.hasvalue.value === 'true';
+      const validVal=(isSelect && allfields[i].value !== '--' ) || ( !isSelect && allfields[i].value !== '' );
+
+      if ( !hasValue|| hasValue && validVal)  {
         if (attr.longopts.value !== 'undefined') {
           opt += '--' + attr.longopts.value;
         } else if (attr.shortopts.value !== 'undefined') {
@@ -1401,7 +1840,6 @@ window.runCommand = function(button, reboot) {
       }
     },
   });
-  enableStatusTimer = true;
 }
 function getLongOps(data, name, longopts){
   return data.values[name]!==undefined?data.values[name][longopts]:"";
@@ -1418,7 +1856,7 @@ function getCommands() {
 
         // innerhtml+='<tr class="table-light"><td>'+(isConfig?'<h1>':'');
         innerhtml +=
-          '<div class="card text-white bg-primary mb-3"><div class="card-header">' +
+          '<div class="card text-white mb-3"><div class="card-header">' +
           command.help.encodeHTML().replace(/\n/g, '<br />') +
           '</div><div class="card-body">';
         innerhtml += '<fieldset id="flds-' + command.name + '">';
@@ -1602,7 +2040,9 @@ function getConfig() {
           $('#player').val(val);
           document.title = val;
           hostName = val;
-        } 
+        } else if (key === 'rel_api') {
+           releaseURL = val;
+        }
         $('tbody#nvsTable').append(
           '<tr>' +
             '<td>' +

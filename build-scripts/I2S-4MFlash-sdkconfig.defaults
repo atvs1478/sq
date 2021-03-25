@@ -34,7 +34,9 @@ CONFIG_SPDIF_WS_IO=-1
 CONFIG_SPDIF_DO_IO=-1
 CONFIG_MUTE_GPIO=-1
 CONFIG_MUTE_GPIO_LEVEL=-1
-
+CONFIG_RELEASE_API="https://api.github.com/repos/sle118/squeezelite-esp32/releases"
+CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+CONFIG_PROJECT_NAME="Squeezelite-ESP32"
 #
 # SDK tool configuration
 #

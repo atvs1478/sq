@@ -9,15 +9,20 @@ const HtmlWebPackPlugin = require('html-webpack-plugin');
 const SpriteLoaderPlugin = require('svg-sprite-loader/plugin');
 const { Command } = require('commander');
 let  cmdLines= { };
+var { parseArgsStringToArgv } = require('string-argv');
+
 const data = {
     messages: require("../mock/messages.json"),
     messagequeue: require("../mock/messages.json"),
+    message_queue_sequence: [],
     commands: require("../mock/commands.json"),
     scan: require("../mock/scan.json"),
     ap: require("../mock/ap.json"),
     config: require("../mock/config.json"),
     statusdefinition: require("../mock/statusdefinition.json"),
-    status: require("../mock/status.json")
+    status: require("../mock/status.json"),
+    messages_ota_fail: require("../mock/messages_ota_fail.json"),
+    messages_ota: require("../mock/messages_ota.json")
 };
 const messagingTypes= {
 	MESSAGING_INFO : 'MESSAGING_INFO',
@@ -32,6 +37,7 @@ const messagingClass= {
 	MESSAGING_CLASS_BT: 'MESSAGING_CLASS_BT'
 } ;
 function requeueMessages(){
+    data.messagequeue = [];
     data.messagequeue.push(...data.messages);
     console.log(`Re-queued ${data.messages.length} messages. Total queue length is: ${data.messagequeue.length}`);
 }
@@ -70,7 +76,7 @@ for(const cmdIdx in data.commands.commands){
         cmd: new Command(),
     };
     cmdLines[cmd.name].cmd
-        .storeOptionsAsProperties(false)
+        .storeOptionsAsProperties(true)
         .name(cmd.name)
         .exitOverride();
     for(const argIdx in cmd.argtable){
@@ -107,6 +113,8 @@ module.exports = merge(common, {
         port: 9100,
         host: 'desktop-n8u8515',//your ip address
         disableHostCheck: true,
+        headers: {'Access-Control-Allow-Origin': '*',
+    'Accept-Encoding': 'identity'},
         overlay: true,
 
         before: function(app) {
@@ -117,6 +125,9 @@ module.exports = merge(common, {
             app.get('/config.json', function(req, res) { res.json( data.config ); });
             app.get('/status.json', function(req, res) { res.json( data.status ); });
             app.get('/messages.json', function(req, res) { 
+                if(data.message_queue_sequence.length>0){
+                    data.messagequeue.push(data.message_queue_sequence.shift());
+                }
                 res.json( data.messagequeue ) ; 
                 data.messagequeue=[];
             });
@@ -127,9 +138,12 @@ module.exports = merge(common, {
                 console.log(req.body.command);
                 try {
                     const cmdName=req.body.command.split(" ")[0];
-                    const args=('node '+req.body.command).split(" ");
+                    const args=parseArgsStringToArgv(req.body.command,'node ');
                     let cmd=cmdLines[cmdName].cmd;
                     if(cmd){
+                        for (const property in cmd.opts()) {
+                            delete cmd[property];
+                        }
                         cmd.parse(args);
                         const msg=`Received Options: ${JSON.stringify(cmd.opts())}\n`;
                         console.log('Options: ', cmd.opts());
@@ -142,20 +156,39 @@ module.exports = merge(common, {
                 res.json( { 'Result' : 'Success' } ); 
             });
             app.post('/config.json', function(req, res) { 
+                var fwurl='';
                 console.log(req.body);
                 console.log(data.config);
                 for (const property in req.body.config) {
                     console.log(`${property}: ${req.body.config[property].value}`);
-                    if(data.config[property]=== undefined){
-                        console.log(`Added config value ${property} [${req.body.config[property].value}]`);
-                        data.config[property] = {value: req.body.config[property].value};
+                    if(property=='fwurl'){
+                        fwurl=req.body.config[property].value;
                     }
-                    else if (data.config[property].value!=req.body.config[property].value){
-                        console.log(`Updated config value ${property}\nFrom: ${data.config[property].value}\nTo: ${req.body.config[property].value}]`);
-                        data.config[property].value=req.body.config[property].value;
+                    else {
+                        if(data.config[property]=== undefined){
+                            console.log(`Added config value ${property} [${req.body.config[property].value}]`);
+                            data.config[property] = {value: req.body.config[property].value};
+                        }
+                        else if (data.config[property].value!=req.body.config[property].value){
+                            console.log(`Updated config value ${property}\nFrom: ${data.config[property].value}\nTo: ${req.body.config[property].value}]`);
+                            data.config[property].value=req.body.config[property].value;
+                        }
                     }
+
                   }
                 res.json( {} ); 
+                if(fwurl!==''){
+                    data.status.recovery=1;
+                    requeueMessages();
+                    if(fwurl.toLowerCase().includes('fail')){
+                        console.log(`queuing ${data.messages_ota_fail.length} ota messages `);
+                        data.message_queue_sequence.push(...data.messages_ota_fail);
+                    }
+                    else {
+                        console.log(`queuing ${data.messages_ota.length} ota messages `);
+                        data.message_queue_sequence.push(...data.messages_ota);
+                    }
+                }
             });
             app.post('/status.json', function(req, res) { 
 

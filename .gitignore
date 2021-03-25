@@ -98,3 +98,5 @@ test/.vscode/
 
 node_modules/*
 esp-dsp/
+
+components/wifi-manager/webapp/webpack/dist

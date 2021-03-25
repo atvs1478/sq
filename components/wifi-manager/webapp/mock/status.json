@@ -1,6 +1,6 @@
 {
-	"project_name": "dev-server",
-	"version": "webpack",
+	"project_name": "SqueezeAMP",
+	"version": "local.500.cmake-master",
 	"recovery": 1,
 	"Jack": "1",
 	"Voltage": 0,

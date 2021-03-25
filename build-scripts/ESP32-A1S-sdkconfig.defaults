@@ -29,7 +29,9 @@ CONFIG_SPDIF_DO_IO=-1
 CONFIG_DAC_CONFIG="model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32"
 CONFIG_MUTE_GPIO=-1
 CONFIG_MUTE_GPIO_LEVEL=-1
-
+CONFIG_RELEASE_API="https://api.github.com/repos/sle118/squeezelite-esp32/releases"
+CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
+CONFIG_PROJECT_NAME="Squeezelite-A1S"
 CONFIG_IDF_TARGET_ESP32=y
 CONFIG_IDF_TARGET="esp32"
 CONFIG_IDF_FIRMWARE_CHIP_ID=0x0000

@@ -125,58 +125,79 @@ module.exports = merge(common, {
         //     }
         // }),
         new WebpackOnBuildPlugin(function(stats) {
-                var getDirectories = function (src, callback) {
-                    glob(`${src}/**/*(*.gz|favicon-32x32.png)`, callback);
-                  };
-                getDirectories('./webpack/dist', function (err, list) {
-                    if (err) {
-                        console.log('Error', err);
-                    } else {
-                        const regex = /^(.*\/)([^\/]*)$/
-                        const relativeRegex = /(\w+\/[^\/]*)$/
-                        const makePathRegex = /([^\.].*)$/
-                        let exportDefHead=
-                        '/***********************************\n'+
-                        'webpack_headers\n'+
-                        stats+'\n'+
-                        '***********************************/\n'+
-                        '#pragma once\n'+
-                        '#include <inttypes.h>\n'+
-                        'extern const char * resource_lookups[];\n'+
-                        'extern const uint8_t * resource_map_start[];\n'+
-                        'extern const uint8_t * resource_map_end[];\n';
-                        let exportDef=  '// Automatically generated. Do not edit manually!.\n'+
-                                        '#include <inttypes.h>\n';
-                        let lookupDef='const char * resource_lookups[] = {\n';
-                        let lookupMapStart='const uint8_t * resource_map_start[] = {\n';
-                        let lookupMapEnd='const uint8_t * resource_map_end[] = {\n';
-                        let cMake='';
-                        list.forEach(fileName=>{
-                              let exportName=fileName.match(regex)[2].replace(/[\. \-]/gm,'_');
-                              let relativeName=fileName.match(relativeRegex)[1];
-                              exportDef+=	'extern const uint8_t _'+exportName+'_start[] asm("_binary_'+exportName+'_start");\n'+
-                                        'extern const uint8_t _'+exportName+'_end[] asm("_binary_'+exportName+'_end");\n';
-                              lookupDef+='\t"/'+relativeName+'",\n';
-                              lookupMapStart+='\t_'+ exportName+'_start,\n';
-                              lookupMapEnd+= '\t_'+ exportName+'_end,\n';
-                              cMake+='target_add_binary_data( __idf_wifi-manager ./webapp'+fileName.match(makePathRegex)[1]+' BINARY)\n';
-                        });
 
-                        lookupDef+='""\n};\n';
-                        lookupMapStart=lookupMapStart.substring(0,lookupMapStart.length-2)+'\n};\n';
-                        lookupMapEnd=lookupMapEnd.substring(0,lookupMapEnd.length-2)+'\n};\n';
+            var getDirectories = function (src, callback) {
+                glob(`${src}/**/*(*.gz|favicon-32x32.png)`, callback);
+                };
+            console.log('Cleaning up previous builds');
+            glob(`../../../build/*.S`, function (err, list) {                  
+                if (err) {
+                    console.error('Error', err);
+                } else {
+                    list.forEach(fileName=>{
                         try {
-                            fs.writeFileSync('webapp.cmake', cMake);
-                            fs.writeFileSync('webpack.c', exportDef+lookupDef+lookupMapStart+lookupMapEnd);
-                            fs.writeFileSync('webpack.h', exportDefHead);
-                            //file written successfully
-                          } catch (e) {
-                            console.error(e);
-                          }        
-                    }
-                    });                
-               }),
-               new BundleAnalyzerPlugin()               
+                            console.log(`Purging old binary file ${fileName} from C project.`);
+                            fs.unlinkSync(fileName)
+                            //file removed
+                            } catch(ferr) {
+                            console.error(ferr)
+                            }
+                    });
+                }
+            }
+            );
+            console.log('Generating C include files from webpack build output');
+            getDirectories('./webpack/dist', function (err, list) {
+                if (err) {
+                    console.log('Error', err);
+                } else {
+                    const regex = /^(.*\/)([^\/]*)$/
+                    const relativeRegex = /(\w+\/[^\/]*)$/
+                    const makePathRegex = /([^\.].*)$/
+                    let exportDefHead=
+                    '/***********************************\n'+
+                    'webpack_headers\n'+
+                    stats+'\n'+
+                    '***********************************/\n'+
+                    '#pragma once\n'+
+                    '#include <inttypes.h>\n'+
+                    'extern const char * resource_lookups[];\n'+
+                    'extern const uint8_t * resource_map_start[];\n'+
+                    'extern const uint8_t * resource_map_end[];\n';
+                    let exportDef=  '// Automatically generated. Do not edit manually!.\n'+
+                                    '#include <inttypes.h>\n';
+                    let lookupDef='const char * resource_lookups[] = {\n';
+                    let lookupMapStart='const uint8_t * resource_map_start[] = {\n';
+                    let lookupMapEnd='const uint8_t * resource_map_end[] = {\n';
+                    let cMake='';
+                    list.forEach(fileName=>{
+                            let exportName=fileName.match(regex)[2].replace(/[\. \-]/gm,'_');
+                            let relativeName=fileName.match(relativeRegex)[1];
+                            exportDef+=	'extern const uint8_t _'+exportName+'_start[] asm("_binary_'+exportName+'_start");\n'+
+                                    'extern const uint8_t _'+exportName+'_end[] asm("_binary_'+exportName+'_end");\n';
+                            lookupDef+='\t"/'+relativeName+'",\n';
+                            lookupMapStart+='\t_'+ exportName+'_start,\n';
+                            lookupMapEnd+= '\t_'+ exportName+'_end,\n';
+                            cMake+='target_add_binary_data( __idf_wifi-manager ./webapp'+fileName.match(makePathRegex)[1]+' BINARY)\n';
+                    });
+
+                    lookupDef+='""\n};\n';
+                    lookupMapStart=lookupMapStart.substring(0,lookupMapStart.length-2)+'\n};\n';
+                    lookupMapEnd=lookupMapEnd.substring(0,lookupMapEnd.length-2)+'\n};\n';
+                    try {
+                        fs.writeFileSync('webapp.cmake', cMake);
+                        fs.writeFileSync('webpack.c', exportDef+lookupDef+lookupMapStart+lookupMapEnd);
+                        fs.writeFileSync('webpack.h', exportDefHead);
+                        //file written successfully
+                        } catch (e) {
+                        console.error(e);
+                        }        
+                }
+            });
+            console.log('Post build completed.');
+
+        }),
+        new BundleAnalyzerPlugin()               
     ]
 });
 

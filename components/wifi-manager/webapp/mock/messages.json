@@ -67,7 +67,14 @@
 		"sent_time":	6245,
 		"current_time":	6364
 	}, {
-		"message":	"[{\n\t\t\"name\":\t\"SMSL BT4.2\",\n\t\t\"rssi\":\t-129\n\t}]",
+		"message":	"[{\n\t\t\"name\":\t\"BOSE BT\",\n\t\t\"rssi\":\t-129\n\t}]",
+		"type":	"MESSAGING_INFO",
+		"class":	"MESSAGING_CLASS_BT",
+		"sent_time":	6259,
+		"current_time":	6364
+	}
+	, {
+		"message":	"[{\n\t\t\"name\":\t\"BOSE2 BT\",\n\t\t\"rssi\":\t-50\n\t}]",
 		"type":	"MESSAGING_INFO",
 		"class":	"MESSAGING_CLASS_BT",
 		"sent_time":	6259,

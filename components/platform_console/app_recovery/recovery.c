@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <string.h>
+#include "application_name.h"
 #include "esp_err.h"
 #include "esp_app_format.h"
+
 extern esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t length);
 
 const __attribute__((section(".rodata_desc"))) esp_app_desc_t esp_app_desc = {
     .magic_word = ESP_APP_DESC_MAGIC_WORD,
     .version = PROJECT_VER,
-    .project_name = PROJECT_NAME,
+    .project_name = CONFIG_PROJECT_NAME,
     .idf_ver = IDF_VER,
 
 #ifdef CONFIG_BOOTLOADER_APP_SECURE_VERSION

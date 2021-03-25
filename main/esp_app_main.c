@@ -20,7 +20,6 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "esp_wifi.h"
-#include "esp_system.h"
 #include <esp_event.h>
 #include "nvs_flash.h"
 #include "esp_log.h"
@@ -291,8 +290,8 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONTROL_DELAY_MS));
 
 	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", SQUEEZELITE_ESP32_RELEASE_URL);
-	config_set_default(NVS_TYPE_STR, "release_url", SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL);
+	config_set_default(NVS_TYPE_STR, "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL, 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_address",CONFIG_DEFAULT_AP_IP );
 	config_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY );
@@ -382,6 +381,10 @@ void register_default_nvs(){
 	
 	ESP_LOGD(TAG,"Registering default value for key %s", "stats");
 	config_set_default(NVS_TYPE_STR, "stats", "n", 0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s", "rel_api");
+	config_set_default(NVS_TYPE_STR, "rel_api", CONFIG_RELEASE_API, 0);
+
 	wait_for_commit();
 	ESP_LOGD(TAG,"Done setting default values in nvs.");
 }

@@ -1,4 +1,19 @@
+
+
 body {
+    min-height: 100vh; 
+  }
+.border-bottom  {
+    border-width:3px !important;
+}
+
+.border-top {
+    border-width:3px !important;
+}
+tr.hide {
+    display: none;
+}
+/* body {
     border: 0;
     margin: 0;
     margin-bottom:50px;
@@ -135,7 +150,7 @@ h3 {
 .fr {
     float: right;
     margin-right: 20px;
-}
+} */
 /* .w0 {
     background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTJDBGvsAAABzUlEQVRIS+WUTShEURTH3zyRhjQ+8hWxmCJMoSzEwsbCgi1LZRYW9pONptiwka9iI81CWFpYaEqNMkVKmpWN1IhYKN9ZDL/z3p3mxZh5g9X4168799xz/vPefedeLeuVC+3gdTgc07CsmCQ2DI2gg21Jci30wSpGt/CeghickTsHPVACDkgqp67rPgpO4E0ZZMIj7OHhxSvPtEyomcVDeFXJv+EZNvEsNa01rZfAuSUhThR2wU+ObJkbyhRNMMDaDIThBqy1MdZ3wAPawqfFC2Lj0Ab5kpBGxdAJs9TeW72ITUhCPZMjFYwwbwXpnkwlDzOIx50yXwP5c0MeggHGanNqSDqqBqQ7/Kxvg2zHAfMN8IE8uZhYO6eBnBXGKnOakLWfaQZ9jMRjSPXhZUuC5A9JjVFpKkeNSVVA0Tq8KJN0yFl4gilqbW2tm+SQKoybXIG8jcT34RSsh1Byt6iVg2ZLlRCg6JpROqEDpFheXZ5S9rcLFsl5YJwHad+MVA5y13w5lRY5oRsKjdm/Vz/7LR86zG+5wr+9NX+iOowjEO+aELEic+lv1ILppeUPosRst6QduTANgnE2mC+BnYswI1VwfYzCCL9dZij7pWkf6UeSTYAuE/QAAAAASUVORK5CYII=') no-repeat left top;
     height: 24px;
@@ -157,7 +172,7 @@ h3 {
     height: 24px;
 } */
 /* SpinKit is licensed under the MIT License. Copyright (c) 2015 Tobias Ahlin */
-.spinner {
+/* .spinner {
     width: 40px;
     height: 40px;
   
@@ -197,11 +212,11 @@ h3 {
       transform: scale(1.0);
       -webkit-transform: scale(1.0);
     }
-  }
+  } */
 /* end of SpinKit */
 
 /* daduke stuff */
-input[type='text'], input[type='password'], textarea, select, option {
+/* input[type='text'], input[type='password'], textarea, select, option {
   background: #999;
   border: 0;
   padding: 4px;
@@ -229,8 +244,8 @@ input[type='text'], input[type='password'], textarea, select, option {
   pointer-events: all;
   border-radius: 1rem;
   background-color: #f00;
-}
-
+} */
+/* 
 .custom-switch .custom-control-label::after {
   top: calc(0.25rem + 2px);
   left: calc(-2.25rem + 2px);
@@ -246,8 +261,8 @@ input[type='text'], input[type='password'], textarea, select, option {
   .custom-switch .custom-control-label::after {
     transition: none;
   }
-}
-
+} */
+/* 
 .custom-switch .custom-control-input:checked ~ .custom-control-label::before {
   background-color: #0f0;
 }
@@ -307,7 +322,7 @@ input, textarea {
 span#flash-status {
     padding-left: 15px;
     font-size: 120%;
-}
+} */
 
 /* #info {
     padding-top: 7px;
@@ -342,7 +357,7 @@ ul#navbar {
     border-top: 1px solid black;
 } */
 
-.footer {
+/* .footer {
   position: fixed;
   left: 0;
   bottom: 0;
@@ -350,8 +365,8 @@ ul#navbar {
   background-color: #555;
   color: white;
   text-align: center;
-}
-
+} */
+/* 
 .sl {
     background-color: #053c1e;
 }
@@ -377,23 +392,21 @@ div#message {
     width:20em;
     height:4em;
     text-align: center;
-    margin-left: -10em; /*set to a negative number 1/2 of your width*/
-    margin-top: -2em; /*set to a negative number 1/2 of your height*/
+    margin-left: -10em; 
+    margin-top: -2em; 
     border-radius: 8px;
     box-shadow: 0px 5px 2px -5px rgba(255, 255, 255, 0.5) inset, 0px 10px 20px -5px rgba(255, 255, 255, 0.1) inset, 0 0px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 1px rgba(0, 0, 0, 0.12), 0 1px 10px 0 rgba(0, 0, 0, 0.3);
     z-index: 20;
-}
-
-tr.hide {
-    display: none;
-}
-
+} */
+/* 
+ */
+/* 
 #searchfw {
     float: right;
     display: none;
-}
+} */
 
-button#updateAP {
+/* button#updateAP {
     float: right;
     display: inline;
-}
+} */
