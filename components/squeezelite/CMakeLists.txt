@@ -31,10 +31,6 @@ set_source_files_properties(flac.c
 
 add_definitions(-DLINKALL -DLOOPBACK -DNO_FAAD -DEMBEDDED -DTREMOR_ONLY -DCUSTOM_VERSION=${BUILD_NUMBER})
 
-if(NOT DEFINED DEPTH)
-	set(DEPTH "16")
-endif()	
-
 if (${DEPTH} EQUAL "32")
 	add_definitions(-DBYTES_PER_FRAME=8)
 else()	
