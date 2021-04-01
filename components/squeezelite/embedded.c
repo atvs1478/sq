@@ -15,6 +15,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "monitor.h"
+#include "platform_config.h"
 
 mutex_type slimp_mutex;
 
@@ -69,3 +70,27 @@ u16_t get_plugged(void) {
 u8_t get_battery(void) {
 	return (battery_level_svc() * 16) / 100;
 }	 
+
+void set_name(char *name) {
+	char *cmd = config_alloc_get(NVS_TYPE_STR, "autoexec1");
+	char *p, *q;
+	
+	if (!cmd) return;
+
+	if ((p = strstr(cmd, " -n")) != NULL) {
+		q = p + 3;
+		// in case some smart dude has a " -" in player's name
+		while ((q = strstr(q, " -")) != NULL) {
+			if (!strchr(q, '"') || !strchr(q+1, '"')) break;
+			q++;
+		}
+		if (q) memmove(p, q, strlen(q) + 1);
+		else *p = '\0';
+	}
+
+	asprintf(&q, "%s -n \"%s\"", cmd, name);
+    config_set_value(NVS_TYPE_STR, "autoexec1", q);
+	
+	free(q);
+	free(cmd);
+}
