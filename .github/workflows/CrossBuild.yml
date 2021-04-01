@@ -114,6 +114,7 @@ jobs:
           build/size_comp2.txt
           partitions.csv
           sdkconfig
+          server_certs/github.pem
           build_output.zip
     - uses: actions/upload-artifact@v2
       with:
