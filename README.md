@@ -23,8 +23,8 @@ Other features include
  - Full web interface for further configuration/management
  - Firmware over-the-air update 
 
-## Performances (opinions here, so I = @philippe44)
-
+## Performances 
+*(opinions here, so I = @philippe44)*
 The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Some might correctly comment that the WROVER module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that. 
 
 Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but less tests have been done. You can chose to compile it in 32 bits mode. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). 
