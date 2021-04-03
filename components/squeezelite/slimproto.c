@@ -480,6 +480,9 @@ static void process_setd(u8_t *pkt, int len) {
 			LOG_INFO("set name: %s", setd->data);
 			// confirm change to server
 			sendSETDName(setd->data);
+#if EMBEDDED
+			set_name(player_name);
+#endif			
 			// write name to name_file if -N option set
 			if (name_file) {
 				FILE *fp = fopen(name_file, "w");

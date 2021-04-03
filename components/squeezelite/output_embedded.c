@@ -114,7 +114,11 @@ void set_volume(unsigned left, unsigned right) {
 bool test_open(const char *device, unsigned rates[], bool userdef_rates) {
 	memset(rates, 0, MAX_SUPPORTED_SAMPLERATES * sizeof(unsigned));
 	if (!strcasecmp(device, "I2S")) {
-		unsigned _rates[] = { 192000, 176400, 96000, 88200, 48000, 
+		unsigned _rates[] = { 
+#if BYTES_PER_FRAME == 4		
+							  192000, 176400, 
+#endif		
+							  96000, 88200, 48000, 
 							  44100, 32000, 24000, 22050, 16000, 
 							  12000, 11025, 8000, 0 };	
 		memcpy(rates, _rates, sizeof(_rates));

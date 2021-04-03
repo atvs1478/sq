@@ -387,6 +387,7 @@ int set_squeezelite_player_name(FILE * f,const char * name){
 
 	FREE_AND_NULL(nvs_config);
 	FREE_AND_NULL(argv);
+	free(cleaned_name);
 	return nerrors;
 	
 }

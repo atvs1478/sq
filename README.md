@@ -23,18 +23,27 @@ Other features include
  - Full web interface for further configuration/management
  - Firmware over-the-air update 
 
-**Important note** (philippe44 writing)
+## Performances 
+*(opinions presented here so I = @philippe44)*
+The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Some might correctly comment that the WROVER module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that. 
 
-The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but very little tests have been done. You can chose to compile it in 32 bits mode. Note the following limitation in 32 bits
+Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but less tests have been done. You can chose to compile it in 32 bits mode. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). 
 
-- no resampling
-- no equalizer
-- buffer are smaller, so crossfade will be at best 5s at 44.1 kHz
-- SPDIF is 20 bits maximum *(1)*
-- display will be slower
+| Capability                 |16 bits|32 bits| comment         						         |	
+|----------------------------|-------|-------|-------------------------------------------------------------------|
+| max sampling rate          |  192k |  96k  | 192k is very challenging, especially when combined with display   |
+| max bit depth              |  16   |  24   | 24 bits are truncated in 16 bits mode                             | 
+| spdif			     |16 bits|20 bits|		                                                         |
+| mp3, aac, opus, ogg/vorbis |  48k  |  48k  |		                                                         |
+| alac, flac, ogg/flac       |  96k  |  96k  | 		                                                         |
+| pcm, wav, aif              |  192k |  96k  |		                                                         |
+| equalizer                  |   Y   |   N   | 48kHz max (after resampling) - equalization skipped on 96k tracks |
+| resampling                 |   Y   |   N   |		                                                         |
+| cross-fade                 |  10s  |  <5s  | depends on buffer size and sampling rate		                 |
 
-I've not tested all codecs, I've only verified it with TAS57xx DAC and in general I've not tested that mode more than a few minutes. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). On memory Some might correctly comment that wrover module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that.
+The esp32 must run at 240 MHz, with Quad-SPI I/O at 80 MHz and a clock of 40 Mhz. Still, it's a lot to run, especially knowing that it has a serial Flash and PSRAM, so kudos to Espressif for their chipset optimization. Now, to have all the decoding, resampling, equalizing, gain, display, spectrum/vu is a very (very) delicate equilibrium between use of internal /external RAM, tasks priorities and buffer handling. It is not perfect and the more you push the system to the limit, the higher the risk that some files would not play (see below). In general, the display will always have the lowest priority and you'll notice slowdown in scrolling and VU/Spectrum refresh rates. Now, even display thread has some critical section and impacts the capabilities. For example, a 16 bits-depth color display with low SPI speed might prevent 24/96 flac to work but still work with pcm 24/96
 
+In 16 bits mode, although 192 kHz is reported as max rate, it's highly recommended to limit reported sampling rate to 96k (-Z 96000). Note that some high-speed 24/96k on-line streams might stutter because of TCP/IP stack performances. It is usually due to the fact that the server sends small packets of data and the esp32 cannot receive encoded audio fast enough, regardless of task priority settings (I've tried to tweak that a fair bit). The best option in that case is to let LMS proxy the stream as it will provide larger chunks and a "smoother" stream that can then be handled.
 ## Supported Hardware
 Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below, but any should work. You can find various help & instructions [here](https://forums.slimdevices.com/showthread.php?112697-ANNOUNCE-Squeezelite-ESP32-(dedicated-thread))
 ### Raw WROVER module
