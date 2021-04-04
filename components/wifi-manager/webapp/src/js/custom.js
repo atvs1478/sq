@@ -550,6 +550,7 @@ let project_name=versionName;
 let btSinkNamesOptSel='#cfg-audio-bt_source-sink_name';
 let ConnectedToSSID={};
 let ConnectingToSSID={};
+let lmsBaseUrl;
 const ConnectingToActions = {
   'CONN' : 0,'MAN' : 1,'STS' : 2,
 }
@@ -1315,8 +1316,7 @@ $(document).ready(function() {
 
 // eslint-disable-next-line no-unused-vars
 window.setURL = function(button) {
-  const url = button.dataset.url;
-  $('#fwurl').val(url);
+  let url = button.dataset.url;
 
   $('[data-url^="http"]')
     .addClass('btn-success')
@@ -1324,6 +1324,13 @@ window.setURL = function(button) {
   $('[data-url="' + url + '"]')
     .addClass('btn-danger')
     .removeClass('btn-success');
+
+  // if user can proxy download through LMS, modify the URL
+  if (lmsBaseUrl) {
+    url = url.replace(/.*\/download\//, lmsBaseUrl + '/plugins/SqueezeESP32/firmware/');
+  }
+
+  $('#fwurl').val(url);
 }
 
 // function performConnect(conntype) {
@@ -1762,6 +1769,20 @@ function checkStatus() {
      $('#battery').show();
     } else {
       $('#battery').hide();
+    }
+
+    if (typeof lmsBaseUrl == "undefined" && data.lms_ip && data.lms_port) {
+      const baseUrl = 'http://' + data.lms_ip + ':' + data.lms_port;
+      $.ajax({
+        url: baseUrl + '/plugins/SqueezeESP32/firmware/-99', 
+        error: function() {
+          // define the value, so we don't check it any more.
+          lmsBaseUrl = '';
+        },
+        success: function() {
+          lmsBaseUrl = baseUrl;
+        }
+      });
     }
     
     $('#o_jack').attr('display', Number(data.Jack) ? 'inline' : 'none');

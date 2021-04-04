@@ -111,7 +111,7 @@ module.exports = merge(common, {
         contentBase: path.join(__dirname, 'dist'),
         publicPath: '/',
         port: 9100,
-        host: 'desktop-n8u8515',//your ip address
+        host: '127.0.0.1',//your ip address
         disableHostCheck: true,
         headers: {'Access-Control-Allow-Origin': '*',
     'Accept-Encoding': 'identity'},
