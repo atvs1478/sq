@@ -67,8 +67,8 @@ u16_t get_plugged(void) {
     return jack_inserted_svc() ? PLUG_HEADPHONE : 0;
 }
 
-u8_t get_battery(void) {
-	return (battery_level_svc() * 16) / 100;
+u16_t get_battery(void) {
+	return (u16_t) (battery_value_svc() * 128) & 0x0fff;
 }	 
 
 void set_name(char *name) {
