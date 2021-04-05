@@ -1,4 +1,4 @@
-idf_component_register( SRC_DIRS . external ac101 tas57xx
+idf_component_register( SRC_DIRS . external ac101 tas57xx wm8978
 						INCLUDE_DIRS .  ac101 
 						PRIV_REQUIRES 	
 									codecs
