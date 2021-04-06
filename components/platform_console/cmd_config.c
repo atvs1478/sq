@@ -774,7 +774,7 @@ static char * get_log_level_options(const char * longname){
 	return options;
 }
 static void register_i2s_config(void){
-	i2s_args.model_name = arg_str1(NULL,"model_name","TAS57xx|TAS5713|AC101|I2S","DAC Model Name");
+	i2s_args.model_name = arg_str1(NULL,"model_name","TAS57xx|TAS5713|AC101|WM8978|I2S","DAC Model Name");
 	i2s_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
     i2s_args.clock = arg_int1(NULL,"clock","<n>","Clock GPIO. e.g. 33");
     i2s_args.wordselect = arg_int1(NULL,"wordselect","<n>","Word Select GPIO. e.g. 25");
