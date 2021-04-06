@@ -117,16 +117,16 @@ static void power(adac_power_e mode) {
  * speaker
  */
 static void speaker(bool active) {
-	if (active) i2c_json_execute("speakeroff");
-	else i2c_json_execute("speakeron");
+	if (active) i2c_json_execute("speakeron");
+	else i2c_json_execute("speakeroff");
 } 
 
 /****************************************************************************************
  * headset
  */
 static void headset(bool active) {
-	if (active) i2c_json_execute("headsetoff");
-	else i2c_json_execute("headseton");
+	if (active) i2c_json_execute("headseton");
+	else i2c_json_execute("headsetoff");
 } 
 
 /****************************************************************************************
