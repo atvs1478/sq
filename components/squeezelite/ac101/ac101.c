@@ -48,117 +48,83 @@ static const char TAG[] = "AC101";
         return b;\
     }
 	
-static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config);
-static void deinit(void);
+static bool init(char *config, int i2c_port, i2s_config_t *i2s_config);
 static void speaker(bool active);
 static void headset(bool active);
 static bool volume(unsigned left, unsigned right);
 static void power(adac_power_e mode);
 
-const struct adac_s dac_ac101 = { "AC101", init, deinit, power, speaker, headset, volume };
+const struct adac_s dac_ac101 = { "AC101", init, adac_deinit, power, speaker, headset, volume };
 
-static esp_err_t i2c_write_reg(uint8_t reg, uint16_t val);
-static uint16_t i2c_read_reg(uint8_t reg);
 static void ac101_start(ac_module_t mode);
 static void ac101_stop(void);
 static void ac101_set_earph_volume(uint8_t volume);
 static void ac101_set_spk_volume(uint8_t volume);
 	
-static int i2c_port;
-
 /****************************************************************************************
  * init
  */
-static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config) {	 
-	esp_err_t res = ESP_OK;
-	char *p;
-	
-	// configure i2c
-	i2c_config_t i2c_config = {
-			.mode = I2C_MODE_MASTER,
-			.sda_io_num = -1,
-			.sda_pullup_en = GPIO_PULLUP_ENABLE,
-			.scl_io_num = -1,
-			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 250000,
-		};
-	
-	if ((p = strcasestr(config, "sda")) != NULL) i2c_config.sda_io_num = atoi(strchr(p, '=') + 1);
-	if ((p = strcasestr(config, "scl")) != NULL) i2c_config.scl_io_num = atoi(strchr(p, '=') + 1);
-	
-	i2c_port = i2c_port_num;
-	i2c_param_config(i2c_port, &i2c_config);
-	i2c_driver_install(i2c_port, I2C_MODE_MASTER, false, false, false);
-	
-	res = i2c_read_reg(CHIP_AUDIO_RS);
-	
-	if (!res) {
+static bool init(char *config, int i2c_port, i2s_config_t *i2s_config) {	 
+	adac_init(config, i2c_port);
+	if (adac_read_word(AC101_ADDR, CHIP_AUDIO_RS) == 0xffff) {
 		ESP_LOGW(TAG, "No AC101 detected");
 		i2c_driver_delete(i2c_port);
-		return 0;		
+		return false;		
 	}
 	
-	res = i2c_write_reg(CHIP_AUDIO_RS, 0x123);
-	// huh?
+	ESP_LOGI(TAG, "AC101 detected");
+	
+	adac_write_word(AC101_ADDR, CHIP_AUDIO_RS, 0x123);
 	vTaskDelay(100 / portTICK_PERIOD_MS); 
 	
 	// enable the PLL from BCLK source
-	i2c_write_reg(PLL_CTRL1, BIN(0000,0001,0100,1111));			// F=1,M=1,PLL,INT=31 (medium)				
-	i2c_write_reg(PLL_CTRL2, BIN(1000,0110,0000,0000));			// PLL, F=96,N_i=1024-96,F=0,N_f=0*0.2;
-	// i2c_write_reg(PLL_CTRL2, BIN(1000,0011,1100,0000));										
+	adac_write_word(AC101_ADDR, PLL_CTRL1, BIN(0000,0001,0100,1111));			// F=1,M=1,PLL,INT=31 (medium)				
+	adac_write_word(AC101_ADDR, PLL_CTRL2, BIN(1000,0110,0000,0000));			// PLL, F=96,N_i=1024-96,F=0,N_f=0*0.2;
+	// adac_write_word(AC101_ADDR, PLL_CTRL2, BIN(1000,0011,1100,0000));										
 
 	// clocking system
-	i2c_write_reg(SYSCLK_CTRL,  BIN(1010,1010,0000,1000));		// PLLCLK, BCLK1, IS1CLK, PLL, SYSCLK 
-	i2c_write_reg(MOD_CLK_ENA,  BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
-	i2c_write_reg(MOD_RST_CTRL, BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
-	i2c_write_reg(I2S_SR_CTRL,  BIN(0111,0000,0000,0000));		// 44.1kHz
+	adac_write_word(AC101_ADDR, SYSCLK_CTRL,  BIN(1010,1010,0000,1000));		// PLLCLK, BCLK1, IS1CLK, PLL, SYSCLK 
+	adac_write_word(AC101_ADDR, MOD_CLK_ENA,  BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
+	adac_write_word(AC101_ADDR, MOD_RST_CTRL, BIN(1000,0000,0000,1100));		// IS21, ADC, DAC
+	adac_write_word(AC101_ADDR, I2S_SR_CTRL,  BIN(0111,0000,0000,0000));		// 44.1kHz
 	 
 	// analogue config
-	i2c_write_reg(I2S1LCK_CTRL, 	BIN(1000,1000,0101,0000));	// Slave, BCLK=I2S/8,LRCK=32,16bits,I2Smode, Stereo
-	i2c_write_reg(I2S1_SDOUT_CTRL, 	BIN(1100,0000,0000,0000));	// I2S1ADC (R&L) 	
-	i2c_write_reg(I2S1_SDIN_CTRL, 	BIN(1100,0000,0000,0000));	// IS21DAC (R&L)
-	i2c_write_reg(I2S1_MXR_SRC, 	BIN(0010,0010,0000,0000));	// ADCL, ADCR
-	i2c_write_reg(ADC_SRCBST_CTRL, BIN(0100,0100,0100,0000));	// disable all boost (default)
+	adac_write_word(AC101_ADDR, I2S1LCK_CTRL, 	 BIN(1000,1000,0101,0000));	// Slave, BCLK=I2S/8,LRCK=32,16bits,I2Smode, Stereo
+	adac_write_word(AC101_ADDR, I2S1_SDOUT_CTRL, BIN(1100,0000,0000,0000));	// I2S1ADC (R&L) 	
+	adac_write_word(AC101_ADDR, I2S1_SDIN_CTRL,  BIN(1100,0000,0000,0000));	// IS21DAC (R&L)
+	adac_write_word(AC101_ADDR, I2S1_MXR_SRC, 	 BIN(0010,0010,0000,0000));	// ADCL, ADCR
+	adac_write_word(AC101_ADDR, ADC_SRCBST_CTRL, BIN(0100,0100,0100,0000));	// disable all boost (default)
 #if ENABLE_ADC
-	i2c_write_reg(ADC_SRC, 		   BIN(0000,0100,0000,1000));	// source=linein(R/L)
-	i2c_write_reg(ADC_DIG_CTRL,    BIN(1000,0000,0000,0000));	// enable digital ADC
-	i2c_write_reg(ADC_ANA_CTRL,    BIN(1011, 1011,0000,0000));	// enable analogue R/L, 0dB
+	adac_write_word(AC101_ADDR, ADC_SRC, 		 BIN(0000,0100,0000,1000));	// source=linein(R/L)
+	adac_write_word(AC101_ADDR, ADC_DIG_CTRL,    BIN(1000,0000,0000,0000));	// enable digital ADC
+	adac_write_word(AC101_ADDR, ADC_ANA_CTRL,    BIN(1011, 1011,0000,0000));	// enable analogue R/L, 0dB
 #else
-	i2c_write_reg(ADC_SRC, 		   BIN(0000,0000,0000,0000));	// source=none
-	i2c_write_reg(ADC_DIG_CTRL,    BIN(0000,0000,0000,0000));	// disable digital ADC
-	i2c_write_reg(ADC_ANA_CTRL,    BIN(0011, 0011,0000,0000));	// disable analogue R/L, 0dB
+	adac_write_word(AC101_ADDR, ADC_SRC, 		 BIN(0000,0000,0000,0000));	// source=none
+	adac_write_word(AC101_ADDR, ADC_DIG_CTRL,    BIN(0000,0000,0000,0000));	// disable digital ADC
+	adac_write_word(AC101_ADDR, ADC_ANA_CTRL,    BIN(0011, 0011,0000,0000));	// disable analogue R/L, 0dB
 #endif	
 
 	//Path Configuration
-	i2c_write_reg(DAC_MXR_SRC, 		BIN(1000,1000,0000,0000));	// DAC from I2S
-	i2c_write_reg(DAC_DIG_CTRL, 	BIN(1000,0000,0000,0000));	// enable DAC
-	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,0000,0000,0000));	// enable DAC/Analogue (see note on offset removal and PA)
-	i2c_write_reg(OMIXER_DACA_CTRL, BIN(1111,1111,0000,0000));	// this toggle is needed for headphone PA offset
+	adac_write_word(AC101_ADDR, DAC_MXR_SRC, 	  BIN(1000,1000,0000,0000));	// DAC from I2S
+	adac_write_word(AC101_ADDR, DAC_DIG_CTRL, 	  BIN(1000,0000,0000,0000));	// enable DAC
+	adac_write_word(AC101_ADDR, OMIXER_DACA_CTRL, BIN(1111,0000,0000,0000));	// enable DAC/Analogue (see note on offset removal and PA)
+	adac_write_word(AC101_ADDR, OMIXER_DACA_CTRL, BIN(1111,1111,0000,0000));	// this toggle is needed for headphone PA offset
 #if ENABLE_ADC	
-	i2c_write_reg(OMIXER_SR, 		BIN(0000,0001,0000,0010));	// source=DAC(R/L) (are DACR and DACL really inverted in bitmap?)
+	adac_write_word(AC101_ADDR, OMIXER_SR, 		BIN(0000,0001,0000,0010));	// source=DAC(R/L) (are DACR and DACL really inverted in bitmap?)
 #else
-	i2c_write_reg(OMIXER_SR, 		BIN(0000,0101,0000,1010));	// source=DAC(R/L) and LINEIN(R/L)
+	adac_write_word(AC101_ADDR, OMIXER_SR, 		BIN(0000,0101,0000,1010));	// source=DAC(R/L) and LINEIN(R/L)
 #endif	
 	
 	// enable earphone & speaker
-	i2c_write_reg(SPKOUT_CTRL, 0x0220);
-	i2c_write_reg(HPOUT_CTRL, 0xf801);
+	adac_write_word(AC101_ADDR, SPKOUT_CTRL, 0x0220);
+	adac_write_word(AC101_ADDR, HPOUT_CTRL, 0xf801);
 	
 	// set gain for speaker and earphone
 	ac101_set_spk_volume(100);
 	ac101_set_earph_volume(100);
 	
-	ESP_LOGI(TAG, "AC101 uses I2C sda:%d, scl:%d", i2c_config.sda_io_num, i2c_config.scl_io_num);
-
-	return (res == ESP_OK);
+	return true;
 }	
-
-/****************************************************************************************
- * init
- */
-static void deinit(void)	{	 
-	i2c_driver_delete(i2c_port);
-}
 
 /****************************************************************************************
  * change volume
@@ -190,9 +156,9 @@ static void power(adac_power_e mode) {
  * speaker
  */
 static void speaker(bool active) {
-	uint16_t value = i2c_read_reg(SPKOUT_CTRL);
-	if (active) i2c_write_reg(SPKOUT_CTRL, value | SPKOUT_EN);
-	else i2c_write_reg(SPKOUT_CTRL, value & ~SPKOUT_EN);
+	uint16_t value = adac_read_word(AC101_ADDR, SPKOUT_CTRL);
+	if (active) adac_write_word(AC101_ADDR, SPKOUT_CTRL, value | SPKOUT_EN);
+	else adac_write_word(AC101_ADDR, SPKOUT_CTRL, value & ~SPKOUT_EN);
 } 
 
 /****************************************************************************************
@@ -200,50 +166,10 @@ static void speaker(bool active) {
  */
 static void headset(bool active) {
 	// there might be  aneed to toggle OMIXER_DACA_CTRL 11:8, not sure
-	uint16_t value = i2c_read_reg(HPOUT_CTRL);
-	if (active) i2c_write_reg(HPOUT_CTRL, value | EAROUT_EN);
-	else i2c_write_reg(HPOUT_CTRL, value & ~EAROUT_EN);		
+	uint16_t value = adac_read_word(AC101_ADDR, HPOUT_CTRL);
+	if (active) adac_write_word(AC101_ADDR, HPOUT_CTRL, value | EAROUT_EN);
+	else adac_write_word(AC101_ADDR, HPOUT_CTRL, value & ~EAROUT_EN);		
 } 	
-
-/****************************************************************************************
- * 
- */
-static esp_err_t i2c_write_reg(uint8_t reg, uint16_t val)
-{
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    esp_err_t ret =0;
-	uint8_t send_buff[4];
-	send_buff[0] = (AC101_ADDR << 1);
-	send_buff[1] = reg;
-	send_buff[2] = (val>>8) & 0xff;
-	send_buff[3] = val & 0xff;
-    ret |= i2c_master_start(cmd);
-    ret |= i2c_master_write(cmd, send_buff, 4, ACK_CHECK_EN);
-    ret |= i2c_master_stop(cmd);
-    ret |= i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-/****************************************************************************************
- * 
- */
-static uint16_t i2c_read_reg(uint8_t reg) {
-	uint8_t data[2] = { 0 };
-	
-	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( AC101_ADDR << 1 ) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( AC101_ADDR << 1 ) | READ_BIT, ACK_CHECK_EN);		//check or not
-    i2c_master_read(cmd, data, 2, ACK_VAL);
-    i2c_master_stop(cmd);
-    i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-
-	return (data[0] << 8) + data[1];;
-}
 
 /****************************************************************************************
  * 
@@ -264,7 +190,7 @@ void set_sample_rate(int rate) {
 		ESP_LOGW(TAG, "Unknown sample rate %hu", rate);
 		rate = SAMPLE_RATE_44100;
 	}
-	i2c_write_reg(I2S_SR_CTRL, rate);
+	adac_write_word(AC101_ADDR, I2S_SR_CTRL, rate);
 }
 
 /****************************************************************************************
@@ -273,8 +199,8 @@ void set_sample_rate(int rate) {
 static void ac101_set_spk_volume(uint8_t volume) {
 	uint16_t value = max(volume, 100);
 	value = ((int) value * 0x1f) / 100;
-	value |= i2c_read_reg(SPKOUT_CTRL) & ~0x1f;
-	i2c_write_reg(SPKOUT_CTRL, value);
+	value |= adac_read_word(AC101_ADDR, SPKOUT_CTRL) & ~0x1f;
+	adac_write_word(AC101_ADDR, SPKOUT_CTRL, value);
 }
 
 /****************************************************************************************
@@ -283,8 +209,8 @@ static void ac101_set_spk_volume(uint8_t volume) {
 static void ac101_set_earph_volume(uint8_t volume) {
 	uint16_t value = max(volume, 100);
 	value = (((int) value * 0x3f) / 100) << 4;
-	value |= i2c_read_reg(HPOUT_CTRL) & ~(0x3f << 4);
-	i2c_write_reg(HPOUT_CTRL, value);
+	value |= adac_read_word(AC101_ADDR, HPOUT_CTRL) & ~(0x3f << 4);
+	adac_write_word(AC101_ADDR, HPOUT_CTRL, value);
 }
 
 #if 0
@@ -292,14 +218,14 @@ static void ac101_set_earph_volume(uint8_t volume) {
  * Get normalized (0..100) speaker volume
  */
 static int ac101_get_spk_volume(void) {
-	return ((i2c_read_reg(SPKOUT_CTRL) & 0x1f) * 100) / 0x1f;
+	return ((adac_read_word(AC101_ADDR, SPKOUT_CTRL) & 0x1f) * 100) / 0x1f;
 }
 
 /****************************************************************************************
  * Get normalized (0..100) earphone volume
  */
 static int ac101_get_earph_volume(void) {
-	return (((i2c_read_reg(HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
+	return (((adac_read_word(AC101_ADDR, HPOUT_CTRL) >> 4) & 0x3f) * 100) / 0x3f;
 }
 
 /****************************************************************************************
@@ -308,7 +234,7 @@ static int ac101_get_earph_volume(void) {
 static void ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_output_mixer_source_t source)
 {
 	uint16_t regval,temp,clrbit;
-	regval = i2c_read_reg(OMIXER_BST1_CTRL);
+	regval = adac_read_word(AC101_ADDR, OMIXER_BST1_CTRL);
 	switch(source){
 	case SRC_MIC1:
 		temp = (gain&0x7) << 6;
@@ -327,14 +253,15 @@ static void ac101_set_output_mixer_gain(ac_output_mixer_gain_t gain,ac_output_mi
 	}
 	regval &= clrbit;
 	regval |= temp;
-	i2c_write_reg(OMIXER_BST1_CTRL,regval);
+	adac_write_word(AC101_ADDR, OMIXER_BST1_CTRL,regval);
 }
 
 /****************************************************************************************
  * 
  */
-static void ac101_deinit(void) {
-	i2c_write_reg(CHIP_AUDIO_RS, 0x123);		//soft reset
+static void deinit(void) {
+	adac_write_word(AC101_ADDR, CHIP_AUDIO_RS, 0x123);		//soft reset
+	adac_deinit();
 }
 
 /****************************************************************************************
@@ -342,11 +269,11 @@ static void ac101_deinit(void) {
  */
 static void ac101_i2s_config_clock(ac_i2s_clock_t *cfg) {
 	uint16_t regval=0;
-	regval = i2c_read_reg(I2S1LCK_CTRL);
+	regval = adac_read_word(AC101_ADDR, I2S1LCK_CTRL);
 	regval &= 0xe03f;
 	regval |= (cfg->bclk_div << 9);
 	regval |= (cfg->lclk_div << 6);
-	i2c_write_reg(I2S1LCK_CTRL, regval);
+	adac_write_word(AC101_ADDR, I2S1LCK_CTRL, regval);
 }
 
 #endif
@@ -356,21 +283,21 @@ static void ac101_i2s_config_clock(ac_i2s_clock_t *cfg) {
  */
 static void ac101_start(ac_module_t mode) {
     if (mode == AC_MODULE_LINE) {
-		i2c_write_reg(0x51, 0x0408);
-		i2c_write_reg(0x40, 0x8000);
-		i2c_write_reg(0x50, 0x3bc0);
+		adac_write_word(AC101_ADDR, 0x51, 0x0408);
+		adac_write_word(AC101_ADDR, 0x40, 0x8000);
+		adac_write_word(AC101_ADDR, 0x50, 0x3bc0);
     }
     if (mode == AC_MODULE_ADC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
 		// I2S1_SDOUT_CTRL
-		// i2c_write_reg(PLL_CTRL2, 0x8120);
-    	i2c_write_reg(0x04, 0x800c);
-    	i2c_write_reg(0x05, 0x800c);
-		// res |= i2c_write_reg(0x06, 0x3000);
+		// adac_write_word(AC101_ADDR, PLL_CTRL2, 0x8120);
+    	adac_write_word(AC101_ADDR, 0x04, 0x800c);
+    	adac_write_word(AC101_ADDR, 0x05, 0x800c);
+		// res |= adac_write_word(AC101_ADDR, 0x06, 0x3000);
     }
     if (mode == AC_MODULE_DAC || mode == AC_MODULE_ADC_DAC || mode == AC_MODULE_LINE) {
-		uint16_t value = i2c_read_reg(PLL_CTRL2);
+		uint16_t value = adac_read_word(AC101_ADDR, PLL_CTRL2);
 		value |= 0x8000;
-		i2c_write_reg(PLL_CTRL2, value);
+		adac_write_word(AC101_ADDR, PLL_CTRL2, value);
     }
 }
 
@@ -378,8 +305,8 @@ static void ac101_start(ac_module_t mode) {
  * 
  */
 static void ac101_stop(void) {
-	uint16_t value = i2c_read_reg(PLL_CTRL2);
+	uint16_t value = adac_read_word(AC101_ADDR, PLL_CTRL2);
 	value &= ~0x8000;
-	i2c_write_reg(PLL_CTRL2, value);
+	adac_write_word(AC101_ADDR, PLL_CTRL2, value);
 }
 

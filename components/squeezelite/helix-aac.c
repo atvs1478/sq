@@ -151,14 +151,19 @@ static int read_mp4_header(unsigned long *samplerate_p, unsigned char *channels_
 				LOG_WARN("error parsing esds");
 				return -1;
 			}
-			mp4_desc_length(&ptr);
+			int desc_len = mp4_desc_length(&ptr);
 			info.profile = *ptr >> 3;
 			info.sampRateCore = (*ptr++ & 0x07) << 1;
 			info.sampRateCore |= (*ptr >> 7) & 0x01;
-			info.sampRateCore = rates[info.sampRateCore];
-			info.nChans = (*ptr & 0x7f) >> 3;
-			*channels_p = info.nChans;
-			*samplerate_p = info.sampRateCore;
+			info.sampRateCore = rates[info.sampRateCore];								
+			info.nChans = (*ptr++ & 0x7f) >> 3;
+			*channels_p = info.nChans;						
+			if (desc_len > 2 && ((ptr[0] << 3) | (ptr[1] >> 5)) == 0x2b7 && (ptr[1] & 0x1f) == 0x05 && (ptr[2] & 0x80)) {
+				*samplerate_p = rates[(ptr[2] & 0x78) >> 3];
+				LOG_WARN("AAC SBR mode activated => high CPU consumption expected, please use LMS proxy to mitigate");						
+			} else {
+				*samplerate_p = info.sampRateCore;
+			}	
 			HAAC(a, SetRawBlockParams, a->hAac, 0, &info); 
 			LOG_DEBUG("playable aac track: %u (p:%x, r:%d, c:%d)", trak, info.profile, info.sampRateCore, info.nChans);
 			play = trak;

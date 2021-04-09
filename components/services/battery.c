@@ -51,8 +51,9 @@ float battery_value_svc(void) {
  * 
  */
 uint8_t battery_level_svc(void) {
-	// TODO: this is totally incorrect
-	return battery.avg ? (battery.avg - (3.0 * battery.cells)) / ((4.2 - 3.0) * battery.cells) * 100 : 0;
+	// TODO: this is vastly incorrect
+	int level = battery.avg ? (battery.avg - (3.0 * battery.cells)) / ((4.2 - 3.0) * battery.cells) * 100 : 0;
+	return level < 100 ? level : 100;
 }
 
 /****************************************************************************************

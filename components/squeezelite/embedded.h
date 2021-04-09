@@ -77,7 +77,7 @@ extern mutex_type slimp_mutex;
 #define PLUG_HEADPHONE	0x04
 u16_t	get_RSSI(void);			// must provide or define as 0xffff
 u16_t	get_plugged(void);		// must provide or define as 0x0
-u8_t	get_battery(void);		// must provide 0..15 or define as 0x0
+u16_t	get_battery(void);		// must provide 12 bits data or define as 0x0 (exact meaning is device-dependant)
 
 // set name 
 void set_name(char *name);		// can be defined as an empty macro

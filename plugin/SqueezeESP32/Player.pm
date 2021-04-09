@@ -343,4 +343,9 @@ sub lineInOutStatus {
 	}
 }
 
+sub voltage {
+	my $voltage = Slim::Networking::Slimproto::voltage(shift) || return 0;
+	return sprintf("%.2f", ($voltage >> 4) / 128);
+}
+
 1;
