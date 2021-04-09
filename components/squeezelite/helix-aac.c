@@ -158,10 +158,11 @@ static int read_mp4_header(unsigned long *samplerate_p, unsigned char *channels_
 			info.sampRateCore = rates[info.sampRateCore];								
 			info.nChans = (*ptr++ & 0x7f) >> 3;
 			*channels_p = info.nChans;						
-			*samplerate_p = info.sampRateCore;
 			if (desc_len > 2 && ((ptr[0] << 3) | (ptr[1] >> 5)) == 0x2b7 && (ptr[1] & 0x1f) == 0x05 && (ptr[2] & 0x80)) {
-				LOG_WARN("AAC SBR mode activated => high CPU consumption (please proxy)");		
 				*samplerate_p = rates[(ptr[2] & 0x78) >> 3];
+				LOG_WARN("AAC SBR mode activated => high CPU consumption expected, please use LMS proxy to mitigate");						
+			} else {
+				*samplerate_p = info.sampRateCore;
 			}	
 			HAAC(a, SetRawBlockParams, a->hAac, 0, &info); 
 			LOG_DEBUG("playable aac track: %u (p:%x, r:%d, c:%d)", trak, info.profile, info.sampRateCore, info.nChans);

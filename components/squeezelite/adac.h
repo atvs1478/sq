@@ -11,6 +11,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "driver/i2s.h"
+#include "driver/i2c.h"
 
 typedef enum { ADAC_ON = 0, ADAC_STANDBY, ADAC_OFF } adac_power_e;
 
@@ -28,3 +29,10 @@ extern const struct adac_s dac_tas57xx;
 extern const struct adac_s dac_tas5713;
 extern const struct adac_s dac_ac101;
 extern const struct adac_s dac_external;
+
+int 		adac_init(char *config, int i2c_port);
+void		adac_deinit(void);
+esp_err_t 	adac_write_byte(int i2c_addr, uint8_t reg, uint8_t val);
+esp_err_t 	adac_write_word(int i2c_addr, uint8_t reg, uint16_t val);
+uint8_t 	adac_read_byte(int i2c_addr, uint8_t reg);
+uint16_t 	adac_read_word(int i2c_addr, uint8_t reg);
