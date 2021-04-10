@@ -17,8 +17,6 @@
 #include "esp_log.h"
 #include "adac.h"
 
-#define WM8978	0x1A	// for TTGO TAudio
-
 static const char TAG[] = "WM8978";
 
 static void speaker(bool active) { }
@@ -29,6 +27,8 @@ static bool init(char *config, int i2c_port_num, i2s_config_t *i2s_config);
 
 static esp_err_t i2c_write_shadow(uint8_t reg, uint16_t val);
 static uint16_t i2c_read_shadow(uint8_t reg);
+
+static int WM8978;
 
 const struct adac_s dac_wm8978 = { "WM8978", init, adac_deinit, power, speaker, headset, volume };
 
@@ -48,10 +48,10 @@ static uint16_t WM8978_REGVAL_TBL[58] =	{
  * init
  */
 static bool init(char *config, int i2c_port, i2s_config_t *i2s_config) {	 
-	// TODO: maybe add something here to confirm it is actually detected? 
-	adac_init(config, i2c_port);
+	WM8978 = adac_init(config, i2c_port);
 	
-	ESP_LOGI(TAG, "WM8978 detected");
+	if (!WM8978) WM8978 = 0x1a;
+	ESP_LOGI(TAG, "WM8978 detected @%d", WM8978);
 
 	// init sequence
 	i2c_write_shadow(0, 0);
