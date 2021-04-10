@@ -70,7 +70,7 @@ typedef enum {
 } parse_state_t;
 static const char *TAG = "cmd_config";
 extern struct arg_end *getParmsEnd(struct arg_hdr * * argtable);
-//bck=<gpio>,ws=<gpio>,do=<gpio>[,mute=<gpio>[:0|1][,model=TAS57xx|TAS5713|AC101|I2S][,sda=<gpio>,scl=gpio[,i2c=<addr>]]
+//bck=<gpio>,ws=<gpio>,do=<gpio>[,mute=<gpio>[:0|1][,model=TAS57xx|TAS5713|AC101|WM8978|I2S][,sda=<gpio>,scl=gpio[,i2c=<addr>]]
 static struct {
 	struct arg_str *model_name;
     struct arg_int *clock;
