@@ -59,7 +59,6 @@ static const struct tas57xx_cmd_s tas57xx_cmd[] = {
 };
 
 static uint8_t tas57_addr;
-	int i2c_port_x;
 
 static void dac_cmd(dac_cmd_e cmd, ...);
 static int tas57_detect(void);
@@ -69,10 +68,9 @@ static int tas57_detect(void);
  */
 static bool init(char *config, int i2c_port, i2s_config_t *i2s_config) {	 
 	// find which TAS we are using (if any)
-i2c_port_x = i2c_port;
-	adac_init(config, i2c_port);
-	tas57_addr = tas57_detect();
-		
+	tas57_addr = adac_init(config, i2c_port);
+	if (!tas57_addr) tas57_addr = tas57_detect();
+	
 	if (!tas57_addr) {
 		ESP_LOGW(TAG, "No TAS57xx detected");
 		adac_deinit();
