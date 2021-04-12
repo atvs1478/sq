@@ -85,11 +85,18 @@ void cb_connection_got_ip(void *pvParameter){
 		esp_restart();
 	}
 	ip.addr = ipInfo.ip.addr;
-	ESP_LOGI(TAG, "I have a connection!");
+	ESP_LOGI(TAG, "Wifi connected!");
 	messaging_post_message(MESSAGING_INFO,MESSAGING_CLASS_SYSTEM,"Wifi connected");
 	xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 	bWifiConnected=true;
 	led_unpush(LED_GREEN);
+		if(is_recovery_running){
+		// when running in recovery, send a LMS discovery message 
+		// to find a running instance. This is to enable using 
+		// the plugin's proxy mode for FW download and avoid
+		// expired certificate issues.
+		discover_ota_server(5);
+	}
 }
 void cb_connection_sta_disconnected(void *pvParameter){
 	led_blink_pushed(LED_GREEN, 250, 250);

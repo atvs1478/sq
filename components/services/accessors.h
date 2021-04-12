@@ -58,6 +58,16 @@ typedef struct {
 } set_GPIO_struct_t;
 
 typedef struct {
+	int A;
+	int B;
+	int SW;
+	bool knobonly;
+	bool volume_lock;
+	bool longpress;
+	int timer;
+} rotary_struct_t;
+
+typedef struct {
 	bool fixed;
 	char * name;
 	char * group;
@@ -82,3 +92,5 @@ gpio_entry_t * 				get_gpio_by_no(int gpionum, bool refresh);
 cJSON * 					get_gpio_list(bool refresh);
 bool 						is_dac_config_locked();
 bool 						are_statistics_enabled();
+const rotary_struct_t * 	config_rotary_get();
+esp_err_t 					config_rotary_set(rotary_struct_t * rotary);

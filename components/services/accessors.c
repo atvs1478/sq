@@ -186,13 +186,54 @@ esp_err_t config_i2c_set(const i2c_config_t * config, int port){
 /****************************************************************************************
  * 
  */
+esp_err_t config_rotary_set(rotary_struct_t * config){
+	int buffer_size=512;
+	esp_err_t err=ESP_OK;
+	char * config_buffer=calloc(buffer_size,1);
+	char * config_buffer2=calloc(buffer_size,1);	
+	if(config_buffer && config_buffer2)  {
+		snprintf(config_buffer,buffer_size,"A=%i,B=%i",config->A, config->B);
+		if(config->SW >=0 ){
+			snprintf(config_buffer2,buffer_size,"%s,SW=%i",config_buffer,config->SW);
+			strcpy(config_buffer,config_buffer2);
+		}
+		if(config->knobonly){
+			strncat(config_buffer,",knobonly",buffer_size);
+			if(config->timer>0){
+				snprintf(config_buffer2,buffer_size,"%s=%i",config_buffer,config->timer);
+				strcpy(config_buffer,config_buffer2);
+			}
+		}
+		if(config->volume_lock){
+			strncat(config_buffer,",volume",buffer_size);
+		}
+		if(config->longpress){
+			strncat(config_buffer,",longpress",buffer_size);
+		}
+			log_send_messaging(MESSAGING_INFO,"Updating rotary configuration to %s",config_buffer);
+		err = config_set_value(NVS_TYPE_STR, "rotary_config", config_buffer);
+		if(err!=ESP_OK){
+			log_send_messaging(MESSAGING_ERROR,"Error: %s",esp_err_to_name(err));
+		}
+	} 
+	else {
+		err = ESP_ERR_NO_MEM;
+	}
+	FREE_AND_NULL(config_buffer);
+	FREE_AND_NULL(config_buffer2);	
+	return err;	
+}
+
+/****************************************************************************************
+ * 
+ */
 esp_err_t config_display_set(const display_config_t * config){
 	int buffer_size=512;
 	esp_err_t err=ESP_OK;
 	char * config_buffer=calloc(buffer_size,1);
 	char * config_buffer2=calloc(buffer_size,1);
 	if(config_buffer && config_buffer2)  {
-		snprintf(config_buffer,buffer_size,"%s:width=%i,height=%i",config->type,config->width,config->height);
+		snprintf(config_buffer,buffer_size,"%s,width=%i,height=%i",config->type,config->width,config->height);
 		if(strcasecmp("I2C",config->type)==0){
 			if(config->address>0 ){
 				snprintf(config_buffer2,buffer_size,"%s,address=%i",config_buffer,config->address);
@@ -511,6 +552,36 @@ void parse_set_GPIO(void (*cb)(int gpio, char *value)) {
 }	
 
 /****************************************************************************************
+ * 
+ */
+const rotary_struct_t * config_rotary_get() {
+
+	static rotary_struct_t rotary={  .A = -1, .B = -1, .SW = -1, .longpress = false, .knobonly=false,.timer=0,.volume_lock=false};
+	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
+	if (config && *config) {
+		char *p;
+		
+		// parse config
+		if ((p = strcasestr(config, "A")) != NULL) rotary.A = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "B")) != NULL) rotary.B = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "SW")) != NULL) rotary.SW = atoi(strchr(p, '=') + 1);
+		if ((p = strcasestr(config, "knobonly")) != NULL) {
+			p = strchr(p, '=');
+			rotary.knobonly = true;
+			rotary.timer = p ? atoi(p + 1) : 350;
+			rotary.longpress = false;
+		} else {
+			rotary.knobonly = false;
+			rotary.timer = 0;
+			if ((p = strcasestr(config, "volume")) != NULL) rotary.volume_lock = true;
+			if ((p = strcasestr(config, "longpress")) != NULL) rotary.longpress = true;
+		}	
+		free(config);
+	}
+	return &rotary;
+}
+
+/****************************************************************************************
  *
  */
 cJSON * get_gpio_entry(const char * name, const char * prefix, int gpio, bool fixed){
@@ -520,6 +591,17 @@ cJSON * get_gpio_entry(const char * name, const char * prefix, int gpio, bool fi
 	cJSON_AddStringToObject(entry,"group",prefix);
 	cJSON_AddBoolToObject(entry,"fixed",fixed);
 	return entry;
+}
+
+/****************************************************************************************
+ *
+ */
+cJSON * add_gpio_for_value(cJSON * list,const char * name,int gpio, const char * prefix, bool fixed){
+	cJSON * llist = list?list:cJSON_CreateArray();
+	if(GPIO_IS_VALID_GPIO(gpio) && gpio>0){
+		cJSON_AddItemToArray(llist,get_gpio_entry(name,prefix,gpio,fixed));
+	}
+	return llist;
 }
 
 /****************************************************************************************
@@ -657,13 +739,11 @@ cJSON * get_SPDIF_GPIO(cJSON * list, bool fixed){
  */
 cJSON * get_Rotary_GPIO(cJSON * list){
 	cJSON * llist = list?list:cJSON_CreateArray();
-	char *config = config_alloc_get_default(NVS_TYPE_STR, "rotary_config", NULL, 0);
-	if(config){
-		llist = add_gpio_for_name(llist,config,"A", "rotary", false);
-		llist = add_gpio_for_name(llist,config,"B", "rotary", false);
-		llist = add_gpio_for_name(llist,config,"SW", "rotary", false);
-		free(config);	
-	}	
+
+	const rotary_struct_t *rotary= config_rotary_get();
+	add_gpio_for_value(llist,"A",rotary->A, "rotary", false);
+	add_gpio_for_value(llist,"B",rotary->B, "rotary", false);
+	add_gpio_for_value(llist,"SW",rotary->SW, "rotary", false);
 	return llist;
 }
 

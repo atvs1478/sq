@@ -157,6 +157,10 @@
 								<button type="button" id='start-flash' data-toggle="modal" data-target="#uCnfrm"
 									class="btn btn-warning btn-sm" style="display: none;">Flash Firmware</button>
 							</div>
+							
+							<div class="col-auto">
+								<button class="btn-warning ota_element" type="submit" onclick="handleReboot('recovery');" >Recovery</button>
+							</div>
 						</div>
 
 					</div>
@@ -171,7 +175,7 @@
 								</button>
 							</div>
 							<div class="modal-body">
-								<p>Flash URL <span id="selectedFWURL"></span> to device?</p>
+								<p>Flash URL <span id="selectedFWURL" class="text-break"></span> to device?</p>
 							</div>
 							<div class="modal-footer  ">
 								<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -181,7 +185,7 @@
 						</div>
 					</div>
 				</div>
-				<div class="card text-white  mb-3">
+				<div class="card text-white mb-3 recovery_element" style="display: none;">
 					<div class="card-header">Local Firmware Upload</div>
 					<div class="card-body">
 							<div id="uploaddiv" class="recovery_element form-group row">
@@ -374,12 +378,10 @@
 									<span class="sr-only">Connecting...</span></button>
 							</div>
 
-							<div class="modal-footer connecting-success connecting-status">
-								<button type="button" class="btn btn-warning" data-toggle="modal" data-dismiss="modal"
-									data-target="#WiFiDisconnectConfirm">Disconnect</button>
-								<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+							<div class="modal-footer connecting-success connecting-status justify-content-between" style=""><button type="button"
+									class="btn btn-primary" data-dismiss="modal">Ok</button><button type="button" class="btn btn-danger"
+									data-toggle="modal" data-dismiss="modal" data-target="#WiFiDisconnectConfirm">Disconnect</button> 
 							</div>
-
 						</div>
 					</div>
 				</div>
@@ -499,8 +501,8 @@
 	<footer>
 		<div class="fixed-bottom d-flex justify-content-between  border-top border-dark p-3 bg-primary">
 			<span class="text-center" id="foot-fw"></span><button class="btn-warning ota_element " id="reboot_nav"
-				type="submit" onclick="handleReboot(false);" style="display: none;">Reboot</button>
-			<button class="btn-warning recovery_element" id="reboot_ota_nav" type="submit" onclick="handleReboot(true);"
+				type="submit" onclick="handleReboot('reboot');" style="display: none;">Reboot</button>
+			<button class="btn-warning recovery_element" id="reboot_ota_nav" type="submit" onclick="handleReboot('reboot_ota');"
 				style="display: none;">Exit Recovery</button><span class="text-center" id="foot-wifi"></span>
 		</div>
 

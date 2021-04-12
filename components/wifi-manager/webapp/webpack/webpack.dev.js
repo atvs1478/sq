@@ -15,6 +15,7 @@ const data = {
     messages: require("../mock/messages.json"),
     messagequeue: require("../mock/messages.json"),
     message_queue_sequence: [],
+    message_queue_sequence_post_empty: null,
     commands: require("../mock/commands.json"),
     scan: require("../mock/scan.json"),
     ap: require("../mock/ap.json"),
@@ -124,9 +125,19 @@ module.exports = merge(common, {
             app.get('/scan.json', function(req, res) { res.json( data.scan ); });
             app.get('/config.json', function(req, res) { res.json( data.config ); });
             app.get('/status.json', function(req, res) { res.json( data.status ); });
+            app.get('/plugins/SqueezeESP32/firmware/-99', function(req, res) { 
+                let has_proxy=  data.status.mock_plugin_has_proxy ?? 'n';
+                const statusCode='xy'.includes((has_proxy).toLowerCase())?200:500;
+                console.log(`Checking if plugin has proxy enabled with option mock_plugin_has_proxy = ${data.status.mock_plugin_has_proxy}. Returning status ${statusCode} `);
+                res.status(statusCode ).json(); 
+            });
             app.get('/messages.json', function(req, res) { 
                 if(data.message_queue_sequence.length>0){
                     data.messagequeue.push(data.message_queue_sequence.shift());
+                }
+                else if (data.message_queue_sequence_post_empty){
+                    data.message_queue_sequence_post_empty();
+                    data.message_queue_sequence_post_empty = null;
                 }
                 res.json( data.messagequeue ) ; 
                 data.messagequeue=[];
@@ -157,7 +168,7 @@ module.exports = merge(common, {
             });
             app.post('/config.json', function(req, res) { 
                 var fwurl='';
-                console.log(req.body);
+                console.log(`Processing config.json with request body: ${req.body}`);
                 console.log(data.config);
                 for (const property in req.body.config) {
                     console.log(`${property}: ${req.body.config[property].value}`);
@@ -177,16 +188,24 @@ module.exports = merge(common, {
 
                   }
                 res.json( {} ); 
-                if(fwurl!==''){
-                    data.status.recovery=1;
-                    requeueMessages();
+                if(fwurl!=='' ){
+                    if(data.status.recovery!=1) {
+                        // we're not yet in recovery. Simulate reboot to recovery 
+                        data.status.recovery=1;
+                        requeueMessages();
+                    }
                     if(fwurl.toLowerCase().includes('fail')){
                         console.log(`queuing ${data.messages_ota_fail.length} ota messages `);
                         data.message_queue_sequence.push(...data.messages_ota_fail);
+
                     }
                     else {
                         console.log(`queuing ${data.messages_ota.length} ota messages `);
                         data.message_queue_sequence.push(...data.messages_ota);
+                        data.message_queue_sequence_post_empty = function(){
+                            data.status.recovery=0;
+                            requeueMessages();
+                        }                        
                     }
                 }
             });

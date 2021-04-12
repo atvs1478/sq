@@ -25,6 +25,7 @@ Object.assign(Date.prototype, {
   },
 });
 
+
 const nvsTypes = {
   NVS_TYPE_U8: 0x01,
 
@@ -108,326 +109,152 @@ const taskStates = {
 };
 const flash_status_codes = {
   NONE : 0,
-  DOWNLOADING_FILE: 1,
   REBOOT_TO_RECOVERY: 2,
-  CHECK_FOR_UPLOAD: 3,
-  UPLOADING: 4,
   SET_FWURL: 5,
   FLASHING: 6,
-  DOWNLOADING_COMPLETE: 7,
+  DONE: 7
 };
 let flash_state=flash_status_codes.FLASH_NONE;
 let flash_ota_dsc='';
 let flash_ota_pct=0;
-function isFlashExecuting(){
-  return flash_ota_dsc!='' || flash_ota_pct>0;
+let older_recovery=false;
+function isFlashExecuting(data){
+  return data.ota_dsc!='' || data.ota_pct>0;
 }
-// function z(){
-  
-//   const data = {
-//     timestamp: Date.now(),
-//   };
-//   if (blockFlashButton) {
-//     return;
-//   }
-//   blockFlashButton = true;
-//   const url = $('#fw-url-input').val();
-//   data.config = {
-//     fwurl: {
-//       value: url,
-//       type: 33,
-//     },
-//   };
-
-//   $.ajax({
-//     url: '/config.json',
-//     dataType: 'text',
-//     method: 'POST',
-//     cache: false,
-//     contentType: 'application/json; charset=utf-8',
-//     data: JSON.stringify(data),
-//     error: handleExceptionResponse,
-//   });
-// }
+function post_config(data){
+  let confPayload={
+    timestamp: Date.now(),
+    config : data
+  };
+  $.ajax({
+    url: '/config.json',
+    dataType: 'text',
+    method: 'POST',
+    cache: false,
+    contentType: 'application/json; charset=utf-8',
+    data: JSON.stringify(confPayload),
+    error: handleExceptionResponse,
+  });
+}
+function process_ota_event(data){
+  if(data.ota_dsc){
+    flash_ota_dsc=data.ota_dsc;
+  }
+  if(data.ota_pct){
+    flash_ota_pct=data.ota_pct;
+  }
+  if(isFlashExecuting(data)){
+    flash_state=flash_status_codes.FLASHING;
+  }  
+  if(flash_state==flash_status_codes.FLASHING){
+    if(flash_ota_pct ==100){
+      // we were processing OTA, and we've reached 100%
+      flash_state=flash_status_codes.DONE;
+    } 
+    else if(flash_ota_pct<0 && older_recovery){
+      // we were processing OTA on an older recovery and we missed the 
+      // end of flashing.
+      console.log('End of flashing from older recovery');
+      if(data.ota_dsc==''){
+        flash_ota_dsc = 'OTA Process Completed';
+      }
+      flash_state=flash_status_codes.DONE;
+    }
+  }
+}
 const flash_events={
-  START_OTA : function(data) {
-    if (flash_state == flash_status_codes.NONE) {
+  START_OTA : function() {
+    if (flash_state == flash_status_codes.NONE || flash_state == undefined) {
       console.log('Starting OTA process');
-      flash_state=flash_status_codes.DOWNLOADING_FILE;
-      // 1. Create a new XMLHttpRequest object
-      let xhr = new XMLHttpRequest();
-      
-      // 2. Configure it: GET-request for the URL /article/.../load
-      xhr.open('GET', data.url);
-      xhr.responseType = "blob";
-      // 4. This will be called after the response is received
-      xhr.onload = function() {
-        if (xhr.status != 200) { // analyze HTTP status of the response
-          console.log(`Error ${xhr.status}: ${xhr.statusText}`); // e.g. 404: Not Found
-        } else { // show the result
-          console.log(`Done, got ${xhr.response.length} bytes`); // response is the server response
-        }
-      };
+      flash_state=flash_status_codes.REBOOT_TO_RECOVERY;
+      if(!recovery){
+        flash_ota_dsc = 'Starting recovery mode...';
+        // Reboot system to recovery mode
+        const data = {
+          timestamp: Date.now(),
+        };
 
-      xhr.onprogress = function(event) {
-        if (event.lengthComputable) {
-          console.log(`Received ${event.loaded} of ${event.total} bytes`);
-        } else {
-          console.log(`Received ${event.loaded} bytes`); // no Content-Length
-        }
+        $.ajax({
+          url: '/recovery.json',
+          dataType: 'text',
+          method: 'POST',
+          cache: false,
+          contentType: 'application/json; charset=utf-8',
+          data: JSON.stringify(data),
+          error: handleExceptionResponse,
+          complete: function(response) {
+            console.log(response.responseText);
+          },
+        });     
+      }
 
-      };
-
-      xhr.onerror = function() {
-        console.log("Request failed");
-      };      
-      xhr.send();
     }
     else {
       console.warn('Unexpected status while starting flashing');
     }    
-
   },
   FOUND_RECOVERY: function(data) {
     console.log(JSON.stringify(data));
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
+    if(flash_state == flash_status_codes.REBOOT_TO_RECOVERY){
+        flash_ota_dsc = 'Recovery mode found. Flashing device.';
+        flash_state= flash_status_codes.SET_FWURL;
+        let confData= { fwurl: {
+              value: $('#fw-url-input').val(),
+              type: 33,
+          }
+        };
+        post_config(confData);
     }
   },
-  UPLOAD_YES: function(data) {
-    console.log(JSON.stringify(data));
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
+  PROCESS_OTA_STATUS: function(data){
+    if(data.ota_pct>0){
+      older_recovery = true;
     }
+    if(flash_state == flash_status_codes.REBOOT_TO_RECOVERY){
+      data.event = flash_events.FOUND_RECOVERY;
+      handle_flash_state(data);
+    }
+    else if(flash_state==flash_status_codes.DONE && !recovery){
+      flash_state=flash_status_codes.NONE;
+      $('#rTable tr.release').removeClass('table-success table-warning');
+      $('#fw-url-input').val('');
+      $('#otadiv').modal('hide');
+    }
+
+    else {
+      process_ota_event(data);
+    }
+    
   },
-  UPLOAD_NO: function(data) {
-    console.log(JSON.stringify(data));
-
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
-    }
-  },
-  DOWNLOAD_COMPLETE: function(data) {
-    console.log(JSON.stringify(data));
-
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
-    }
-  },
-  MESSAGES: function(data) {
-    console.log(JSON.stringify(data));
-    if(data.ota_dsc){
-      flash_ota_dsc=data.ota_dsc;
-    }
-    if(data.ota_pct){
-      flash_ota_pct=data.ota_pct;
-    }
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
-    }    
-  },
-  STATUS: function(data) {
-    console.log(JSON.stringify(data));
-
-    if(data.ota_dsc){
-      flash_ota_dsc=data.ota_dsc;
-    }
-    if(data.ota_pct){
-      flash_ota_pct=data.ota_pct;
-    }
-    switch (flash_state) {
-      case flash_status_codes.NONE:
-
-          console.log('Current Flash state is NONE');
-        break;
-        case flash_status_codes.DOWNLOADING_FILE:
-          console.log('DOWNLOADING_FILE');
-        break;
-        case flash_status_codes.DOWNLOADING_COMPLETE:
-          console.log('DOWNLOADING_COMPLETE');
-        break;        
-        case flash_status_codes.REBOOT_TO_RECOVERY:
-          console.log('REBOOT_TO_RECOVERY');
-        break;
-        case flash_status_codes.CHECK_FOR_UPLOAD:
-          console.log('CHECK_FOR_UPLOAD');
-        break;
-        case flash_status_codes.UPLOADING:
-          console.log('UPLOADING');
-        break;
-        case flash_status_codes.SET_FWURL:
-          console.log('SET_FWURL');
-        break;
-        case flash_status_codes.FLASHING:
-          console.log('FLASHING');
-        break;
-    
-      default:
-        break;
-    }    
+  PROCESS_OTA: function(data) {
+    process_ota_event(data);
   }
 };
 window.hideSurrounding = function(obj){
   $(obj).parent().parent().hide();
 }
 
-
 function handle_flash_state(data) {
-  if(isFlashExecuting()) {
-    flash_state= flash_status_codes.FLASHING;
-  }
   if(data.event)  {
     data.event(data);
   } 
+  else {
+    console.error('Unexpected error while processing handle_flash_state');
+    return;
+  }
 
+  if(flash_state && flash_state >flash_status_codes.NONE && flash_ota_pct>=0) {
 
-  if(flash_state!=flash_status_codes.NONE){
     $('#otadiv').modal();
     if (flash_ota_pct !== 0) {
       $('.progress-bar')
         .css('width', flash_ota_pct + '%')
-        .attr('aria-valuenow', flash_ota_pct);
-      $('.progress-bar').html(flash_ota_pct + '%');
+        .attr('aria-valuenow', flash_ota_pct)
+        .text(flash_ota_pct+'%')
+      $('.progress-bar').html((flash_state==flash_status_codes.DONE?100:flash_ota_pct) + '%');
     }
     if (flash_ota_dsc !== '') {
       $('span#flash-status').html(flash_ota_dsc);
-      if ((data.type ?? '') === 'MESSAGING_ERROR' || flash_ota_pct > 95) {
-        //blockFlashButton = false;
-      }
     }      
   }
   else {
@@ -438,12 +265,12 @@ function handle_flash_state(data) {
 window.hFlash = function(){
   handle_flash_state({ event: flash_events.START_OTA, url: $('#fw-url-input').val() });
 }
-window.handleReboot = function(ota){
-  if(ota){
-    $('#reboot_ota_nav').removeClass('active'); delayReboot(500,'', true);
+window.handleReboot = function(link){
+  if(link=='reboot_ota'){
+    $('#reboot_ota_nav').removeClass('active'); delayReboot(500,'', 'reboot_ota');
   }
   else {
-    $('#reboot_nav').removeClass('active'); delayReboot(500,'', false);
+    $('#reboot_nav').removeClass('active'); delayReboot(500,'',link);
   }
 }
 
@@ -547,10 +374,12 @@ var output = '';
 let hostName = '';
 let versionName='Squeezelite-ESP32';
 let project_name=versionName;
+let platform_name=versionName;
 let btSinkNamesOptSel='#cfg-audio-bt_source-sink_name';
 let ConnectedToSSID={};
 let ConnectingToSSID={};
 let lmsBaseUrl;
+let prevLMSIP='';
 const ConnectingToActions = {
   'CONN' : 0,'MAN' : 1,'STS' : 2,
 }
@@ -573,14 +402,6 @@ Promise.prototype.delay = function(duration) {
     }
   );
 };
-// function stopCheckStatusInterval() {
-//   if (checkStatusInterval != null) {
-//     clearTimeout(checkStatusInterval);
-//     checkStatusInterval = null;
-//   }
-//   StatusIntervalActive = false;
-// }
-
 
 function startCheckStatusInterval() {
   StatusIntervalActive = true;
@@ -676,8 +497,8 @@ function onChooseFile(event, onLoadFileHandler) {
   fr.readAsText(file);
   input.value = '';
 }
-function delayReboot(duration, cmdname, ota = false) {
-  const url = ota ? '/reboot_ota.json' : '/reboot.json';
+function delayReboot(duration, cmdname, ota = 'reboot') {
+  const url = '/'+ota+'.json';
   $('tbody#tasks').empty();
   $('#tasks_sect').css('visibility', 'collapse');
   Promise.resolve({ cmdname: cmdname, url: url })
@@ -839,11 +660,8 @@ $(document).ready(function() {
   });
   $('.upSrch').on('input', function() {
     const val = this.value;
-    
-    if(val.length==0) {
-      $("#rTable tr").removeClass(this.id+'_hide');
-    }
-    else {
+    $("#rTable tr").removeClass(this.id+'_hide');
+    if(val.length>0) {
       $(`#rTable td:nth-child(${$(this).parent().index()+1})`).filter(function(){ 
         return !$(this).text().toUpperCase().includes(val.toUpperCase());
       }).parent().addClass(this.id+'_hide');
@@ -907,24 +725,6 @@ $(document).ready(function() {
      }
    });
 
-  // $('#cancel').on('click', function() {
-  //   selectedSSID = '';
-  //   $('#connect').slideUp('fast', function() {});
-  //   $('#connect_manual').slideUp('fast', function() {});
-  //   $('#wifi').slideDown('fast', function() {});
-  // });
-
-  // $('#manual_cancel').on('click', function() {
-  //   selectedSSID = '';
-  //   $('#connect').slideUp('fast', function() {});
-  //   $('#connect_manual').slideUp('fast', function() {});
-  //   $('#wifi').slideDown('fast', function() {});
-  // });
-
-  // $('#ok-details').on('click', function() {
-  //   $('#connect-details').slideUp('fast', function() {});
-  //   $('#wifi').slideDown('fast', function() {});
-  // });
 
   $('#ok-credits').on('click', function() {
     $('#credits').slideUp('fast', function() {});
@@ -937,39 +737,6 @@ $(document).ready(function() {
     $('#credits').slideDown('fast', function() {});
   });
 
-  // $('#disconnect').on('click', function() {
-  //   $('#connect-details-wrap').addClass('blur');
-  //   $('#diag-disconnect').slideDown('fast', function() {});
-  // });
-
-  // $('#no-disconnect').on('click', function() {
-  //   $('#diag-disconnect').slideUp('fast', function() {});
-  //   $('#connect-details-wrap').removeClass('blur');
-  // });
-
-  // $('#yes-disconnect').on('click', function() {
-  //   stopCheckStatusInterval();
-  //   selectedSSID = '';
-
-  //   $('#diag-disconnect').slideUp('fast', function() {});
-  //   $('#connect-details-wrap').removeClass('blur');
-
-  //   $.ajax({
-  //     url: '/connect.json',
-  //     dataType: 'text',
-  //     method: 'DELETE',
-  //     cache: false,
-  //     contentType: 'application/json; charset=utf-8',
-  //     data: JSON.stringify({
-  //       timestamp: Date.now(),
-  //     }),
-  //   });
-
-  //   startCheckStatusInterval();
-
-  //   $('#connect-details').slideUp('fast', function() {});
-  //   $('#wifi').slideDown('fast', function() {});
-  // });
   $('input#show-commands').on('click', function() {
     this.checked = this.checked ? 1 : 0;
     if (this.checked) {
@@ -1008,24 +775,7 @@ $(document).ready(function() {
   });
 
   $('#save-nvs').on('click', function() {
-    const headers = {};
-    const data = {
-      timestamp: Date.now(),
-    };
-    const config = getConfigJson(false);
-    data.config = config;
-    $.ajax({
-      url: '/config.json',
-      dataType: 'text',
-      method: 'POST',
-      cache: false,
-      headers: headers,
-      contentType: 'application/json; charset=utf-8',
-      data: JSON.stringify(data),
-      error: handleExceptionResponse,
-    });
-    console.log('sent config JSON with headers:', JSON.stringify(headers));
-    console.log('sent config JSON with data:', JSON.stringify(data));
+    post_config(getConfigJson(false));
   });
   $('#fwUpload').on('click', function() {
     const uploadPath = '/flash.json';
@@ -1062,35 +812,7 @@ $(document).ready(function() {
       xhttp.send(file);
     }
   });
-  // $('#flash').on('click', function() {
-  //   const data = {
-  //     timestamp: Date.now(),
-  //   };
-  //   if (blockFlashButton) {
-  //     return;
-  //   }
-  //   blockFlashButton = true;
-  //   const url = $('#fwurl').val();
-  //   data.config = {
-  //     fwurl: {
-  //       value: url,
-  //       type: 33,
-  //     },
-  //   };
-
-  //   $.ajax({
-  //     url: '/config.json',
-  //     dataType: 'text',
-  //     method: 'POST',
-  //     cache: false,
-  //     contentType: 'application/json; charset=utf-8',
-  //     data: JSON.stringify(data),
-  //     error: handleExceptionResponse,
-  //   });
-  //   enableStatusTimer = true;
-  // });
-
-  $('[name=output-tmpl]').on('click', function() {
+   $('[name=output-tmpl]').on('click', function() {
     handleTemplateTypeRadio(this.id);
   });
 
@@ -1152,11 +874,19 @@ $(document).ready(function() {
         });
       }
       $('#searchfw').css('display', 'inline');
-      if($('.upf').filter(function(){ return $(this).text().toUpperCase()===project_name.toUpperCase()}).length>0){
+      if(platform_name!=='' && $('.upf').filter(function(){ return $(this).text().toUpperCase()===platform_name.toUpperCase()}).length>0){
+        $('#splf').val(platform_name).trigger('input');
+      }
+      else if($('.upf').filter(function(){ return $(this).text().toUpperCase()===project_name.toUpperCase()}).length>0){
         $('#splf').val(project_name).trigger('input');
       }
+      
       $('#rTable tr.release').on('click', function() {
-        $('#fw-url-input').val(this.attributes['fwurl'].value);
+        var url=this.attributes['fwurl'].value;
+        if (lmsBaseUrl) {
+          url = url.replace(/.*\/download\//, lmsBaseUrl + '/plugins/SqueezeESP32/firmware/');
+        }
+        $('#fw-url-input').val(url);
         $('#start-flash').show();
         $('#rTable tr.release').removeClass('table-success table-warning');
         $(this).addClass('table-success table-warning');
@@ -1252,55 +982,6 @@ $(document).ready(function() {
     });
   });
 
-  // $('input#searchinput').on('input', function() {
-  //   const s = $('input#searchinput').val();
-  //   const re = new RegExp(s, 'gi');
-  //   if (s.length === 0) {
-  //     $('tr.release').removeClass('hide');
-  //   } else if (s.length < 3) {
-  //     $('tr.release').addClass('hide');
-  //   } else {
-  //     $('tr.release').addClass('hide');
-  //     $('tr.release').each(function() {
-  //       $(this)
-  //         .find('td')
-  //         .each(function() {
-  //           if (
-  //             $(this)
-  //               .html()
-  //               .match(re)
-  //           ) {
-  //             $(this)
-  //               .parent()
-  //               .removeClass('hide');
-  //           }
-  //         });
-  //     });
-  //   }
-  // });
-
-  // $('#fwbranch').on('change', function() {
-  //   const branch = this.value;
-  //   const re = new RegExp('^' + branch + '$', 'gi');
-  //   $('tr.release').addClass('hide');
-  //   $('tr.release').each(function() {
-  //     $(this)
-  //       .find('td')
-  //       .each(function() {
-  //         console.log($(this).html());
-  //         if (
-  //           $(this)
-  //             .html()
-  //             .match(re)
-  //         ) {
-  //           $(this)
-  //             .parent()
-  //             .removeClass('hide');
-  //         }
-  //       });
-  //   });
-  // });
-
   $('#updateAP').on('click', function() {
     refreshAP();
     console.log('refresh AP');
@@ -1333,55 +1014,6 @@ window.setURL = function(button) {
   $('#fwurl').val(url);
 }
 
-// function performConnect(conntype) {
-//   // stop the status refresh. This prevents a race condition where a status
-//   // request would be refreshed with wrong ip info from a previous connection
-//   // and the request would automatically shows as succesful.
-//   stopCheckStatusInterval();
-
-//   // stop refreshing wifi list
-
-//   let pwd;
-//   let dhcpname;
-//   if (conntype === 'manual') {
-//     // Grab the manual SSID and PWD
-//     selectedSSID = $('#manual_ssid').val();
-//     pwd = $('#manual_pwd').val();
-//     dhcpname = $('#dhcp-name2').val();
-//   } else {
-//     pwd = $('#pwd').val();
-//     dhcpname = $('#dhcp-name1').val();
-//   }
-
-//   // reset connection
-//   $('#connect-success').hide();
-//   $('#connect-fail').hide();
-
-//   $('#ok-connect').prop('disabled', true);
-//   $('#ssid-wait').text(selectedSSID);
-//   $('#connect').slideUp('fast', function() {});
-//   $('#connect_manual').slideUp('fast', function() {});
-
-//   $.ajax({
-//     url: '/connect.json',
-//     dataType: 'text',
-//     method: 'POST',
-//     cache: false,
-
-//     //        headers: { 'X-Custom-ssid': selectedSSID, 'X-Custom-pwd': pwd, 'X-Custom-host_name': dhcpname },
-//     contentType: 'application/json; charset=utf-8',
-//     data: JSON.stringify({
-//       timestamp: Date.now(),
-//       ssid: selectedSSID,
-//       pwd: pwd,
-//       host_name: dhcpname,
-//     }),
-//     error: handleExceptionResponse,
-//   });
-
-//   // now we can re-set the intervals regardless of result
-//   startCheckStatusInterval();
-// }
 
 function rssiToIcon(rssi) {
   if (rssi >= -55) {
@@ -1501,7 +1133,7 @@ function getBTSinkOpt(name){
   return $(`${btSinkNamesOptSel} option:contains('${name}')`);
 }
 function getMessages() {
-  $.getJSON('/messages.json?1', async function(data) {
+  $.getJSON('/messages.json', async function(data) {
     for (const msg of data) {
       const msgAge = msg.current_time - msg.sent_time;
       var msgTime = new Date();
@@ -1510,10 +1142,9 @@ function getMessages() {
         case 'MESSAGING_CLASS_OTA':
           var otaData = JSON.parse(msg.message);
           handle_flash_state({
-            ota_pct: (otaData.ota_pct ?? 0),
+            ota_pct: (otaData.ota_pct ?? -1),
             ota_dsc: (otaData.ota_dsc ??''),
-            type: msg.type,
-            event: flash_events.MESSAGES
+            event: flash_events.PROCESS_OTA
           });
           break;
         case 'MESSAGING_CLASS_STATS':
@@ -1753,9 +1384,16 @@ function checkStatus() {
     handleRecoveryMode(data);
     handleWifiStatus(data);
     handlebtstate(data);
-    handle_flash_state(data);
+    handle_flash_state({
+      ota_pct: (data.ota_pct ?? -1),
+      ota_dsc: (data.ota_dsc ??''),
+      event: flash_events.PROCESS_OTA_STATUS
+    });
     if (data.project_name && data.project_name !== '') {
       project_name = data.project_name;
+    }
+    if(data.platform_name && data.platform_name!==''){
+      platform_name = data.platform_name;
     }
     if (data.version && data.version !== '') {
       versionName=data.version;
@@ -1771,10 +1409,13 @@ function checkStatus() {
       $('#battery').hide();
     }
 
-    if (typeof lmsBaseUrl == "undefined" && data.lms_ip && data.lms_port) {
+    if (typeof lmsBaseUrl == "undefined" || data.lms_ip != prevLMSIP && data.lms_ip && data.lms_port) {
       const baseUrl = 'http://' + data.lms_ip + ':' + data.lms_port;
+      prevLMSIP=data.lms_ip;
       $.ajax({
         url: baseUrl + '/plugins/SqueezeESP32/firmware/-99', 
+        dataType: 'text',
+        cache: false,
         error: function() {
           // define the value, so we don't check it any more.
           lmsBaseUrl = '';

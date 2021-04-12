@@ -69,6 +69,7 @@ Contains the freeRTOS task and all necessary support
 #include "monitor.h"
 #include "globdefs.h"
 
+
 #ifndef CONFIG_SQUEEZELITE_ESP32_RELEASE_URL
 #pragma message "Defaulting release url"
 #define CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
@@ -91,11 +92,13 @@ char *ip_info_json = NULL;
 char * release_url=NULL;
 cJSON * ip_info_cjson=NULL;
 wifi_config_t* wifi_manager_config_sta = NULL;
-
-
+static void	(*chained_notify)(in_addr_t, u16_t, u16_t);	
 static int32_t total_connected_time=0;
 static int64_t last_connected=0;
 static uint16_t num_disconnect=0;
+static char lms_server_ip[IP4ADDR_STRLEN_MAX]={0};
+static uint16_t lms_server_port=0;
+static uint16_t lms_server_cport=0;
 
 void (**cb_ptr_arr)(void*) = NULL;
 
@@ -297,6 +300,22 @@ void wifi_manager_init_wifi(){
     taskYIELD();
     ESP_LOGD(TAG,   "Initializing wifi. done");
 }
+
+void set_lms_server_details(in_addr_t ip, u16_t hport, u16_t cport){
+	strncpy(lms_server_ip,inet_ntoa(ip),sizeof(lms_server_ip));
+	ESP_LOGI(TAG,"LMS IP: %s, hport: %d, cport: %d",lms_server_ip, hport, cport);
+	lms_server_port = hport;
+	lms_server_cport = cport;
+
+}
+
+static void connect_notify(in_addr_t ip, u16_t hport, u16_t cport) {
+	set_lms_server_details(ip,hport,cport);
+	if (chained_notify) (*chained_notify)(ip, hport, cport);
+	wifi_manager_update_status();
+}
+
+
 void wifi_manager_start(){
 
 
@@ -338,7 +357,8 @@ void wifi_manager_start(){
 	else {
 		ESP_LOGD(TAG,   "Found release url %s", release_url);
 	}
-
+	chained_notify = server_notify;
+	server_notify = connect_notify;
 	ESP_LOGD(TAG,   "About to call init wifi");
 	wifi_manager_init_wifi();
 
@@ -495,6 +515,35 @@ void wifi_manager_update_basic_info(){
 		if(avg_conn_time){
 			cJSON_SetNumberValue(avg_conn_time,	num_disconnect>0?(total_connected_time/num_disconnect):0);
 		}	
+		if(lms_server_cport>0){
+			cJSON * value = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "lms_cport");
+			if(value){
+				cJSON_SetNumberValue(value,lms_server_cport);
+			}			
+			else {
+				cJSON_AddNumberToObject(ip_info_cjson,"lms_cport",lms_server_cport);
+			}
+		}
+
+		if(lms_server_port>0){
+			cJSON * value = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "lms_port");
+			if(value){
+				cJSON_SetNumberValue(value,lms_server_port);
+			}			
+			else {
+				cJSON_AddNumberToObject(ip_info_cjson,"lms_port",lms_server_port);
+			}
+		}
+
+
+		if(strlen(lms_server_ip) >0){
+			cJSON * value = cJSON_GetObjectItemCaseSensitive(ip_info_cjson, "lms_ip");
+			if(!value){
+				// only create if it does not exist. Since we're creating a reference 
+				// to a char buffer, updates to cJSON aren't needed
+				cJSON_AddItemToObject(ip_info_cjson, "lms_ip", cJSON_CreateStringReference(lms_server_ip));
+			}			
+		}		
 		wifi_manager_unlock_json_buffer();
 	}
 }
@@ -504,6 +553,9 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 	ESP_LOGV(TAG,  "wifi_manager_get_basic_info called");
 	cJSON *root = wifi_manager_get_new_json(old);
 	cJSON_AddItemToObject(root, "project_name", cJSON_CreateString(desc->project_name));
+	#ifdef CONFIG_FW_PLATFORM_NAME
+		cJSON_AddItemToObject(root, "platform_name", cJSON_CreateString(CONFIG_FW_PLATFORM_NAME));
+	#endif
 	cJSON_AddItemToObject(root, "version", cJSON_CreateString(desc->version));
 	if(release_url !=NULL) cJSON_AddItemToObject(root, "release_url", cJSON_CreateString(release_url));
 	cJSON_AddNumberToObject(root,"recovery",	is_recovery_running?1:0);
@@ -518,6 +570,7 @@ cJSON * wifi_manager_get_basic_info(cJSON **old){
 #else
 	cJSON_AddFalseToObject(root, "is_i2c_locked");
 #endif
+
 	ESP_LOGV(TAG,  "wifi_manager_get_basic_info done");
 	return root;
 }

@@ -38,6 +38,8 @@
 #include "gds_text.h"
 #include "gds_draw.h"
 #include "platform_esp32.h"
+#include "lwip/sockets.h"
+
 
 extern const char * get_certificate();
 #define IF_DISPLAY(x) if(display) { x; }
@@ -91,6 +93,7 @@ ota_status_t * ota_status;
 
 struct timeval tv;
 static esp_http_client_config_t http_client_config;
+
 
 void _printMemStats(){
 	ESP_LOGD(TAG,"Heap internal:%zu (min:%zu) external:%zu (min:%zu)",
@@ -276,8 +279,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 //	int data_len - data length of data
 //	void *user_data -- user_data context, from esp_http_client_config_t user_data
 
-//	char *header_key For HTTP_EVENT_ON_HEADER event_id, it’s store current http header key
-//	char *header_value For HTTP_EVENT_ON_HEADER event_id, it’s store current http header value
+//	char *header_key For HTTP_EVENT_ON_HEADER event_id, itï¿½s store current http header key
+//	char *header_value For HTTP_EVENT_ON_HEADER event_id, itï¿½s store current http header value
 // --------------
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
@@ -721,5 +724,66 @@ esp_err_t process_recovery_ota(const char * bin_url, char * bin_buffer, uint32_t
     return ESP_OK;
 }
 
+extern void set_lms_server_details(in_addr_t ip, u16_t hport, u16_t cport);
 
+in_addr_t discover_ota_server(int max) {
+	struct sockaddr_in d;
+	struct sockaddr_in s;
+	char buf[32], port_d[] = "JSON", clip_d[] = "CLIP";
+	struct pollfd pollinfo;
+	uint8_t len;
+	uint16_t hport=9000;
+	uint16_t cport=9090;
+
+	int disc_sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+	socklen_t enable = 1;
+	setsockopt(disc_sock, SOL_SOCKET, SO_BROADCAST, (const void *)&enable, sizeof(enable));
+
+	len = sprintf(buf,"e%s%c%s", port_d, '\0', clip_d) + 1;
+
+	memset(&d, 0, sizeof(d));
+	d.sin_family = AF_INET;
+	d.sin_port = htons(3483);
+	d.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+	pollinfo.fd = disc_sock;
+	pollinfo.events = POLLIN;
+
+	do {
+
+		ESP_LOGI(TAG,"sending LMS discovery");
+		memset(&s, 0, sizeof(s));
+
+		if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
+			ESP_LOGE(TAG,"error sending discovery");
+		}
+		else {
+
+			if (poll(&pollinfo, 1, 5000) == 1) {
+				char readbuf[64], *p;
+				socklen_t slen = sizeof(s);
+				memset(readbuf, 0, sizeof(readbuf));
+				recvfrom(disc_sock, readbuf, sizeof(readbuf) - 1, 0, (struct sockaddr *)&s, &slen);
+				ESP_LOGI(TAG,"got response from: %s:%d - %s", inet_ntoa(s.sin_addr), ntohs(s.sin_port),readbuf);
+
+				if ((p = strstr(readbuf, port_d)) != NULL) {
+					p += strlen(port_d);
+					hport = atoi(p + 1);
+				}
+
+				if ((p = strstr(readbuf, clip_d)) != NULL) {
+					p += strlen(clip_d);
+					cport = atoi(p + 1);
+				}
+				server_notify(s.sin_addr.s_addr, hport, cport);
+			}
+		}
+
+	} while (s.sin_addr.s_addr == 0 && (!max || --max));
+
+	closesocket(disc_sock);
+
+	return s.sin_addr.s_addr;
+}
 

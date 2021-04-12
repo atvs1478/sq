@@ -79,6 +79,13 @@ menu "Squeezelite-ESP32"
 			default "DAC32" if DAC32
 			default "Squeezelite-TWATCH" if TWATCH2020
 			default "Squeezelite-ESP32" if !A1S && !SQUEEZEAMP && !DAC32 && !TWATCH2020
+		config FW_PLATFORM_NAME
+			string "Hardware Platform Name"
+			default "SqueezeAmp" if SQUEEZEAMP
+			default "DAC32" if DAC32
+			default "ESP32-A1S" if A1S
+			default "TWATCH" if TWATCH2020
+			default "I2S-4MFlash" if !A1S && !SQUEEZEAMP && !DAC32 && !TWATCH2020
 		# AGGREGATES - begin
 		# these parameters are "aggregates"	that take precedence. The must have a default value	
 		config DAC_CONFIG

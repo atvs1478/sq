@@ -24,6 +24,7 @@ const char * desc_dac= "DAC Options";
 const char * desc_spdif= "SPDIF Options";
 const char * desc_audio= "General Audio Options";
 const char * desc_bt_source= "Bluetooth Audio Output Options";
+const char * desc_rotary= "Rotary Control";
 
 
 #define CODECS_BASE "flac|pcm|mp3|ogg"
@@ -85,6 +86,19 @@ static struct {
     struct arg_end *end;
 } i2s_args;
 
+static struct {
+	struct arg_rem * rem;
+	struct arg_int * A;
+	struct arg_int * B;
+	struct arg_int * SW;
+	struct arg_lit * volume_lock;
+	struct arg_lit * longpress;
+	struct arg_lit * knobonly;
+	struct arg_int * timer;
+	struct arg_lit * clear;
+	struct arg_end * end;
+} rotary_args;
+//config_rotary_get
 static struct{
 		struct arg_str *sink_name;
 		struct arg_str *pin_code;
@@ -142,7 +156,7 @@ static struct {
     struct arg_end *end;
 } squeezelite_args;
 
-int is_output_gpio(struct arg_int * gpio, FILE * f, int * gpio_out, bool mandatory){
+int is_gpio(struct arg_int * gpio, FILE * f, int * gpio_out, bool mandatory, bool output){
 	int res = 0;
 	const char * name = gpio->hdr.longopts?gpio->hdr.longopts:gpio->hdr.glossary;
 	*gpio_out=-1;
@@ -152,7 +166,7 @@ int is_output_gpio(struct arg_int * gpio, FILE * f, int * gpio_out, bool mandato
 			fprintf(f,"Missing: %s\n", name);
 			res++;
 		}
-	} else  if(!GPIO_IS_VALID_OUTPUT_GPIO(t_gpio)){
+	} else  if((output && !GPIO_IS_VALID_OUTPUT_GPIO(t_gpio)) || (!GPIO_IS_VALID_GPIO(t_gpio))){
 		fprintf(f,"Invalid %s gpio: [%d] %s\n",name, t_gpio, GPIO_IS_VALID_GPIO(t_gpio)?NOT_OUTPUT:NOT_GPIO );
 		res++;
 	}
@@ -161,7 +175,9 @@ int is_output_gpio(struct arg_int * gpio, FILE * f, int * gpio_out, bool mandato
 	}
 	return res;
 }
-
+int is_output_gpio(struct arg_int * gpio, FILE * f, int * gpio_out, bool mandatory){
+	return is_gpio(gpio,f,gpio_out,mandatory,true);
+}
 int check_missing_parm(struct arg_int * int_parm, FILE * f){
 	int res=0;
 	const char * name = int_parm->hdr.longopts?int_parm->hdr.longopts:int_parm->hdr.glossary;
@@ -482,6 +498,60 @@ static int do_spdif_cmd(int argc, char **argv){
 	return (nerrors==0 && err==ESP_OK)?0:1;
 }
 
+static int do_rotary_cmd(int argc, char **argv){
+	rotary_struct_t rotary={  .A = -1, .B = -1, .SW = -1, .longpress = 0, .knobonly=0,.volume_lock=false};
+	esp_err_t err=ESP_OK;
+	int nerrors = arg_parse(argc, argv,(void **)&rotary_args);
+	if (rotary_args.clear->count) {
+		cmd_send_messaging(argv[0],MESSAGING_WARNING,"rotary config cleared\n");
+		config_set_value(NVS_TYPE_STR, "rotary_config", "");
+		return 0;
+	}
+
+	char *buf = NULL;
+	size_t buf_size = 0;
+	FILE *f = open_memstream(&buf, &buf_size);
+	if (f == NULL) {
+		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.\n");
+		return 1;
+	}
+	if(nerrors >0){
+		arg_print_errors(f,rotary_args.end,desc_rotary);
+		return 1;
+	}
+	nerrors+=is_gpio(rotary_args.A, f, &rotary.A, true,false);
+	nerrors+=is_gpio(rotary_args.B, f, &rotary.B, true,false);
+	nerrors+=is_gpio(rotary_args.SW, f, &rotary.SW,false,false);
+
+
+	if(rotary_args.knobonly->count>0 && (rotary_args.volume_lock->count>0 || rotary_args.longpress->count>0)){
+		fprintf(f,"error: Cannot use volume lock or longpress option when knob only option selected\n");
+		nerrors++;
+	}
+	if(rotary_args.timer->count>0 && rotary_args.timer->ival[0]<0){
+		fprintf(f,"error: knob only timer should be greater than or equal to zero.\n");
+		nerrors++;
+	}
+	else {
+		rotary.timer = rotary_args.timer->count>0?rotary_args.timer->ival[0]:0;
+	}
+	rotary.knobonly = rotary_args.knobonly->count>0;
+	rotary.volume_lock= rotary_args.volume_lock->count>0;
+	rotary.longpress = rotary_args.longpress->count>0;
+	if(!nerrors ){
+		fprintf(f,"Storing rotary parameters.\n");
+		nerrors+=(config_rotary_set(&rotary )!=ESP_OK);
+	}
+	if(!nerrors ){
+		fprintf(f,"Done.\n");
+	}
+	fflush (f);
+	cmd_send_messaging(argv[0],nerrors>0?MESSAGING_ERROR:MESSAGING_INFO,"%s", buf);
+	fclose(f);
+	FREE_AND_NULL(buf);
+	return (nerrors==0 && err==ESP_OK)?0:1;
+}
+
 static int do_i2s_cmd(int argc, char **argv)
 {
 	i2s_platform_config_t i2s_dac_pin = {
@@ -622,6 +692,23 @@ cJSON * spdif_cb(){
 		cJSON_AddNumberToObject(values,"data",spdif_conf->pin.data_out_num);
 	}
 		
+	return values;
+}
+cJSON * rotary_cb(){
+	cJSON * values = cJSON_CreateObject();
+	const rotary_struct_t *rotary= config_rotary_get();
+	
+	if(GPIO_IS_VALID_GPIO(rotary->A ) && rotary->A>=0 && GPIO_IS_VALID_GPIO(rotary->B) && rotary->B>=0){
+		cJSON_AddNumberToObject(values,"A",rotary->A);
+		cJSON_AddNumberToObject(values,"B",rotary->B);
+		if(GPIO_IS_VALID_GPIO(rotary->SW ) && rotary->SW>=0 ){
+			cJSON_AddNumberToObject(values,"SW",rotary->SW);
+		}
+		cJSON_AddBoolToObject(values,"volume_lock",rotary->volume_lock);
+		cJSON_AddBoolToObject(values,"longpress",rotary->longpress);
+		cJSON_AddBoolToObject(values,"knobonly",rotary->knobonly);
+		cJSON_AddNumberToObject(values,"timer",rotary->timer);
+	}
 	return values;
 }
 cJSON * audio_cb(){
@@ -815,6 +902,27 @@ static void register_bt_source_config(void){
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+static void register_rotary_config(void){
+	rotary_args.rem = arg_rem("remark","One rotary encoder is supported, quadrature shift with press. Such encoders usually have 2 pins for encoders (A and B), and common C that must be set to ground and an optional SW pin for press. A, B and SW must be pulled up, so automatic pull-up is provided by ESP32, but you can add your own resistors. A bit of filtering on A and B (~470nF) helps for debouncing which is not made by software.\r\nEncoder is normally hard-coded to respectively knob left, right and push on LMS and to volume down/up/play toggle on BT and AirPlay.");
+	rotary_args.A = arg_int1(NULL,"A","gpio","A/DT gpio");
+	rotary_args.B = arg_int1(NULL,"B","gpio","B/CLK gpio");
+	rotary_args.SW = arg_int0(NULL,"SW","gpio","Switch gpio");
+	rotary_args.knobonly = arg_lit0(NULL,"knobonly","Single knob full navigation. Left, Right and Press is navigation, with Press always going to lower submenu item. Longpress is 'Play', Double press is 'Back', a quick left-right movement on the encoder is 'Pause'");
+	rotary_args.timer = arg_int0(NULL,"timer","ms","The speed of double click (or left-right) when knob only option is enabled. Be aware that the longer you set double click speed, the less responsive the interface will be. ");
+	rotary_args.volume_lock = arg_lit0(NULL,"volume_lock", "Force Volume down/up/play toggle all the time (even in LMS). ");
+	rotary_args.longpress = arg_lit0(NULL,"longpress","Enable alternate mode mode on long-press. In that mode, left is previous, right is next and press is toggle. Every long press on SW alternates between modes (the main mode actual behavior depends on 'volume').");
+	rotary_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
+	rotary_args.end = arg_end(3);
+	const esp_console_cmd_t cmd = {
+        .command = CFG_TYPE_HW("rotary"),
+        .help = desc_rotary,
+        .hint = NULL,
+        .func = &do_rotary_cmd,
+        .argtable = &rotary_args
+    };
+    cmd_to_json_with_cb(&cmd,&rotary_cb);
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
 
 static void register_audio_config(void){
 	audio_args.jack_behavior = arg_str0("j", "jack_behavior","Headphones|Subwoofer","On supported DAC, determines the audio jack behavior. Selecting headphones will cause the external amp to be muted on insert, while selecting Subwoofer will keep the amp active all the time.");
@@ -828,7 +936,9 @@ static void register_audio_config(void){
     };
     cmd_to_json_with_cb(&cmd,&audio_cb);
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
-}static void register_spdif_config(void){
+}
+
+static void register_spdif_config(void){
 	spdif_args.clear = arg_lit0(NULL, "clear", "Clear configuration");
     spdif_args.clock = arg_int1(NULL,"clock","<n>","Clock GPIO. e.g. 33");
     spdif_args.wordselect = arg_int1(NULL,"wordselect","<n>","Word Select GPIO. e.g. 25");
@@ -893,5 +1003,6 @@ void register_config_cmd(void){
 	register_bt_source_config();
 	register_i2s_config();
 	register_spdif_config();
+	register_rotary_config();
 }
 

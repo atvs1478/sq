@@ -33,3 +33,4 @@ extern void console_start();
 extern pthread_cond_t wifi_connect_suspend_cond;
 extern pthread_t wifi_connect_suspend_mutex;
 
+extern void (*server_notify)(in_addr_t ip, uint16_t hport, uint16_t cport);

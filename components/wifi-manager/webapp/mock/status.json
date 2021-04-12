@@ -16,6 +16,8 @@
 	"netmask": "255.255.255.0",
 	"gw": "192.168.10.1",
 	"lms_cport": 9090,
-	"lms_port": 9000,
-	"lms_ip": "127.0.0.1"
+	"lms_port": 9100,
+	"lms_ip": "127.0.0.1",
+	"mock_plugin_has_proxy": "x",
+	"platform_name": "SqueezeAmp"
 }

@@ -33,6 +33,7 @@ CONFIG_SPDIF_CONFIG="bck=33,ws=25,do=15"
 CONFIG_DAC_CONFIG="model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0"
 CONFIG_MUTE_GPIO_LEVEL=-1
 CONFIG_PROJECT_NAME="SqueezeAmp"
+CONFIG_FW_PLATFORM_NAME="SqueezeAmp"
 CONFIG_RELEASE_API="https://api.github.com/repos/sle118/squeezelite-esp32/releases"
 CONFIG_SQUEEZELITE_ESP32_RELEASE_URL "https://github.com/sle118/squeezelite-esp32/releases"
 #

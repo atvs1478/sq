@@ -97,7 +97,8 @@ cJSON * ParmsToJSON(struct arg_hdr * * argtable){
 		ADD_TO_JSON(entry,table[tabindex],glossary);
 		ADD_TO_JSON(entry,table[tabindex],longopts);
 		ADD_TO_JSON(entry,table[tabindex],shortopts);
-		cJSON_AddBoolToObject(entry, "checkbox", (table[tabindex]->flag & ARG_HASOPTVALUE)==0 && (table[tabindex]->flag & ARG_HASVALUE)==0);
+		cJSON_AddBoolToObject(entry, "checkbox", (table[tabindex]->flag & ARG_HASOPTVALUE)==0 && (table[tabindex]->flag & ARG_HASVALUE)==0 && (table[tabindex]->longopts || table[tabindex]->shortopts) );
+		cJSON_AddBoolToObject(entry, "remark", (table[tabindex]->flag & ARG_HASOPTVALUE)==0 && (table[tabindex]->flag & ARG_HASVALUE)==0 && (!table[tabindex]->longopts && !table[tabindex]->shortopts));
 		cJSON_AddBoolToObject(entry, "hasvalue", table[tabindex]->flag & ARG_HASVALUE);
 		cJSON_AddNumberToObject(entry,"mincount",table[tabindex]->mincount);
 		cJSON_AddNumberToObject(entry,"maxcount",table[tabindex]->maxcount);
