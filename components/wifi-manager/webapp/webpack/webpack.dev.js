@@ -15,7 +15,9 @@ const data = {
     messages: require("../mock/messages.json"),
     messagequeue: require("../mock/messages.json"),
     message_queue_sequence: [],
+    status_queue_sequence:[],
     message_queue_sequence_post_empty: null,
+    status_queue_sequence_post_empty: null,
     commands: require("../mock/commands.json"),
     scan: require("../mock/scan.json"),
     ap: require("../mock/ap.json"),
@@ -23,6 +25,7 @@ const data = {
     statusdefinition: require("../mock/statusdefinition.json"),
     status: require("../mock/status.json"),
     messages_ota_fail: require("../mock/messages_ota_fail.json"),
+    messages_ota_flash: require("../mock/messages_ota_flash.json"),
     messages_ota: require("../mock/messages_ota.json")
 };
 const messagingTypes= {
@@ -123,8 +126,47 @@ module.exports = merge(common, {
             app.use(bodyParser.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
             app.get('/ap.json', function(req, res) { res.json( data.ap ); });
             app.get('/scan.json', function(req, res) { res.json( data.scan ); });
-            app.get('/config.json', function(req, res) { res.json( data.config ); });
-            app.get('/status.json', function(req, res) { res.json( data.status ); });
+            app.get('/config.json', function(req, res) { 
+                if(data.status.recovery==1 && (data.status.mock_old_recovery??'')!==''){
+                    res.json( data.config.config ); 
+                    console.log('Mock old recovery - return config structure without gpio');
+                }
+                else {
+                    res.json( data.config ); 
+                }
+            });
+
+            app.get('/status.json', function(req, res) { 
+                if(data.status_queue_sequence.length>0){
+                    const curstatus = JSON.parse(data.status_queue_sequence_queue_sequence.shift());
+                    data.status.ota_pct=curstatus.ota_pct??0;
+                    data.status.ota_dsc=curstatus.ota_dsc??'';
+                    console.log(`Mock firmware update @${data.status.ota_pct}%, ${data.status.ota_dsc}`)
+                }
+                else if (data.status_queue_sequence_post_empty){
+                    data.status_queue_sequence_post_emptyy();
+                    console.log(`Mock old firmware update: simulating a restart`);
+                    data.status_queue_sequence_post_empty = null;
+                }
+                else if(data.status.ota_pct!=undefined || data.status.ota_dsc!=undefined) {
+                    if(data.status.ota_pct!=undefined) delete data.status.ota_pct;
+                    if(data.status.ota_dsc!=undefined) delete data.status.ota_dsc;
+                }
+                if(data.status.message) delete data.status.message;
+                if(data.status.recovery==1 && (data.status.mock_old_recovery??'')!==''){
+                    if(data.message_queue_sequence.length>0){
+                        
+                        const msgpayload = JSON.parse(data.message_queue_sequence.shift());
+                        data.status.message = msgpayload.message??'';
+                        console.log(`Mocking recovery, setting status message to ${data.status.message}`)
+                    }
+                    else if (data.message_queue_sequence_post_empty){
+                        data.message_queue_sequence_post_empty();
+                        data.message_queue_sequence_post_empty = null;
+                    }
+                }                                
+                res.json( data.status ); 
+            });
             app.get('/plugins/SqueezeESP32/firmware/-99', function(req, res) { 
                 let has_proxy=  data.status.mock_plugin_has_proxy ?? 'n';
                 const statusCode='xy'.includes((has_proxy).toLowerCase())?200:500;
@@ -132,6 +174,11 @@ module.exports = merge(common, {
                 res.status(statusCode ).json(); 
             });
             app.get('/messages.json', function(req, res) { 
+                if(data.status.recovery==1 && (data.status.mock_old_recovery??'')!==''){
+                    console.log('Mocking old recovery, with no commands backend' );
+                    res.status(404).end(); 
+                    return;
+                }
                 if(data.message_queue_sequence.length>0){
                     data.messagequeue.push(data.message_queue_sequence.shift());
                 }
@@ -144,8 +191,22 @@ module.exports = merge(common, {
             });
             
             app.get('/statusdefinition.json', function(req, res) { res.json( data.statusdefinition ); });
-            app.get('/commands.json', function(req, res) { res.json( data.commands ); });
+            app.get('/commands.json', function(req, res) { 
+                if(data.status.recovery==1 && (data.status.mock_old_recovery??'')!==''){
+                    console.log('Mocking old recovery, with no commands backend' );
+                    res.status(404).end(); 
+                }
+                else {
+                    res.json( data.commands ); 
+                }
+                
+            });
             app.post('/commands.json', function(req, res) { 
+                if(data.status.recovery==1 && (data.status.mock_old_recovery??'')!==''){
+                    console.log('Mocking old recovery, with no commands backend' );
+                    res.status(404).end(); 
+                    return;
+                }
                 console.log(req.body.command);
                 try {
                     const cmdName=req.body.command.split(" ")[0];
@@ -189,23 +250,29 @@ module.exports = merge(common, {
                   }
                 res.json( {} ); 
                 if(fwurl!=='' ){
+                    const ota_msg_list= ((data.status.mock_fail_fw_update ?? '')!=='')?data.messages_ota_fail:data.messages_ota;
                     if(data.status.recovery!=1) {
                         // we're not yet in recovery. Simulate reboot to recovery 
                         data.status.recovery=1;
-                        requeueMessages();
-                    }
-                    if(fwurl.toLowerCase().includes('fail')){
-                        console.log(`queuing ${data.messages_ota_fail.length} ota messages `);
-                        data.message_queue_sequence.push(...data.messages_ota_fail);
-
-                    }
-                    else {
-                        console.log(`queuing ${data.messages_ota.length} ota messages `);
-                        data.message_queue_sequence.push(...data.messages_ota);
-                        data.message_queue_sequence_post_empty = function(){
-                            data.status.recovery=0;
+                        if((data.status.mock_old_recovery??'')===''){
+                            // older recovery partitions possibly aren't 
+                            // sending messages
                             requeueMessages();
-                        }                        
+                        }
+                        
+                    }
+                    var targetQueue='message_queue_sequence';
+                    var targetPostEmpty='message_queue_sequence_post_empty';
+                    if((data.status.mock_old_recovery??'')!==''){
+                            console.log('Mocking old firmware flashing mechanism.  Starting!');
+                            targetQueue='status_queue_sequence';
+                            targetPostEmpty='status_queue_sequence_post_empty';
+                    }
+                    console.log(`queuing ${ota_msg_list.length} ota messages `);
+                    data[targetQueue].push(...ota_msg_list);
+                    data[targetPostEmpty] = function(){
+                        data.status.recovery=0;
+                        requeueMessages();
                     }
                 }
             });
@@ -220,7 +287,7 @@ module.exports = merge(common, {
                         console.log(`Updated status value ${property}\nFrom: ${data.status[property]}\nTo: ${req.body.status[property]}`);
                         data.status[property]=req.body.status[property];
                     }
-                  }
+                }
                 res.json( {} ); 
             });            
             app.post('/connect.json', function(req, res) { 
@@ -251,17 +318,37 @@ module.exports = merge(common, {
                 requeueMessages();
             });
             app.post('/recovery.json', function(req, res) { 
-                data.status.recovery=1;
-                requeueMessages();
-                res.json( { } ); 
+                if((data.status.mock_fail_recovery ?? '')!==''){
+                    res.status(404).end(); 
+                }
+                else {
+                    data.status.recovery=1;
+                    requeueMessages();
+                    res.json( { } ); 
+                }                
             });
             app.post('/flash.json', function(req, res) { 
+                
                 if(data.status.recovery>0){
-                    res.json({});
-                  }
-                  else {
+                    if((data.status.mock_fail_fw_update ?? '')!=='' || (data.status.mock_old_recovery??'')!==''){
+                        console.log('Old recovery mock, or fw fail requested' );
+                        res.status(404).end(); 
+                    }
+                    else {
+                        console.log(`queuing ${data.messages_ota_flash.length} flash ota messages `);
+                        data.message_queue_sequence.push(...data.messages_ota_flash);
+                        data.message_queue_sequence_post_empty = function(){
+                            data.status.recovery=0;
+                            requeueMessages();
+                            
+                        }   
+                        res.json({});                  
+                    }
+                    
+                }
+                else {
                     res.status(404).end(); 
-                  }  
+                }  
             });                  
             app.delete('/connect.json', function(req, res) { 
                 data.status.ssid='';

@@ -633,7 +633,7 @@ void ota_task(void *pvParameter)
 				gettimeofday(&tv, NULL);
 				uint32_t elapsed_ms= (tv.tv_sec-ota_status->OTA_start.tv_sec )*1000+(tv.tv_usec-ota_status->OTA_start.tv_usec)/1000;
 				ESP_LOGI(TAG,"OTA progress : %d/%.0f (%d pct), %d KB/s", ota_status->actual_image_len, ota_status->total_image_len, ota_status->newpct, elapsed_ms>0?ota_status->actual_image_len*1000/elapsed_ms/1024:0);
-				sendMessaging(MESSAGING_INFO,"Writing binary file %%%3d.",ota_status->newpct);
+				sendMessaging(MESSAGING_INFO,"Writing binary file %3d %%.",ota_status->newpct);
 				ota_status->lastpct=ota_status->newpct;
 			}
 			taskYIELD();
@@ -662,7 +662,7 @@ void ota_task(void *pvParameter)
     	ESP_LOGI(TAG,"OTA Process completed successfully!");
     	sendMessaging(MESSAGING_INFO,"Success!");
     	IF_DISPLAY(GDS_TextLine(display, 2, GDS_TEXT_LEFT, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, "Success!"));
-    	vTaskDelay(1500/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
+    	vTaskDelay(3500/ portTICK_PERIOD_MS);  // wait here to give the UI a chance to refresh
     	IF_DISPLAY(GDS_Clear(display,GDS_COLOR_BLACK));
         esp_restart();
     } else {

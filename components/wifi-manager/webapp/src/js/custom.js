@@ -112,14 +112,16 @@ const flash_status_codes = {
   REBOOT_TO_RECOVERY: 2,
   SET_FWURL: 5,
   FLASHING: 6,
-  DONE: 7
+  DONE: 7,
+  UPLOADING: 8,
+  ERROR: 9
 };
 let flash_state=flash_status_codes.FLASH_NONE;
 let flash_ota_dsc='';
 let flash_ota_pct=0;
 let older_recovery=false;
 function isFlashExecuting(data){
-  return data.ota_dsc!='' || data.ota_pct>0;
+  return (flash_state!=flash_status_codes.UPLOADING ) && (data.ota_dsc!='' || data.ota_pct>0);
 }
 function post_config(data){
   let confPayload={
@@ -140,16 +142,21 @@ function process_ota_event(data){
   if(data.ota_dsc){
     flash_ota_dsc=data.ota_dsc;
   }
-  if(data.ota_pct){
+  if( data.ota_pct != undefined){
     flash_ota_pct=data.ota_pct;
   }
-  if(isFlashExecuting(data)){
+  
+  if(flash_state==flash_status_codes.ERROR){
+    return;
+  }
+  else if(isFlashExecuting(data)){
     flash_state=flash_status_codes.FLASHING;
   }  
-  if(flash_state==flash_status_codes.FLASHING){
+  else if(flash_state==flash_status_codes.FLASHING ){
     if(flash_ota_pct ==100){
       // we were processing OTA, and we've reached 100%
       flash_state=flash_status_codes.DONE;
+      $('#flashfilename').val('');
     } 
     else if(flash_ota_pct<0 && older_recovery){
       // we were processing OTA on an older recovery and we missed the 
@@ -161,11 +168,48 @@ function process_ota_event(data){
       flash_state=flash_status_codes.DONE;
     }
   }
+  else if(flash_state ==flash_status_codes.UPLOADING){ 
+    if(flash_ota_pct ==100){
+      // we were processing OTA, and we've reached 100%
+      // reset the progress bar 
+      flash_ota_pct = 0;
+      flash_state=flash_status_codes.FLASHING;
+    } 
+  }
+}
+function set_ota_error(message){
+  flash_state=flash_status_codes.ERROR;
+  handle_flash_state({
+    ota_pct: 0,
+    ota_dsc: message,
+    event: flash_events.SET_ERROR
+  });  
+}
+function show_update_dialog(){
+  $('#otadiv').modal();
+    if (flash_ota_pct >= 0) {
+      update_progress();
+    }
+    if (flash_ota_dsc !== '') {
+      $('span#flash-status').html(flash_ota_dsc);
+    }
 }
 const flash_events={
+  SET_ERROR: function(data){
+    if(data.ota_dsc){
+      flash_ota_dsc=data.ota_dsc;
+    }
+    else {
+      flash_ota_dsc = 'Error';
+    }
+    flash_ota_pct=data.ota_pct??0;
+    $('#fwProgressLabel').parent().addClass('bg-danger');
+    update_progress();
+    show_update_dialog();
+  },
   START_OTA : function() {
-    if (flash_state == flash_status_codes.NONE || flash_state == undefined) {
-      console.log('Starting OTA process');
+    if (flash_state == flash_status_codes.NONE || flash_state == flash_status_codes.ERROR || flash_state == undefined) {
+      $('#fwProgressLabel').parent().removeClass('bg-danger');
       flash_state=flash_status_codes.REBOOT_TO_RECOVERY;
       if(!recovery){
         flash_ota_dsc = 'Starting recovery mode...';
@@ -181,13 +225,19 @@ const flash_events={
           cache: false,
           contentType: 'application/json; charset=utf-8',
           data: JSON.stringify(data),
-          error: handleExceptionResponse,
+          error:  function(xhr, _ajaxOptions, thrownError){
+            set_ota_error(`Unexpected error while trying to restart to recovery. (status=${xhr.status??''}, error=${thrownError??''} ) `);
+          },
           complete: function(response) {
             console.log(response.responseText);
           },
         });     
       }
-
+      else {
+        flash_ota_dsc='Starting Update';
+      }
+      show_update_dialog();
+      
     }
     else {
       console.warn('Unexpected status while starting flashing');
@@ -195,16 +245,48 @@ const flash_events={
   },
   FOUND_RECOVERY: function(data) {
     console.log(JSON.stringify(data));
+    const url=$('#fw-url-input').val();
     if(flash_state == flash_status_codes.REBOOT_TO_RECOVERY){
-        flash_ota_dsc = 'Recovery mode found. Flashing device.';
-        flash_state= flash_status_codes.SET_FWURL;
-        let confData= { fwurl: {
-              value: $('#fw-url-input').val(),
-              type: 33,
-          }
-        };
-        post_config(confData);
+        const fileInput = $('#flashfilename')[0].files;
+        if (fileInput.length > 0) {
+          flash_ota_dsc = 'Sending file to device.';
+          flash_state= flash_status_codes.UPLOADING;
+          const uploadPath = '/flash.json';
+          const xhttp = new XMLHttpRequest();
+    //      xhrObj.upload.addEventListener("loadstart", loadStartFunction, false);  
+          xhttp.upload.addEventListener("progress", progressFunction, false);  
+          //xhrObj.upload.addEventListener("load", transferCompleteFunction, false);  
+          xhttp.onreadystatechange = function() {
+            if (xhttp.readyState === 4) {
+              if(xhttp.status === 0 || xhttp.status === 404) {
+                set_ota_error(`Upload Failed. Recovery version might not support uploading. Please use web update instead.`);
+                $('#flashfilename').val('');
+              }
+            }
+          };
+          xhttp.open('POST', uploadPath, true);
+          xhttp.send(fileInput[0] );
+        }
+        else if(url==''){
+          flash_state= flash_status_codes.NONE;
+        }
+        else {
+          flash_ota_dsc = 'Saving firmware URL location.';
+          flash_state= flash_status_codes.SET_FWURL;
+          let confData= { fwurl: {
+                value: $('#fw-url-input').val(),
+                type: 33,
+            }
+          };
+          post_config(confData);          
+        }
+        show_update_dialog();
     }
+  },
+  PROCESS_OTA_UPLOAD: function(data){
+    flash_state= flash_status_codes.UPLOADING;
+    process_ota_event(data);
+    show_update_dialog();
   },
   PROCESS_OTA_STATUS: function(data){
     if(data.ota_pct>0){
@@ -218,22 +300,33 @@ const flash_events={
       flash_state=flash_status_codes.NONE;
       $('#rTable tr.release').removeClass('table-success table-warning');
       $('#fw-url-input').val('');
-      $('#otadiv').modal('hide');
     }
 
     else {
       process_ota_event(data);
-    }
-    
+      if(flash_state && (flash_state >flash_status_codes.NONE && flash_ota_pct>=0) ) {
+        show_update_dialog();
+      }
+    } 
   },
   PROCESS_OTA: function(data) {
     process_ota_event(data);
+    if(flash_state && (flash_state >flash_status_codes.NONE && flash_ota_pct>=0) ) {
+      show_update_dialog();
+    }
   }
 };
 window.hideSurrounding = function(obj){
   $(obj).parent().parent().hide();
 }
+function update_progress(){
+  $('.progress-bar')
+    .css('width', flash_ota_pct + '%')
+    .attr('aria-valuenow', flash_ota_pct)
+    .text(flash_ota_pct+'%')
+  $('.progress-bar').html((flash_state==flash_status_codes.DONE?100:flash_ota_pct) + '%');
 
+}
 function handle_flash_state(data) {
   if(data.event)  {
     data.event(data);
@@ -243,37 +336,33 @@ function handle_flash_state(data) {
     return;
   }
 
-  if(flash_state && flash_state >flash_status_codes.NONE && flash_ota_pct>=0) {
-
-    $('#otadiv').modal();
-    if (flash_ota_pct !== 0) {
-      $('.progress-bar')
-        .css('width', flash_ota_pct + '%')
-        .attr('aria-valuenow', flash_ota_pct)
-        .text(flash_ota_pct+'%')
-      $('.progress-bar').html((flash_state==flash_status_codes.DONE?100:flash_ota_pct) + '%');
-    }
-    if (flash_ota_dsc !== '') {
-      $('span#flash-status').html(flash_ota_dsc);
-    }      
-  }
-  else {
-    flash_ota_pct=0;
-    flash_ota_dsc='';
-  }
 }
 window.hFlash = function(){
+  // reset file upload selection if any;
+  $('#flashfilename').val('');
   handle_flash_state({ event: flash_events.START_OTA, url: $('#fw-url-input').val() });
 }
 window.handleReboot = function(link){
+  
   if(link=='reboot_ota'){
-    $('#reboot_ota_nav').removeClass('active'); delayReboot(500,'', 'reboot_ota');
+    $('#reboot_ota_nav').removeClass('active').prop("disabled",true); delayReboot(500,'', 'reboot_ota');
   }
   else {
     $('#reboot_nav').removeClass('active'); delayReboot(500,'',link);
   }
 }
-
+function progressFunction(evt){  
+  // if (evt.lengthComputable) {  
+  //   progressBar.max = evt.total;  
+  //   progressBar.value = evt.loaded;  
+  //   percentageDiv.innerHTML = Math.round(evt.loaded / evt.total * 100) + "%";  
+  // }  
+  handle_flash_state({
+    ota_pct: ( Math.round(evt.loaded / evt.total * 100)),
+    ota_dsc: ('Uploading file to device'),
+    event: flash_events.PROCESS_OTA_UPLOAD
+  });  
+}  
 function handlebtstate(data) {
   let icon = '';
   let tt = '';
@@ -373,6 +462,7 @@ let LastCommandsState = null;
 var output = '';
 let hostName = '';
 let versionName='Squeezelite-ESP32';
+let prevmessage='';
 let project_name=versionName;
 let platform_name=versionName;
 let btSinkNamesOptSel='#cfg-audio-bt_source-sink_name';
@@ -515,6 +605,7 @@ function delayReboot(duration, cmdname, ota = 'reboot') {
         showLocalMessage('System is rebooting.\n', 'MESSAGING_WARNING');
       }
       console.log('now triggering reboot');
+      $("button[onclick*='handleReboot']").addClass('rebooting');
       $.ajax({
         url: data.url,
         dataType: 'text',
@@ -619,7 +710,13 @@ window.handleDisconnect = function(){
        }),
      });
 }
-
+function setPlatformFilter(val){
+  if($('.upf').filter(function(){ return $(this).text().toUpperCase()===val.toUpperCase()}).length>0){
+    $('#splf').val(val).trigger('input');
+    return true;
+  }
+  return false;
+}
 window.handleConnect = function(){
   ConnectingToSSID.ssid = $('#manual_ssid').val();
   ConnectingToSSID.pwd = $('#manual_pwd').val();
@@ -777,40 +874,15 @@ $(document).ready(function() {
   $('#save-nvs').on('click', function() {
     post_config(getConfigJson(false));
   });
+  
   $('#fwUpload').on('click', function() {
-    const uploadPath = '/flash.json';
-
-    if (!recovery) {
-      $('#flash-status').text('Rebooting to recovery.  Please try again');
-      window.handleReboot(false);
-    }
-
     const fileInput = document.getElementById('flashfilename').files;
     if (fileInput.length === 0) {
       alert('No file selected!');
     } else {
-      const file = fileInput[0];
-      const xhttp = new XMLHttpRequest();
-      xhttp.onreadystatechange = function() {
-        if (xhttp.readyState === 4) {
-          if (xhttp.status === 200) {
-            showLocalMessage(xhttp.responseText, 'MESSAGING_INFO');
-          } else if (xhttp.status === 0) {
-            showLocalMessage(
-              'Upload connection was closed abruptly!',
-              'MESSAGING_ERROR'
-            );
-          } else {
-            showLocalMessage(
-              xhttp.status + ' Error!\n' + xhttp.responseText,
-              'MESSAGING_ERROR'
-            );
-          }
-        }
-      };
-      xhttp.open('POST', uploadPath, true);
-      xhttp.send(file);
+      handle_flash_state({ event: flash_events.START_OTA, file: fileInput[0] });
     }
+    
   });
    $('[name=output-tmpl]').on('click', function() {
     handleTemplateTypeRadio(this.id);
@@ -874,13 +946,9 @@ $(document).ready(function() {
         });
       }
       $('#searchfw').css('display', 'inline');
-      if(platform_name!=='' && $('.upf').filter(function(){ return $(this).text().toUpperCase()===platform_name.toUpperCase()}).length>0){
-        $('#splf').val(platform_name).trigger('input');
+      if(!setPlatformFilter(platform_name)){
+        setPlatformFilter(project_name)
       }
-      else if($('.upf').filter(function(){ return $(this).text().toUpperCase()===project_name.toUpperCase()}).length>0){
-        $('#splf').val(project_name).trigger('input');
-      }
-      
       $('#rTable tr.release').on('click', function() {
         var url=this.attributes['fwurl'].value;
         if (lmsBaseUrl) {
@@ -1221,7 +1289,16 @@ function getMessages() {
           break;
       }
     }
-  }).fail(handleExceptionResponse);
+  }).fail(function(xhr, ajaxOptions, thrownError){
+      if(xhr.status==404){
+        $('.orec').hide(); // system commands won't be available either
+      } 
+      else {
+        handleExceptionResponse(xhr, ajaxOptions, thrownError);
+      }
+      
+    }
+  );
 
   /*
     Minstk is minimum stack space left
@@ -1408,6 +1485,12 @@ function checkStatus() {
     } else {
       $('#battery').hide();
     }
+    if((data.message??'')!='' && prevmessage != data.message){
+      // supporting older recovery firmwares - messages will come from the status.json structure
+      prevmessage = data.message;
+      showLocalMessage(data.message, 'MESSAGING_INFO')
+    }
+    $("button[onclick*='handleReboot']").removeClass('rebooting');
 
     if (typeof lmsBaseUrl == "undefined" || data.lms_ip != prevLMSIP && data.lms_ip && data.lms_port) {
       const baseUrl = 'http://' + data.lms_ip + ':' + data.lms_port;
@@ -1489,9 +1572,29 @@ window.runCommand = function(button, reboot) {
     cache: false,
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
-    error: handleExceptionResponse,
-    complete: function(response) {
+    error: function(xhr, _ajaxOptions, thrownError){
+      var cmd=JSON.parse(this.data  ).command;
+      if(xhr.status==404){
+        showCmdMessage(
+          cmd.substr(0,cmd.indexOf(' ')),
+          'MESSAGING_ERROR',
+          `${recovery?'Limited recovery mode active. Unsupported action ':'Unexpected error while processing command'}`,
+          true
+        );
+      }
+      else {
+        handleExceptionResponse(xhr, _ajaxOptions, thrownError);
+        showCmdMessage(
+          cmd.substr(0,cmd.indexOf(' ')-1),
+          'MESSAGING_ERROR',
+          `Unexpected error ${(thrownError !== '')?thrownError:'with return status = '+xhr.status}`,
+          true
+        );        
+      }
+    },
+    success: function(response) {
       // var returnedResponse = JSON.parse(response.responseText);
+      $('.orec').show();
       console.log(response.responseText);
       if (
         response.responseText &&
@@ -1509,6 +1612,7 @@ function getLongOps(data, name, longopts){
 function getCommands() {
   $.getJSON('/commands.json', function(data) {
     console.log(data);
+    $('.orec').show();
     data.commands.forEach(function(command) {
       if ($('#flds-' + command.name).length === 0) {
         const cmdParts = command.name.split('-');
@@ -1664,7 +1768,13 @@ function getCommands() {
       }
     });
   }).fail(function(xhr, ajaxOptions, thrownError) {
-    handleExceptionResponse(xhr, ajaxOptions, thrownError);
+    if(xhr.status==404){
+      $('.orec').hide();
+    } 
+    else {
+      handleExceptionResponse(xhr, ajaxOptions, thrownError);
+    }
+    
     $('#commands-list').empty();
     blockAjax = false;
   });
@@ -1725,6 +1835,7 @@ function getConfig() {
       "<tr><td><input type='text' class='form-control' id='nvs-new-key' placeholder='new key'></td><td><input type='text' class='form-control' id='nvs-new-value' placeholder='new value' nvs_type=33 ></td></tr>"
     );
     if (entries.gpio) {
+      $('#pins').show();
       $('tbody#gpiotable tr').remove();
       entries.gpio.forEach(function(gpioEntry) {
         $('tbody#gpiotable').append(
@@ -1741,6 +1852,9 @@ function getConfig() {
             '</td></tr>'
         );
       });
+    }
+    else {
+      $('#pins').hide();
     }
   }).fail(function(xhr, ajaxOptions, thrownError) {
     handleExceptionResponse(xhr, ajaxOptions, thrownError);

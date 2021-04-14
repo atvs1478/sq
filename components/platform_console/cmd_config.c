@@ -1001,8 +1001,12 @@ void register_config_cmd(void){
 	register_audio_config();
 //	register_squeezelite_config();
 	register_bt_source_config();
-	register_i2s_config();
-	register_spdif_config();
+	if(!is_dac_config_locked()){
+		register_i2s_config();
+	}
+	if(!is_spdif_config_locked()){
+		register_spdif_config();
+	}
 	register_rotary_config();
 }
 

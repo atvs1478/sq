@@ -18,6 +18,9 @@
 	"lms_cport": 9090,
 	"lms_port": 9100,
 	"lms_ip": "127.0.0.1",
+	"platform_name": "SqueezeAmp",
 	"mock_plugin_has_proxy": "x",
-	"platform_name": "SqueezeAmp"
+	"mock_fail_fw_update":"",
+	"mock_fail_recovery":"",
+	"mock_old_recovery":""
 }

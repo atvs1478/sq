@@ -1,26 +1,26 @@
 /***********************************
 webpack_headers
-Hash: 5b6fcca7137c495bebc9
-Version: webpack 4.44.2
-Time: 8665ms
-Built at: 2021-04-10 09 h 58 min 36 s
+Hash: abeafc790ab5fbef1c83
+Version: webpack 4.46.0
+Time: 11034ms
+Built at: 2021-04-14 18 h 05 min 54 s
                                 Asset       Size  Chunks                                Chunk Names
-          ./js/index.5b6fcc.bundle.js    229 KiB       0  [emitted] [immutable]         index
-       ./js/index.5b6fcc.bundle.js.br   31.3 KiB          [emitted]                     
-       ./js/index.5b6fcc.bundle.js.gz   40.6 KiB          [emitted]                     
-   ./js/node-modules.5b6fcc.bundle.js    265 KiB       1  [emitted] [immutable]  [big]  node-modules
-./js/node-modules.5b6fcc.bundle.js.br   76.2 KiB          [emitted]                     
-./js/node-modules.5b6fcc.bundle.js.gz   88.6 KiB          [emitted]                     
-        ./js/runtime.5b6fcc.bundle.js   1.46 KiB       2  [emitted] [immutable]         runtime
-     ./js/runtime.5b6fcc.bundle.js.br  644 bytes          [emitted]                     
-     ./js/runtime.5b6fcc.bundle.js.gz  722 bytes          [emitted]                     
+          ./js/index.abeafc.bundle.js    231 KiB       0  [emitted] [immutable]         index
+       ./js/index.abeafc.bundle.js.br     32 KiB          [emitted]                     
+       ./js/index.abeafc.bundle.js.gz   41.2 KiB          [emitted]                     
+   ./js/node-modules.abeafc.bundle.js    266 KiB       1  [emitted] [immutable]  [big]  node-modules
+./js/node-modules.abeafc.bundle.js.br   76.3 KiB          [emitted]                     
+./js/node-modules.abeafc.bundle.js.gz   88.7 KiB          [emitted]                     
+        ./js/runtime.abeafc.bundle.js   1.46 KiB       2  [emitted] [immutable]         runtime
+     ./js/runtime.abeafc.bundle.js.br  644 bytes          [emitted]                     
+     ./js/runtime.abeafc.bundle.js.gz  722 bytes          [emitted]                     
                     favicon-32x32.png  578 bytes          [emitted]                     
                            index.html   21.7 KiB          [emitted]                     
-                        index.html.br   4.78 KiB          [emitted]                     
-                        index.html.gz   5.78 KiB          [emitted]                     
+                        index.html.br   4.75 KiB          [emitted]                     
+                        index.html.gz   5.76 KiB          [emitted]                     
                            sprite.svg    4.4 KiB          [emitted]                     
                         sprite.svg.br  912 bytes          [emitted]                     
-Entrypoint index [big] = ./js/runtime.5b6fcc.bundle.js ./js/node-modules.5b6fcc.bundle.js ./js/index.5b6fcc.bundle.js
+Entrypoint index [big] = ./js/runtime.abeafc.bundle.js ./js/node-modules.abeafc.bundle.js ./js/index.abeafc.bundle.js
  [6] ./node_modules/bootstrap/dist/js/bootstrap-exposed.js 437 bytes {1} [built]
 [11] ./src/sass/main.scss 1.55 KiB {0} [built]
 [16] ./node_modules/remixicon/icons/Device/signal-wifi-fill.svg 340 bytes {1} [built]
@@ -35,22 +35,22 @@ Entrypoint index [big] = ./js/runtime.5b6fcc.bundle.js ./js/node-modules.5b6fcc.
 [25] ./node_modules/remixicon/icons/Device/device-recover-fill.svg 346 bytes {1} [built]
 [26] ./node_modules/remixicon/icons/Device/bluetooth-fill.svg 336 bytes {1} [built]
 [27] ./node_modules/remixicon/icons/Device/bluetooth-connect-fill.svg 352 bytes {1} [built]
-[37] ./src/index.ts + 1 modules 58.4 KiB {0} [built]
+[37] ./src/index.ts + 1 modules 62.5 KiB {0} [built]
      | ./src/index.ts 1.36 KiB [built]
-     | ./src/js/custom.js 57 KiB [built]
+     | ./src/js/custom.js 61 KiB [built]
     + 23 hidden modules
 
 WARNING in asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
 This can impact web performance.
 Assets: 
-  ./js/node-modules.5b6fcc.bundle.js (265 KiB)
+  ./js/node-modules.abeafc.bundle.js (266 KiB)
 
 WARNING in entrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (244 KiB). This can impact web performance.
 Entrypoints:
-  index (496 KiB)
-      ./js/runtime.5b6fcc.bundle.js
-      ./js/node-modules.5b6fcc.bundle.js
-      ./js/index.5b6fcc.bundle.js
+  index (499 KiB)
+      ./js/runtime.abeafc.bundle.js
+      ./js/node-modules.abeafc.bundle.js
+      ./js/index.abeafc.bundle.js
 
 
 WARNING in webpack performance recommendations: 
@@ -58,10 +58,10 @@ You can limit the size of your bundles by using import() or require.ensure to la
 For more info visit https://webpack.js.org/guides/code-splitting/
 Child html-webpack-plugin for "index.html":
          Asset     Size  Chunks  Chunk Names
-    index.html  559 KiB       0  
+    index.html  560 KiB       0  
     Entrypoint undefined = index.html
     [0] ./node_modules/html-webpack-plugin/lib/loader.js!./src/index.ejs 23.9 KiB {0} [built]
-    [1] ./node_modules/lodash/lodash.js 530 KiB {0} [built]
+    [1] ./node_modules/lodash/lodash.js 531 KiB {0} [built]
     [2] (webpack)/buildin/global.js 472 bytes {0} [built]
     [3] (webpack)/buildin/module.js 497 bytes {0} [built]
 ***********************************/

@@ -13,6 +13,9 @@ body {
 tr.hide {
     display: none;
 }
+.rebooting {
+    display: none;
+}
 /* body {
     border: 0;
     margin: 0;
