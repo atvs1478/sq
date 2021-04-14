@@ -13,25 +13,63 @@ use constant FIRMWARE_POLL_INTERVAL => 3600 * (5 + rand());
 use constant GITHUB_RELEASES_URI => "https://api.github.com/repos/sle118/squeezelite-esp32/releases";
 use constant GITHUB_ASSET_URI => GITHUB_RELEASES_URI . "/assets/";
 use constant GITHUB_DOWNLOAD_URI => "https://github.com/sle118/squeezelite-esp32/releases/download/";
-my $FW_DOWNLOAD_ID_REGEX = qr|plugins/SqueezeESP32/firmware/(-?\d+)|;
+use constant ESP32_STATUS_URI => "/status.json";
+
 my $FW_DOWNLOAD_REGEX = qr|plugins/SqueezeESP32/firmware/([-a-z0-9-/.]+\.bin)$|i;
 my $FW_FILENAME_REGEX = qr/^squeezelite-esp32-.*\.bin(\.tmp)?$/;
-my $FW_TAG_REGEX = qr/\/(ESP32-A1S|SqueezeAmp|I2S-4MFlash)\.(16|32)\.(\d+)\.(.*)\//;
+my $FW_TAG_REGEX = qr/\b(ESP32-A1S|SqueezeAmp|I2S-4MFlash)\.(16|32)\.(\d+)\.([-a-zA-Z0-9]+)\b/;
 
 my $prefs = preferences('plugin.squeezeesp32');
 my $log = logger('plugin.squeezeesp32');
 
+my $initialized;
+
 sub init {
-	Slim::Web::Pages->addRawFunction($FW_DOWNLOAD_ID_REGEX, \&handleFirmwareDownload);
-	Slim::Web::Pages->addRawFunction($FW_DOWNLOAD_REGEX, \&handleFirmwareDownloadDirect);
+	my ($client) = @_;
+
+	if (!$initialized) {
+		$initialized = 1;
+		Slim::Web::Pages->addRawFunction($FW_DOWNLOAD_REGEX, \&handleFirmwareDownload);
+	}
 
 	# start checking for firmware updates
-	Slim::Utils::Timers::setTimer(undef, Time::HiRes::time() + 30 + rand(30), \&prefetchFirmware);
+	Slim::Utils::Timers::setTimer($client, Time::HiRes::time() + 3.0 + rand(3.0), \&initFirmwareDownload);
+}
+
+sub initFirmwareDownload {
+	my ($client) = @_;
+
+	Slim::Utils::Timers::killTimers($client, \&initFirmwareDownload);
+
+	Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $http = shift;
+			my $content = eval { from_json( $http->content ) };
+
+			if ($content && ref $content) {
+				my $releaseInfo = _getFirmwareTag($content->{version});
+
+				if ($releaseInfo && ref $releaseInfo) {
+					prefetchFirmware($releaseInfo);
+				}
+			}
+		},
+		sub {
+			my ($http, $error) = @_;
+			$log->error("Failed to get releases from Github: $error");
+		},
+		{
+			timeout => 10
+		}
+	)->get('http://' . $client->ip . ESP32_STATUS_URI);
+
+	Slim::Utils::Timers::setTimer($client, Time::HiRes::time() + FIRMWARE_POLL_INTERVAL, \&initFirmwareDownload);
 }
 
 sub prefetchFirmware {
-	Slim::Utils::Timers::killTimers(undef, \&prefetchFirmware);
-	my $releaseInfo = $prefs->get('lastReleaseTagUsed');
+	my ($releaseInfo) = @_;
+
+	return unless $releaseInfo;
 
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
@@ -63,7 +101,6 @@ sub prefetchFirmware {
 
 				$log->error(sprintf("Failed to get firmware image from Github: %s (%s)", $error || $http->error, $url));
 			}, $url) if $url && $url =~ /^https?/;
-
 		},
 		sub {
 			my ($http, $error) = @_;
@@ -74,65 +111,10 @@ sub prefetchFirmware {
 			cache => 1,
 			expires => 3600
 		}
-	)->get(GITHUB_RELEASES_URI) if $releaseInfo;
-
-	Slim::Utils::Timers::setTimer(undef, Time::HiRes::time() + FIRMWARE_POLL_INTERVAL, \&prefetchFirmware);
+	)->get(GITHUB_RELEASES_URI);
 }
 
 sub handleFirmwareDownload {
-	my ($httpClient, $response) = @_;
-
-	my $request = $response->request;
-
-	my $_errorDownloading = sub {
-		_errorDownloading($httpClient, $response, @_);
-	};
-
-	my $id;
-	if (!defined $request || !(($id) = $request->uri =~ $FW_DOWNLOAD_ID_REGEX)) {
-		return $_errorDownloading->(undef, 'Invalid request', $request->uri, 400);
-	}
-
-	# this is the magic number used on the client to figure out whether the plugin does support download proxying
-	if ($id == -99) {
-		$response->code(204);
-		$response->header('Access-Control-Allow-Origin' => '*');
-
-		$httpClient->send_response($response);
-		return Slim::Web::HTTP::closeHTTPSocket($httpClient);
-	}
-
-	Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $http = shift;
-			my $content = eval { from_json( $http->content ) };
-
-			if (!$content || !ref $content) {
-				$@ && $log->error("Failed to parse response: $@");
-				return $_errorDownloading->($http);
-			}
-			elsif (!$content->{browser_download_url} || !$content->{name}) {
-				return $_errorDownloading->($http, 'No download URL found');
-			}
-
-			downloadFirmwareFile(sub {
-				my $firmwareFile = shift;
-				$response->code(200);
-				Slim::Web::HTTP::sendStreamingFile($httpClient, $response, 'application/octet-stream', $firmwareFile, undef, 1);
-			}, $_errorDownloading, $content->{browser_download_url}, $content->{name});
-		},
-		$_errorDownloading,
-		{
-			timeout => 10,
-			cache => 1,
-			expires => 86400
-		}
-	)->get(GITHUB_ASSET_URI . $id);
-
-	return;
-}
-
-sub handleFirmwareDownloadDirect {
 	my ($httpClient, $response) = @_;
 
 	my $request = $response->request;
@@ -159,7 +141,7 @@ sub downloadFirmwareFile {
 	my ($cb, $ecb, $url, $name) = @_;
 
 	# keep track of the last firmware we requested, to prefetch it in the future
-	_getFirmwareTag($url);
+	my $releaseInfo = _getFirmwareTag($url);
 
 	$name ||= basename($url);
 
@@ -169,7 +151,9 @@ sub downloadFirmwareFile {
 
 	my $updatesDir = Slim::Utils::OSDetect::dirsFor('updates');
 	my $firmwareFile = catfile($updatesDir, $name);
-	Slim::Utils::Misc::deleteFiles($updatesDir, $FW_FILENAME_REGEX, $firmwareFile);
+
+	my $fileMatchRegex = join('-', '', $releaseInfo->{branch}, $releaseInfo->{model}, $releaseInfo->{res});
+	Slim::Utils::Misc::deleteFiles($updatesDir, $fileMatchRegex, $firmwareFile);
 
 	if (-f $firmwareFile) {
 		main::INFOLOG && $log->is_info && $log->info("Found cached firmware file");
@@ -198,17 +182,15 @@ sub downloadFirmwareFile {
 }
 
 sub _getFirmwareTag {
-	my ($url) = @_;
+	my ($info) = @_;
 
-	if (my ($model, $resolution, $version, $branch) = $url =~ $FW_TAG_REGEX) {
+	if (my ($model, $resolution, $version, $branch) = $info =~ $FW_TAG_REGEX) {
 		my $releaseInfo = {
 			model => $model,
 			res => $resolution,
 			version => $version,
 			branch => $branch
 		};
-
-		$prefs->set('lastReleaseTagUsed', $releaseInfo);
 
 		return $releaseInfo;
 	}

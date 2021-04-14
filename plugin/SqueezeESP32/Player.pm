@@ -9,6 +9,8 @@ use List::Util qw(min);
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
+use Plugins::SqueezeESP32::FirmwareHelper;
+
 my $sprefs = preferences('server');
 my $prefs = preferences('plugin.squeezeesp32');
 my $log   = logger('plugin.squeezeesp32');
@@ -95,6 +97,8 @@ sub init {
 	}
 	
 	$client->SUPER::init(@_);
+	Plugins::SqueezeESP32::FirmwareHelper::init($client);
+
 	main::INFOLOG && $log->is_info && $log->info("SqueezeESP player connected: " . $client->id);
 }	
 

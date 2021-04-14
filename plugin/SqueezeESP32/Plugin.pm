@@ -8,8 +8,6 @@ use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 use Slim::Web::ImageProxy;
 
-use Plugins::SqueezeESP32::FirmwareHelper;
-
 my $prefs = preferences('plugin.squeezeesp32');
 
 my $log = Slim::Utils::Log->addLogCategory({
@@ -60,8 +58,6 @@ sub initPlugin {
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
-
-	Plugins::SqueezeESP32::FirmwareHelper->init();
 }
 
 sub onStopClear {
