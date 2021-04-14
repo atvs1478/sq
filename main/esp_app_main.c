@@ -286,33 +286,46 @@ void register_default_nvs(){
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec", "1");
 	config_set_default(NVS_TYPE_STR,"autoexec","1", 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "autoexec1",default_command_line);
 	config_set_default(NVS_TYPE_STR,"autoexec1",default_command_line,0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", CONFIG_A2DP_SINK_NAME);
 	config_set_default(NVS_TYPE_STR, "a2dp_sink_name", CONFIG_A2DP_SINK_NAME, 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
-	config_set_default(NVS_TYPE_STR, "a2dp_ctmt", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS), 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS));
-	config_set_default(NVS_TYPE_STR, "a2dp_ctrld", STR(CONFIG_A2DP_CONTROL_DELAY_MS), 0);
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONTROL_DELAY_MS));
 
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_sink_name", STR(CONFIG_A2DP_SINK_NAME));
+	config_set_default(NVS_TYPE_STR, "a2dp_ctmt", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS), 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_ctmt", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS));
+	config_set_default(NVS_TYPE_STR, "a2dp_ctrld", STR(CONFIG_A2DP_CONTROL_DELAY_MS), 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONTROL_DELAY_MS));
 	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL);
 	config_set_default(NVS_TYPE_STR, "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL, 0);
+	
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_address",CONFIG_DEFAULT_AP_IP );
 	config_set_default(NVS_TYPE_STR, "ap_ip_address",CONFIG_DEFAULT_AP_IP , 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY );
 	config_set_default(NVS_TYPE_STR, "ap_ip_gateway",CONFIG_DEFAULT_AP_GATEWAY , 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s","ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK );
 	config_set_default(NVS_TYPE_STR, "ap_ip_netmask",CONFIG_DEFAULT_AP_NETMASK , 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL));
 	config_set_default(NVS_TYPE_STR, "ap_channel",STR(CONFIG_DEFAULT_AP_CHANNEL) , 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD);
 	config_set_default(NVS_TYPE_STR, "ap_pwd", CONFIG_DEFAULT_AP_PASSWORD, 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "airplay_port", CONFIG_AIRPLAY_PORT);
 	config_set_default(NVS_TYPE_STR, "airplay_port", CONFIG_AIRPLAY_PORT, 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_dev_name", CONFIG_A2DP_DEV_NAME);
 	config_set_default(NVS_TYPE_STR, "a2dp_dev_name", CONFIG_A2DP_DEV_NAME, 0);
+
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bypass_wm", "0");
 	config_set_default(NVS_TYPE_STR, "bypass_wm", "0", 0);
 
@@ -340,6 +353,12 @@ void register_default_nvs(){
 
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_bt_sink", STR(CONFIG_BT_SINK));
 	config_set_default(NVS_TYPE_STR, "enable_bt_sink", STR(CONFIG_BT_SINK), 0);
+
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_BT_SINK_PIN));
+	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
+	
+	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_volume", "127");
+	config_set_default(NVS_TYPE_STR, "bt_sink_volume", "127", 0);
 	
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "enable_airplay", STR(CONFIG_AIRPLAY_SINK));
 	config_set_default(NVS_TYPE_STR, "enable_airplay", STR(CONFIG_AIRPLAY_SINK), 0);

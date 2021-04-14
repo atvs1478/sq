@@ -62,7 +62,7 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param);
 static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param);
 /* avrc TG event handler */
 static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param);
-static void volume_set_by_local_host(uint8_t volume);
+static void volume_set_by_local_host(int value, bool is_step);
 static void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *event_parameter);
 
 static const char *s_a2d_conn_state_str[] = {"Disconnected", "Connecting", "Connected", "Disconnecting"};
@@ -70,7 +70,7 @@ static const char *s_a2d_audio_state_str[] = {"Suspended", "Stopped", "Started"}
 static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
 
 static _lock_t s_volume_lock;
-static uint8_t s_volume = 0;
+static int s_volume, abs_volume, sink_volume;
 static bool s_volume_notify;
 static enum { AUDIO_IDLE, AUDIO_CONNECTED, AUDIO_PLAYING } s_audio = AUDIO_IDLE;
 
@@ -90,16 +90,14 @@ static EXT_RAM_ATTR struct {
 
 static void bt_volume_up(bool pressed) {
 	if (!pressed) return;
-	// volume UP/DOWN buttons are not supported by iPhone/Android
-	volume_set_by_local_host(s_volume < 127-3 ? s_volume + 3 : 127);
+	volume_set_by_local_host(+3, true);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 	ESP_LOGD(BT_AV_TAG, "BT volume up %u", s_volume);
 }
 
 static void bt_volume_down(bool pressed) {
 	if (!pressed) return;
-	// volume UP/DOWN buttons are not supported by iPhone/Android
-	volume_set_by_local_host(s_volume > 3 ? s_volume - 3 : 0);
+	volume_set_by_local_host(-3, true);
 	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 }
 
@@ -284,6 +282,8 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_DISCONNECTED);
         } else if (a2d->conn_stat.state == ESP_A2D_CONNECTION_STATE_CONNECTED){
+			abs_volume = -1;
+			s_volume = sink_volume;
             esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
 			(*bt_app_a2d_cmd_cb)(BT_SINK_CONNECTED);
         }
@@ -491,20 +491,29 @@ static void bt_av_hdl_avrc_ct_evt(uint16_t event, void *p_param)
 
 static void volume_set_by_controller(uint8_t volume)
 {
-    ESP_LOGD(BT_RC_TG_TAG, "Volume is set by remote controller %d%%\n", (uint32_t)volume * 100 / 0x7f);
+	// do not modified NVS volume
     _lock_acquire(&s_volume_lock);
-    s_volume = volume;
+    s_volume = abs_volume = (volume * 100) / 127;
     _lock_release(&s_volume_lock);
-	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, volume);
+	(*bt_app_a2d_cmd_cb)(BT_SINK_VOLUME, s_volume);
 }
 
-static void volume_set_by_local_host(uint8_t volume)
+static void volume_set_by_local_host(int value, bool is_step)
 {
-    ESP_LOGD(BT_RC_TG_TAG, "Volume is set locally to: %d%%", (uint32_t)volume * 100 / 0x7f);
-    _lock_acquire(&s_volume_lock);
-    s_volume = volume;
-    _lock_release(&s_volume_lock);
+	_lock_acquire(&s_volume_lock);
+	s_volume = is_step ? s_volume + value : value;
+	if (s_volume > 127) s_volume = 127;
+	else if (s_volume < 0) s_volume = 0;	
+	if (abs_volume >= 0) abs_volume = s_volume;
+	else sink_volume = s_volume;
+	_lock_release(&s_volume_lock);
 
+	// volume has been set by controller, do not store it in NVS	
+	if (abs_volume < 0) {
+		char p[4];
+		config_set_value(NVS_TYPE_STR, "bt_sink_volume", itoa(s_volume, p, 10));					
+	}
+	
     if (s_volume_notify) {
         esp_avrc_rn_param_t rn_param;
         rn_param.volume = s_volume;
@@ -529,7 +538,7 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param)
         break;
     }
     case ESP_AVRC_TG_SET_ABSOLUTE_VOLUME_CMD_EVT: {
-        ESP_LOGD(BT_RC_TG_TAG, "AVRC set absolute volume: %d%%", (int)rc->set_abs_vol.volume * 100/ 0x7f);
+        ESP_LOGD(BT_RC_TG_TAG, "AVRC set absolute volume: %d%%", (rc->set_abs_vol.volume * 100) / 127);
         volume_set_by_controller(rc->set_abs_vol.volume);
         break;
     }
@@ -597,6 +606,10 @@ void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb)
     esp_bt_gap_set_security_param(param_type, &iocap, sizeof(uint8_t));
 #endif
 
+	char *item = config_alloc_get_default(NVS_TYPE_STR, "bt_sink_volume", "127", 0);
+	sink_volume = atol(item);
+	free(item);
+
     /*
      * Set default parameters for Legacy Pairing
      */
@@ -630,6 +643,7 @@ void bt_sink_init(bt_cmd_vcb_t cmd_cb, bt_data_cb_t data_cb)
     	esp_pin_code[3]='4';
     }
     esp_bt_gap_set_pin(pin_type, strlen(pin_code), esp_pin_code);
+	free(pin_code);
 }
 
 void bt_sink_deinit(void)
