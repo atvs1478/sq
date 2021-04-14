@@ -1,5 +1,9 @@
 [% PROCESS settings/header.html %]
 
+	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_FIRMWARE" desc="" %]
+		<div><a href="http://[% player_ip %]" target="_blank">[% "PLUGIN_SQUEEZEESP32_PLAYERSETTINGS" | string %] ([% player_ip %])</a></div>
+	[% END %]
+
 	[% IF prefs.pref_width %]
 		[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_WIDTH" desc="PLUGIN_SQUEEZEESP32_WIDTH_DESC" %]
 			<!--<input type="text" readonly class="stdedit" name="pref_width" id="width" value="[% prefs.pref_width %]" size="3">-->
@@ -101,6 +105,6 @@
 				<input type="text" class="stdedit sliderInput_-13_20" name="pref_equalizer.9" id="pref_equalizer.9" value="[% pref_equalizer.9 %]" size="2">
 			[% END %]
 		[% END %]
-	[% END %]		
+	[% END %]
 
 [% PROCESS settings/footer.html %]

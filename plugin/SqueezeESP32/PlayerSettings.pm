@@ -94,6 +94,7 @@ sub handler {
 	}
 
 	$paramRef->{'pref_equalizer'} = $cprefs->get('equalizer') if $client->depth == 16;
+	$paramRef->{'player_ip'} = $client->ip;
 
 	return $class->SUPER::handler($client, $paramRef);
 }
