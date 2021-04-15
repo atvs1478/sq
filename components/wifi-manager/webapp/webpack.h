@@ -2,8 +2,8 @@
 webpack_headers
 Hash: abeafc790ab5fbef1c83
 Version: webpack 4.46.0
-Time: 11034ms
-Built at: 2021-04-14 18 h 05 min 54 s
+Time: 7893ms
+Built at: 2021-04-14 21 h 06 min 20 s
                                 Asset       Size  Chunks                                Chunk Names
           ./js/index.abeafc.bundle.js    231 KiB       0  [emitted] [immutable]         index
        ./js/index.abeafc.bundle.js.br     32 KiB          [emitted]                     
