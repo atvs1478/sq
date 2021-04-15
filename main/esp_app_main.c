@@ -299,9 +299,6 @@ void register_default_nvs(){
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "a2dp_ctmt", STR(CONFIG_A2DP_CONNECT_TIMEOUT_MS));
 	config_set_default(NVS_TYPE_STR, "a2dp_ctrld", STR(CONFIG_A2DP_CONTROL_DELAY_MS), 0);
 	
-	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "bt_sink_pin", STR(CONFIG_A2DP_CONTROL_DELAY_MS));
-	config_set_default(NVS_TYPE_STR, "bt_sink_pin", STR(CONFIG_BT_SINK_PIN), 0);
-
 	ESP_LOGD(TAG,"Registering default value for key %s, value %s", "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL);
 	config_set_default(NVS_TYPE_STR, "release_url", CONFIG_SQUEEZELITE_ESP32_RELEASE_URL, 0);
 	
