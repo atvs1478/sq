@@ -38,9 +38,11 @@ sub init {
 }
 
 sub initFirmwareDownload {
-	my ($client) = @_;
+	my ($client, $cb) = @_;
 
 	Slim::Utils::Timers::killTimers($client, \&initFirmwareDownload);
+
+	return unless preferences('server')->get('checkVersion') || $cb;
 
 	Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
@@ -48,16 +50,21 @@ sub initFirmwareDownload {
 			my $content = eval { from_json( $http->content ) };
 
 			if ($content && ref $content) {
-				my $releaseInfo = _getFirmwareTag($content->{version});
+				my $releaseInfo = getFirmwareTag($content->{version});
 
 				if ($releaseInfo && ref $releaseInfo) {
-					prefetchFirmware($releaseInfo);
+					prefetchFirmware($releaseInfo, $cb);
+				}
+				else {
+					$cb->() if $cb;
 				}
 			}
 		},
 		sub {
 			my ($http, $error) = @_;
 			$log->error("Failed to get releases from Github: $error");
+
+			$cb->() if $cb;
 		},
 		{
 			timeout => 10
@@ -68,7 +75,7 @@ sub initFirmwareDownload {
 }
 
 sub prefetchFirmware {
-	my ($releaseInfo) = @_;
+	my ($releaseInfo, $cb) = @_;
 
 	return unless $releaseInfo;
 
@@ -93,15 +100,21 @@ sub prefetchFirmware {
 				}
 			}
 
-			downloadFirmwareFile(sub {
-				main::INFOLOG && $log->is_info && $log->info("Pre-cached firmware file: " . $_[0]);
-			}, sub {
-				my ($http, $error, $url, $code) = @_;
-				$error ||= ($http && $http->error) || 'unknown error';
-				$url   ||= ($http && $http->url) || 'no URL';
+			my $customFwUrl = sprintf('%s/plugins/SqueezeESP32/firmware/custom.bin', Slim::Utils::Network::serverURL()) if $cb && -f _customFirmwareFile();
 
-				$log->error(sprintf("Failed to get firmware image from Github: %s (%s)", $error || $http->error, $url));
-			}, $url) if $url && $url =~ /^https?/;
+			if ( ($url && $url =~ /^https?/) || $customFwUrl ) {
+				downloadFirmwareFile(sub {
+					main::INFOLOG && $log->is_info && $log->info("Pre-cached firmware file: " . $_[0]);
+				}, sub {
+					my ($http, $error, $url, $code) = @_;
+					$error ||= ($http && $http->error) || 'unknown error';
+					$url   ||= ($http && $http->url) || 'no URL';
+
+					$log->error(sprintf("Failed to get firmware image from Github: %s (%s)", $error || $http->error, $url));
+				}, $url) if $url;
+
+				$cb->($releaseInfo, _gh2lmsUrl($url), $customFwUrl) if $cb;
+			}
 		},
 		sub {
 			my ($http, $error) = @_;
@@ -113,6 +126,18 @@ sub prefetchFirmware {
 			expires => 3600
 		}
 	)->get(GITHUB_RELEASES_URI);
+}
+
+sub _gh2lmsUrl {
+	my ($url) = @_;
+	my $ghPrefix = GITHUB_DOWNLOAD_URI;
+	my $baseUrl = Slim::Utils::Network::serverURL();
+	$url =~ s/$ghPrefix/$baseUrl\/plugins\/SqueezeESP32\/firmware\//;
+	return $url;
+}
+
+sub _customFirmwareFile {
+	return catfile(scalar Slim::Utils::OSDetect::dirsFor('updates'), 'squeezelite-esp32-custom.bin');
 }
 
 sub handleFirmwareDownload {
@@ -139,7 +164,7 @@ sub handleFirmwareDownload {
 	}
 
 	if ($path =~ $FW_CUSTOM_REGEX) {
-		my $firmwareFile = catfile(scalar Slim::Utils::OSDetect::dirsFor('updates'), 'squeezelite-esp32-custom.bin');
+		my $firmwareFile = _customFirmwareFile();
 
 		if (! -f $firmwareFile) {
 			main::INFOLOG && $log->is_info && $log->info("Failed to find custom firmware build: $firmwareFile");
@@ -167,7 +192,7 @@ sub downloadFirmwareFile {
 	my ($cb, $ecb, $url, $name) = @_;
 
 	# keep track of the last firmware we requested, to prefetch it in the future
-	my $releaseInfo = _getFirmwareTag($url);
+	my $releaseInfo = getFirmwareTag($url);
 
 	$name ||= basename($url);
 
@@ -207,7 +232,7 @@ sub downloadFirmwareFile {
 	return;
 }
 
-sub _getFirmwareTag {
+sub getFirmwareTag {
 	my ($info) = @_;
 
 	if (my ($model, $resolution, $version, $branch) = $info =~ $FW_TAG_REGEX) {

@@ -24,6 +24,14 @@ PLUGIN_SQUEEZEESP32_PLAYERSETTINGS
 PLUGIN_SQUEEZEESP32_FIRMWARE
 	EN	Firmware
 
+PLUGIN_SQUEEZEESP32_FIRMWARE_AVAILABLE
+	DE	Es steht eine neue Firmware Version v%s zur Verfügung (aktuell installiert: v%s).
+	EN	A new firmware version v%s is available (currently installed: v%s).
+
+PLUGIN_SQUEEZEESP32_CUSTOM_FIRMWARE_AVAILABLE
+	DE	Es steht eine benutzerdefinierte Firmware Version zur Verfügung.
+	EN	A custom firmware image is available for installation.
+
 PLUGIN_SQUEEZEESP32_WIDTH
 	DE	Displaybreite
 	EN	Screen width

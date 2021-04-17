@@ -2,6 +2,18 @@
 
 	[% WRAPPER setting title="PLUGIN_SQUEEZEESP32_FIRMWARE" desc="" %]
 		<div><a href="http://[% player_ip %]" target="_blank">[% "PLUGIN_SQUEEZEESP32_PLAYERSETTINGS" | string %] ([% player_ip %])</a></div>
+		[% IF fwUpdateAvailable %]
+			<div>
+				<input type="submit" name="installUpdate" class="stdclick" value="[% "CONTROLPANEL_INSTALL_UPDATE" | string %]"/>
+				[% fwUpdateAvailable %]
+			</div>
+		[% END %]
+		[% IF fwCustomUpdateAvailable %]
+			<div>
+				<input type="submit" name="installCustomUpdate" class="stdclick" value="[% "CONTROLPANEL_INSTALL_UPDATE" | string %]"/>
+				[% fwCustomUpdateAvailable | string %]
+			</div>
+		[% END %]
 	[% END %]
 
 	[% IF prefs.pref_width %]
