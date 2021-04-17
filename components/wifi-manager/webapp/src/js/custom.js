@@ -1496,7 +1496,8 @@ function checkStatus() {
       const baseUrl = 'http://' + data.lms_ip + ':' + data.lms_port;
       prevLMSIP=data.lms_ip;
       $.ajax({
-        url: baseUrl + '/plugins/SqueezeESP32/firmware/-99', 
+        url: baseUrl + '/plugins/SqueezeESP32/firmware/-check.bin', 
+        type: 'HEAD',
         dataType: 'text',
         cache: false,
         error: function() {

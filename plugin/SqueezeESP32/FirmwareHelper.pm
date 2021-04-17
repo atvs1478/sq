@@ -13,7 +13,7 @@ use constant FIRMWARE_POLL_INTERVAL => 3600 * (5 + rand());
 use constant GITHUB_RELEASES_URI => "https://api.github.com/repos/sle118/squeezelite-esp32/releases";
 use constant GITHUB_ASSET_URI => GITHUB_RELEASES_URI . "/assets/";
 use constant GITHUB_DOWNLOAD_URI => "https://github.com/sle118/squeezelite-esp32/releases/download/";
-use constant ESP32_STATUS_URI => "/status.json";
+use constant ESP32_STATUS_URI => "http://%s/status.json";
 
 my $FW_DOWNLOAD_REGEX = qr|plugins/SqueezeESP32/firmware/([-a-z0-9-/.]+\.bin)$|i;
 my $FW_FILENAME_REGEX = qr/^squeezelite-esp32-.*\.bin(\.tmp)?$/;
@@ -61,7 +61,7 @@ sub initFirmwareDownload {
 		{
 			timeout => 10
 		}
-	)->get('http://' . $client->ip . ESP32_STATUS_URI);
+	)->get(sprintf(ESP32_STATUS_URI, $client->ip));
 
 	Slim::Utils::Timers::setTimer($client, Time::HiRes::time() + FIRMWARE_POLL_INTERVAL, \&initFirmwareDownload);
 }
@@ -126,6 +126,15 @@ sub handleFirmwareDownload {
 	my $path;
 	if (!defined $request || !(($path) = $request->uri =~ $FW_DOWNLOAD_REGEX)) {
 		return $_errorDownloading->(undef, 'Invalid request', $request->uri, 400);
+	}
+
+	# this is the magic number used on the client to figure out whether the plugin does support download proxying
+	if ($path eq '-check.bin' && $request->method eq 'HEAD') {
+		$response->code(204);
+		$response->header('Access-Control-Allow-Origin' => '*');
+
+		$httpClient->send_response($response);
+		return Slim::Web::HTTP::closeHTTPSocket($httpClient);
 	}
 
 	main::INFOLOG && $log->is_info && $log->info("Requesting firmware from: $path");
