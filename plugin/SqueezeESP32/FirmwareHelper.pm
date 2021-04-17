@@ -16,6 +16,7 @@ use constant GITHUB_DOWNLOAD_URI => "https://github.com/sle118/squeezelite-esp32
 use constant ESP32_STATUS_URI => "http://%s/status.json";
 
 my $FW_DOWNLOAD_REGEX = qr|plugins/SqueezeESP32/firmware/([-a-z0-9-/.]+\.bin)$|i;
+my $FW_CUSTOM_REGEX = qr/^((?:squeezelite-esp32-)?custom\.bin)$/;
 my $FW_FILENAME_REGEX = qr/^squeezelite-esp32-.*\.bin(\.tmp)?$/;
 my $FW_TAG_REGEX = qr/\b(ESP32-A1S|SqueezeAmp|I2S-4MFlash)\.(16|32)\.(\d+)\.([-a-zA-Z0-9]+)\b/;
 
@@ -135,6 +136,22 @@ sub handleFirmwareDownload {
 
 		$httpClient->send_response($response);
 		return Slim::Web::HTTP::closeHTTPSocket($httpClient);
+	}
+
+	if ($path =~ $FW_CUSTOM_REGEX) {
+		my $firmwareFile = catfile(scalar Slim::Utils::OSDetect::dirsFor('updates'), 'squeezelite-esp32-custom.bin');
+
+		if (! -f $firmwareFile) {
+			main::INFOLOG && $log->is_info && $log->info("Failed to find custom firmware build: $firmwareFile");
+			$response->code(404);
+			$httpClient->send_response($response);
+			return Slim::Web::HTTP::closeHTTPSocket($httpClient);
+		}
+
+		main::INFOLOG && $log->is_info && $log->info("Getting custom firmware build");
+
+		$response->code(200);
+		return Slim::Web::HTTP::sendStreamingFile($httpClient, $response, 'application/octet-stream', $firmwareFile, undef, 1);
 	}
 
 	main::INFOLOG && $log->is_info && $log->info("Requesting firmware from: $path");

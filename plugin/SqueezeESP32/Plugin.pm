@@ -37,12 +37,13 @@ $prefs->setChange(sub {
 sub initPlugin {
 	my $class = shift;
 
+	# enable the following to test the firmware downloading code without a SqueezeliteESP32 player
+	# require Plugins::SqueezeESP32::FirmwareHelper;
+	# Plugins::SqueezeESP32::FirmwareHelper::init();
+
 	if ( main::WEBUI ) {
 		require Plugins::SqueezeESP32::PlayerSettings;
 		Plugins::SqueezeESP32::PlayerSettings->new;
-
-		# require Plugins::SqueezeESP32::Settings;
-		# Plugins::SqueezeESP32::Settings->new;
 	}
 
 	$class->SUPER::initPlugin(@_);
