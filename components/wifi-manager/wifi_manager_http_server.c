@@ -44,6 +44,8 @@ void register_common_handlers(httpd_handle_t server){
 	httpd_register_uri_handler(server, &js_get);
 	httpd_uri_t icon_get = { .uri = "/icons*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
 	httpd_register_uri_handler(server, &icon_get);	
+	httpd_uri_t png_get = { .uri = "/favicon*", .method = HTTP_GET, .handler = resource_filehandler, .user_ctx = rest_context };
+	httpd_register_uri_handler(server, &png_get);	
 
 }
 void register_regular_handlers(httpd_handle_t server){

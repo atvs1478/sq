@@ -11,8 +11,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
-const ImageminPlugin = require('imagemin-webpack-plugin').default;
-const imageminMozjpeg = require('imagemin-mozjpeg');
+
 const fs = require('fs');
 const glob = require('glob');
 var WebpackOnBuildPlugin = require('on-build-webpack');
@@ -83,21 +82,7 @@ module.exports = merge(common, {
             threshold: 100,
             minRatio: 0.8,
         }),
-        new ImageminPlugin({
-            test: /\.(jpe?g|png|gif|svg)$/i,
-            // lossLess gif compressor
-            gifsicle: {
-                optimizationLevel: 9
-            },
-            // lossy png compressor, remove for default lossLess
-            pngquant: ({
-                quality: '75'
-            }),
-            // lossy jpg compressor
-            plugins: [imageminMozjpeg({
-                quality: '75'
-            })]
-        }), 
+
         // new FaviconsWebpackPlugin({
         //     // Your source logo
         //     logo: './src/assets/images/200px-ControllerAppIcon.png',
@@ -152,7 +137,7 @@ module.exports = merge(common, {
                     console.log('Error', err);
                 } else {
                     const regex = /^(.*\/)([^\/]*)$/
-                    const relativeRegex = /(\w+\/[^\/]*)$/
+                    const relativeRegex = /((\w+(?<!dist)\/){0,1}[^\/]*)$/
                     const makePathRegex = /([^\.].*)$/
                     let exportDefHead=
                     '/***********************************\n'+

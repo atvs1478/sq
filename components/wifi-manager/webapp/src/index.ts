@@ -19,6 +19,6 @@ import '../node_modules/remixicon/icons/Media/play-circle-fill.svg';
 import '../node_modules/remixicon/icons/Media/pause-circle-fill.svg';
 import '../node_modules/remixicon/icons/System/lock-fill.svg';
 import '../node_modules/remixicon/icons/System/lock-unlock-fill.svg';
-
+import './assets/images/favicon-32x32.png';
 import './js/custom.js'; 
 // <%= `<svg><use xlink:href="#${htmlWebpackPlugin.files.sprites.svg.defs.symbol[s].id}"></use></svg>` %>
