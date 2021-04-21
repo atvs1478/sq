@@ -123,6 +123,7 @@ The NVS parameter "i2c_config" set the i2c's gpio used for generic purpose (e.g.
 ```
 sda=<gpio>,scl=<gpio>[,port=0|1][,speed=<speed>]
 ```
+<strong>Please note that you can not use the same GPIO or port as the DAC</strong>
 ### SPI
 The NVS parameter "spi_config" set the spi's gpio used for generic purpose (e.g. display). Leave it blank to disable SPI usage. The DC parameter is needed for displays. Syntax is
 ```
@@ -144,6 +145,8 @@ The parameter "dac_controlset" allows definition of simple commands to be sent o
 This is standard JSON notation, so if you are not familiar with it, Google is your best friend. Be aware that the '...' means you can have as many entries as you want, it's not part of the syntax. Every section is optional, but it does not make sense to set i2c in the 'dac_config' parameter and not setting anything here. The parameter 'mode' allows to *or* the register with the value or to *and* it. Don't set 'mode' if you simply want to write. **Note that all values must be decimal**. You can use a validator like [this](https://jsonlint.com) to verify your syntax
 
 NB: For well-known configuration, this is ignored
+
+<strong>Please note that you can not use the same GPIO or port as the I2C</strong>
 ### SPDIF
 The NVS parameter "spdif_config" sets the i2s's gpio needed for SPDIF. 
 

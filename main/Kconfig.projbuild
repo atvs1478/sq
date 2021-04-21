@@ -87,7 +87,7 @@ menu "Squeezelite-ESP32"
 			default "TWATCH" if TWATCH2020
 			default "I2S-4MFlash" if !A1S && !SQUEEZEAMP && !DAC32 && !TWATCH2020
 		# AGGREGATES - begin
-		# these parameters are "aggregates"	that take precedence. The must have a default value	
+		# these parameters are "aggregates"	that take precedence. They must have a default value	
 		config DAC_CONFIG
 			string 
 			default "model=TAS57xx,bck=33,ws=25,do=32,sda=27,scl=26,mute=14:0" if SQUEEZEAMP
