@@ -31,7 +31,7 @@ jobs:
     - name: Set target name
       run: |
         echo "TARGET_BUILD_NAME=${{ matrix.node }}" >> $GITHUB_ENV
-        echo "build_version_prefix=V0." >> $GITHUB_ENV
+        echo "build_version_prefix=1." >> $GITHUB_ENV
     - uses: actions/checkout@v2
       with:
         fetch-depth: 15
