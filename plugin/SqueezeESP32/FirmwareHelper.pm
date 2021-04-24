@@ -20,6 +20,8 @@ my $FW_CUSTOM_REGEX = qr/^((?:squeezelite-esp32-)?custom\.bin)$/;
 my $FW_FILENAME_REGEX = qr/^squeezelite-esp32-.*\.bin(\.tmp)?$/;
 my $FW_TAG_REGEX = qr/\b(ESP32-A1S|SqueezeAmp|I2S-4MFlash)\.(16|32)\.(\d+)\.([-a-zA-Z0-9]+)\b/;
 
+use constant MAX_FW_IMAGE_SIZE => 10 * 1024 * 1024;
+
 my $prefs = preferences('plugin.squeezeesp32');
 my $log = logger('plugin.squeezeesp32');
 
@@ -31,6 +33,7 @@ sub init {
 	if (!$initialized) {
 		$initialized = 1;
 		Slim::Web::Pages->addRawFunction($FW_DOWNLOAD_REGEX, \&handleFirmwareDownload);
+		Slim::Web::Pages->addRawFunction('plugins/SqueezeESP32/firmware/upload', \&handleFirmwareUpload);
 	}
 
 	# start checking for firmware updates
@@ -100,7 +103,7 @@ sub prefetchFirmware {
 				}
 			}
 
-			my $customFwUrl = sprintf('%s/plugins/SqueezeESP32/firmware/custom.bin', Slim::Utils::Network::serverURL()) if $cb && -f _customFirmwareFile();
+			my $customFwUrl = _urlFromPath('custom.bin') if $cb && -f _customFirmwareFile();
 
 			if ( ($url && $url =~ /^https?/) || $customFwUrl ) {
 				downloadFirmwareFile(sub {
@@ -134,6 +137,10 @@ sub _gh2lmsUrl {
 	my $baseUrl = Slim::Utils::Network::serverURL();
 	$url =~ s/$ghPrefix/$baseUrl\/plugins\/SqueezeESP32\/firmware\//;
 	return $url;
+}
+
+sub _urlFromPath {
+	return sprintf('%s/plugins/SqueezeESP32/firmware/%s', Slim::Utils::Network::serverURL(), basename(shift));
 }
 
 sub _customFirmwareFile {
@@ -200,11 +207,21 @@ sub downloadFirmwareFile {
 		return $ecb->(undef, 'Unexpected firmware image name: ' . $name, $url, 400);
 	}
 
-	my $updatesDir = Slim::Utils::OSDetect::dirsFor('updates');
+	my $updatesDir = _getTempDir();
 	my $firmwareFile = catfile($updatesDir, $name);
 
-	my $fileMatchRegex = join('-', '', $releaseInfo->{branch}, $releaseInfo->{model}, $releaseInfo->{res});
-	Slim::Utils::Misc::deleteFiles($updatesDir, $fileMatchRegex, $firmwareFile);
+	if (-f $firmwareFile) {
+		main::INFOLOG && $log->is_info && $log->info("Found uploaded firmware file $name");
+		return $cb->($firmwareFile);
+	}
+
+	$updatesDir = Slim::Utils::OSDetect::dirsFor('updates');
+	$firmwareFile = catfile($updatesDir, $name);
+
+	if ($releaseInfo) {
+		my $fileMatchRegex = join('-', '', $releaseInfo->{branch}, $releaseInfo->{model}, $releaseInfo->{res});
+		Slim::Utils::Misc::deleteFiles($updatesDir, $fileMatchRegex, $firmwareFile);
+	}
 
 	if (-f $firmwareFile) {
 		main::INFOLOG && $log->is_info && $log->info("Found cached firmware file");
@@ -223,7 +240,11 @@ sub downloadFirmwareFile {
 
 			return $cb->($firmwareFile);
 		},
-		$ecb,
+		sub {
+			my ($http, $error) = @_;
+			$http->code(404) if $error =~ /\b404\b/;
+			$ecb->(@_);
+		},
 		{
 			saveAs => "$firmwareFile.tmp",
 		}
@@ -265,6 +286,124 @@ sub _errorDownloading {
 	$httpClient->send_response($response);
 	Slim::Web::HTTP::closeHTTPSocket($httpClient);
 };
+
+sub handleFirmwareUpload {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $result = {};
+
+	my $t = Time::HiRes::time();
+
+	main::INFOLOG && $log->is_info && $log->info("New firmware image to upload. Size: " . formatMB($request->content_length));
+
+	if ( $request->method !~ /HEAD|OPTIONS|POST/ ) {
+		$log->error("Invalid HTTP verb: " . $request->method);
+		$result = {
+			error => 'Invalid request.',
+			code  => 400,
+		};
+	}
+	elsif ( $request->content_length > MAX_FW_IMAGE_SIZE ) {
+		$log->error("Upload data is too large: " . $request->content_length);
+		$result = {
+			error => string('PLUGIN_DNDPLAY_FILE_TOO_LARGE', formatMB($request->content_length), formatMB(MAX_FW_IMAGE_SIZE)),
+			code  => 413,
+		};
+	}
+	else {
+		my $ct = $request->header('Content-Type');
+		my ($boundary) = $ct =~ /boundary=(.*)/;
+
+		my ($uploadedFwFh, $filename, $inUpload, $buf);
+
+		# open a pseudo-filehandle to the uploaded data ref for further processing
+		open TEMP, '<', $request->content_ref;
+
+		while (<TEMP>) {
+			if ( Time::HiRes::time - $t > 0.2 ) {
+				main::idleStreams();
+				$t = Time::HiRes::time();
+			}
+
+			# a new part starts - reset some variables
+			if ( /--\Q$boundary\E/i ) {
+				$filename = '';
+
+				if ($buf) {
+					$buf =~ s/\r\n$//;
+					print $uploadedFwFh $buf if $uploadedFwFh;
+				}
+
+				close $uploadedFwFh if $uploadedFwFh;
+				$inUpload = undef;
+			}
+
+			# write data to file handle
+			elsif ( $inUpload && $uploadedFwFh ) {
+				print $uploadedFwFh $buf if defined $buf;
+				$buf = $_;
+			}
+
+			# we got an uploaded file name
+			elsif ( /filename="(.+?)"/i ) {
+				$filename = $1;
+				main::INFOLOG && $log->is_info && $log->info("New file to upload: $filename")
+			}
+
+			# we got the separator after the upload file name: file data comes next. Open a file handle to write the data to.
+			elsif ( $filename && /^\s*$/ ) {
+				$inUpload = 1;
+
+				$uploadedFwFh = File::Temp->new(
+					DIR => _getTempDir(),
+					SUFFIX => '.bin',
+					TEMPLATE => 'squeezelite-esp32-upload-XXXXXX',
+					UNLINK => 0,
+				) or $log->warn("Failed to open file: $@");
+
+				binmode $uploadedFwFh;
+
+				# remove file after a few minutes
+				Slim::Utils::Timers::setTimer($uploadedFwFh->filename, Time::HiRes::time() + 15 * 60, sub { unlink shift });
+			}
+		}
+
+		close TEMP;
+		close $uploadedFwFh if $uploadedFwFh;
+
+		main::idleStreams();
+
+		if (!$result->{error}) {
+			$result->{url} = _urlFromPath($uploadedFwFh->filename);
+			$result->{size} = -s $uploadedFwFh->filename;
+		}
+	}
+
+	$log->error($result->{error}) if $result->{error};
+
+	my $content = to_json($result);
+	$response->header( 'Content-Length' => length($content) );
+	$response->code($result->{code} || 200);
+	$response->header('Connection' => 'close');
+	$response->content_type('application/json');
+
+	Slim::Web::HTTP::addHTTPResponse( $httpClient, $response, \$content );
+}
+
+my $tempDir;
+sub _getTempDir {
+	return $tempDir if $tempDir;
+
+	eval { $tempDir = Slim::Utils::Misc::getTempDir() };		# LMS 8.2+ only
+	$tempDir ||= File::Temp::tempdir(CLEANUP => 1, DIR => preferences('server')->get('cachedir'));
+
+	return $tempDir;
+}
+
+sub formatMB {
+	return Slim::Utils::Misc::delimitThousands(int($_[0] / 1024 / 1024)) . 'MB';
+}
 
 
 1;
