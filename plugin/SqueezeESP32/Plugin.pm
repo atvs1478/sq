@@ -8,8 +8,6 @@ use Slim::Utils::Prefs;
 use Slim::Utils::Log;
 use Slim::Web::ImageProxy;
 
-use Plugins::SqueezeESP32::FirmwareHelper;
-
 my $prefs = preferences('plugin.squeezeesp32');
 
 my $log = Slim::Utils::Log->addLogCategory({
@@ -39,12 +37,13 @@ $prefs->setChange(sub {
 sub initPlugin {
 	my $class = shift;
 
+	# enable the following to test the firmware downloading code without a SqueezeliteESP32 player
+	# require Plugins::SqueezeESP32::FirmwareHelper;
+	# Plugins::SqueezeESP32::FirmwareHelper::init();
+
 	if ( main::WEBUI ) {
 		require Plugins::SqueezeESP32::PlayerSettings;
 		Plugins::SqueezeESP32::PlayerSettings->new;
-
-		# require Plugins::SqueezeESP32::Settings;
-		# Plugins::SqueezeESP32::Settings->new;
 	}
 
 	$class->SUPER::initPlugin(@_);
@@ -60,8 +59,6 @@ sub initPlugin {
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['newmetadata'] ] );
 	Slim::Control::Request::subscribe( sub { onNotification(@_) }, [ ['playlist'], ['open', 'newsong'] ]);
 	Slim::Control::Request::subscribe( \&onStopClear, [ ['playlist'], ['stop', 'clear'] ]);
-
-	Plugins::SqueezeESP32::FirmwareHelper->init();
 }
 
 sub onStopClear {
