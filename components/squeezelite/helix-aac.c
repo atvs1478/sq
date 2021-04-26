@@ -438,7 +438,7 @@ static decode_state helixaac_decode(void) {
 
 			// not finished header parsing come back next time
 			UNLOCK_S;
-			LOG_INFO("header not found yet");
+			LOG_DEBUG("header not found yet");
 			return DECODE_RUNNING;
 		}
 	}
