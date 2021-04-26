@@ -24,7 +24,7 @@
 
 // make may define: PORTAUDIO, SELFPIPE, RESAMPLE, RESAMPLE_MP, VISEXPORT, GPIO, IR, DSD, LINKALL to influence build
 
-#define MAJOR_VERSION "0"
+#define MAJOR_VERSION "1"
 #define MINOR_VERSION "0"
 #define MICRO_VERSION ""
 

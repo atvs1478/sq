@@ -16,6 +16,12 @@ tr.hide {
 .rebooting {
     display: none;
 }
+td.value {
+    width: 80%;
+}
+#boot-div {
+    float: right;
+}
 /* body {
     border: 0;
     margin: 0;
@@ -378,13 +384,9 @@ ul#navbar {
     background-color: #3c0505;
 }
 
-td.value {
-    width: 80%;
-}
 
-#boot-div {
-    float: right;
-}
+
+
 div#message {
     display: none;
     color: #000;

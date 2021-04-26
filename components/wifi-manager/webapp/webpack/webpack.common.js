@@ -11,6 +11,8 @@ const ESLintPlugin = require('eslint-webpack-plugin');
 const SpriteLoaderPlugin = require('svg-sprite-loader/plugin');
 // Linting
 const TSLintPlugin = require('tslint-webpack-plugin');
+const ImageminPlugin = require('imagemin-webpack-plugin').default;
+const imageminMozjpeg = require('imagemin-mozjpeg');
 
 
 module.exports = {
@@ -97,9 +99,10 @@ module.exports = {
                         loader: 'url-loader',
                         options: {
                            // publicPath: '../',
-                            name: './assets/images/' + '[name].[ext]',
+                            //name: './assets/images/' + '[name].[ext]',
                             limit: 10000,
-                            publicPath: '../'
+                            //limit:false,
+                            //publicPath: '../'
                         }
 
                     },
@@ -177,6 +180,22 @@ module.exports = {
 
     plugins: [
       new CleanWebpackPlugin(),
+      new ImageminPlugin({
+          test: /\.(jpe?g|png|gif|svg)$/i,
+          // lossLess gif compressor
+          gifsicle: {
+              optimizationLevel: 9
+          },
+          // lossy png compressor, remove for default lossLess
+          pngquant: ({
+              quality: '75'
+          }),
+          // lossy jpg compressor
+          plugins: [imageminMozjpeg({
+              quality: '75'
+          })],
+          destination: './webpack',
+      }),       
         new ESLintPlugin({
             cache: true,
             ignore: true,
@@ -203,6 +222,7 @@ module.exports = {
               useShortDoctype                : true
             },
             favicon: "./src/assets/images/favicon-32x32.png",
+            
             excludeChunks: ['test'],
         }),
         
