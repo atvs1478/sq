@@ -163,7 +163,7 @@ sub handleFirmwareDownload {
 	}
 
 	# this is the magic request used on the client to figure out whether the plugin does support download proxying
-	if ($path =~ /^(?:-99|-check.bin)$/ && $request->method eq 'HEAD') {
+	if ($path =~ /^(?:-99|-check.bin)$/) {
 		$response->code(204);
 		$response->header('Access-Control-Allow-Origin' => '*');
 
