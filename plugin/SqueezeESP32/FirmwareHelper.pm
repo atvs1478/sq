@@ -14,8 +14,9 @@ use constant GITHUB_RELEASES_URI => "https://api.github.com/repos/sle118/squeeze
 use constant GITHUB_ASSET_URI => GITHUB_RELEASES_URI . "/assets/";
 use constant GITHUB_DOWNLOAD_URI => "https://github.com/sle118/squeezelite-esp32/releases/download/";
 use constant ESP32_STATUS_URI => "http://%s/status.json";
+use constant BASE_PATH => 'plugins/SqueezeESP32/firmware/';
 
-my $FW_DOWNLOAD_REGEX = qr|plugins/SqueezeESP32/firmware/([-a-z0-9-/.]+\.bin)$|i;
+my $FW_DOWNLOAD_REGEX = qr{plugins/SqueezeESP32/firmware/(-99|[-a-z0-9-/.]+\.bin)(?:\?.*)?$}i;
 my $FW_CUSTOM_REGEX = qr/^((?:squeezelite-esp32-)?custom\.bin)$/;
 my $FW_FILENAME_REGEX = qr/^squeezelite-esp32-.*\.bin(\.tmp)?$/;
 my $FW_TAG_REGEX = qr/\b(ESP32-A1S|SqueezeAmp|I2S-4MFlash)\.(16|32)\.(\d+)\.([-a-zA-Z0-9]+)\b/;
@@ -140,7 +141,7 @@ sub _gh2lmsUrl {
 }
 
 sub _urlFromPath {
-	return sprintf('%s/plugins/SqueezeESP32/firmware/%s', Slim::Utils::Network::serverURL(), basename(shift));
+	return sprintf('%s/%s%s', Slim::Utils::Network::serverURL(), BASE_PATH, basename(shift));
 }
 
 sub _customFirmwareFile {
@@ -161,8 +162,8 @@ sub handleFirmwareDownload {
 		return $_errorDownloading->(undef, 'Invalid request', $request->uri, 400);
 	}
 
-	# this is the magic number used on the client to figure out whether the plugin does support download proxying
-	if ($path eq '-check.bin' && $request->method eq 'HEAD') {
+	# this is the magic request used on the client to figure out whether the plugin does support download proxying
+	if ($path =~ /^(?:-99|-check.bin)$/ && $request->method eq 'HEAD') {
 		$response->code(204);
 		$response->header('Access-Control-Allow-Origin' => '*');
 
