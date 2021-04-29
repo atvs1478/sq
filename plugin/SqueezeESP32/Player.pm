@@ -286,7 +286,7 @@ sub reconnect {
 	$client->SUPER::reconnect(@_);
 	
 	$client->pluginData('artwork_md5', '');
-	$client->config_artwork;
+	$client->config_artwork if $client->display->isa("Plugins::SqueezeESP32::Graphics");
 	$client->send_equalizer;
 }
 
