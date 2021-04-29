@@ -211,7 +211,7 @@ sub update_artwork {
 	my $cprefs = $prefs->client($client);
 
 	my $artwork = $cprefs->get('artwork') || return;
-	return unless $artwork->{'enable'};
+	return unless $artwork->{'enable'} && $client->display->isa("Plugins::SqueezeESP32::Graphics");
 	
 	my $header = pack('Nnn', $artwork->{'enable'}, $artwork->{'x'}, $artwork->{'y'});
 	$client->sendFrame( grfa => \$header );
