@@ -113,14 +113,23 @@ struct ANIC_header {
 	u8_t mode;
 };
 
+struct dmxt_packet {
+	char  opcode[4];
+	u16_t x;
+	u16_t length;
+};
+
 #pragma pack(pop)
 
 static struct {
 	TaskHandle_t task;
-	SemaphoreHandle_t mutex;
-	int width, height;
-	bool dirty;
-	bool owned;
+	int wake;
+	bool owned;	
+	struct {
+		SemaphoreHandle_t mutex;		
+		int width, height;
+		bool dirty;
+	};	
 } displayer = { .dirty = true, .owned = true };	
 
 static uint32_t *grayMap;
@@ -143,13 +152,13 @@ static uint32_t *grayMap;
 static struct scroller_s {
 	// copy of grfs content
 	u8_t  screen;	
-	u32_t pause, speed;
-	int wake;	
+	u32_t pause;
 	u16_t mode;	
 	s16_t by;
 	// scroller management & sharing between grfg and scrolling task
 	bool active, first, overflow;
 	int scrolled;
+	int speed, wake;	
 	struct {
 		u8_t *frame;
 		u32_t width;
@@ -167,7 +176,7 @@ static struct {
 	u8_t *data;
 	u32_t size;
 	u16_t x, y;
-	bool enable;
+	bool enable, full;
 } artwork;
 
 #define MAX_BARS	32
@@ -175,21 +184,31 @@ static struct {
 static EXT_RAM_ATTR struct {
 	int bar_gap, bar_width, bar_border;
 	bool rotate;
-	struct {
+	struct bar_s {
 		int current, max;
 		int limit;
 	} bars[MAX_BARS];
 	float spectrum_scale;
 	int n, col, row, height, width, border, style, max;
-	enum { VISU_BLANK, VISU_VUMETER, VISU_SPECTRUM, VISU_WAVEFORM } mode;
-	int speed, wake;	
-	float fft[FFT_LEN*2], samples[FFT_LEN*2], hanning[FFT_LEN];
+	enum { VISU_BLANK, VISU_VUMETER = 0x01, VISU_SPECTRUM = 0x02, VISU_WAVEFORM } mode;
 	struct {
 		u8_t *frame;
 		int width;
 		bool active;
 	} back;		
 } visu;
+
+static EXT_RAM_ATTR struct {
+	float fft[FFT_LEN*2], samples[FFT_LEN*2], hanning[FFT_LEN];
+	int levels[2];
+} meters;
+
+static EXT_RAM_ATTR struct {
+	int mode;
+	int max;
+	u16_t config;
+	struct bar_s bars[MAX_BARS] ;
+} led_visu;
 
 extern const uint8_t vu_bitmap[]   asm("_binary_vu_data_start");
 
@@ -211,7 +230,7 @@ static bool (*display_bus_chain)(void *from, enum display_bus_cmd_e cmd);
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static void server(in_addr_t ip, u16_t hport, u16_t cport);
-static void sendSETD(u16_t width, u16_t height);
+static void sendSETD(u16_t width, u16_t height, u16_t led_config);
 static void sendANIC(u8_t code);
 static bool handler(u8_t *data, int len);
 static bool display_bus_handler(void *from, enum display_bus_cmd_e cmd);
@@ -222,7 +241,11 @@ static void grfs_handler(u8_t *data, int len);
 static void grfg_handler(u8_t *data, int len);
 static void grfa_handler(u8_t *data, int len);
 static void visu_handler(u8_t *data, int len);
+static void dmxt_handler(u8_t *data, int len);
 static void displayer_task(void* arg);
+
+// PLACEHOLDER
+void *led_display = 0x1000;
 
 /* scrolling undocumented information
 	grfs	
@@ -277,50 +300,61 @@ static void displayer_task(void* arg);
  Right channel parameters (not required for mono):
    4-5 - same as left channel parameters
 */
-
+ 
 /****************************************************************************************
  * 
  */
-bool sb_display_init(void) {
+bool sb_displayer_init(void) {
 	static DRAM_ATTR StaticTask_t xTaskBuffer __attribute__ ((aligned (4)));
 	static EXT_RAM_ATTR StackType_t xStack[SCROLL_STACK_SIZE] __attribute__ ((aligned (4)));
 	
 	// no display, just make sure we won't have requests
-	if (!display || GDS_GetWidth(display) <= 0 || GDS_GetHeight(display) <= 0) {
-		LOG_INFO("no display for LMS");
+	if ((GDS_GetWidth(display) <= 0 || GDS_GetHeight(display) <= 0) && !led_display) {
+		LOG_INFO("no display or led visualizer for LMS");
 		return false;
 	}	
 	
-	// inform LMS of our screen dimensions
-	sendSETD(GDS_GetWidth(display), GDS_GetHeight(display));
+	if (display) {
+		// need to force height to 32 maximum
+		displayer.width = GDS_GetWidth(display);
+		displayer.height = min(GDS_GetHeight(display), SB_HEIGHT);
 	
-	// need to force height to 32 maximum
-	displayer.width = GDS_GetWidth(display);
-	displayer.height = min(GDS_GetHeight(display), SB_HEIGHT);
+		// allocate gray-color mapping if needed;
+		if (GDS_GetMode(display) > GDS_GRAYSCALE) {
+			grayMap = malloc(256*sizeof(*grayMap));
+			for (int i = 0; i < 256; i++) grayMap[i] = GDS_GrayMap(display, i);
+		}
 	
-	// allocate gray-color mapping if needed;
-	if (GDS_GetMode(display) > GDS_GRAYSCALE) {
-		grayMap = malloc(256*sizeof(*grayMap));
-		for (int i = 0; i < 256; i++) grayMap[i] = GDS_GrayMap(display, i);
+		// create visu configuration
+		visu.bar_gap = 1;
+		visu.back.frame = calloc(1, (displayer.width * displayer.height) / 8);
+		
+		// size scroller (width + current screen)
+		scroller.scroll.max = (displayer.width * displayer.height / 8) * (15 + 1);
+		scroller.scroll.frame = malloc(scroller.scroll.max);
+		scroller.back.frame = malloc(displayer.width * displayer.height / 8);
+		scroller.frame = malloc(displayer.width * displayer.height / 8);
+		
+		// chain handlers
+		display_bus_chain = display_bus;
+		display_bus = display_bus_handler;
+	}	
+	
+	if (led_display) {
+		// PLACEHOLDER to init config
+		led_visu.mode = VISU_VUMETER;
 	}
 	
-	// create visu configuration
-	visu.bar_gap = 1;
-	visu.speed = 100;
-	visu.back.frame = calloc(1, (displayer.width * displayer.height) / 8);
-	dsps_fft2r_init_fc32(visu.fft, FFT_LEN);
-	dsps_wind_hann_f32(visu.hanning, FFT_LEN);
+	// inform LMS of our screen/led dimensions
+	sendSETD(GDS_GetWidth(display), GDS_GetHeight(display), led_visu.config);
+	
+	dsps_fft2r_init_fc32(meters.fft, FFT_LEN);
+	dsps_wind_hann_f32(meters.hanning, FFT_LEN);
 		
-	// create scroll management task
+	// create displayer management task
 	displayer.mutex = xSemaphoreCreateMutex();
 	displayer.task = xTaskCreateStatic( (TaskFunction_t) displayer_task, "displayer_thread", SCROLL_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN + 1, xStack, &xTaskBuffer);
 	
-	// size scroller (width + current screen)
-	scroller.scroll.max = (displayer.width * displayer.height / 8) * (15 + 1);
-	scroller.scroll.frame = malloc(scroller.scroll.max);
-	scroller.back.frame = malloc(displayer.width * displayer.height / 8);
-	scroller.frame = malloc(displayer.width * displayer.height / 8);
-
 	// chain handlers
 	slimp_handler_chain = slimp_handler;
 	slimp_handler = handler;
@@ -328,10 +362,7 @@ bool sb_display_init(void) {
 	notify_chain = server_notify;
 	server_notify = server;
 	
-	display_bus_chain = display_bus;
-	display_bus = display_bus_handler;
-	
-	return true;
+	return display != NULL;
 }
 
 /****************************************************************************************
@@ -380,14 +411,14 @@ static void sendANIC(u8_t code) {
 /****************************************************************************************
  * Send SETD for width
  */
-static void sendSETD(u16_t width, u16_t height) {
+static void sendSETD(u16_t width, u16_t height, u16_t led_config) {
 	struct SETD_header pkt_header;
 		
 	memset(&pkt_header, 0, sizeof(pkt_header));
 	memcpy(&pkt_header.opcode, "SETD", 4);
 
 	pkt_header.id = 0xfe; // id 0xfe is width S:P:Squeezebox2
-	pkt_header.length = htonl(sizeof(pkt_header) +  4 - 8);
+	pkt_header.length = htonl(sizeof(pkt_header) +  6 - 8);
 		
 	LOG_INFO("sending dimension %ux%u", width, height);	
 
@@ -398,6 +429,7 @@ static void sendSETD(u16_t width, u16_t height) {
 	send_packet((uint8_t *) &pkt_header, sizeof(pkt_header));
 	send_packet((uint8_t *) &width, 2);
 	send_packet((uint8_t *) &height, 2);
+	send_packet((uint8_t *) &led_config, 2);
 	UNLOCK_P;
 }
 
@@ -410,13 +442,13 @@ static void server(in_addr_t ip, u16_t hport, u16_t cport) {
 	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 	
 	sprintf(msg, "%s:%hu", inet_ntoa(ip), hport);
-	if (displayer.owned) GDS_TextPos(display, GDS_FONT_DEFAULT, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg);
+	if (display && displayer.owned) GDS_TextPos(display, GDS_FONT_DEFAULT, GDS_TEXT_CENTERED, GDS_TEXT_CLEAR | GDS_TEXT_UPDATE, msg);
 	displayer.dirty = true;
 	
 	xSemaphoreGive(displayer.mutex);
 		
 	// inform new LMS server of our capabilities
-	sendSETD(displayer.width, GDS_GetHeight(display));
+	sendSETD(GDS_GetWidth(display), GDS_GetHeight(display), led_visu.config);
 	
 	if (notify_chain) (*notify_chain)(ip, hport, cport);
 }
@@ -441,6 +473,8 @@ static bool handler(u8_t *data, int len){
 		grfa_handler(data, len);		
 	} else if (!strncmp((char*) data, "visu", 4)) {
 		visu_handler(data, len);
+	} else if (!strncmp((char*) data, "dmxt", 4)) {
+		dmxt_handler(data, len);		
 	} else {
 		res = false;
 	}
@@ -629,8 +663,7 @@ static void grfe_handler( u8_t *data, int len) {
 	scroller.active = false;
 	
 	// full screen artwork or for small screen, full screen visu has priority
-	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) ||
-		(artwork.enable && artwork.x == 0 && artwork.y == 0)) {
+	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) || artwork.full) {
 		xSemaphoreGive(displayer.mutex);
 		return;
 	}	
@@ -753,8 +786,7 @@ static void grfg_handler(u8_t *data, int len) {
 	LOG_DEBUG("gfrg s:%hu w:%hu (len:%u)", htons(pkt->screen), htons(pkt->width), len);
 
 	// full screen artwork or for small screen, visu has priority when full screen	
-	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) || 
-		(artwork.enable && artwork.x == 0 && artwork.y == 0)) {
+	if (((visu.mode & VISU_ESP32) && !visu.col && visu.row < displayer.height) || artwork.full) {
 		return;
 	}	
 	
@@ -808,6 +840,7 @@ static void grfa_handler(u8_t *data, int len) {
 			artwork.y = htons(pkt->y);		
 		} else if (artwork.size) GDS_ClearWindow(display, artwork.x, artwork.y, -1, -1, GDS_COLOR_BLACK);
 		
+		artwork.full = artwork.enable && artwork.x == 0 && artwork.y == 0;
 		LOG_INFO("gfra en:%u x:%hu, y:%hu", artwork.enable, artwork.x, artwork.y);
 		
 		// done in any case
@@ -825,6 +858,7 @@ static void grfa_handler(u8_t *data, int len) {
 		// now use new parameters
 		artwork.x = htons(pkt->x);
 		artwork.y = htons(pkt->y);
+		artwork.full = artwork.enable && artwork.x == 0 && artwork.y == 0;
 		if (artwork.data) free(artwork.data);
 		artwork.data = malloc(length);
 	}	
@@ -843,95 +877,57 @@ static void grfa_handler(u8_t *data, int len) {
 }
 
 /****************************************************************************************
- * Update visualization bars
+ * Fit spectrum into N bands and convert to dB
  */
-static void visu_update(void) {
-	// no update when artwork is full screen (but no need to protect against not owning the display as we are playing	
-	if ((artwork.enable && artwork.x == 0 && artwork.y == 0) || pthread_mutex_trylock(&visu_export.mutex)) {
-		return;
-	}	
-	
-	int mode = visu.mode & ~VISU_ESP32;
-				
-	// not enough frames
-	if (visu_export.level < (mode == VISU_VUMETER ? RMS_LEN : FFT_LEN) && visu_export.running) {
-		pthread_mutex_unlock(&visu_export.mutex);
-		return;
-	}
-	
-	// reset bars for all cases first	
-	for (int i = visu.n; --i >= 0;) visu.bars[i].current = 0;
-	
-	if (visu_export.running) {
-					
-		if (mode == VISU_VUMETER) {
-			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
-			
-			// calculate sum(L²+R²), try to not overflow at the expense of some precision
-			for (int i = RMS_LEN; --i >= 0;) {
-				visu.bars[0].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr += BYTES_PER_FRAME / 4;
-				visu.bars[1].current += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
-				iptr += BYTES_PER_FRAME / 4;
-			}	
-		
-			// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
-			for (int i = visu.n; --i >= 0;) {	 
-				visu.bars[i].current = visu.max * (0.01667f*10*log10f(0.0000001f + (visu.bars[i].current >> (visu_export.gain == FIXED_ONE ? 8 : 1))) - 0.2543f);
-				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
-				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
-			}
-		} else {
-			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
-			// on xtensa/esp32 the floating point FFT takes 1/2 cycles of the fixed point
-			for (int i = 0 ; i < FFT_LEN ; i++) {
-				// don't normalize here, but we are due INT16_MAX and FFT_LEN / 2 / 2
-				visu.samples[i * 2 + 0] = (float) (*iptr + *(iptr+BYTES_PER_FRAME/4)) * visu.hanning[i];
-				visu.samples[i * 2 + 1] = 0;
-				iptr += 2 * BYTES_PER_FRAME / 4;
-			}
+void spectrum_scale(int n, struct bar_s *bars, int max, float *samples) { 
+	float rate = visu_export.rate;			
+	// now arrange the result with the number of bar and sampling rate (don't want DC)
+	for (int i = 0, j = 1; i < n && j < (FFT_LEN / 2); i++) {
+		float power, count;
 
-			// actual FFT that might be less cycle than all the crap below		
-			dsps_fft2r_fc32_ae32(visu.samples, FFT_LEN);
-			dsps_bit_rev_fc32_ansi(visu.samples, FFT_LEN);
-			float rate = visu_export.rate;
-			
-			// now arrange the result with the number of bar and sampling rate (don't want DC)
-			for (int i = 0, j = 1; i < visu.n && j < (FFT_LEN / 2); i++) {
-				float power, count;
-
-				// find the next point in FFT (this is real signal, so only half matters)
-				for (count = 0, power = 0; j * visu_export.rate < visu.bars[i].limit * FFT_LEN && j < FFT_LEN / 2; j++, count += 1) {
-					power += visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1];
-				}
-				// due to sample rate, we have reached the end of the available spectrum
-				if (j >= (FFT_LEN / 2)) {
-					// normalize accumulated data
-					if (count) power /= count * 2.;
-				} else if (count) {
-					// how much of what remains do we need to add
-					float ratio = j - (visu.bars[i].limit * FFT_LEN) / rate;
-					power += (visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1]) * ratio;
-					
-					// normalize accumulated data
-					power /= (count + ratio) * 2;
-				} else {
-					// no data for that band (sampling rate too high), just assume same as previous one
-					power = (visu.samples[2*j] * visu.samples[2*j] + visu.samples[2*j+1] * visu.samples[2*j+1]) / 2.;
-				}	
-			
-				// convert to dB and bars, same back-off
-				if (power) visu.bars[i].current = visu.max * (0.01667f*10*(log10f(power) - log10f(FFT_LEN*(visu_export.gain == FIXED_ONE ? 256 : 2))) - 0.2543f);
-				if (visu.bars[i].current > visu.max) visu.bars[i].current = visu.max;
-				else if (visu.bars[i].current < 0) visu.bars[i].current = 0;
-			}	
+		// find the next point in FFT (this is real signal, so only half matters)
+		for (count = 0, power = 0; j * visu_export.rate < bars[i].limit * FFT_LEN && j < FFT_LEN / 2; j++, count += 1) {
+			power += samples[2*j] * samples[2*j] + samples[2*j+1] * samples[2*j+1];
 		}
-	} 
-		
-	// we took what we want, we can release the buffer
-	visu_export.level = 0;
-	pthread_mutex_unlock(&visu_export.mutex);
+		// due to sample rate, we have reached the end of the available spectrum
+		if (j >= (FFT_LEN / 2)) {
+			// normalize accumulated data
+			if (count) power /= count * 2.;
+		} else if (count) {
+			// how much of what remains do we need to add
+			float ratio = j - (bars[i].limit * FFT_LEN) / rate;
+			power += (samples[2*j] * samples[2*j] + samples[2*j+1] * samples[2*j+1]) * ratio;
+					
+			// normalize accumulated data
+			power /= (count + ratio) * 2;
+		} else {
+			// no data for that band (sampling rate too high), just assume same as previous one
+			power = (samples[2*j] * samples[2*j] + samples[2*j+1] * samples[2*j+1]) / 2.;
+		}	
+			
+		// convert to dB and bars, same back-off
+		bars[i].current = max * (0.01667f*10*(log10f(0.0000001f + power) - log10f(FFT_LEN*(visu_export.gain == FIXED_ONE ? 256 : 2))) - 0.2543f);
+		if (bars[i].current > max) bars[i].current = max;
+		else if (bars[i].current < 0) bars[i].current = 0;
+	}	
+}		
 
+/****************************************************************************************
+ * Fit levels to max and convert to dB
+ */
+void vu_scale(struct bar_s *bars, int max, int *levels) { 
+	// convert to dB (1 bit remaining for getting X²/N, 60dB dynamic starting from 0dBFS = 3 bits back-off)
+	for (int i = 2; --i >= 0;) {	 
+		bars[i].current = max * (0.01667f*10*log10f(0.0000001f + (levels[i] >> (visu_export.gain == FIXED_ONE ? 8 : 1))) - 0.2543f);
+		if (bars[i].current > max) bars[i].current = max;
+		else if (bars[i].current < 0) bars[i].current = 0;
+	}
+}	
+
+/****************************************************************************************
+ * visu draw
+ */
+void visu_draw(void) {
 	// don't refresh screen if all max are 0 (we were are somewhat idle)
 	int clear = 0;
 	for (int i = visu.n; --i >= 0;) clear = max(clear, visu.bars[i].max);
@@ -942,9 +938,8 @@ static void visu_update(void) {
 		GDS_DrawBitmapCBR(display, visu.back.frame, visu.back.width, displayer.height, GDS_COLOR_WHITE);
 	}	
 
-	if (mode != VISU_VUMETER || !visu.style) {
+	if ((visu.mode & ~VISU_ESP32) != VISU_VUMETER || !visu.style) {
 		// there is much more optimization to be done here, like not redrawing bars unless needed
-
 		for (int i = visu.n; --i >= 0;) {
 			// update maximum
 			if (visu.bars[i].current > visu.bars[i].max) visu.bars[i].max = visu.bars[i].current;
@@ -986,8 +981,79 @@ static void visu_update(void) {
 		int level = (visu.bars[0].current + visu.bars[1].current) / 2;
 		draw_VU(display, vu_bitmap, level, 0, visu.row, visu.rotate ? visu.height : visu.width, visu.rotate);		
 	}	
-}
+}	
 
+/****************************************************************************************
+ * Update displayer
+ */
+static void displayer_update(void) {
+	// no update when artwork is full screen and no led_strip (but no need to protect against not owning the display as we are playing	
+	if ((artwork.full && !led_visu.mode) || pthread_mutex_trylock(&visu_export.mutex)) {
+		return;
+	}	
+	
+	int mode = (visu.mode & ~VISU_ESP32) | led_visu.mode;
+				
+	// not enough frames
+	if (visu_export.level < (mode & VISU_SPECTRUM ? FFT_LEN : RMS_LEN) && visu_export.running) {
+		pthread_mutex_unlock(&visu_export.mutex);
+		return;
+	}
+	
+	// reset all levels no matter what
+	meters.levels[0] = meters.levels[1] = 0;
+	memset(meters.samples, 0, sizeof(meters.samples));	
+	
+	if (visu_export.running) {
+		
+		// calculate data for VU-meter						
+		if (mode & VISU_VUMETER) {
+			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
+			int *left = &meters.levels[0], *right = &meters.levels[1];
+			// calculate sum(L²+R²), try to not overflow at the expense of some precision
+			for (int i = RMS_LEN; --i >= 0;) {
+				*left += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+				iptr += BYTES_PER_FRAME / 4;
+				*right += (*iptr * *iptr + (1 << (RMS_LEN_BIT - 2))) >> (RMS_LEN_BIT - 1);
+				iptr += BYTES_PER_FRAME / 4;
+			}	
+		}
+		
+		// calculate data for spectrum
+		if (mode & VISU_SPECTRUM) {
+			s16_t *iptr = (s16_t*) visu_export.buffer + (BYTES_PER_FRAME / 4) - 1;
+			// on xtensa/esp32 the floating point FFT takes 1/2 cycles of the fixed point
+			for (int i = 0 ; i < FFT_LEN ; i++) {
+				// don't normalize here, but we are due INT16_MAX and FFT_LEN / 2 / 2
+				meters.samples[i * 2 + 0] = (float) (*iptr + *(iptr+BYTES_PER_FRAME/4)) * meters.hanning[i];
+				meters.samples[i * 2 + 1] = 0;
+				iptr += 2 * BYTES_PER_FRAME / 4;
+			}
+
+			// actual FFT that might be less cycle than all the crap below		
+			dsps_fft2r_fc32_ae32(meters.samples, FFT_LEN);
+			dsps_bit_rev_fc32_ansi(meters.samples, FFT_LEN);
+		}	
+		
+	} 
+		
+	// we took what we want, we can release the buffer
+	visu_export.level = 0;
+	pthread_mutex_unlock(&visu_export.mutex);
+
+	// actualize the display
+	if (visu.mode && !artwork.full) {
+		if (visu.mode & VISU_SPECTRUM) spectrum_scale(visu.n, visu.bars, visu.max, meters.samples);
+		else for (int i = 2; --i >= 0;) vu_scale(visu.bars, visu.max, meters.levels);
+		visu_draw();
+	}	
+	
+	// actualize led_vu
+	if (led_visu.mode) {
+		// PLACEHOLDER to handle led_display. you need potentially scaling of spectrum (X and Y) 
+		// and scaling of levels (Y) and then call the 
+	}
+}
 
 /****************************************************************************************
  * Calculate spectrum spread
@@ -1129,7 +1195,7 @@ static void visu_handler( u8_t *data, int len) {
 			if (visu.row < displayer.height) scroller.active = false;
 			vTaskResume(displayer.task);
 		}	
-		visu.wake = 0;
+		displayer.wake = 0;
 		
 		// reset bars maximum
 		for (int i = visu.n; --i >= 0;) visu.bars[i].max = 0;
@@ -1145,6 +1211,25 @@ static void visu_handler( u8_t *data, int len) {
 }	
 
 /****************************************************************************************
+ * Dmx style packet handler
+ * ToDo: make packet match dmx protocol format
+ */
+static void dmxt_handler( u8_t *data, int len) {
+	struct dmxt_packet *pkt = (struct dmxt_packet*) data;
+	uint16_t offset = htons(pkt->x);
+	uint16_t length = htons(pkt->length);
+
+	LOG_INFO("dmx packet len:%u offset:%u", length, offset);
+
+	xSemaphoreTake(displayer.mutex, portMAX_DELAY);
+
+	// PLACEHOLDER
+	//led_vu_data(data + sizeof(struct dmxt_packet), offset, length);
+
+	xSemaphoreGive(displayer.mutex);
+}	
+
+/****************************************************************************************
  * Scroll task
  *  - with the addition of the visualizer, it's a bit a 2-headed beast not easy to 
  * maintain, so som better separation between the visu and scroll is probably needed
@@ -1156,15 +1241,15 @@ static void displayer_task(void *args) {
 		xSemaphoreTake(displayer.mutex, portMAX_DELAY);
 		
 		// suspend ourselves if nothing to do, grfg or visu will wake us up
-		if (!scroller.active && !visu.mode)  {
+		if (!scroller.active && !visu.mode && !led_visu.mode)  {
 			xSemaphoreGive(displayer.mutex);
 			vTaskSuspend(NULL);
 			xSemaphoreTake(displayer.mutex, portMAX_DELAY);
-			scroller.wake = visu.wake = 0;
+			scroller.wake = displayer.wake = 0;
 		}	
-		
+
 		// go for long sleep when either item is disabled
-		if (!visu.mode) visu.wake = LONG_WAKE;
+		if (!visu.mode && !led_visu.mode) displayer.wake = LONG_WAKE;
 		if (!scroller.active) scroller.wake = LONG_WAKE;
 								
 		// scroll required amount of columns (within the window)
@@ -1200,20 +1285,20 @@ static void displayer_task(void *args) {
 		}
 
 		// update visu if active
-		if (visu.mode && visu.wake <= 0) {
-			visu_update();
-			visu.wake = 100;
+		if ((visu.mode || led_visu.mode) && displayer.wake <= 0) {
+			displayer_update();
+			displayer.wake = 100;
 		}
 		
 		// need to make sure we own display
-		if (displayer.owned) GDS_Update(display);
+		if (display && displayer.owned) GDS_Update(display);
 		
 		// release semaphore and sleep what's needed
 		xSemaphoreGive(displayer.mutex);
 		
-		sleep = min(visu.wake, scroller.wake);
+		sleep = min(displayer.wake, scroller.wake);
 		vTaskDelay(sleep / portTICK_PERIOD_MS);
 		scroller.wake -= sleep;
-		visu.wake -= sleep;
+		displayer.wake -= sleep;
 	}	
 }	

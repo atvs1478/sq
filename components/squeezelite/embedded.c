@@ -45,14 +45,14 @@ uint32_t _gettime_ms_(void) {
 }
 
 extern void sb_controls_init(void);
-extern bool sb_display_init(void);
+extern bool sb_displayer_init(void);
 
 u8_t custom_player_id = 12;
 
 void embedded_init(void) {
 	mutex_create(slimp_mutex);
 	sb_controls_init();
-	custom_player_id = sb_display_init() ? 100 : 101;
+	custom_player_id = sb_displayer_init() ? 100 : 101;
 }
 
 u16_t get_RSSI(void) {
