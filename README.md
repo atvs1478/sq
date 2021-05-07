@@ -47,7 +47,7 @@ In 16 bits mode, although 192 kHz is reported as max rate, it's highly recommend
 ## Supported Hardware
 Any esp32-based hardware with at least 4MB of flash and 4MB of PSRAM will be capable of running squeezelite-esp32 and there are various boards that include such chip. A few are mentionned below, but any should work. You can find various help & instructions [here](https://forums.slimdevices.com/showthread.php?112697-ANNOUNCE-Squeezelite-ESP32-(dedicated-thread))
 
-**For the sake of clarity, WROOM module DO NOT work as they don't incldue PSRAM. Some designs might add it externally, but it's unlikely.**
+**For the sake of clarity, WROOM modules DO NOT work as they don't include PSRAM. Some designs might add it externally, but it's (very) unlikely.**
 ### Raw WROVER module
 Per above description, a [WROVER module](https://www.espressif.com/en/products/modules/esp32) is enough to run Squeezelite-esp32, but that requires a bit of tinkering to extend it to have analogue audio or hardware buttons (e.g.) 
 
