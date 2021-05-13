@@ -361,9 +361,9 @@ The benefit of the "raw" mode is that you can build a player which is as close a
 There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
 
 ### Battery / ADC
-The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
+The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. The "atten" value attenuates the input voltage to the ADC input (the read value maintains a 0-1V rage) where: 0=no attenuation(0..800mV), 1=2.5dB attenuation(0..1.1V), 2=6dB attenuation(0..1.35V), 3=11dB attenuation(0..2.6V). Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
 ```
-channel=0..7,scale=<scale>,cells=<2|3>
+channel=0..7,scale=<scale>,cells=<2|3>,[atten=<0|1|2|3>]
 ```
 NB: Set parameter to empty to disable battery reading. For well-known configuration, this is ignored (except for SqueezeAMP where number of cells is required)
 # Configuration
