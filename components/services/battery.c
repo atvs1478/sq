@@ -32,8 +32,8 @@ static const char *TAG = "battery";
 static struct {
 	int channel;
 	float sum, avg, scale;
-	int count, attenuation;
-	int cells;
+	int count;
+	int cells, attenuation;
 	TimerHandle_t timer;
 } battery = {
 	.channel = CONFIG_BAT_CHANNEL,
