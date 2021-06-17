@@ -133,12 +133,14 @@ static void bt_next(bool pressed) {
 }
 
 const static actrls_t controls = {
+    NULL, // power
 	bt_volume_up, bt_volume_down,	// volume up, volume down
 	bt_toggle, bt_play,	// toggle, play
 	bt_pause, bt_stop,	// pause, stop
 	NULL, NULL,			// rew, fwd
 	bt_prev, bt_next,	// prev, next
 	NULL, NULL, NULL, NULL, // left, right, up, down
+    NULL, NULL, NULL, NULL, NULL, NULL, // pre1-6
 	bt_volume_down, bt_volume_up, bt_toggle// knob left, knob_right, knob push
 };
 
