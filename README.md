@@ -68,7 +68,7 @@ NB: You can use the pre-build binaries SqueezeAMP4MBFlash which has all the hard
 - spdif_config: bck=33,ws=25,do=15
 
 ### ESP32-A1S
-Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4001060963585.html?spm=a2g0o.productlist.0.0.1553262bnHoTQV&algo_pvid=d56ffae2-fe7f-4e2f-8401-44b5400158c5&algo_expid=d56ffae2-fe7f-4e2f-8401-44b5400158c5-8&btsid=0bb0623c16230496915602712ef3ef&ws_ab_test=searchweb0_0,searchweb201602_,searchweb201603_) or an external amplifier if you want direct speaker connection. 
+Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4001060963585.html) or an external amplifier if you want direct speaker connection. 
 
 The board shown above has the following IO set
 - amplifier: GPIO21
