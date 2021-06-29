@@ -7,13 +7,14 @@
  *  https://opensource.org/licenses/MIT
  *
  */
- 
+
+#include "nvs_utilities.h"
 #include "squeezelite.h" 
 #include "equalizer.h"
 #include "esp_equalizer.h"
- 
-#define EQ_BANDS	10
 
+#define EQ_BANDS 10
+ 
 static log_level loglevel = lINFO;
  
 static struct {
@@ -21,6 +22,20 @@ static struct {
 	float gain[EQ_BANDS];
 	bool update;
 } equalizer = { .update = true };
+
+/****************************************************************************************
+ * initialize equalizer
+ */
+void equalizer_init(void) {
+	s8_t *gain = get_nvs_value_alloc(NVS_TYPE_BLOB, "equalizer");
+	
+	if (!gain) gain = calloc(EQ_BANDS, sizeof(*gain));
+	
+	equalizer_update(gain);
+	free(gain);
+	
+	LOG_INFO("initializing equalizer");
+}	
  
 /****************************************************************************************
  * open equalizer
@@ -68,9 +83,12 @@ void equalizer_close(void) {
  * update equalizer gain
  */
 void equalizer_update(s8_t *gain) {
+	store_nvs_value_len(NVS_TYPE_BLOB, "equalizer", gain, EQ_BANDS * sizeof(*gain));
+	
 	for (int i = 0; i < EQ_BANDS; i++) equalizer.gain[i] = gain[i];
 	equalizer.update = true;
 }
+
 
 /****************************************************************************************
  * process equalizer 
