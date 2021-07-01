@@ -8,7 +8,7 @@
  *
  */
 
-#include "nvs_utilities.h"
+#include "platform_config.h"
 #include "squeezelite.h" 
 #include "equalizer.h"
 #include "esp_equalizer.h"
@@ -27,13 +27,18 @@ static struct {
  * initialize equalizer
  */
 void equalizer_init(void) {
-	s8_t *gain = get_nvs_value_alloc(NVS_TYPE_BLOB, "equalizer");
+	s8_t gain[EQ_BANDS] = { };
+	char *config = config_alloc_get(NVS_TYPE_STR, "equalizer");
+	char *p = strtok(config, ", !");	
 	
-	if (!gain) gain = calloc(EQ_BANDS, sizeof(*gain));
-	
+	for (int i = 0; p && i < EQ_BANDS; i++) {
+		gain[i] = atoi(p);
+		p = strtok(NULL, ", :");
+	}
+			
+	free(config);	
 	equalizer_update(gain);
-	free(gain);
-	
+		
 	LOG_INFO("initializing equalizer");
 }	
  
@@ -83,9 +88,18 @@ void equalizer_close(void) {
  * update equalizer gain
  */
 void equalizer_update(s8_t *gain) {
-	store_nvs_value_len(NVS_TYPE_BLOB, "equalizer", gain, EQ_BANDS * sizeof(*gain));
+	char config[EQ_BANDS * 4 + 1] = { };
+	char *p = config;
 	
-	for (int i = 0; i < EQ_BANDS; i++) equalizer.gain[i] = gain[i];
+	for (int i = 0; i < EQ_BANDS; i++) {
+		equalizer.gain[i] = gain[i];
+		if (gain[i] < 0) *p++ = '-';
+		*p++ = (gain[i] / 10) + 0x30;
+		*p++ = (gain[i] % 10) + 0x30;
+		if (i < EQ_BANDS - 1) *p++ = ',';
+	}
+	
+	config_set_value(NVS_TYPE_STR, "equalizer", config);					
 	equalizer.update = true;
 }
 
