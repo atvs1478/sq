@@ -103,7 +103,6 @@ void equalizer_update(s8_t *gain) {
 	equalizer.update = true;
 }
 
-
 /****************************************************************************************
  * process equalizer 
  */
