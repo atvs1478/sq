@@ -241,7 +241,7 @@ void process_received_data(const char * buffer, size_t size){
 
 	// scrub from any escape command
 	if(*c == '\e'){
-		while(*(c++) !='n'){
+		while(*(c++) != '\n'){
 			--size;
 		};
 		--size;
