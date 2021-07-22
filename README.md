@@ -68,7 +68,7 @@ NB: You can use the pre-build binaries SqueezeAMP4MBFlash which has all the hard
 - spdif_config: bck=33,ws=25,do=15
 
 ### ESP32-A1S
-Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4001060963585.html) or an external amplifier if you want direct speaker connection. 
+Works with [ESP32-A1S](https://docs.ai-thinker.com/esp32-a1s) module that includes audio codec and headset output. You still need to use a demo board like [this](https://www.aliexpress.com/item/4001060963585.html) or an external amplifier if you want direct speaker connection. Note that there is a version with AC101 codec and anotehr one with ES8288 (see below)
 
 The board shown above has the following IO set
 - amplifier: GPIO21
@@ -85,11 +85,17 @@ The board shown above has the following IO set
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
-- dac_config: model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32
+- dac_config: model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32 for ES83881
 - a button mapping: 
 ```
 [{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
 ```
+for AC101
+- dac_config: model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32
+ 
+for ES8388 (not avail for now)
+- dac_config model=ES8388,bck=27,ws=26,do=25,sda=18,scl=23,i2c=16
+- dac_controlset: {"init":[{"reg":4,"val":60},{"reg":8,"val":0},{"reg":23,"val":24}]} (replace 24 by 32 for 32 bits bmode)
 ### T-WATCH2020 by LilyGo
 This is a fun [smartwatch](http://www.lilygo.cn/prod_view.aspx?TypeId=50036&Id=1290&FId=t3:50036:3) based on ESP32. It has a 240x240 ST7789 screen and onboard audio. Not very useful to listen to anything but it works. This is an example of a device that requires an I2C set of commands for its dac (see below). There is a build-option if you decide to rebuild everything by yourself, otherwise the I2S default option works with the following parameters
 
