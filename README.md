@@ -23,6 +23,8 @@ Other features include
  - Full web interface for further configuration/management
  - Firmware over-the-air update 
 
+To control the equalizer or use the display on LMS, a new player model is required and this is provided through a plugin that can be found [here]( https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml)
+
 ## Performances 
 *(opinions presented here so I = @philippe44)*
 The main build of squeezelite-esp32 is a 16 bits internal core with all calculations in 32 bits or float precision. This is a design choice I've made to preserve CPU performances (it is already stretching a lot the esp32 chipset) and optimize memory usage as we only have 4MB of usable RAM. Some might correctly comment that the WROVER module have 8MB of RAM, but the processor is only able to address 4MB and the remaining 4MB must be paginated by smaller blocks and I don't have patience to that. 
@@ -203,7 +205,7 @@ SPI,width=<pixels>,height=<pixels>,cs=<gpio>[,back=<gpio>][,reset=<gpio>][,speed
 - ST7789 is a 240x320 65k (262k not enabled) color SPI [here](https://www.waveshare.com/product/displays/lcd-oled/lcd-oled-3/2inch-lcd-module.htm). It also exist with 240x240 displays. See **rotate** for use in portrait mode
 - ILI9341 is another 240x320 65k (262k capable) color SPI. I've not used it much, the driver it has been provided by one external contributor to the project
 
-To use the display on LMS, add repository https://raw.githubusercontent.com/sle118/squeezelite-esp32/master/plugin/repo.xml. You will then be able to tweak how the vu-meter and spectrum analyzer are displayed, as well as size of artwork. You can also install the excellent plugin "Music Information Screen" which is super useful to tweak the layout.
+You can tweak how the vu-meter and spectrum analyzer are displayed, as well as size of artwork through a dedicated menu in player's settings (don't forget to add the plugin).
 
 The NVS parameter "metadata_config" sets how metadata is displayed for AirPlay and Bluetooth. Syntax is
 ```
