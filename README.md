@@ -31,17 +31,17 @@ The main build of squeezelite-esp32 is a 16 bits internal core with all calculat
 
 Now, when I did the porting of squeezelite to esp32, I've also made the core 16 or 32 bits compatible at compile-time. So far, it works in 32 bits but less tests have been done. You can chose to compile it in 32 bits mode. I'm not very interested above 16 bits samples because it does not bring anything (I have an engineering background in theory of information). 
 
-| Capability                 |16 bits|32 bits| comment         						         |	
-|----------------------------|-------|-------|-------------------------------------------------------------------|
-| max sampling rate          |  192k |  96k  | 192k is very challenging, especially when combined with display   |
-| max bit depth              |  16   |  24   | 24 bits are truncated in 16 bits mode                             | 
-| spdif			     |16 bits|20 bits|		                                                         |
-| mp3, aac, opus, ogg/vorbis |  48k  |  48k  |		                                                         |
-| alac, flac, ogg/flac       |  96k  |  96k  | 		                                                         |
-| pcm, wav, aif              |  192k |  96k  |		                                                         |
-| equalizer                  |   Y   |   N   | 48kHz max (after resampling) - equalization skipped on 96k tracks |
-| resampling                 |   Y   |   N   |		                                                         |
-| cross-fade                 |  10s  |  <5s  | depends on buffer size and sampling rate		                 |
+| Capability                 |16 bits|32 bits| comment         						          |	
+|----------------------------|-------|-------|--------------------------------------------------------------------|
+| max sampling rate          |  192k |  96k  | 192k is very challenging, especially when combined with display    |
+| max bit depth              |  16   |  24   | 24 bits are truncated in 16 bits mode                              | 
+| spdif			     |16 bits|20 bits|		                                                          |
+| mp3, aac, opus, ogg/vorbis |  48k  |  48k  |		                                                          |
+| alac, flac, ogg/flac       |  96k  |  96k  | 		                                                          |
+| pcm, wav, aif              |  192k |  96k  |		                                                          |
+| equalizer                  |   Y   |   N   | 48kHz max (after resampling) - equalization skipped on >48k tracks |
+| resampling                 |   Y   |   N   |		                                                          |
+| cross-fade                 |  10s  |  <5s  | depends on buffer size and sampling rate		                  |
 
 The esp32 must run at 240 MHz, with Quad-SPI I/O at 80 MHz and a clock of 40 Mhz. Still, it's a lot to run, especially knowing that it has a serial Flash and PSRAM, so kudos to Espressif for their chipset optimization. Now, to have all the decoding, resampling, equalizing, gain, display, spectrum/vu is a very (very) delicate equilibrium between use of internal /external RAM, tasks priorities and buffer handling. It is not perfect and the more you push the system to the limit, the higher the risk that some files would not play (see below). In general, the display will always have the lowest priority and you'll notice slowdown in scrolling and VU/Spectrum refresh rates. Now, even display thread has some critical section and impacts the capabilities. For example, a 16 bits-depth color display with low SPI speed might prevent 24/96 flac to work but still work with pcm 24/96
 
@@ -87,7 +87,6 @@ The board shown above has the following IO set
 
 So a possible config would be
 - set_GPIO: 21=amp,22=green:0,39=jack:0
-- dac_config: model=AC101,bck=27,ws=26,do=25,di=35,sda=33,scl=32 for ES83881
 - a button mapping: 
 ```
 [{"gpio":5,"normal":{"pressed":"ACTRLS_TOGGLE"}},{"gpio":18,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLUP"}, "shifted":{"pressed":"ACTRLS_NEXT"}}, {"gpio":23,"pull":true,"shifter_gpio":5,"normal":{"pressed":"ACTRLS_VOLDOWN"},"shifted":{"pressed":"ACTRLS_PREV"}}]
