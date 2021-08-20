@@ -243,6 +243,7 @@ Syntax is:
 <gpio>=Vcc|GND|amp[:1|0]|ir|jack[:0|1]|green[:0|1]|red[:0|1]|spkfault[:0|1][,<repeated sequence for next GPIO>]
 ```
 You can define the defaults for jack, spkfault leds at compile time but nvs parameter takes precedence except for well-known configurations where these are forced at runtime.
+**Note that gpio 36 and 39 are input only and cannot use interrupt. When set to jack or speaker fault, a 100ms polling checks their value but that's expensive**
 ### LED 
 See §**set_GPIO** for how to set the green and red LEDs. In addition, their brightness can be controlled using the "led_brigthness" parameter. The syntax is
 ```
@@ -273,6 +274,7 @@ The SW gpio is optional, you can re-affect it to a pure button if you prefer but
 
 See also the "IMPORTANT NOTE" on the "Buttons" section and remember that when 'lms_ctrls_raw' (see below) is activated, none of these knobonly,volume,longpress options apply, raw button codes (not actions) are simply sent to LMS
 
+**Note that gpio 36 and 39 are input only and cannot use interrupt, so they cannot be set to A or B. When using them for SW, a 100ms polling is used which is expensive**
 ### Buttons
 Buttons are described using a JSON string with the following syntax
 ```
@@ -366,7 +368,8 @@ The benefit of the "raw" mode is that you can build a player which is as close a
 **Be aware that when using non "raw" mode, the CLI (Command Line Interface) of LMS is used and *must* be available without password**
 
 There is no good or bad option, it's your choice. Use the NVS parameter "lms_ctrls_raw" to change that option
-
+	
+**Note that gpio 36 and 39 are input only and cannot use interrupt. When using them for a button, a 100ms polling is started which is expensive. Long press is also likely to not work very well**
 ### Battery / ADC
 The NVS parameter "bat_config" sets the ADC1 channel used to measure battery/DC voltage. The "atten" value attenuates the input voltage to the ADC input (the read value maintains a 0-1V rage) where: 0=no attenuation(0..800mV), 1=2.5dB attenuation(0..1.1V), 2=6dB attenuation(0..1.35V), 3=11dB attenuation(0..2.6V). Scale is a float ratio applied to every sample of the 12 bits ADC. A measure is taken every 10s and an average is made every 5 minutes (not a sliding window). Syntax is
 ```
