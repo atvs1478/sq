@@ -40,7 +40,6 @@
 #endif
 static struct {
 	struct arg_str *scanmode;
-    //disable_ps    struct arg_lit *disable_power_save;
 	struct arg_end *end;
 } wifi_parms_arg;
 static struct {
@@ -610,7 +609,6 @@ static int do_configure_wifi(int argc, char **argv){
 		cmd_send_messaging(argv[0],MESSAGING_ERROR,"Unable to open memory stream.");
 		return 1;
 	}
-	// disable_ps nerrors += enable_disable(f,"disable_ps",wifi_parms_arg.disable_power_save);
     
     if(wifi_parms_arg.scanmode->count>0){
         if(strcasecmp(wifi_parms_arg.scanmode->sval[0],"Comprehensive") == 0){
@@ -690,11 +688,7 @@ static int do_set_services(int argc, char **argv)
 cJSON * configure_wifi_cb(){
 	cJSON * values = cJSON_CreateObject();
 	char * p=NULL;
-    // disable_ps 
-	// if ((p = config_alloc_get(NVS_TYPE_STR, "disable_ps")) != NULL) {
-	// 	cJSON_AddBoolToObject(values,"disable_power_save",strcmp(p,"1") == 0 || strcasecmp(p,"y") == 0);
-	// 	FREE_AND_NULL(p);
-	// }
+
     if ((p = config_alloc_get(NVS_TYPE_STR, "wifi_smode")) != NULL) {
         cJSON_AddStringToObject(values,"scanmode",strcasecmp(p,"a") == 0 ?"Comprehensive":"Fast");
         FREE_AND_NULL(p);
@@ -757,7 +751,6 @@ static void register_set_services(){
 
 static void register_set_wifi_parms(){
 	wifi_parms_arg.scanmode = arg_str0(NULL, "scanmode", "Fast|Comprehensive","Sets the WiFi Scan Mode. Use Comprehensive where more than one AP has the same name on different channels. This will ensure that the AP with the strongest signal is chosen.");
-    //disable_ps	wifi_parms_arg.disable_power_save = arg_lit0(NULL, "disable_power_save", "Disable Power Saving. This may help if the wifi connection is unstable.");
 	wifi_parms_arg.end=arg_end(2);
 	const esp_console_cmd_t cmd = {
         .command = CFG_TYPE_SYST("wifi"),

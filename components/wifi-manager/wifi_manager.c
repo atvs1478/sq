@@ -283,18 +283,6 @@ void wifi_manager_init_wifi(){
     ESP_LOGD(TAG,   "Initializing wifi. Setting WiFi mode to WIFI_MODE_NULL");
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_NULL) );
     ESP_LOGD(TAG,   "Initializing wifi. Starting wifi");
-	// char * disable_ps = config_alloc_get_default(NVS_TYPE_STR, "disable_ps", "n", 0);
-
-    // if (gpio36_39_used || (disable_ps && strcasecmp(disable_ps,"y")==0)) {
-	// 	if(gpio36_39_used){
-	// 		ESP_LOGW(TAG, "GPIO 36 or 39 are in use, need to disable WiFi PowerSave!");
-	// 	}
-	// 	else {
-	// 		ESP_LOGW(TAG, "wifi powersave config is disabled. Disabling WiFi PowerSave!");
-	// 	}
-	// 	esp_wifi_set_ps(WIFI_PS_NONE); 
-	// }
-    // FREE_AND_NULL(disable_ps);
     ESP_ERROR_CHECK( esp_wifi_start() );
 
     taskYIELD();
